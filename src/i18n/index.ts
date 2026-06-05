@@ -1,0 +1,312 @@
+// ────────────────────────────────────────────────────────────────────────────
+// src/i18n/index.ts
+// Lightweight i18n system — no external deps, Zustand-driven language switch.
+// ────────────────────────────────────────────────────────────────────────────
+
+import { useSettingsStore } from "@/stores/settingsStore";
+
+/* ── Translation dictionaries ───────────────────────────────────────────── */
+
+const zh = {
+  // Sidebar
+  "sidebar.dragToCanvas": "拖拽到画布",
+  "sidebar.settings": "设置",
+  "sidebar.clearCanvas": "清空画布",
+  "sidebar.clearConfirm": "确定清空所有节点和连线？",
+
+  // Palette
+  "palette.prompt": "提示词",
+  "palette.prompt.desc": "自由文本输入",
+  "palette.text": "文本生成",
+  "palette.text.desc": "LLM 文本生成",
+  "palette.image": "图像生成",
+  "palette.image.desc": "AI 图像创作",
+  "palette.video": "视频生成",
+  "palette.video.desc": "AI 视频生成",
+  "palette.upload": "上传图片",
+  "palette.upload.desc": "上传本地图片 (base64)",
+
+  // Task
+  "task.title": "任务",
+  "task.new": "新建",
+  "task.newPlaceholder": "新任务名称...",
+  "task.saveTo": "保存到",
+  "task.noTasks": "暂无保存的任务，输入名称点击新建。",
+  "task.clickToSwitch": "点击切换（自动保存当前画布）",
+  "task.historyEntries": "个历史版本",
+  "task.restoreVersion": "恢复此版本",
+  "task.deleteConfirm": "删除「{name}」？",
+
+  // Canvas
+  "canvas.runWorkflow": "▶ 运行工作流",
+
+  // Settings
+  "settings.title": "设置",
+  "settings.apiKey": "API 密钥",
+  "settings.baseUrl": "API 基础地址",
+  "settings.save": "保存设置",
+  "settings.testConnection": "测试连接",
+  "settings.testing": "测试中",
+  "settings.saved": "设置已保存",
+  "settings.keyEmpty": "API Key 不能为空",
+  "settings.keyEmptyTest": "请先输入 API Key 再测试",
+  "settings.connectionOk": "连接正常，模型响应成功。",
+  "settings.connectionOkPreview": "连接正常，响应预览：",
+  "settings.storageNote": "密钥存储在浏览器本地，仅在向配置的地址发起 API 请求时才会发送。",
+  "settings.language": "语言",
+
+  // Panel
+  "panel.noSelection": "未选中节点",
+  "panel.noSelectionHint": "点击画布上的节点查看属性",
+  "panel.properties": "属性",
+  "panel.label": "标签",
+  "panel.runNode": "运行此节点",
+  "panel.resetStates": "重置所有执行状态",
+  "panel.noLogs": "暂无日志",
+  "panel.logs": "日志",
+  "panel.temperature": "温度",
+  "panel.maxTokens": "最大Token",
+  "panel.textOutput": "文本输出",
+  "panel.imagePrompt": "图像提示词",
+  "panel.imageSize": "尺寸",
+  "panel.inputImageUrl": "输入图片URL",
+  "panel.inputImage": "输入图片",
+  "panel.connectedInput": "已连接输入",
+  "panel.manualInput": "手动输入",
+  "panel.img2img": "图生图",
+  "panel.outputImage": "输出图片",
+  "panel.videoPrompt": "视频提示词",
+  "panel.resolution": "分辨率",
+  "panel.fpsFrames": "帧率 / 帧数",
+  "panel.fps": "帧率",
+  "panel.frames": "帧",
+  "panel.outputVideo": "输出视频",
+  "panel.systemPrompt": "系统提示词",
+  "panel.systemPromptPlaceholder": "可选的系统提示词...",
+  "panel.outputModality": "输出模态",
+  "panel.text": "文本",
+  "panel.image": "图像",
+  "panel.video": "视频",
+  "panel.file": "文件",
+  "panel.preview": "预览",
+  "panel.noUploadedImage": "暂无图片，请拖拽文件到节点上",
+  "panel.promptText": "提示词",
+  "panel.promptPlaceholder": "输入提示词...",
+  "panel.negativePrompt": "负面提示词",
+  "panel.negativePlaceholder": "可选，描述不想要的内容...",
+  "panel.guidance": "引导强度",
+  "panel.seed": "随机种子",
+  "panel.output": "输出",
+  "panel.taskId": "任务ID",
+  "panel.taskProgress": "进度",
+
+  // Nodes
+  "node.untitled": "未命名",
+  "node.runTooltip": "运行此节点及下游",
+  "node.deleteTooltip": "删除节点",
+  "node.idle": "待执行",
+  "node.running": "执行中",
+  "node.done": "完成",
+  "node.failed": "失败",
+  "prompt.placeholder": "输入提示词...",
+  "text.model": "模型",
+  "text.placeholder": "提示词文本（或从上游连接）...",
+  "text.temp": "温度",
+  "text.maxTokens": "最大Token",
+  "image.model": "模型",
+  "image.img2img": "图生图",
+  "image.connectedInput": "已连接输入",
+  "image.manualInput": "手动输入",
+  "image.disconnectTooltip": "断开以使用手动URL",
+  "image.hideInput": "- 隐藏",
+  "image.showInput": "+ 输入图片URL",
+  "image.placeholder": "图像提示词...",
+  "image.img2imgPlaceholder": "描述如何变换输入图片...",
+  "image.output": "输出",
+  "image.generating": "生成中...",
+  "video.model": "模型",
+  "video.placeholder": "视频提示词（或从上游连接）...",
+  "video.width": "宽",
+  "video.height": "高",
+  "video.fps": "帧率",
+  "video.creatingTask": "创建任务中...",
+  "upload.removeTooltip": "移除图片",
+  "upload.dropHint": "拖拽图片或点击上传",
+  "upload.formats": "PNG, JPG, WebP, GIF",
+
+  // Workflow
+  "workflow.cycleDetected": "检测到循环依赖，无法执行",
+  "workflow.noNodes": "画布上没有节点",
+  "workflow.upstreamFailed": "上游节点失败",
+  "workflow.running": "正在执行...",
+} as const;
+
+const en = {
+  // Sidebar
+  "sidebar.dragToCanvas": "Drag to canvas",
+  "sidebar.settings": "Settings",
+  "sidebar.clearCanvas": "Clear Canvas",
+  "sidebar.clearConfirm": "Clear all nodes and edges?",
+
+  // Palette
+  "palette.prompt": "Prompt",
+  "palette.prompt.desc": "Freeform text input",
+  "palette.text": "Text Gen",
+  "palette.text.desc": "LLM text generation",
+  "palette.image": "Image Gen",
+  "palette.image.desc": "AI image creation",
+  "palette.video": "Video Gen",
+  "palette.video.desc": "AI video generation",
+  "palette.upload": "Upload",
+  "palette.upload.desc": "Upload local image (base64)",
+
+  // Task
+  "task.title": "Tasks",
+  "task.new": "New",
+  "task.newPlaceholder": "New task name...",
+  "task.saveTo": "Save to",
+  "task.noTasks": "No saved tasks. Type a name and click New.",
+  "task.clickToSwitch": "Click to switch (auto-saves current)",
+  "task.historyEntries": "history entries",
+  "task.restoreVersion": "Restore this version",
+  "task.deleteConfirm": "Delete \"{name}\"?",
+
+  // Canvas
+  "canvas.runWorkflow": "▶ Run Workflow",
+
+  // Settings
+  "settings.title": "Settings",
+  "settings.apiKey": "API Key",
+  "settings.baseUrl": "API Base URL",
+  "settings.save": "Save Settings",
+  "settings.testConnection": "Test Connection",
+  "settings.testing": "Testing",
+  "settings.saved": "Settings saved",
+  "settings.keyEmpty": "API Key cannot be empty",
+  "settings.keyEmptyTest": "Enter an API key before testing.",
+  "settings.connectionOk": "Connection OK. Model responded successfully.",
+  "settings.connectionOkPreview": "Connection OK. Response preview: ",
+  "settings.storageNote": "Keys are stored in your browser. They never leave your device except when making API calls to the configured base URL.",
+  "settings.language": "Language",
+
+  // Panel
+  "panel.noSelection": "No node selected",
+  "panel.noSelectionHint": "Click a node on the canvas to view its properties",
+  "panel.properties": "Properties",
+  "panel.label": "Label",
+  "panel.runNode": "Run this node",
+  "panel.resetStates": "Reset all execution states",
+  "panel.noLogs": "No logs yet.",
+  "panel.logs": "Logs",
+  "panel.temperature": "Temperature",
+  "panel.maxTokens": "Max Tokens",
+  "panel.textOutput": "Text Output",
+  "panel.imagePrompt": "Image Prompt",
+  "panel.imageSize": "Size",
+  "panel.inputImageUrl": "Input Image URL",
+  "panel.inputImage": "Input Image",
+  "panel.connectedInput": "Connected input",
+  "panel.manualInput": "Manual input",
+  "panel.img2img": "img2img",
+  "panel.outputImage": "Output Image",
+  "panel.videoPrompt": "Video Prompt",
+  "panel.resolution": "Resolution",
+  "panel.fpsFrames": "FPS / Frames",
+  "panel.fps": "fps",
+  "panel.frames": "frames",
+  "panel.outputVideo": "Output Video",
+  "panel.systemPrompt": "System Prompt",
+  "panel.systemPromptPlaceholder": "Optional system prompt...",
+  "panel.outputModality": "Output Modality",
+  "panel.text": "Text",
+  "panel.image": "Image",
+  "panel.video": "Video",
+  "panel.file": "File",
+  "panel.preview": "Preview",
+  "panel.noUploadedImage": "No image uploaded. Drag a file onto the node.",
+  "panel.promptText": "Prompt",
+  "panel.promptPlaceholder": "Enter prompt...",
+  "panel.negativePrompt": "Negative Prompt",
+  "panel.negativePlaceholder": "Optional, describe what you don't want...",
+  "panel.guidance": "Guidance Scale",
+  "panel.seed": "Seed",
+  "panel.output": "Output",
+  "panel.taskId": "Task ID",
+  "panel.taskProgress": "Progress",
+
+  // Nodes
+  "node.untitled": "Untitled",
+  "node.runTooltip": "Run this node and downstream",
+  "node.deleteTooltip": "Delete node",
+  "node.idle": "Idle",
+  "node.running": "Running",
+  "node.done": "Done",
+  "node.failed": "Failed",
+  "prompt.placeholder": "Enter your prompt...",
+  "text.model": "Model",
+  "text.placeholder": "Prompt text (or connect from upstream)...",
+  "text.temp": "Temp",
+  "text.maxTokens": "Max",
+  "image.model": "Model",
+  "image.img2img": "img2img",
+  "image.connectedInput": "Connected input",
+  "image.manualInput": "Manual input",
+  "image.disconnectTooltip": "Disconnect to use manual URL",
+  "image.hideInput": "- Hide",
+  "image.showInput": "+ Input image URL",
+  "image.placeholder": "Image prompt...",
+  "image.img2imgPlaceholder": "Describe how to transform the input image...",
+  "image.output": "Output",
+  "image.generating": "Generating...",
+  "video.model": "Model",
+  "video.placeholder": "Video prompt (or connect from upstream)...",
+  "video.width": "W",
+  "video.height": "H",
+  "video.fps": "FPS",
+  "video.creatingTask": "Creating task...",
+  "upload.removeTooltip": "Remove image",
+  "upload.dropHint": "Drop image or click to upload",
+  "upload.formats": "PNG, JPG, WebP, GIF",
+
+  // Workflow
+  "workflow.cycleDetected": "Cycle detected — cannot execute",
+  "workflow.noNodes": "No nodes on canvas",
+  "workflow.upstreamFailed": "Upstream node failed",
+  "workflow.running": "Running...",
+} as const;
+
+export type TranslationKey = keyof typeof zh;
+
+const dictionaries: Record<string, Record<TranslationKey, string>> = { zh, en };
+
+/* ── Translation hook ───────────────────────────────────────────────────── */
+
+export function useT() {
+  const lang = useSettingsStore((s) => s.language);
+  const dict = dictionaries[lang] ?? zh;
+
+  function t(key: TranslationKey, vars?: Record<string, string | number>): string {
+    let result = dict[key] ?? key;
+    if (vars) {
+      for (const [k, v] of Object.entries(vars)) {
+        result = result.replace(`{${k}}`, String(v));
+      }
+    }
+    return result;
+  }
+
+  return t;
+}
+
+/* ── Direct (non-hook) accessor for outside-react contexts ──────────────── */
+
+export function getTranslation(key: TranslationKey, vars?: Record<string, string | number>): string {
+  const lang = useSettingsStore.getState().language;
+  let result = (dictionaries[lang] ?? zh)[key] ?? key;
+  if (vars) {
+    for (const [k, v] of Object.entries(vars)) {
+      result = result.replace(`{${k}}`, String(v));
+    }
+  }
+  return result;
+}

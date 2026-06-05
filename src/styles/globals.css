@@ -1,0 +1,65 @@
+@import "tailwindcss";
+
+/* ── Global dark-theme defaults ──────────────────────────────────────────── */
+
+:root {
+  color-scheme: dark;
+}
+
+body {
+  @apply m-0 overflow-hidden bg-slate-950 text-slate-100 antialiased;
+  font-family: "Inter", system-ui, -apple-system, sans-serif;
+  font-size: 14px;
+}
+
+/* ── React Flow overrides ────────────────────────────────────────────────── */
+
+.react-flow__attribution {
+  @apply !hidden;
+}
+
+.react-flow__edge-path {
+  stroke: #475569 !important;
+  stroke-width: 1.5px;
+}
+
+.react-flow__edge.selected .react-flow__edge-path {
+  stroke: #22d3ee !important;
+  stroke-width: 2px;
+}
+
+
+/* ── Controls toolbar contrast on dark canvas ──────────────────────────────── */
+.react-flow__controls .react-flow__controls-button,
+.controls .react-flow__controls-button {
+  --xy-controls-button-color-default: #e2e8f0;
+  --xy-controls-button-color-hover-default: #ffffff;
+  --xy-controls-button-background-color-default: rgba(15, 23, 42, 0.92);
+  --xy-controls-button-background-color-hover-default: rgba(30, 41, 59, 0.95);
+  --xy-controls-button-border-color-default: rgba(71, 85, 105, 0.8);
+}
+.react-flow__handle {
+  @apply !border-2 !border-slate-900;
+}
+
+.react-flow__node {
+  @apply !rounded-xl;
+}
+
+/* ── Scrollbar ───────────────────────────────────────────────────────────── */
+
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  @apply rounded-full bg-slate-700;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  @apply bg-slate-600;
+}
