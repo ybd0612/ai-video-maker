@@ -53,7 +53,6 @@ src/
 - `npm run dev` — 启动开发服务器（端口 3000）
 - `npm run build` — TypeScript 检查 + Vite 生产构建
 - `npm run preview` — 预览生产版本（端口 5180）
-- `python "C:\Users\ybd06\Documents\project\pm\python\conversation_hook.py" "标题" "行1" "行2" "行3"` — OLED 屏幕摘要
 
 ## 路径别名
 
@@ -94,6 +93,14 @@ src/
 - `text → text` / `text → prompt`
 - `image → image` / `image → video`
 - `video → video`
+
+## 工作流约定（Agent 必须遵守）
+
+每次完成代码编写任务后，执行以下流程：
+
+1. **文档同步检查** — 审查所有相关文档（README.md、AGENTS.md、docs/ 等），确保与代码变动一致。如有新增/删除/重命名的文件、接口变更、功能变更等，必须同步更新文档。
+2. **提交代码** — 使用 `git add` + `git commit` 提交所有变更，commit message 遵循约定式提交格式（`feat:` / `fix:` / `docs:` / `refactor:` 等）。
+3. **推送代码** — 执行 `git push` 推送到远程仓库。
 
 ## 注意事项
 
