@@ -56,7 +56,7 @@ const zh = {
   // Settings
   "settings.title": "设置",
   "settings.apiKey": "API 密钥",
-  "settings.baseUrl": "API 基础地址",
+  "settings.baseUrl": "API 地址",
   "settings.save": "保存设置",
   "settings.testConnection": "测试连接",
   "settings.testing": "测试中",
@@ -245,7 +245,7 @@ const en = {
   // Settings
   "settings.title": "Settings",
   "settings.apiKey": "API Key",
-  "settings.baseUrl": "API Base URL",
+  "settings.baseUrl": "API URL",
   "settings.save": "Save Settings",
   "settings.testConnection": "Test Connection",
   "settings.testing": "Testing",
