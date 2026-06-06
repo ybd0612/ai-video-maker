@@ -210,17 +210,17 @@ function ImageNodeFields({ nodeId, data }: { nodeId: string; data: ImageNodeData
           onChange={(e) => updateNodeData(nodeId, { size: e.target.value })}
           className="w-full rounded border border-slate-700 bg-slate-800 px-2 py-1 text-xs text-slate-300 focus:border-violet-500 focus:outline-none"
         >
-          <option value="1024x682">3:2 (1024x682)</option>
-          <option value="682x1024">2:3 (682x1024)</option>
-          <option value="1024x768">4:3 (1024x768)</option>
-          <option value="768x1024">3:4 (768x1024)</option>
-          <option value="1024x576">16:9 (1024x576)</option>
           <option value="576x1024">9:16 (576x1024)</option>
-          <option value="1024x1024">1:1 (1024x1024)</option>
-          <option value="1152x648">16:9 (1152x648)</option>
+          <option value="1024x576">16:9 (1024x576)</option>
           <option value="648x1152">9:16 (648x1152)</option>
-          <option value="1536x864">16:9 (1536x864)</option>
+          <option value="1152x648">16:9 (1152x648)</option>
+          <option value="682x1024">2:3 (682x1024)</option>
+          <option value="1024x682">3:2 (1024x682)</option>
+          <option value="768x1024">3:4 (768x1024)</option>
+          <option value="1024x768">4:3 (1024x768)</option>
+          <option value="1024x1024">1:1 (1024x1024) 1K</option>
           <option value="864x1536">9:16 (864x1536)</option>
+          <option value="1536x864">16:9 (1536x864)</option>
           <option value="auto">Auto</option>
         </select>
       </Field>
