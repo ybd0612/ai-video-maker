@@ -132,6 +132,14 @@ export function SettingsDialog() {
                 <div>
                   <label className="mb-1 block text-[11px] font-medium text-slate-400">
 {t("settings.apiKey")}
+                                      <a
+                      href="https://platform.agnes-ai.com/login"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="ml-1 text-emerald-400 hover:text-emerald-300 underline"
+                    >
+                      {t("settings.getApiKey")}
+                    </a>
                   </label>
                   <div className="relative">
                     <input
