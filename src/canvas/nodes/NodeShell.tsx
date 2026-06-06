@@ -48,7 +48,7 @@ export function NodeShell({
   const displayError = errorKey ? t(errorKey as Parameters<typeof t>[0], errorParams) : errorMessage;
 
   return (
-    <div className={`min-w-[18rem] max-w-xs rounded-xl border ${borderColor} bg-slate-900 shadow-2xl`}>
+    <div className={`w-80 rounded-xl border ${borderColor} bg-slate-900 shadow-2xl`}>
       {/* Header */}
       <div className="flex items-center gap-2 rounded-t-xl bg-slate-800 px-3 py-2">
         <Icon size={14} className={iconColor} />
