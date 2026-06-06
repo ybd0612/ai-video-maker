@@ -278,7 +278,7 @@ function VideoNodeFields({ nodeId, data }: { nodeId: string; data: VideoNodeData
             className="w-16 rounded-md border border-slate-700 bg-slate-800 px-2 py-1 text-xs text-slate-100 focus:border-amber-500 focus:outline-none"
           />
           <span className="text-xs text-slate-500">{t("panel.fps")}</span>
-          <NumberInput min={1} max={300} value={data.numFrames}
+          <NumberInput min={1} max={441} value={data.numFrames}
             onChange={(v) => updateNodeData(nodeId, { numFrames: v })}
             className="w-16 rounded-md border border-slate-700 bg-slate-800 px-2 py-1 text-xs text-slate-100 focus:border-amber-500 focus:outline-none"
           />
