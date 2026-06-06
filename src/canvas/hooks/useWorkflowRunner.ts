@@ -509,7 +509,7 @@ export function useWorkflowRunner() {
                 model: data.modelId ?? "agnes-image-2.1-flash",
                 prompt: imagePrompt,
                 inputImageUrl: inputs.imageInputs[0],
-                size: data.size,
+                size: `${data.width}x${data.height}`,
                 quality: data.quality,
 
               });

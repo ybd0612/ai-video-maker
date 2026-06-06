@@ -191,7 +191,6 @@ function ImageNodeFields({ nodeId, data }: { nodeId: string; data: ImageNodeData
   const updateNodeData = useCanvasStore((s) => s.updateNodeData);
   const t = useT();
 
-  const sizes = ["512x512", "768x768", "1024x1024", "1024x1792", "1792x1024"];
 
   return (
     <>
@@ -206,15 +205,25 @@ function ImageNodeFields({ nodeId, data }: { nodeId: string; data: ImageNodeData
         />
       </Field>
       <Field label={t("panel.imageSize")} hint={t("hint.imageSize")}>
-        <select
-          value={data.size}
-          onChange={(e) => updateNodeData(nodeId, { size: e.target.value })}
-          className="w-full rounded-md border border-slate-700 bg-slate-800 px-2 py-1 text-xs text-slate-100 focus:border-violet-500 focus:outline-none"
-        >
-          {sizes.map((s) => (
-            <option key={s} value={s}>{s}</option>
-          ))}
-        </select>
+        <div className="flex items-center gap-1">
+          <NumberInput
+            min={64}
+            max={2048}
+            step={64}
+            value={data.width}
+            onChange={(v) => updateNodeData(nodeId, { width: v })}
+            className="w-20 rounded border border-slate-700 bg-slate-800 px-1.5 py-0.5 text-xs text-slate-300 focus:border-violet-500 focus:outline-none"
+          />
+          <span className="text-xs text-slate-600">×</span>
+          <NumberInput
+            min={64}
+            max={2048}
+            step={64}
+            value={data.height}
+            onChange={(v) => updateNodeData(nodeId, { height: v })}
+            className="w-20 rounded border border-slate-700 bg-slate-800 px-1.5 py-0.5 text-xs text-slate-300 focus:border-violet-500 focus:outline-none"
+          />
+        </div>
       </Field>
       {/* Input image from upstream is now shown in the canvas node */}
       {data.outputUrl && (

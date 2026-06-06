@@ -8,9 +8,8 @@ import { NodeShell } from "./NodeShell";
 import { useT } from '@/i18n';
 import { sanitizePrompt } from "@/lib/validation";
 import { HelpTooltip } from "@/components/ui/HelpTooltip";
+import { NumberInput } from "@/components/ui/NumberInput";
 import { Lightbox } from "@/components/ui/Lightbox";
-
-const SIZE_OPTIONS = ["512x512", "768x768", "1024x1024", "1024x1792", "1792x1024"];
 
 function ImageNodeInner({ id, data }: NodeProps) {
   const d = data as unknown as ImageNodeData;
@@ -84,15 +83,25 @@ function ImageNodeInner({ id, data }: NodeProps) {
 
       {/* Size selector */}
       <div className="flex items-center gap-1 text-xs text-slate-500">{t("panel.imageSize")} <HelpTooltip>{t("hint.imageSize")}</HelpTooltip></div>
-      <select
-        value={d.size}
-        onChange={(e) => updateNodeData(id, { size: e.target.value } as Partial<ImageNodeData>)}
-        className="w-full rounded border border-slate-700 bg-slate-800 px-2 py-1 text-xs text-slate-300 focus:border-violet-500 focus:outline-none"
-      >
-        {SIZE_OPTIONS.map((s) => (
-          <option key={s} value={s}>{s}</option>
-        ))}
-      </select>
+      <div className="flex items-center gap-1">
+        <NumberInput
+          min={64}
+          max={2048}
+          step={64}
+          value={d.width}
+          onChange={(v) => updateNodeData(id, { width: v } as Partial<ImageNodeData>)}
+          className="w-20 rounded border border-slate-700 bg-slate-800 px-1.5 py-0.5 text-xs text-slate-300 focus:border-violet-500 focus:outline-none"
+        />
+        <span className="text-xs text-slate-600">×</span>
+        <NumberInput
+          min={64}
+          max={2048}
+          step={64}
+          value={d.height}
+          onChange={(v) => updateNodeData(id, { height: v } as Partial<ImageNodeData>)}
+          className="w-20 rounded border border-slate-700 bg-slate-800 px-1.5 py-0.5 text-xs text-slate-300 focus:border-violet-500 focus:outline-none"
+        />
+      </div>
 
       {/* Output */}
       {d.outputUrl ? (
