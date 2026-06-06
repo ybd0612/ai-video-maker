@@ -1,4 +1,4 @@
-﻿// ────────────────────────────────────────────────────────────────────────────
+// ────────────────────────────────────────────────────────────────────────────
 // src/components/TaskManager.tsx
 // Task management — save/load canvas snapshots as named tasks.
 // Tab-style switcher with auto-save before switching.
@@ -144,7 +144,6 @@ function TabButton({
 
 export function TaskManager() {
   const [expanded, setExpanded] = useState(true);
-  const [saveName, setSaveName] = useState("");
 
   const tasks = useTaskStore((s) => s.tasks);
   const createTask = useTaskStore((s) => s.createTask);
@@ -162,12 +161,11 @@ export function TaskManager() {
       const snapshot = captureSnapshot();
       updateTask(activeTaskId, { canvasData: snapshot });
     }
-    const name = sanitizeTaskName(saveName) || `Task ${tasks.length + 1}`;
+    const name = `Task ${tasks.length + 1}`;
     const emptySnap: CanvasSnapshot = { nodes: [], edges: [], viewport: { x: 0, y: 0, zoom: 1 }, capturedAt: Date.now() };
     const task = createTask(name, emptySnap);
     loadSnapshotIntoCanvas(task.canvasData);
-    setSaveName("");
-  }, [saveName, tasks.length, createTask, activeTaskId, updateTask]);
+  }, [tasks.length, createTask, activeTaskId, updateTask]);
 
   /* ── Switch task (auto-saves current first) ──────────────────────────── */
   const handleSwitch = useCallback(
@@ -246,24 +244,12 @@ export function TaskManager() {
       {expanded && (
         <div className="space-y-2.5 overflow-hidden px-3 pb-3">
 
-          {/* ── Action bar ──────────────────────────────────────────────── */}
-          <div className="flex gap-1.5 min-w-0 overflow-hidden">
-            <input
-              type="text"
-              value={saveName}
-              onChange={(e) => setSaveName(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleSaveNew()}
-              placeholder={t("task.newPlaceholder")}
-              className="flex-1 rounded-md border border-slate-700 bg-slate-800 px-2 py-1.5 text-xs text-slate-200 placeholder:text-slate-600 focus:border-emerald-500 focus:outline-none"
-            />
-            <button
-              onClick={handleSaveNew}
-              title="Create a new blank task"
-              className="shrink-0 flex items-center gap-1 whitespace-nowrap rounded-md bg-emerald-600 px-2 py-1.5 text-xs font-medium text-white transition hover:bg-emerald-500 disabled:opacity-40 disabled:cursor-not-allowed"
-            >
-              <Plus size={11} /> {t("task.new")}
-            </button>
-          </div>
+          <button
+            onClick={handleSaveNew}
+            className="flex w-full items-center justify-center gap-1.5 rounded-md bg-emerald-600 px-3 py-2 text-xs font-medium text-white transition hover:bg-emerald-500"
+          >
+            <Plus size={12} /> {t("task.new")}
+          </button>
 
           {/* ── Task tabs ───────────────────────────────────────────────── */}
           {tasks.length === 0 ? (
