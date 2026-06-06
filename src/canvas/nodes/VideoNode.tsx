@@ -58,6 +58,17 @@ function VideoNodeInner({ id, data }: NodeProps) {
           className="w-12 rounded border border-slate-700 bg-slate-800 px-1.5 py-0.5 text-xs text-slate-300 focus:border-amber-500 focus:outline-none"
         />
       </div>
+      {/* Seed */}
+      <div className="flex items-center gap-1">
+        <label className="text-xs text-slate-500">{t("panel.seed")} <HelpTooltip>{t("hint.seedVideo")}</HelpTooltip></label>
+        <NumberInput
+          min={0}
+          max={2147483647}
+          value={d.seed ?? 0}
+          onChange={(v) => updateNodeData(id, { seed: v } as Partial<VideoNodeData>)}
+          className="w-24 rounded border border-slate-700 bg-slate-800 px-1.5 py-0.5 text-xs text-slate-300 focus:border-amber-500 focus:outline-none"
+        />
+      </div>
       {/* Progress bar */}
       {d.executionStatus === "pending" && (
         <div className="space-y-1">
