@@ -48,7 +48,7 @@ export function NodeShell({
   const displayError = errorKey ? t(errorKey as Parameters<typeof t>[0], errorParams) : errorMessage;
 
   return (
-    <div className={`w-80 rounded-xl border ${borderColor} bg-slate-900 shadow-2xl`}>
+    <div className={`w-80 overflow-hidden rounded-xl border ${borderColor} bg-slate-900 shadow-2xl`}>
       {/* Header */}
       <div className="flex items-center gap-2 rounded-t-xl bg-slate-800 px-3 py-2">
         <Icon size={14} className={iconColor} />
@@ -83,7 +83,7 @@ export function NodeShell({
       </div>
 
       {/* Body */}
-      <div className="space-y-2 p-3">
+      <div className="space-y-2 p-3 overflow-hidden">
         {children}
         {displayError && (
           <div className="rounded-md border border-red-800/50 bg-red-950/30 p-2">

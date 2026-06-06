@@ -50,28 +50,36 @@ function VideoNodeInner({ id, data }: NodeProps) {
         rows={2}
         className="w-full resize-none rounded-md border border-slate-700/60 bg-slate-800/80 p-2 text-xs text-slate-400 placeholder:text-slate-600 focus:border-amber-500 focus:outline-none"
       />
-      {/* Params row */}
-      <div className="flex items-center gap-2">
-        <label className="text-xs text-slate-500">{t("video.width")} <HelpTooltip>{t("hint.resolution")}</HelpTooltip></label>
-        <NumberInput min={256} max={1920} step={64} value={d.width}
-          onChange={(v) => updateNodeData(id, { width: v } as Partial<VideoNodeData>)}
-          className="w-14 rounded border border-slate-700 bg-slate-800 px-1.5 py-0.5 text-xs text-slate-300 focus:border-amber-500 focus:outline-none"
-        />
-        <label className="text-xs text-slate-500">{t("video.height")} <HelpTooltip>{t("hint.resolution")}</HelpTooltip></label>
-        <NumberInput min={256} max={1920} step={64} value={d.height}
-          onChange={(v) => updateNodeData(id, { height: v } as Partial<VideoNodeData>)}
-          className="w-14 rounded border border-slate-700 bg-slate-800 px-1.5 py-0.5 text-xs text-slate-300 focus:border-amber-500 focus:outline-none"
-        />
-        <label className="text-xs text-slate-500">{t("video.fps")} <HelpTooltip>{t("hint.fps")}</HelpTooltip></label>
-        <NumberInput min={1} max={60} value={d.fps}
-          onChange={(v) => updateNodeData(id, { fps: v } as Partial<VideoNodeData>)}
-          className="w-12 rounded border border-slate-700 bg-slate-800 px-1.5 py-0.5 text-xs text-slate-300 focus:border-amber-500 focus:outline-none"
-        />
-        <label className="text-xs text-slate-500">{t("video.duration")} <HelpTooltip>{t("hint.duration")}</HelpTooltip></label>
-        <NumberInput min={1} max={30} step={0.5} value={d.duration ?? 5}
-          onChange={(v) => updateNodeData(id, { duration: v } as Partial<VideoNodeData>)}
-          className="w-12 rounded border border-slate-700 bg-slate-800 px-1.5 py-0.5 text-xs text-slate-300 focus:border-amber-500 focus:outline-none"
-        />
+      {/* Params — 2-col grid */}
+      <div className="grid grid-cols-2 gap-x-2 gap-y-1">
+        <div className="flex items-center gap-1">
+          <label className="text-[11px] text-slate-500">{t("video.width")}</label>
+          <NumberInput min={256} max={1920} step={64} value={d.width}
+            onChange={(v) => updateNodeData(id, { width: v } as Partial<VideoNodeData>)}
+            className="w-14 rounded border border-slate-700 bg-slate-800 px-1.5 py-0.5 text-xs text-slate-300 focus:border-amber-500 focus:outline-none"
+          />
+        </div>
+        <div className="flex items-center gap-1">
+          <label className="text-[11px] text-slate-500">{t("video.height")}</label>
+          <NumberInput min={256} max={1920} step={64} value={d.height}
+            onChange={(v) => updateNodeData(id, { height: v } as Partial<VideoNodeData>)}
+            className="w-14 rounded border border-slate-700 bg-slate-800 px-1.5 py-0.5 text-xs text-slate-300 focus:border-amber-500 focus:outline-none"
+          />
+        </div>
+        <div className="flex items-center gap-1">
+          <label className="text-[11px] text-slate-500">{t("video.fps")}</label>
+          <NumberInput min={1} max={60} value={d.fps}
+            onChange={(v) => updateNodeData(id, { fps: v } as Partial<VideoNodeData>)}
+            className="w-14 rounded border border-slate-700 bg-slate-800 px-1.5 py-0.5 text-xs text-slate-300 focus:border-amber-500 focus:outline-none"
+          />
+        </div>
+        <div className="flex items-center gap-1">
+          <label className="text-[11px] text-slate-500">{t("video.duration")}</label>
+          <NumberInput min={1} max={30} step={0.5} value={d.duration ?? 5}
+            onChange={(v) => updateNodeData(id, { duration: v } as Partial<VideoNodeData>)}
+            className="w-14 rounded border border-slate-700 bg-slate-800 px-1.5 py-0.5 text-xs text-slate-300 focus:border-amber-500 focus:outline-none"
+          />
+        </div>
       </div>
       {/* Seed */}
       <div className="flex items-center gap-1">
