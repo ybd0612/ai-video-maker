@@ -7,7 +7,7 @@
 - React 18 + TypeScript 6 + Vite 8
 - React Flow v12（`@xyflow/react`）— 画布核心
 - Zustand v5 — 状态管理
-- localForage — IndexedDB 持久化（画布图 + 二进制 Blob）
+- localForage — IndexedDB 持久化（画布图）
 - TailwindCSS v4 + Framer Motion — 样式与动画
 - Lucide React — 图标库
 
@@ -65,7 +65,7 @@ src/
 - `erasableSyntaxOnly: true` — 禁止使用需要运行时擦除的 TS 语法（如 enum）
 - 节点数据类型采用判别联合（discriminated union），在 `src/canvas/types.ts` 集中定义
 - 状态管理使用 Zustand + persist 中间件：画布数据走 IndexedDB，设置走 localStorage
-- 大二进制输出（图片/视频）通过 `canvasStore` 的 `persistBlob` / `retrieveBlob` 存取 IndexedDB，不放入 store state
+- 图片和视频输出存储为 URL（由 AI 模型返回），不存储为 base64 或二进制 Blob
 - 国际化使用自研 `useT()` hook，翻译键在 `src/i18n/index.ts` 的 `zh` / `en` 字典中
 - 新增翻译键时必须同时添加 zh 和 en 两个字典
 

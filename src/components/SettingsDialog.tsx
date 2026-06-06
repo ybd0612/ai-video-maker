@@ -158,9 +158,10 @@ export function SettingsDialog() {
                   <input
                     type="text"
                     value={baseUrl}
-                    onChange={(e) => setBaseUrl(e.target.value)}
+                    readOnly
+
                     placeholder="https://apihub.agnes-ai.com/v1"
-                    className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-xs text-slate-100 focus:border-emerald-500 focus:outline-none"
+                    className="w-full cursor-not-allowed rounded-lg border border-slate-700/50 bg-slate-800/50 px-3 py-2 text-xs text-slate-500 focus:outline-none"
                   />
                 </div>
 
