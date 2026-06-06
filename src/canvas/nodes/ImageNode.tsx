@@ -102,6 +102,25 @@ function ImageNodeInner({ id, data }: NodeProps) {
         <option value="auto">Auto</option>
       </select>
 
+      {/* Count selector */}
+      <div className="flex items-center gap-1 text-xs text-slate-500">{t("panel.imageCount")} <HelpTooltip>{t("hint.imageCount")}</HelpTooltip></div>
+      <select
+        value={d.count}
+        onChange={(e) => updateNodeData(id, { count: parseInt(e.target.value) } as Partial<ImageNodeData>)}
+        className="w-full rounded border border-slate-700 bg-slate-800 px-2 py-1 text-xs text-slate-300 focus:border-violet-500 focus:outline-none"
+      >
+        <option value="1">1</option>
+        <option value="2">2</option>
+        <option value="3">3</option>
+        <option value="4">4</option>
+        <option value="5">5</option>
+        <option value="6">6</option>
+        <option value="7">7</option>
+        <option value="8">8</option>
+        <option value="9">9</option>
+        <option value="10">10</option>
+      </select>
+
       {/* Output */}
       {d.outputUrl ? (
         <div className="space-y-1">
