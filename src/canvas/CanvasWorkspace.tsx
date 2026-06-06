@@ -396,13 +396,23 @@ function CanvasInner() {
         )}
         {showMinimap && (
           <MiniMap
-            nodeStrokeColor="#334155"
-            nodeColor="#0f172a"
-            maskColor="rgba(0,0,0,0.6)"
-            className="!bg-slate-900 !border-slate-700"
+            nodeStrokeColor="#64748b"
+            nodeColor={(node) => {
+              const colors: Record<string, string> = {
+                prompt: "#10b981",
+                text: "#38bdf8",
+                image: "#a78bfa",
+                video: "#fbbf24",
+                upload: "#fb7185",
+              };
+              return colors[node.type as string] ?? "#475569";
+            }}
+            maskColor="rgba(0,0,0,0.7)"
+            pannable
+            zoomable
           />
         )}
-        <Controls className="controls !bg-slate-900/90 !text-slate-200 !border !border-slate-700 !shadow-xl" showZoom showFitView showInteractive={false} style={{ bottom: 12, right: 12 }} />
+        <Controls className="controls !bg-slate-900/90 !text-slate-200 !border !border-slate-700 !shadow-xl" showZoom showFitView showInteractive={false} />
         {contextMenu && (
           <ContextMenu
             x={contextMenu.x}
