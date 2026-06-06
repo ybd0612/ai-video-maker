@@ -67,6 +67,11 @@ function VideoNodeInner({ id, data }: NodeProps) {
           onChange={(v) => updateNodeData(id, { fps: v } as Partial<VideoNodeData>)}
           className="w-12 rounded border border-slate-700 bg-slate-800 px-1.5 py-0.5 text-xs text-slate-300 focus:border-amber-500 focus:outline-none"
         />
+        <label className="text-xs text-slate-500">{t("video.duration")} <HelpTooltip>{t("hint.duration")}</HelpTooltip></label>
+        <NumberInput min={1} max={30} step={0.5} value={d.duration ?? 5}
+          onChange={(v) => updateNodeData(id, { duration: v } as Partial<VideoNodeData>)}
+          className="w-12 rounded border border-slate-700 bg-slate-800 px-1.5 py-0.5 text-xs text-slate-300 focus:border-amber-500 focus:outline-none"
+        />
       </div>
       {/* Seed */}
       <div className="flex items-center gap-1">

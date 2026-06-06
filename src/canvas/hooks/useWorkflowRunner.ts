@@ -26,6 +26,7 @@ import type {
   VideoTaskStatus,
 } from "@/providers/types";
 import { resolveBaseUrl } from "@/lib/resolveBaseUrl";
+import { calcNumFrames } from "@/lib/validation";
 import { getTranslation } from "@/i18n";
 
 /* ── Constants ──────────────────────────────────────────────────────────── */
@@ -540,7 +541,7 @@ export function useWorkflowRunner() {
                 imageUrls: inputs.imageInputs.length > 1 ? inputs.imageInputs : undefined,
                 width: data.width,
                 height: data.height,
-                numFrames: data.numFrames,
+                numFrames: calcNumFrames(data.duration ?? 5, data.fps),
                 fps: data.fps,
                 mode: data.mode,
                 seed: data.seed,

@@ -77,6 +77,20 @@ export function sanitizePrompt(value: string): string {
   return sanitizeRichText(value).slice(0, PROMPT_MAX_LENGTH);
 }
 
+/* ── Video num_frames calculation ──────────────────────────────────────── */
+
+/**
+ * Calculate valid num_frames from duration (seconds) and fps.
+ * Enforces: num_frames = 8n + 1, max 441.
+ */
+export function calcNumFrames(durationSec: number, fps: number): number {
+  const raw = Math.round(durationSec * fps);
+  // Snap to nearest 8n + 1
+  const n = Math.round((raw - 1) / 8);
+  const frames = n * 8 + 1;
+  return clampNumber(frames, 9, 441); // min 8*1+1=9
+}
+
 /* ── Number clamping ─────────────────────────────────────────────────────── */
 
 export function clampNumber(value: number, min: number, max: number): number {
