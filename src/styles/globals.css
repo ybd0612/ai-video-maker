@@ -49,6 +49,14 @@ body {
   background-color: rgba(30, 41, 59, 0.98) !important;
   color: #ffffff !important;
 }
+/* ── MiniMap dark background ────────────────────────────────────────────── */
+.react-flow__minimap {
+  background-color: rgba(15, 23, 42, 0.95) !important;
+  border: 1px solid rgba(71, 85, 105, 0.8) !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4) !important;
+  border-radius: 8px !important;
+}
+
 .react-flow__controls .react-flow__controls-button svg {
   fill: #e2e8f0 !important;
 }

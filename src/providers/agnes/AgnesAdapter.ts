@@ -127,8 +127,7 @@ export class AgnesAdapter implements ModelProvider {
       model: params.model,
       prompt: params.prompt,
       size: params.size ?? "1024x1024",
-      // Always request base64 output so we can store it locally
-      return_base64: true,
+
     };
 
     // Per Agnes Image API: input image (URL or data URI) goes in top-level `image` array
@@ -157,7 +156,7 @@ export class AgnesAdapter implements ModelProvider {
     const json = await resp.json();
     const img = json.data?.[0];
     return {
-      url: img?.url ?? img?.b64_json ?? "",
+      url: img?.url ?? "",
       revisedPrompt: img?.revised_prompt,
     };
   }

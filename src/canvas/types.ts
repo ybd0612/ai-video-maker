@@ -90,7 +90,6 @@ export interface ImageNodeData extends BaseNodeData {
   height: number;
   quality: string;
   outputUrl?: string;
-  outputBlobKey?: string;
   revisedPrompt?: string;
 }
 
@@ -108,7 +107,6 @@ export interface VideoNodeData extends BaseNodeData {
   taskId?: string;
   taskProgress: number;
   outputUrl?: string;
-  outputBlobKey?: string;
   coverImageUrl?: string;
   duration?: number;
 }

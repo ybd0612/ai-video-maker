@@ -263,8 +263,7 @@ async function callImageAPI(apiKey: string, _baseUrl: string, params: ImageParam
     body.image = [params.inputImageUrl];
   }
 
-  // Always request base64 output so we can store it locally
-  body.return_base64 = true;
+
 
   body.extra_body = {
     ...(params.extraBody ?? {}),
@@ -283,11 +282,7 @@ async function callImageAPI(apiKey: string, _baseUrl: string, params: ImageParam
 
   const json = await resp.json();
   const img = json.data?.[0];
-  // b64_json comes back as raw base64; convert to data URL for display
-  let url = img?.url ?? "";
-  if (img?.b64_json) {
-    url = `data:image/png;base64,${img.b64_json}`;
-  }
+  const url = img?.url ?? "";
   return { url, revisedPrompt: img?.revised_prompt };
 }
 
