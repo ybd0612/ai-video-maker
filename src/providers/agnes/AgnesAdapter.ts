@@ -155,8 +155,13 @@ export class AgnesAdapter implements ModelProvider {
 
     const json = await resp.json();
     const img = json.data?.[0];
+    let url = img?.url ?? "";
+    // Ensure URL has protocol
+    if (url && !url.startsWith("http://") && !url.startsWith("https://")) {
+      url = "https://" + url;
+    }
     return {
-      url: img?.url ?? "",
+      url,
       revisedPrompt: img?.revised_prompt,
     };
   }

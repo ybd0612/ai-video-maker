@@ -81,6 +81,20 @@ function VideoNodeInner({ id, data }: NodeProps) {
             className="w-14 rounded border border-slate-700 bg-slate-800 px-1.5 py-0.5 text-xs text-slate-300 focus:border-amber-500 focus:outline-none"
           />
         </div>
+        <div className="flex items-center gap-1">
+          <label className="text-[11px] text-slate-500">{t("video.count")}</label>
+          <select
+            value={d.count}
+            onChange={(e) => updateNodeData(id, { count: parseInt(e.target.value) } as Partial<VideoNodeData>)}
+            className="w-14 rounded border border-slate-700 bg-slate-800 px-1.5 py-0.5 text-xs text-slate-300 focus:border-amber-500 focus:outline-none"
+          >
+            <option value="1">1</option>
+            <option value="2">2</option>
+            <option value="3">3</option>
+            <option value="4">4</option>
+            <option value="5">5</option>
+          </select>
+        </div>
       </div>
       {/* Seed */}
       <div className="flex items-center gap-1">
@@ -89,7 +103,7 @@ function VideoNodeInner({ id, data }: NodeProps) {
           min={0}
           max={2147483647}
           value={d.seed ?? 0}
-          onChange={(v) => updateNodeData(id, { seed: v } as Partial<VideoNodeData>)}
+          onChange={(v) => updateNodeData(id, { seed: v === 0 ? undefined : v } as Partial<VideoNodeData>)}
           className="w-24 rounded border border-slate-700 bg-slate-800 px-1.5 py-0.5 text-xs text-slate-300 focus:border-amber-500 focus:outline-none"
         />
       </div>

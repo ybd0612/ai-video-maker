@@ -97,6 +97,7 @@ export interface TextResult {
 
 export interface ImageResult {
   url: string;
+  urls?: string[];
   revisedPrompt?: string;
   usage?: Usage;
 }

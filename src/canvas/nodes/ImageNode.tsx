@@ -122,7 +122,22 @@ function ImageNodeInner({ id, data }: NodeProps) {
       </select>
 
       {/* Output */}
-      {d.outputUrl ? (
+      {d.outputUrls && d.outputUrls.length > 0 ? (
+        <div className="space-y-1">
+          <span className="text-xs text-slate-500">{t("image.output")}</span>
+          <div className="grid grid-cols-2 gap-1">
+            {d.outputUrls.map((url, index) => (
+              <Lightbox key={index} src={url} alt={"Generated " + (index + 1)}>
+                <img
+                  src={url}
+                  alt={"Generated " + (index + 1)}
+                  className="max-h-20 w-full rounded-md border border-slate-700 object-contain"
+                />
+              </Lightbox>
+            ))}
+          </div>
+        </div>
+      ) : d.outputUrl ? (
         <div className="space-y-1">
           <span className="text-xs text-slate-500">{t("image.output")}</span>
           <Lightbox src={d.outputUrl} alt="Generated">

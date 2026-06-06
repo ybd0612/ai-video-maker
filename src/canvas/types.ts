@@ -90,6 +90,7 @@ export interface ImageNodeData extends BaseNodeData {
   count: number;
   quality: string;
   outputUrl?: string;
+  outputUrls?: string[];
   revisedPrompt?: string;
 }
 
@@ -99,6 +100,7 @@ export interface VideoNodeData extends BaseNodeData {
   modelId?: string;
   prompt: string;
   size: string;
+  count: number;
   numFrames: number;
   fps: number;
   mode: "normal" | "keyframe";
@@ -106,7 +108,9 @@ export interface VideoNodeData extends BaseNodeData {
   taskId?: string;
   taskProgress: number;
   outputUrl?: string;
+  outputUrls?: string[];
   coverImageUrl?: string;
+  coverImageUrls?: string[];
   duration?: number;
 }
 
@@ -258,6 +262,7 @@ export function createDefaultVideoNodeData(t: (key: string, vars?: Record<string
     modelId: getDefaultModelId("video"),
     prompt: "",
     size: "1280x720",
+    count: 1,
     numFrames: 121,
     fps: 24,
     mode: "normal",
