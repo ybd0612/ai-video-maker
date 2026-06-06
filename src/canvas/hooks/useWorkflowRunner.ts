@@ -295,6 +295,7 @@ async function callVideoCreateAPI(apiKey: string, _baseUrl: string, params: Vide
   const body: Record<string, unknown> = {
     model: params.model,
     prompt: params.prompt,
+    ...(params.negativePrompt ? { negative_prompt: params.negativePrompt } : {}),
     num_frames: params.numFrames,
     frame_rate: params.fps,
   };
@@ -329,12 +330,14 @@ async function callVideoCreateAPI(apiKey: string, _baseUrl: string, params: Vide
 
   const json = await resp.json();
   const taskId: string | undefined = json.task_id ?? json.id;
+    const videoId: string | undefined = json.video_id;
   if (!taskId) throw new Error(getTranslation("error.videoCreateNoTaskId"));
-  return taskId;
+    return videoId ?? taskId;
 }
 
 async function callVideoPollAPI(apiKey: string, _baseUrl: string, taskId: string): Promise<VideoTaskStatus> {
-  const resp = await fetch(`${resolveBaseUrl(_baseUrl)}/videos/${taskId}`, {
+    const pollUrl = taskId.startsWith("video_") ? `${resolveBaseUrl(_baseUrl)}/agnesapi?video_id=${taskId}` : `${resolveBaseUrl(_baseUrl)}/videos/${taskId}`;
+    const resp = await fetch(pollUrl, {
     headers: { Authorization: `Bearer ${apiKey}` },
   });
 
@@ -537,6 +540,7 @@ export function useWorkflowRunner() {
               const taskId = await callVideoCreateAPI(apiKey, baseUrl, {
                 model: data.modelId ?? "agnes-video-v2.0",
                 prompt: videoPrompt,
+                negativePrompt: data.negativePrompt as string | undefined,
                 imageUrl: inputs.imageInputs[0],
                 imageUrls: inputs.imageInputs.length > 1 ? inputs.imageInputs : undefined,
                 width: data.width,
