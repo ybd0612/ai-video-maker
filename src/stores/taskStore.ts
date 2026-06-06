@@ -18,18 +18,11 @@ export interface CanvasSnapshot {
   capturedAt: number;
 }
 
-export interface HistoryEntry {
-  canvasData: CanvasSnapshot;
-  savedAt: number;
-  label: string;
-}
-
 export interface Task {
   id: string;
   name: string;
   description: string;
   canvasData: CanvasSnapshot;
-  history: HistoryEntry[];
   createdAt: number;
   updatedAt: number;
 }
@@ -45,8 +38,6 @@ interface TaskState {
   deleteTask: (id: string) => void;
   setActiveTaskId: (id: string | null) => void;
   getTaskById: (id: string) => Task | undefined;
-  pushHistory: (taskId: string, label?: string) => void;
-  restoreFromHistory: (taskId: string, index: number) => void;
 }
 
 /* ── ID generator ──────────────────────────────────────────────────────── */
@@ -72,7 +63,6 @@ export const useTaskStore = create<TaskState>()(
           name,
           description,
           canvasData: { ...canvasData, capturedAt: now },
-          history: [],
           createdAt: now,
           updatedAt: now,
         };
@@ -84,18 +74,14 @@ export const useTaskStore = create<TaskState>()(
         set((s) => ({
           tasks: s.tasks.map((t) => {
             if (t.id !== id) return t;
-            const updated = { ...t, ...updates, updatedAt: Date.now() };
-            if (updates.canvasData) {
-              // Push current canvasData to history before overwriting
-              const entry: HistoryEntry = {
-                canvasData: t.canvasData,
-                savedAt: Date.now(),
-                label: new Date().toLocaleTimeString(),
-              };
-              updated.history = [...(t.history ?? []), entry].slice(-20); // keep last 20
-              updated.canvasData = { ...updates.canvasData, capturedAt: Date.now() };
-            }
-            return updated;
+            return {
+              ...t,
+              ...updates,
+              canvasData: updates.canvasData
+                ? { ...updates.canvasData, capturedAt: Date.now() }
+                : t.canvasData,
+              updatedAt: Date.now(),
+            };
           }),
         })),
 
@@ -108,40 +94,6 @@ export const useTaskStore = create<TaskState>()(
       setActiveTaskId: (id) => set({ activeTaskId: id }),
 
       getTaskById: (id) => get().tasks.find((t) => t.id === id),
-
-      pushHistory: (taskId, label) =>
-        set((s) => ({
-          tasks: s.tasks.map((t) => {
-            if (t.id !== taskId) return t;
-            const entry: HistoryEntry = {
-              canvasData: t.canvasData,
-              savedAt: Date.now(),
-              label: label ?? new Date().toLocaleTimeString(),
-            };
-            return { ...t, history: [...(t.history ?? []), entry].slice(-20) };
-          }),
-        })),
-
-      restoreFromHistory: (taskId, index) =>
-        set((s) => ({
-          tasks: s.tasks.map((t) => {
-            if (t.id !== taskId) return t;
-            const entry = t.history?.[index];
-            if (!entry) return t;
-            // Push current state to history before restoring
-            const current: HistoryEntry = {
-              canvasData: t.canvasData,
-              savedAt: Date.now(),
-              label: "Before restore: " + new Date().toLocaleTimeString(),
-            };
-            return {
-              ...t,
-              canvasData: entry.canvasData,
-              history: [...(t.history ?? []), current].slice(-20),
-              updatedAt: Date.now(),
-            };
-          }),
-        })),
     }),
     { name: "wxhb-tasks" },
   ),

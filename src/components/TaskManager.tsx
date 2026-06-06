@@ -5,9 +5,9 @@
 // ────────────────────────────────────────────────────────────────────────────
 
 import { useState, useCallback, useEffect, useRef } from "react";
-import { Save, FolderOpen, Trash2, Pencil, Check, X, Plus, ChevronDown, ChevronUp, History, RotateCcw } from "lucide-react";
+import { Save, FolderOpen, Trash2, Pencil, Check, X, Plus, ChevronDown, ChevronUp } from "lucide-react";
 import { useCanvasStore } from "@/stores/canvasStore";
-import { useTaskStore, type Task, type CanvasSnapshot, type HistoryEntry } from "@/stores/taskStore";
+import { useTaskStore, type Task, type CanvasSnapshot } from "@/stores/taskStore";
 import { useT } from "@/i18n";
 import { confirmDialog } from "@/components/ui/ConfirmDialog";
 import { sanitizeTaskName } from "@/lib/validation";
@@ -32,19 +32,15 @@ function TabButton({
   onClick,
   onDelete,
   onRename,
-  onRestoreHistory,
 }: {
   task: Task;
   isActive: boolean;
   onClick: () => void;
   onDelete: () => void;
   onRename: (name: string) => void;
-  onRestoreHistory: (index: number) => void;
 }) {
   const [editing, setEditing] = useState(false);
   const [editName, setEditName] = useState(task.name);
-  const [showHistory, setShowHistory] = useState(false);
-  const t = useT();
 
   const commitRename = () => {
     const sanitized = sanitizeTaskName(editName);
@@ -52,10 +48,9 @@ function TabButton({
     setEditing(false);
   };
 
-  const historyCount = task.history?.length ?? 0;
-
   if (editing) {
-    return (
+
+  return (
       <div className="flex items-center gap-1 rounded-md border border-emerald-500/50 bg-slate-800 px-1.5 py-1">
         <input
           autoFocus
@@ -70,6 +65,7 @@ function TabButton({
     );
   }
 
+
   return (
     <div className="w-full">
       <div
@@ -83,17 +79,6 @@ function TabButton({
         <FolderOpen size={10} className={isActive ? "text-emerald-400" : "text-slate-600"} />
         <span className="truncate max-w-[80px]">{task.name}</span>
         <span className="text-xs text-slate-600">({task.canvasData.nodes.length})</span>
-
-        {/* History toggle */}
-        {historyCount > 0 && (
-          <button
-            onClick={(e) => { e.stopPropagation(); setShowHistory(!showHistory); }}
-            className={`ml-auto flex items-center gap-0.5 rounded px-1 py-0.5 text-xs transition ${showHistory ? "text-amber-400 bg-amber-950/30" : "text-slate-600 hover:text-slate-400"}`}
-            title={`${historyCount} ${t("task.historyEntries")}`}
-          >
-            <History size={9} /> {historyCount}
-          </button>
-        )}
 
         {/* Hover actions */}
         <div className="absolute -top-1 -right-1 flex gap-0.5 opacity-0 transition group-hover:opacity-100">
@@ -113,29 +98,6 @@ function TabButton({
           </button>
         </div>
       </div>
-
-      {/* History list */}
-      {showHistory && historyCount > 0 && (
-        <div className="ml-3 mt-1 space-y-0.5 border-l border-slate-700/60 pl-2">
-          {(task.history ?? []).slice().reverse().map((entry: HistoryEntry, ri: number) => {
-            const actualIndex = historyCount - 1 - ri;
-            const d = new Date(entry.savedAt);
-            return (
-              <button
-                key={entry.savedAt}
-                onClick={(e) => { e.stopPropagation(); onRestoreHistory(actualIndex); }}
-                className="flex w-full items-center gap-1.5 rounded px-1.5 py-1 text-[11px] text-slate-500 transition hover:bg-slate-800 hover:text-amber-300"
-                title={t("task.restoreVersion")}
-              >
-                <RotateCcw size={8} />
-                <span>
-                  v{actualIndex + 1} &middot; {d.toLocaleDateString()} {d.toLocaleTimeString()}
-                </span>
-              </button>
-            );
-          })}
-        </div>
-      )}
     </div>
   );
 }
@@ -144,19 +106,29 @@ function TabButton({
 
 export function TaskManager() {
   const [expanded, setExpanded] = useState(true);
+  const t = useT();
 
   const tasks = useTaskStore((s) => s.tasks);
+  const activeTaskId = useTaskStore((s) => s.activeTaskId);
   const createTask = useTaskStore((s) => s.createTask);
   const updateTask = useTaskStore((s) => s.updateTask);
   const deleteTask = useTaskStore((s) => s.deleteTask);
-  const activeTaskId = useTaskStore((s) => s.activeTaskId);
   const setActiveTaskId = useTaskStore((s) => s.setActiveTaskId);
-  const restoreFromHistory = useTaskStore((s) => s.restoreFromHistory);
-  const t = useT();
+
+  /* ── Auto-save current task on unload / task switch ─────────────────── */
+  useEffect(() => {
+    const saveCurrent = () => {
+      if (!activeTaskId) return;
+      const snapshot = captureSnapshot();
+      updateTask(activeTaskId, { canvasData: snapshot });
+    };
+    window.addEventListener("beforeunload", saveCurrent);
+
+  return () => window.removeEventListener("beforeunload", saveCurrent);
+  }, [activeTaskId, updateTask]);
 
   /* ── New blank task ──────────────────────────────────────────────────── */
   const handleSaveNew = useCallback(() => {
-    // Auto-save current task before creating a new one
     if (activeTaskId) {
       const snapshot = captureSnapshot();
       updateTask(activeTaskId, { canvasData: snapshot });
@@ -194,25 +166,6 @@ export function TaskManager() {
     [deleteTask, t],
   );
 
-  /* ── Restore a history entry ─────────────────────────────────────────── */
-  const handleRestoreHistory = useCallback(
-    (taskId: string, index: number) => {
-      if (activeTaskId) {
-        const snapshot = captureSnapshot();
-        updateTask(activeTaskId, { canvasData: snapshot });
-      }
-      restoreFromHistory(taskId, index);
-      const task = useTaskStore.getState().getTaskById(taskId);
-      if (task) {
-        loadSnapshotIntoCanvas(task.canvasData);
-      }
-      setActiveTaskId(taskId);
-    },
-    [activeTaskId, updateTask, restoreFromHistory, setActiveTaskId],
-  );
-
-  const activeTask = tasks.find((t) => t.id === activeTaskId);
-
   const tabRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const didInitRef = useRef(false);
   useEffect(() => {
@@ -227,6 +180,8 @@ export function TaskManager() {
       }
     }
   }, [activeTaskId]);
+
+  const activeTask = tasks.find((t) => t.id === activeTaskId);
 
   return (
     <div className="border-t border-slate-800">
@@ -244,6 +199,7 @@ export function TaskManager() {
       {expanded && (
         <div className="space-y-2.5 overflow-hidden px-3 pb-3">
 
+          {/* ── New button ──────────────────────────────────────────────── */}
           <button
             onClick={handleSaveNew}
             className="flex w-full items-center justify-center gap-1.5 rounded-md bg-emerald-600 px-3 py-2 text-xs font-medium text-white transition hover:bg-emerald-500"
@@ -268,7 +224,6 @@ export function TaskManager() {
                         onClick={() => handleSwitch(task)}
                         onDelete={() => handleDelete(task)}
                         onRename={(name) => updateTask(task.id, { name })}
-                        onRestoreHistory={(index) => handleRestoreHistory(task.id, index)}
                       />
                     </div>
                   ))}
