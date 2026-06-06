@@ -329,6 +329,9 @@ function CanvasInner() {
             })),
           );
         }}
+        onEdgeDoubleClick={(_event, edge) => {
+          setEdges((eds) => eds.filter((e) => e.id !== edge.id));
+        }}
 
         snapToGrid
         className="bg-slate-950"
