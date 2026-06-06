@@ -98,8 +98,7 @@ export interface ImageNodeData extends BaseNodeData {
 export interface VideoNodeData extends BaseNodeData {
   modelId?: string;
   prompt: string;
-  width: number;
-  height: number;
+  size: string;
   numFrames: number;
   fps: number;
   mode: "normal" | "keyframe";
@@ -258,8 +257,7 @@ export function createDefaultVideoNodeData(t: (key: string, vars?: Record<string
     label: t("node.label.video"),
     modelId: getDefaultModelId("video"),
     prompt: "",
-    width: 768,
-    height: 1152,
+    size: "1280x720",
     numFrames: 121,
     fps: 24,
     mode: "normal",

@@ -259,17 +259,18 @@ function VideoNodeFields({ nodeId, data }: { nodeId: string; data: VideoNodeData
         />
       </Field>
       <Field label={t("panel.resolution")} hint={t("hint.resolution")}>
-        <div className="flex items-center gap-2">
-          <NumberInput min={256} max={1920} step={64} value={data.width}
-            onChange={(v) => updateNodeData(nodeId, { width: v })}
-            className="w-20 rounded-md border border-slate-700 bg-slate-800 px-2 py-1 text-xs text-slate-100 focus:border-amber-500 focus:outline-none"
-          />
-          <span className="text-xs text-slate-500">x</span>
-          <NumberInput min={256} max={1920} step={64} value={data.height}
-            onChange={(v) => updateNodeData(nodeId, { height: v })}
-            className="w-20 rounded-md border border-slate-700 bg-slate-800 px-2 py-1 text-xs text-slate-100 focus:border-amber-500 focus:outline-none"
-          />
-        </div>
+        <select
+          value={data.size}
+          onChange={(e) => updateNodeData(nodeId, { size: e.target.value })}
+          className="w-full rounded border border-slate-700 bg-slate-800 px-2 py-1 text-xs text-slate-300 focus:border-amber-500 focus:outline-none"
+        >
+          <option value="1280x720">横屏 1280x720</option>
+          <option value="720x1280">竖屏 720x1280</option>
+          <option value="1024x1024">方形 1024x1024</option>
+          <option value="1792x1024">宽屏 1792x1024</option>
+          <option value="1024x1792">1024x1792</option>
+          <option value="auto">Auto</option>
+        </select>
       </Field>
       <Field label={t("panel.fpsFrames")} hint={t("hint.fps")}>
         <div className="flex items-center gap-2">

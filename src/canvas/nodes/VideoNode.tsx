@@ -52,19 +52,20 @@ function VideoNodeInner({ id, data }: NodeProps) {
       />
       {/* Params — 2-col grid */}
       <div className="grid grid-cols-2 gap-x-2 gap-y-1">
-        <div className="flex items-center gap-1">
-          <label className="text-[11px] text-slate-500">{t("video.width")}</label>
-          <NumberInput min={256} max={1920} step={64} value={d.width}
-            onChange={(v) => updateNodeData(id, { width: v } as Partial<VideoNodeData>)}
-            className="w-14 rounded border border-slate-700 bg-slate-800 px-1.5 py-0.5 text-xs text-slate-300 focus:border-amber-500 focus:outline-none"
-          />
-        </div>
-        <div className="flex items-center gap-1">
-          <label className="text-[11px] text-slate-500">{t("video.height")}</label>
-          <NumberInput min={256} max={1920} step={64} value={d.height}
-            onChange={(v) => updateNodeData(id, { height: v } as Partial<VideoNodeData>)}
-            className="w-14 rounded border border-slate-700 bg-slate-800 px-1.5 py-0.5 text-xs text-slate-300 focus:border-amber-500 focus:outline-none"
-          />
+        <div className="col-span-2">
+          <label className="text-[11px] text-slate-500">{t("video.size")}</label>
+          <select
+            value={d.size}
+            onChange={(e) => updateNodeData(id, { size: e.target.value } as Partial<VideoNodeData>)}
+            className="w-full rounded border border-slate-700 bg-slate-800 px-2 py-1 text-xs text-slate-300 focus:border-amber-500 focus:outline-none"
+          >
+            <option value="1280x720">横屏 1280x720</option>
+            <option value="720x1280">竖屏 720x1280</option>
+            <option value="1024x1024">方形 1024x1024</option>
+            <option value="1792x1024">宽屏 1792x1024</option>
+            <option value="1024x1792">1024x1792</option>
+            <option value="auto">Auto</option>
+          </select>
         </div>
         <div className="flex items-center gap-1">
           <label className="text-[11px] text-slate-500">{t("video.fps")}</label>

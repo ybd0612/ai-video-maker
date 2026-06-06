@@ -532,14 +532,19 @@ export function useWorkflowRunner() {
 
               if (!videoPrompt) throw new LocalizedError("error.noVideoPrompt");
 
+              // Parse size string to width and height
+              const sizeParts = data.size === "auto" ? [] : data.size.split("x").map(Number);
+              const width = sizeParts[0];
+              const height = sizeParts[1];
+
               const taskId = await callVideoCreateAPI(apiKey, baseUrl, {
                 model: data.modelId ?? "agnes-video-v2.0",
                 prompt: videoPrompt,
                 negativePrompt: data.negativePrompt as string | undefined,
                 imageUrl: inputs.imageInputs[0],
                 imageUrls: inputs.imageInputs.length > 1 ? inputs.imageInputs : undefined,
-                width: data.width,
-                height: data.height,
+                width: width,
+                height: height,
                 numFrames: calcNumFrames(data.duration ?? 5, data.fps),
                 fps: data.fps,
                 mode: data.mode,
