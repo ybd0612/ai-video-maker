@@ -12,7 +12,6 @@ import { useWorkflowRunner } from "@/canvas/hooks/useWorkflowRunner";
 import { useT } from "@/i18n";
 import { NumberInput } from "@/components/ui/NumberInput";
 import { HelpTooltip } from "@/components/ui/HelpTooltip";
-import { Lightbox } from "@/components/ui/Lightbox";
 import { sanitizeNodeLabel, sanitizePrompt, sanitizeRichText } from "@/lib/validation";
 import type {
   AnyNodeData,
@@ -220,9 +219,7 @@ function ImageNodeFields({ nodeId, data }: { nodeId: string; data: ImageNodeData
       {/* Input image from upstream is now shown in the canvas node */}
       {data.outputUrl && (
         <Field label={t("panel.outputImage")}>
-          <Lightbox src={data.outputUrl} alt="Generated">
           <img src={data.outputUrl} alt="Generated" className="w-full rounded-md border border-slate-700" />
-          </Lightbox>
         </Field>
       )}
       {data.revisedPrompt && (
@@ -341,9 +338,7 @@ function UploadNodeFields({ data }: { nodeId: string; data: UploadNodeData }) {
             </p>
           </Field>
           <Field label={t("panel.preview")}>
-            <Lightbox src={data.base64Data} alt={data.fileName ?? "Uploaded"}>
             <img src={data.base64Data} alt={data.fileName ?? "Uploaded"} className="w-full rounded-md border border-slate-700" />
-            </Lightbox>
           </Field>
         </>
       ) : (
