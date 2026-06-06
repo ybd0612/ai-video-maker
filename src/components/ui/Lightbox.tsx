@@ -1,5 +1,4 @@
-import { useState, useEffect, useCallback, type ReactNode } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { useState, useEffect, useCallback, useRef, type ReactNode } from "react";
 
 /**
  * Lightbox — 点击图片放大展示
@@ -18,31 +17,34 @@ export function Lightbox({
 }) {
   const [open, setOpen] = useState(false);
   const [scale, setScale] = useState(1);
+  const overlayRef = useRef<HTMLDivElement>(null);
 
   const handleOpen = useCallback(() => {
     setScale(1);
     setOpen(true);
   }, []);
 
+  const handleClose = useCallback(() => {
+    setOpen(false);
+  }, []);
+
   useEffect(() => {
     if (!open) return;
     const handler = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setOpen(false);
+      if (e.key === "Escape") handleClose();
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [open]);
+  }, [open, handleClose]);
 
-  const handleWheel = useCallback(
-    (e: React.WheelEvent) => {
-      e.preventDefault();
-      setScale((s) => {
-        const next = e.deltaY < 0 ? s * 1.15 : s / 1.15;
-        return Math.min(Math.max(next, 0.2), 10);
-      });
-    },
-    [],
-  );
+  const handleWheel = useCallback((e: React.WheelEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setScale((s) => {
+      const next = e.deltaY < 0 ? s * 1.15 : s / 1.15;
+      return Math.min(Math.max(next, 0.1), 10);
+    });
+  }, []);
 
   return (
     <>
@@ -56,29 +58,24 @@ export function Lightbox({
         {children}
       </div>
 
-      <AnimatePresence>
-        {open && src && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[200] flex items-center justify-center bg-black/80 backdrop-blur-sm"
-            onClick={() => setOpen(false)}
-            onWheel={handleWheel}
-          >
-            <motion.img
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale, opacity: 1 }}
-              exit={{ scale: 0.9, opacity: 0 }}
-              transition={{ type: "tween", duration: 0 }}
-              src={src}
-              alt={alt ?? ""}
-              className="max-h-[90vh] max-w-[90vw] rounded-lg border border-slate-700 object-contain shadow-2xl select-none"
-              draggable={false}
-            />
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {open && src && (
+        <div
+          ref={overlayRef}
+          className="fixed inset-0 z-[9999] flex items-center justify-center"
+          style={{ backgroundColor: "rgba(0,0,0,0.8)", backdropFilter: "blur(4px)" }}
+          onClick={handleClose}
+          onWheel={handleWheel}
+        >
+          <img
+            src={src}
+            alt={alt ?? ""}
+            style={{ transform: `scale(${scale})`, transition: "transform 0.05s ease-out" }}
+            className="max-h-[90vh] max-w-[90vw] rounded-lg border border-slate-700 object-contain shadow-2xl select-none"
+            draggable={false}
+            onClick={(e) => e.stopPropagation()}
+          />
+        </div>
+      )}
     </>
   );
 }
