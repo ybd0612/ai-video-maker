@@ -35,7 +35,7 @@ import { useSettingsStore } from "@/stores/settingsStore";
 import { useWorkflowRunner } from './hooks/useWorkflowRunner';
 import { useT } from '@/i18n';
 import { ContextMenu, type ContextMenuItem } from "@/components/ui/ContextMenu";
-import { MessageSquare, Type, ImageIcon, Film, Upload } from "lucide-react";
+import { MessageSquare, Type, ImageIcon, Film, Upload, Trash2 } from "lucide-react";
 import { PropertiesPanel } from "./panels/PropertiesPanel";
 import {
   createDefaultPromptNodeData,
@@ -365,8 +365,18 @@ function CanvasInner() {
             })),
           );
         }}
-        onEdgeDoubleClick={(_event, edge) => {
-          setEdges((eds) => eds.filter((e) => e.id !== edge.id));
+        onEdgeContextMenu={(event, edge) => {
+          event.preventDefault();
+          setContextMenu({
+            x: event.clientX,
+            y: event.clientY,
+            items: [{
+              label: t("contextMenu.deleteEdge"),
+              icon: <Trash2 size={13} />,
+              color: "text-red-400",
+              onClick: () => setEdges((eds) => eds.filter((e) => e.id !== edge.id)),
+            }],
+          });
         }}
 
         snapToGrid
