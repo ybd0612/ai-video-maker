@@ -162,6 +162,7 @@ const zh = {
     "workflow.running": "正在执行...",
 
   // Workflow — errors & log messages
+  "error.upstreamFailed": "上游依赖 {nodeId} 执行失败，已跳过。",
   "error.noPromptText": "该节点没有可用的提示词文本。",
   "error.noImagePrompt": "图像生成没有可用的提示词。",
   "error.noVideoPrompt": "视频生成没有可用的提示词。",
@@ -337,6 +338,7 @@ const en = {
     "workflow.running": "Running...",
 
   // Workflow — errors & log messages
+  "error.upstreamFailed": "Upstream dependency {nodeId} failed, skipped.",
   "error.noPromptText": "No prompt text available for this node.",
   "error.noImagePrompt": "No prompt text available for image generation.",
   "error.noVideoPrompt": "No prompt text available for video generation.",

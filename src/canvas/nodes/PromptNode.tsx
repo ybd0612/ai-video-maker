@@ -21,6 +21,8 @@ function PromptNodeInner({ id, data }: NodeProps) {
       borderColor="border-emerald-800/60"
       status={d.executionStatus}
       errorMessage={d.errorMessage}
+      errorKey={d.errorKey}
+      errorParams={d.errorParams}
       runnable={false}
     >
       <textarea

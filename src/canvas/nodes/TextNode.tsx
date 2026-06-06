@@ -1,4 +1,4 @@
-import { memo } from "react";
+﻿import { memo } from "react";
 import { Handle, Position, type NodeProps } from "@xyflow/react";
 import { Type } from "lucide-react";
 import { useCanvasStore } from "@/stores/canvasStore";
@@ -23,6 +23,8 @@ function TextNodeInner({ id, data }: NodeProps) {
       borderColor="border-sky-800/60"
       status={d.executionStatus}
       errorMessage={d.errorMessage}
+      errorKey={d.errorKey}
+      errorParams={d.errorParams}
     >
       {/* Fixed model label */}
       <div className="rounded border border-slate-700/50 bg-slate-800/50 px-2 py-1 text-xs text-slate-500">

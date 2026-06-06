@@ -57,6 +57,8 @@ interface BaseNodeData extends Record<string, unknown> {
   executionStatus: NodeExecutionStatus;
   executionLogs: NodeExecutionLog[];
   errorMessage?: string;
+  errorKey?: string;
+  errorParams?: Record<string, string | number>;
 }
 
 /* ── Prompt node — freeform text input ──────────────────────────────────── */

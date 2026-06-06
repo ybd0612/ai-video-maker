@@ -8,8 +8,8 @@ import type { ReactNode } from "react";
 import { Play, Trash2 } from "lucide-react";
 import { useCanvasStore } from "@/stores/canvasStore";
 import { useWorkflowRunner } from "@/canvas/hooks/useWorkflowRunner";
-import { StatusBadge } from "./StatusBadge"
-import { useT } from '@/i18n';;
+import { StatusBadge } from "./StatusBadge";
+import { useT } from '@/i18n';
 import type { NodeExecutionStatus } from "@/canvas/types";
 import type { LucideIcon } from "lucide-react";
 
@@ -21,8 +21,9 @@ interface NodeShellProps {
   borderColor: string;
   status: NodeExecutionStatus;
   errorMessage?: string;
+  errorKey?: string;
+  errorParams?: Record<string, string | number>;
   children: ReactNode;
-  /** Show the single-node run button */
   runnable?: boolean;
 }
 
@@ -34,12 +35,17 @@ export function NodeShell({
   borderColor,
   status,
   errorMessage,
+  errorKey,
+  errorParams,
   children,
   runnable = true,
 }: NodeShellProps) {
   const removeNode = useCanvasStore((s) => s.removeNode);
   const t = useT();
   const { run } = useWorkflowRunner();
+
+  // Prefer live-translated errorKey over stored errorMessage
+  const displayError = errorKey ? t(errorKey as Parameters<typeof t>[0], errorParams) : errorMessage;
 
   return (
     <div className={`w-72 rounded-xl border ${borderColor} bg-slate-900 shadow-2xl`}>
@@ -79,9 +85,9 @@ export function NodeShell({
       {/* Body */}
       <div className="space-y-2 p-3">
         {children}
-        {errorMessage && (
+        {displayError && (
           <div className="rounded-md border border-red-800/50 bg-red-950/30 p-2">
-            <p className="text-xs leading-tight text-red-400">{errorMessage}</p>
+            <p className="text-xs leading-tight text-red-400">{displayError}</p>
           </div>
         )}
       </div>

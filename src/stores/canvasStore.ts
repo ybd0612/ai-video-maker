@@ -1,4 +1,4 @@
-// ────────────────────────────────────────────────────────────────────────────
+﻿// ────────────────────────────────────────────────────────────────────────────
 // src/stores/canvasStore.ts
 // Zustand store with localForage persistence for the infinite canvas.
 // Large binary outputs (image blobs, video files) are persisted to IndexedDB
@@ -90,6 +90,8 @@ interface CanvasState {
       nodeId: string;
       status: NodeExecutionStatus;
       errorMessage?: string;
+      errorKey?: string;
+      errorParams?: Record<string, string | number>;
       log?: NodeExecutionLog;
     }>,
   ) => void;
@@ -191,6 +193,8 @@ export const useCanvasStore = create<CanvasState>()(
                   ...n.data,
                   executionStatus: upd.status,
                   errorMessage: upd.errorMessage,
+                  errorKey: upd.errorKey,
+                  errorParams: upd.errorParams,
                   executionLogs: newLog,
                 },
               };
@@ -204,6 +208,8 @@ export const useCanvasStore = create<CanvasState>()(
             ...n,
             data: {
               ...n.data,
+              errorKey: undefined,
+              errorParams: undefined,
               executionStatus: "idle" as NodeExecutionStatus,
               executionLogs: [],
               errorMessage: undefined,

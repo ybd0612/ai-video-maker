@@ -77,6 +77,8 @@ function UploadNodeInner({ id, data }: NodeProps) {
       borderColor={d.base64Data ? "border-rose-500/80" : "border-rose-800/60"}
       status={d.executionStatus}
       errorMessage={d.errorMessage}
+      errorKey={d.errorKey}
+      errorParams={d.errorParams}
       runnable={false}
     >
       {/* Hidden file input */}

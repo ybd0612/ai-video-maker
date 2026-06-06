@@ -35,6 +35,16 @@ const VIDEO_POLL_TIMEOUT_MS = 10 * 60 * 1000;
 
 type RFNode = Node<Record<string, unknown>>;
 
+class LocalizedError extends Error {
+  errorKey: string;
+  errorParams?: Record<string, string | number>;
+  constructor(key: string, params?: Record<string, string | number>) {
+    super(getTranslation(key as Parameters<typeof getTranslation>[0], params));
+    this.errorKey = key;
+    this.errorParams = params;
+  }
+}
+
 /* ── Cycle detection (DFS) ──────────────────────────────────────────────── */
 
 function detectCycle(nodes: RFNode[], edges: Edge[]): { hasCycle: boolean; cyclePath: string[] } {
@@ -439,7 +449,9 @@ export function useWorkflowRunner() {
           store.cascadeNodeStates([{
             nodeId,
             status: "failed",
-            errorMessage: `Upstream dependency "${failedNodeId}" failed. ${failureMessage ?? ""}`.trim(),
+            errorMessage: `Upstream dependency "${failedNodeId}" failed.`,
+            errorKey: "error.upstreamFailed",
+            errorParams: { nodeId: failedNodeId },
             log: log("error", getTranslation("log.skippedUpstreamFailure")),
           }]);
           executed.push(nodeId);
@@ -464,7 +476,7 @@ export function useWorkflowRunner() {
                 ? inputs.textInputs.join("\n\n")
                 : ("prompt" in data ? data.prompt : "");
 
-              if (!textPrompt) throw new Error(getTranslation("error.noPromptText"));
+              if (!textPrompt) throw new LocalizedError("error.noPromptText");
 
               const result = await callTextAPI(apiKey, baseUrl, {
                 model: (("modelId" in data ? (data as TextNodeData).modelId : undefined)) ?? "agnes-2.0-flash",
@@ -491,7 +503,7 @@ export function useWorkflowRunner() {
                 ? inputs.textInputs.join("\n\n")
                 : data.prompt;
 
-              if (!imagePrompt) throw new Error(getTranslation("error.noImagePrompt"));
+              if (!imagePrompt) throw new LocalizedError("error.noImagePrompt");
 
               const result = await callImageAPI(apiKey, baseUrl, {
                 model: data.modelId ?? "agnes-image-2.1-flash",
@@ -519,7 +531,7 @@ export function useWorkflowRunner() {
                 ? inputs.textInputs.join("\n\n")
                 : data.prompt;
 
-              if (!videoPrompt) throw new Error(getTranslation("error.noVideoPrompt"));
+              if (!videoPrompt) throw new LocalizedError("error.noVideoPrompt");
 
               const taskId = await callVideoCreateAPI(apiKey, baseUrl, {
                 model: data.modelId ?? "agnes-video-v2.0",
@@ -577,6 +589,7 @@ export function useWorkflowRunner() {
           }
         } catch (err) {
           const message = err instanceof Error ? err.message : String(err);
+          const isLocalized = err instanceof LocalizedError;
           failedNodeId = nodeId;
           failureMessage = message;
 
@@ -584,6 +597,8 @@ export function useWorkflowRunner() {
             nodeId,
             status: "failed",
             errorMessage: message,
+            errorKey: isLocalized ? err.errorKey : undefined,
+            errorParams: isLocalized ? err.errorParams : undefined,
             log: log("error", getTranslation("log.failed", { message })),
           }]);
         }
