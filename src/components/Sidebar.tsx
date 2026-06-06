@@ -22,7 +22,7 @@ export function Sidebar() {
       </div>
 
       {/* Tree-view task manager */}
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 overflow-y-auto flex flex-col">
         <TaskTreeView />
       </div>
 
