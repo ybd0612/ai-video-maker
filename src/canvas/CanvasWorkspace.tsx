@@ -34,6 +34,8 @@ import { useTaskStore } from "@/stores/taskStore";
 import { useSettingsStore } from "@/stores/settingsStore";
 import { useWorkflowRunner } from './hooks/useWorkflowRunner';
 import { useT } from '@/i18n';
+import { ContextMenu, type ContextMenuItem } from "@/components/ui/ContextMenu";
+import { MessageSquare, Type, ImageIcon, Film, Upload } from "lucide-react";
 import { PropertiesPanel } from "./panels/PropertiesPanel";
 import {
   createDefaultPromptNodeData,
@@ -85,6 +87,7 @@ export function CanvasWorkspace() {
 function CanvasInner() {
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; items: ContextMenuItem[] } | null>(null);
 
   /* ── Track sync direction to prevent infinite loops ───────────────────── */
   const syncingFromStore = useRef(false);
@@ -324,6 +327,31 @@ function CanvasInner() {
         onConnect={onConnect}
         onNodeClick={onNodeClick}
         onPaneClick={onPaneClick}
+        onPaneContextMenu={(event) => {
+          event.preventDefault();
+          const pos = screenToFlowPosition({ x: event.clientX, y: event.clientY });
+          const factories = getNodeFactories(t as (key: string, vars?: Record<string, unknown>) => string);
+          const iconMap: Record<string, typeof MessageSquare> = { prompt: MessageSquare, text: Type, image: ImageIcon, video: Film, upload: Upload };
+          const colorMap: Record<string, string> = { prompt: "text-emerald-400", text: "text-sky-400", image: "text-violet-400", video: "text-amber-400", upload: "text-rose-400" };
+          const labelMap: Record<string, string> = { prompt: t("palette.prompt"), text: t("palette.text"), image: t("palette.image"), video: t("palette.video"), upload: t("palette.upload") };
+          const items: ContextMenuItem[] = Object.keys(factories).map((key) => ({
+            label: labelMap[key] ?? key,
+            icon: (() => { const Icon = iconMap[key]; return Icon ? <Icon size={13} /> : null; })(),
+            color: colorMap[key],
+            onClick: () => {
+              const type = key as DragNodeType;
+              const newNode: RFNode = {
+                id: nextNodeId(type),
+                type,
+                position: pos,
+                data: factories[type](),
+              };
+              addStoreNode(newNode);
+              setNodes((nds) => [...nds, newNode]);
+            },
+          }));
+          setContextMenu({ x: event.clientX, y: event.clientY, items });
+        }}
         nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}
         isValidConnection={(conn) => validateCanvasConnection(conn as Connection, nodes, edges)}
@@ -365,6 +393,14 @@ function CanvasInner() {
           />
         )}
         <Controls className="controls !bg-slate-900/90 !text-slate-200 !border !border-slate-700 !shadow-xl" showZoom showFitView showInteractive={false} />
+        {contextMenu && (
+          <ContextMenu
+            x={contextMenu.x}
+            y={contextMenu.y}
+            items={contextMenu.items}
+            onClose={() => setContextMenu(null)}
+          />
+        )}
       </ReactFlow>
 
       {/* Floating run button */}

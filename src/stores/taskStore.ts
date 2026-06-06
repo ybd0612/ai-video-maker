@@ -1,15 +1,14 @@
 // ────────────────────────────────────────────────────────────────────────────
 // src/stores/taskStore.ts
-// Task management store — saves/loads canvas snapshots as named tasks.
-// Each task holds a full canvasData snapshot (nodes + edges + viewport).
-// Persisted to localStorage for instant access.
+// Task & folder management — tree structure for organizing canvas workflows.
+// Persisted to localStorage. Folders contain tasks; tasks hold canvas snapshots.
 // ────────────────────────────────────────────────────────────────────────────
 
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import type { Node, Edge, Viewport } from "@xyflow/react";
 
-/* ── Task data model ────────────────────────────────────────────────────── */
+/* ── Data models ────────────────────────────────────────────────────────── */
 
 export interface CanvasSnapshot {
   nodes: Node<Record<string, unknown>>[];
@@ -21,31 +20,45 @@ export interface CanvasSnapshot {
 export interface Task {
   id: string;
   name: string;
-  description: string;
+  folderId: string | null;
   canvasData: CanvasSnapshot;
   createdAt: number;
   updatedAt: number;
+}
+
+export interface Folder {
+  id: string;
+  name: string;
+  createdAt: number;
+}
+
+/* ── ID generator ───────────────────────────────────────────────────────── */
+
+let counter = 0;
+function newId(prefix: string): string {
+  counter += 1;
+  return `${prefix}__${Date.now()}_${counter}`;
 }
 
 /* ── Store shape ────────────────────────────────────────────────────────── */
 
 interface TaskState {
   tasks: Task[];
+  folders: Folder[];
   activeTaskId: string | null;
 
-  createTask: (name: string, canvasData: CanvasSnapshot, description?: string) => Task;
-  updateTask: (id: string, updates: Partial<Pick<Task, "name" | "description" | "canvasData">>) => void;
+  /* Folder actions */
+  createFolder: (name: string) => Folder;
+  renameFolder: (id: string, name: string) => void;
+  deleteFolder: (id: string) => void;
+
+  /* Task actions */
+  createTask: (name: string, canvasData: CanvasSnapshot, folderId?: string | null) => Task;
+  updateTask: (id: string, updates: Partial<Pick<Task, "name" | "canvasData" | "folderId">>) => void;
   deleteTask: (id: string) => void;
+  moveTask: (taskId: string, folderId: string | null) => void;
   setActiveTaskId: (id: string | null) => void;
   getTaskById: (id: string) => Task | undefined;
-}
-
-/* ── ID generator ──────────────────────────────────────────────────────── */
-
-let counter = 0;
-function newId(): string {
-  counter += 1;
-  return `task__${Date.now()}_${counter}`;
 }
 
 /* ── Store ──────────────────────────────────────────────────────────────── */
@@ -54,14 +67,39 @@ export const useTaskStore = create<TaskState>()(
   persist(
     (set, get) => ({
       tasks: [],
+      folders: [],
       activeTaskId: null,
 
-      createTask: (name, canvasData, description = "") => {
+      /* ── Folders ──────────────────────────────────────────────────────── */
+
+      createFolder: (name) => {
+        const folder: Folder = { id: newId("folder"), name, createdAt: Date.now() };
+        set((s) => ({ folders: [...s.folders, folder] }));
+        return folder;
+      },
+
+      renameFolder: (id, name) =>
+        set((s) => ({
+          folders: s.folders.map((f) => (f.id === id ? { ...f, name } : f)),
+        })),
+
+      deleteFolder: (id) =>
+        set((s) => ({
+          folders: s.folders.filter((f) => f.id !== id),
+          // Move tasks out of deleted folder to root
+          tasks: s.tasks.map((t) =>
+            t.folderId === id ? { ...t, folderId: null } : t,
+          ),
+        })),
+
+      /* ── Tasks ────────────────────────────────────────────────────────── */
+
+      createTask: (name, canvasData, folderId = null) => {
         const now = Date.now();
         const task: Task = {
-          id: newId(),
+          id: newId("task"),
           name,
-          description,
+          folderId: folderId ?? null,
           canvasData: { ...canvasData, capturedAt: now },
           createdAt: now,
           updatedAt: now,
@@ -91,8 +129,14 @@ export const useTaskStore = create<TaskState>()(
           activeTaskId: s.activeTaskId === id ? null : s.activeTaskId,
         })),
 
-      setActiveTaskId: (id) => set({ activeTaskId: id }),
+      moveTask: (taskId, folderId) =>
+        set((s) => ({
+          tasks: s.tasks.map((t) =>
+            t.id === taskId ? { ...t, folderId, updatedAt: Date.now() } : t,
+          ),
+        })),
 
+      setActiveTaskId: (id) => set({ activeTaskId: id }),
       getTaskById: (id) => get().tasks.find((t) => t.id === id),
     }),
     { name: "wxhb-tasks" },
