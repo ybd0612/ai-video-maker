@@ -32,7 +32,6 @@ const zh = {
   "task.newPlaceholder": "新任务名称...",
   "task.saveTo": "保存到",
   "task.noTasks": "暂无保存的任务，输入名称点击新建。",
-  "task.clickToSwitch": "点击切换（自动保存当前画布）",
   "task.historyEntries": "个历史版本",
   "task.restoreVersion": "恢复此版本",
   "task.deleteConfirm": "删除「{name}」？",
@@ -138,7 +137,27 @@ const zh = {
   "workflow.cycleDetected": "检测到循环依赖，无法执行",
   "workflow.noNodes": "画布上没有节点",
   "workflow.upstreamFailed": "上游节点失败",
-  "workflow.running": "正在执行...",
+    "workflow.running": "正在执行...",
+
+  // Workflow — errors & log messages
+  "error.noPromptText": "该节点没有可用的提示词文本。",
+  "error.noImagePrompt": "图像生成没有可用的提示词。",
+  "error.noVideoPrompt": "视频生成没有可用的提示词。",
+  "error.apiError": "API 请求失败 ({status}): {detail}",
+  "error.videoCreateNoTaskId": "视频 API 未返回任务 ID。",
+  "error.videoPollCancelled": "视频轮询已取消。",
+  "error.videoGenerationFailed": "视频生成失败: {reason}",
+  "error.videoGenerationTimedOut": "视频生成超时。",
+  "error.unknownNodeType": "未知节点类型: {type}",
+  "log.executionStarted": "开始执行。",
+  "log.queuedForExecution": "等待执行。",
+  "log.skippedUpstreamFailure": "已跳过 — 上游失败。",
+  "log.generatedChars": "生成了 {count} 个字符。",
+  "log.imageGeneratedSuccess": "图像生成成功。",
+  "log.videoTaskCreated": "视频任务已创建: {taskId}",
+  "log.videoProgress": "进度: {progress}% — {status}",
+  "log.videoCompleted": "视频生成完成。",
+  "log.failed": "失败: {message}",
 } as const;
 
 const en = {
@@ -166,7 +185,6 @@ const en = {
   "task.newPlaceholder": "New task name...",
   "task.saveTo": "Save to",
   "task.noTasks": "No saved tasks. Type a name and click New.",
-  "task.clickToSwitch": "Click to switch (auto-saves current)",
   "task.historyEntries": "history entries",
   "task.restoreVersion": "Restore this version",
   "task.deleteConfirm": "Delete \"{name}\"?",
@@ -272,7 +290,27 @@ const en = {
   "workflow.cycleDetected": "Cycle detected — cannot execute",
   "workflow.noNodes": "No nodes on canvas",
   "workflow.upstreamFailed": "Upstream node failed",
-  "workflow.running": "Running...",
+    "workflow.running": "Running...",
+
+  // Workflow — errors & log messages
+  "error.noPromptText": "No prompt text available for this node.",
+  "error.noImagePrompt": "No prompt text available for image generation.",
+  "error.noVideoPrompt": "No prompt text available for video generation.",
+  "error.apiError": "API request failed ({status}): {detail}",
+  "error.videoCreateNoTaskId": "Video API did not return a task_id.",
+  "error.videoPollCancelled": "Video polling cancelled.",
+  "error.videoGenerationFailed": "Video generation failed: {reason}",
+  "error.videoGenerationTimedOut": "Video generation timed out.",
+  "error.unknownNodeType": "Unknown node type: {type}",
+  "log.executionStarted": "Execution started.",
+  "log.queuedForExecution": "Queued for execution.",
+  "log.skippedUpstreamFailure": "Skipped — upstream failure.",
+  "log.generatedChars": "Generated {count} chars.",
+  "log.imageGeneratedSuccess": "Image generated successfully.",
+  "log.videoTaskCreated": "Video task created: {taskId}",
+  "log.videoProgress": "Progress: {progress}% — {status}",
+  "log.videoCompleted": "Video completed.",
+  "log.failed": "Failed: {message}",
 } as const;
 
 export type TranslationKey = keyof typeof zh;

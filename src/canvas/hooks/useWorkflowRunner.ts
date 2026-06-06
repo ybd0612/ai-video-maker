@@ -26,6 +26,7 @@ import type {
   VideoTaskStatus,
 } from "@/providers/types";
 import { resolveBaseUrl } from "@/lib/resolveBaseUrl";
+import { getTranslation } from "@/i18n";
 
 /* ── Constants ──────────────────────────────────────────────────────────── */
 
@@ -222,7 +223,7 @@ async function callTextAPI(apiKey: string, _baseUrl: string, params: TextParams)
 
   if (!resp.ok) {
     const body = await resp.text().catch(() => "");
-    throw new Error(`Text API ${resp.status}: ${body}`);
+    throw new Error(getTranslation("error.apiError", { status: String(resp.status), detail: body }));
   }
 
   const json = await resp.json();
@@ -266,7 +267,7 @@ async function callImageAPI(apiKey: string, _baseUrl: string, params: ImageParam
 
   if (!resp.ok) {
     const text = await resp.text().catch(() => "");
-    throw new Error(`Image API ${resp.status}: ${text}`);
+    throw new Error(getTranslation("error.apiError", { status: String(resp.status), detail: text }));
   }
 
   const json = await resp.json();
@@ -312,12 +313,12 @@ async function callVideoCreateAPI(apiKey: string, _baseUrl: string, params: Vide
 
   if (!resp.ok) {
     const text = await resp.text().catch(() => "");
-    throw new Error(`Video create ${resp.status}: ${text}`);
+    throw new Error(getTranslation("error.apiError", { status: String(resp.status), detail: text }));
   }
 
   const json = await resp.json();
   const taskId: string | undefined = json.task_id ?? json.id;
-  if (!taskId) throw new Error("Video API did not return a task_id.");
+  if (!taskId) throw new Error(getTranslation("error.videoCreateNoTaskId"));
   return taskId;
 }
 
@@ -328,7 +329,7 @@ async function callVideoPollAPI(apiKey: string, _baseUrl: string, taskId: string
 
   if (!resp.ok) {
     const text = await resp.text().catch(() => "");
-    throw new Error(`Video poll ${resp.status}: ${text}`);
+    throw new Error(getTranslation("error.apiError", { status: String(resp.status), detail: text }));
   }
 
   const json = await resp.json();
@@ -416,7 +417,7 @@ export function useWorkflowRunner() {
           nodeId: id,
           status: "idle" as const,
           errorMessage: undefined,
-          log: log("info", "Queued for execution."),
+          log: log("info", getTranslation("log.queuedForExecution")),
         })),
       );
 
@@ -439,14 +440,14 @@ export function useWorkflowRunner() {
             nodeId,
             status: "failed",
             errorMessage: `Upstream dependency "${failedNodeId}" failed. ${failureMessage ?? ""}`.trim(),
-            log: log("error", "Skipped — upstream failure."),
+            log: log("error", getTranslation("log.skippedUpstreamFailure")),
           }]);
           executed.push(nodeId);
           continue;
         }
 
         store.setNodeExecutionStatus(nodeId, "pending");
-        store.appendNodeLog(nodeId, log("info", "Execution started."));
+        store.appendNodeLog(nodeId, log("info", getTranslation("log.executionStarted")));
 
         const inputs = gatherInputs(nodeId, edges);
         /* Re-read node data from the live store so upstream outputs are fresh */
@@ -463,7 +464,7 @@ export function useWorkflowRunner() {
                 ? inputs.textInputs.join("\n\n")
                 : ("prompt" in data ? data.prompt : "");
 
-              if (!textPrompt) throw new Error("No prompt text available for this node.");
+              if (!textPrompt) throw new Error(getTranslation("error.noPromptText"));
 
               const result = await callTextAPI(apiKey, baseUrl, {
                 model: (("modelId" in data ? (data as TextNodeData).modelId : undefined)) ?? "agnes-2.0-flash",
@@ -479,7 +480,7 @@ export function useWorkflowRunner() {
                 executionStatus: "success",
                 errorMessage: undefined,
               });
-              store.appendNodeLog(nodeId, log("info", `Generated ${result.content.length} chars.`));
+              store.appendNodeLog(nodeId, log("info", getTranslation("log.generatedChars", { count: result.content.length })));
               break;
             }
 
@@ -490,7 +491,7 @@ export function useWorkflowRunner() {
                 ? inputs.textInputs.join("\n\n")
                 : data.prompt;
 
-              if (!imagePrompt) throw new Error("No prompt text available for image generation.");
+              if (!imagePrompt) throw new Error(getTranslation("error.noImagePrompt"));
 
               const result = await callImageAPI(apiKey, baseUrl, {
                 model: data.modelId ?? "agnes-image-2.1-flash",
@@ -507,7 +508,7 @@ export function useWorkflowRunner() {
                 executionStatus: "success",
                 errorMessage: undefined,
               });
-              store.appendNodeLog(nodeId, log("info", "Image generated successfully."));
+              store.appendNodeLog(nodeId, log("info", getTranslation("log.imageGeneratedSuccess")));
               break;
             }
 
@@ -518,7 +519,7 @@ export function useWorkflowRunner() {
                 ? inputs.textInputs.join("\n\n")
                 : data.prompt;
 
-              if (!videoPrompt) throw new Error("No prompt text available for video generation.");
+              if (!videoPrompt) throw new Error(getTranslation("error.noVideoPrompt"));
 
               const taskId = await callVideoCreateAPI(apiKey, baseUrl, {
                 model: data.modelId ?? "agnes-video-v2.0",
@@ -534,29 +535,29 @@ export function useWorkflowRunner() {
               });
 
               store.updateNodeData(nodeId, { taskId, taskProgress: 0 });
-              store.appendNodeLog(nodeId, log("info", `Video task created: ${taskId}`));
+              store.appendNodeLog(nodeId, log("info", getTranslation("log.videoTaskCreated", { taskId })));
 
               /* Poll until completion or timeout */
               const deadline = Date.now() + VIDEO_POLL_TIMEOUT_MS;
               let finalStatus: VideoTaskStatus | undefined;
 
               while (Date.now() < deadline) {
-                if (opts.signal?.aborted) throw new Error("Video polling cancelled.");
+                if (opts.signal?.aborted) throw new Error(getTranslation("error.videoPollCancelled"));
 
                 await new Promise<void>((r) => setTimeout(r, VIDEO_POLL_INTERVAL_MS));
                 finalStatus = await callVideoPollAPI(apiKey, baseUrl, taskId);
 
                 store.updateNodeData(nodeId, { taskProgress: finalStatus.progress });
-                store.appendNodeLog(nodeId, log("info", `Progress: ${finalStatus.progress}% — ${finalStatus.status}`));
+                store.appendNodeLog(nodeId, log("info", getTranslation("log.videoProgress", { progress: finalStatus.progress, status: finalStatus.status })));
 
                 if (finalStatus.status === "completed") break;
                 if (finalStatus.status === "failed") {
-                  throw new Error(`Video generation failed: ${finalStatus.error ?? "unknown error"}`);
+                  throw new Error(getTranslation("error.videoGenerationFailed", { reason: finalStatus.error ?? "unknown error" }));
                 }
               }
 
               if (!finalStatus || finalStatus.status !== "completed") {
-                throw new Error("Video generation timed out.");
+                throw new Error(getTranslation("error.videoGenerationTimedOut"));
               }
 
               store.updateNodeData(nodeId, {
@@ -567,12 +568,12 @@ export function useWorkflowRunner() {
                 executionStatus: "success",
                 errorMessage: undefined,
               });
-              store.appendNodeLog(nodeId, log("info", "Video completed."));
+              store.appendNodeLog(nodeId, log("info", getTranslation("log.videoCompleted")));
               break;
             }
 
             default:
-              throw new Error(`Unknown node type: "${node.type}"`);
+              throw new Error(getTranslation("error.unknownNodeType", { type: String(node.type) }));
           }
         } catch (err) {
           const message = err instanceof Error ? err.message : String(err);
@@ -583,7 +584,7 @@ export function useWorkflowRunner() {
             nodeId,
             status: "failed",
             errorMessage: message,
-            log: log("error", `Failed: ${message}`),
+            log: log("error", getTranslation("log.failed", { message })),
           }]);
         }
 
