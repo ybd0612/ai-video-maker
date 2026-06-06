@@ -1,4 +1,4 @@
-// ────────────────────────────────────────────────────────────────────────────
+﻿// ────────────────────────────────────────────────────────────────────────────
 // src/components/TaskManager.tsx
 // Task management — save/load canvas snapshots as named tasks.
 // Tab-style switcher with auto-save before switching.
@@ -244,10 +244,10 @@ export function TaskManager() {
       </button>
 
       {expanded && (
-        <div className="space-y-2.5 px-3 pb-3">
+        <div className="space-y-2.5 overflow-hidden px-3 pb-3">
 
           {/* ── Action bar ──────────────────────────────────────────────── */}
-          <div className="flex gap-1.5 min-w-0">
+          <div className="flex gap-1.5 min-w-0 overflow-hidden">
             <input
               type="text"
               value={saveName}
@@ -259,7 +259,7 @@ export function TaskManager() {
             <button
               onClick={handleSaveNew}
               title="Create a new blank task"
-              className="shrink-0 flex items-center gap-1 rounded-md bg-emerald-600 px-2 py-1.5 text-xs font-medium text-white transition hover:bg-emerald-500 disabled:opacity-40 disabled:cursor-not-allowed"
+              className="shrink-0 flex items-center gap-1 whitespace-nowrap rounded-md bg-emerald-600 px-2 py-1.5 text-xs font-medium text-white transition hover:bg-emerald-500 disabled:opacity-40 disabled:cursor-not-allowed"
             >
               <Plus size={11} /> {t("task.new")}
             </button>
