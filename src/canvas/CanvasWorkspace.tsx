@@ -402,7 +402,7 @@ function CanvasInner() {
             className="!bg-slate-900 !border-slate-700"
           />
         )}
-        <Controls className="controls !bg-slate-900/90 !text-slate-200 !border !border-slate-700 !shadow-xl" showZoom showFitView showInteractive={false} />
+        <Controls className="controls !bg-slate-900/90 !text-slate-200 !border !border-slate-700 !shadow-xl" showZoom showFitView showInteractive={false} style={{ bottom: 12, right: 12 }} />
         {contextMenu && (
           <ContextMenu
             x={contextMenu.x}
