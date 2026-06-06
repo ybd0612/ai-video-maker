@@ -1,4 +1,4 @@
-// ────────────────────────────────────────────────────────────────────────────
+﻿// ────────────────────────────────────────────────────────────────────────────
 // src/canvas/types.ts
 // React Flow node data types — one per node kind.
 // Every node carries its own execution state and error log.
@@ -200,9 +200,9 @@ export const NODE_HANDLES: Record<string, HandleSpec[]> = {
 
 /* ── Default data factories ─────────────────────────────────────────────── */
 
-export function createDefaultPromptNodeData(): PromptNodeData {
+export function createDefaultPromptNodeData(t: (key: string, vars?: Record<string, unknown>) => string): PromptNodeData {
   return {
-    label: "Prompt",
+    label: t("node.label.prompt"),
     prompt: "",
     systemPrompt: "",
     outputModality: "text",
@@ -211,9 +211,9 @@ export function createDefaultPromptNodeData(): PromptNodeData {
   };
 }
 
-export function createDefaultTextNodeData(): TextNodeData {
+export function createDefaultTextNodeData(t: (key: string, vars?: Record<string, unknown>) => string): TextNodeData {
   return {
-    label: "Text Generation",
+    label: t("node.label.text"),
     modelId: getDefaultModelId("text"),
     prompt: "",
     systemPrompt: "",
@@ -224,9 +224,9 @@ export function createDefaultTextNodeData(): TextNodeData {
   };
 }
 
-export function createDefaultImageNodeData(): ImageNodeData {
+export function createDefaultImageNodeData(t: (key: string, vars?: Record<string, unknown>) => string): ImageNodeData {
   return {
-    label: "Image Generation",
+    label: t("node.label.image"),
     modelId: getDefaultModelId("image"),
     prompt: "",
     size: "1024x1024",
@@ -236,17 +236,17 @@ export function createDefaultImageNodeData(): ImageNodeData {
   };
 }
 
-export function createDefaultUploadNodeData(): UploadNodeData {
+export function createDefaultUploadNodeData(t: (key: string, vars?: Record<string, unknown>) => string): UploadNodeData {
   return {
-    label: "Upload Image",
+    label: t("node.label.upload"),
     executionStatus: "idle",
     executionLogs: [],
   };
 }
 
-export function createDefaultVideoNodeData(): VideoNodeData {
+export function createDefaultVideoNodeData(t: (key: string, vars?: Record<string, unknown>) => string): VideoNodeData {
   return {
-    label: "Video Generation",
+    label: t("node.label.video"),
     modelId: getDefaultModelId("video"),
     prompt: "",
     width: 768,

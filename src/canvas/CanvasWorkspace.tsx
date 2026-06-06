@@ -1,4 +1,4 @@
-// ────────────────────────────────────────────────────────────────────────────
+﻿// ────────────────────────────────────────────────────────────────────────────
 // src/canvas/CanvasWorkspace.tsx
 // The main infinite canvas — wires up React Flow with custom nodes/edges,
 // connection validation, drag-to-add, and workflow execution.
@@ -45,15 +45,20 @@ import {
 
 /* ── Node type registry for drag-and-drop ───────────────────────────────── */
 
-const NODE_FACTORIES = {
-  prompt: createDefaultPromptNodeData,
-  text: createDefaultTextNodeData,
-  image: createDefaultImageNodeData,
-  video: createDefaultVideoNodeData,
-  upload: createDefaultUploadNodeData,
-} as const;
+function getNodeFactories(t: (key: string, vars?: Record<string, unknown>) => string) {
+  return {
+    prompt: () => createDefaultPromptNodeData(t),
+    text: () => createDefaultTextNodeData(t),
+    image: () => createDefaultImageNodeData(t),
+    video: () => createDefaultVideoNodeData(t),
+    upload: () => createDefaultUploadNodeData(t),
+  } as const;
+}
 
-type DragNodeType = keyof typeof NODE_FACTORIES;
+
+
+type NodeFactories = ReturnType<typeof getNodeFactories>;
+type DragNodeType = keyof NodeFactories;
 
 type RFNode = Node<Record<string, unknown>>;
 
@@ -263,8 +268,9 @@ function CanvasInner() {
   const onDrop = useCallback(
     (event: React.DragEvent<HTMLDivElement>) => {
       event.preventDefault();
+      const factories = getNodeFactories(t as (key: string, vars?: Record<string, unknown>) => string);
       const nodeType = event.dataTransfer.getData("application/wxhb-node") as DragNodeType;
-      if (!nodeType || !(nodeType in NODE_FACTORIES)) return;
+      if (!nodeType || !(nodeType in factories)) return;
 
       const position = screenToFlowPosition({
         x: event.clientX,
@@ -275,13 +281,13 @@ function CanvasInner() {
         id: nextNodeId(nodeType),
         type: nodeType,
         position,
-        data: NODE_FACTORIES[nodeType](),
+        data: factories[nodeType as DragNodeType](),
       };
 
       addStoreNode(newNode);
       setNodes((nds) => [...nds, newNode]);
     },
-    [addStoreNode, setNodes, screenToFlowPosition],
+    [addStoreNode, setNodes, screenToFlowPosition, t],
   );
 
   /* ── Workflow runner ──────────────────────────────────────────────────── */

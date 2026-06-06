@@ -103,6 +103,11 @@ const zh = {
   "panel.taskProgress": "进度",
 
   // Nodes
+  "node.label.prompt": "提示词",
+  "node.label.text": "文本生成",
+  "node.label.image": "图像生成",
+  "node.label.video": "视频生成",
+  "node.label.upload": "上传图片",
   "node.untitled": "未命名",
   "node.runTooltip": "运行此节点及下游",
   "node.deleteTooltip": "删除节点",
@@ -259,6 +264,11 @@ const en = {
   "panel.taskProgress": "Progress",
 
   // Nodes
+  "node.label.prompt": "Prompt",
+  "node.label.text": "Text Generation",
+  "node.label.image": "Image Generation",
+  "node.label.video": "Video Generation",
+  "node.label.upload": "Upload Image",
   "node.untitled": "Untitled",
   "node.runTooltip": "Run this node and downstream",
   "node.deleteTooltip": "Delete node",
