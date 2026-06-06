@@ -1,4 +1,4 @@
-﻿// ────────────────────────────────────────────────────────────────────────────
+// ────────────────────────────────────────────────────────────────────────────
 // src/canvas/panels/PropertiesPanel.tsx
 // Right-side panel that shows the selected node's editable properties,
 // execution logs, and output preview.
@@ -11,6 +11,7 @@ import { useCanvasStore } from "@/stores/canvasStore";
 import { useWorkflowRunner } from "@/canvas/hooks/useWorkflowRunner";
 import { useT } from "@/i18n";
 import { NumberInput } from "@/components/ui/NumberInput";
+import { sanitizeNodeLabel, sanitizePrompt, sanitizeRichText } from "@/lib/validation";
 import type {
   AnyNodeData,
   TextNodeData,
@@ -114,6 +115,7 @@ export function PropertiesPanel({ node, onClose }: PropertiesPanelProps) {
             type="text"
             value={d.label}
             onChange={(e) => updateNodeData(node.id, { label: e.target.value })}
+            onBlur={(e) => updateNodeData(node.id, { label: sanitizeNodeLabel(e.target.value) })}
             className="w-full rounded-md border border-slate-700 bg-slate-800 px-2.5 py-1.5 text-xs text-slate-100 focus:border-slate-500 focus:outline-none"
           />
         </Field>
@@ -146,6 +148,7 @@ function TextNodeFields({ nodeId, data }: { nodeId: string; data: TextNodeData }
         <textarea
           value={data.prompt}
           onChange={(e) => updateNodeData(nodeId, { prompt: e.target.value })}
+          onBlur={(e) => updateNodeData(nodeId, { prompt: sanitizePrompt(e.target.value) })}
           placeholder={t("panel.promptPlaceholder")}
           rows={4}
           className="w-full resize-none rounded-md border border-slate-700 bg-slate-800 p-2 text-xs text-slate-100 placeholder:text-slate-600 focus:border-sky-500 focus:outline-none"
@@ -195,6 +198,7 @@ function ImageNodeFields({ nodeId, data }: { nodeId: string; data: ImageNodeData
         <textarea
           value={data.prompt}
           onChange={(e) => updateNodeData(nodeId, { prompt: e.target.value })}
+          onBlur={(e) => updateNodeData(nodeId, { prompt: sanitizePrompt(e.target.value) })}
           placeholder={t("panel.promptPlaceholder")}
           rows={4}
           className="w-full resize-none rounded-md border border-slate-700 bg-slate-800 p-2 text-xs text-slate-100 placeholder:text-slate-600 focus:border-violet-500 focus:outline-none"
@@ -242,6 +246,7 @@ function VideoNodeFields({ nodeId, data }: { nodeId: string; data: VideoNodeData
         <textarea
           value={data.prompt}
           onChange={(e) => updateNodeData(nodeId, { prompt: e.target.value })}
+          onBlur={(e) => updateNodeData(nodeId, { prompt: sanitizePrompt(e.target.value) })}
           placeholder={t("panel.promptPlaceholder")}
           rows={4}
           className="w-full resize-none rounded-md border border-slate-700 bg-slate-800 p-2 text-xs text-slate-100 placeholder:text-slate-600 focus:border-amber-500 focus:outline-none"
@@ -300,6 +305,7 @@ function PromptNodeFields({ nodeId, data }: { nodeId: string; data: PromptNodeDa
         <textarea
           value={data.systemPrompt ?? ""}
           onChange={(e) => updateNodeData(nodeId, { systemPrompt: e.target.value })}
+          onBlur={(e) => updateNodeData(nodeId, { systemPrompt: sanitizeRichText(e.target.value) })}
           placeholder={t("panel.systemPromptPlaceholder")}
           rows={2}
           className="w-full resize-none rounded-md border border-slate-700 bg-slate-800 p-2 text-xs text-slate-100 placeholder:text-slate-600 focus:border-emerald-500 focus:outline-none"

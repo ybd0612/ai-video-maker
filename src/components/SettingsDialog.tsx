@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { resolveBaseUrl } from '@/lib/resolveBaseUrl';
 import { useT } from '@/i18n';
 import type { Language } from '@/stores/settingsStore';
+import { isValidUrl } from "@/lib/validation";
 
 export function SettingsDialog() {
   const open = useSettingsStore((s) => s.settingsDialogOpen);
@@ -44,6 +45,7 @@ export function SettingsDialog() {
   };
 
   const handleSave = () => {
+    if (baseUrl.trim() && !isValidUrl(baseUrl.trim())) { showToast("error", t("settings.invalidUrl")); return; }
     if (!apiKey.trim()) {
       showToast("error", t("settings.keyEmpty"));
       return;

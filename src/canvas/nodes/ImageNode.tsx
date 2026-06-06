@@ -6,6 +6,7 @@ import type { ImageNodeData } from "@/canvas/types";
 import type { AnyNodeData } from "@/canvas/types";
 import { NodeShell } from "./NodeShell"
 import { useT } from '@/i18n';;
+import { sanitizePrompt, isValidUrl } from "@/lib/validation";
 
 const SIZE_OPTIONS = ["512x512", "768x768", "1024x1024", "1024x1792", "1792x1024"];
 
@@ -92,6 +93,7 @@ function ImageNodeInner({ id, data }: NodeProps) {
               onChange={(e) =>
                 updateNodeData(id, { inputImageUrl: e.target.value || undefined } as Partial<ImageNodeData>)
               }
+              onBlur={(e) => { const v = e.target.value.trim(); if (v && !isValidUrl(v)) { e.target.value = ""; updateNodeData(id, { inputImageUrl: undefined } as Partial<ImageNodeData>); } }}
               placeholder="https://example.com/image.png"
               className="mt-1 w-full rounded border border-slate-700 bg-slate-800 px-2 py-1 text-xs text-slate-300 placeholder:text-slate-600 focus:border-violet-500 focus:outline-none"
             />
@@ -104,6 +106,7 @@ function ImageNodeInner({ id, data }: NodeProps) {
         onChange={(e) =>
           updateNodeData(id, { prompt: e.target.value } as Partial<ImageNodeData>)
         }
+        onBlur={(e) => updateNodeData(id, { prompt: sanitizePrompt(e.target.value) } as Partial<ImageNodeData>)}
         placeholder={hasInputImage ? t("image.img2imgPlaceholder") : t("image.placeholder")}
         rows={3}
         className="w-full resize-none rounded-md border border-slate-700 bg-slate-800 p-2 text-xs text-slate-100 placeholder:text-slate-500 focus:border-violet-500 focus:outline-none"

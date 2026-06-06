@@ -1,4 +1,4 @@
-﻿import { memo } from "react";
+import { memo } from "react";
 import { Handle, Position, type NodeProps } from "@xyflow/react";
 import { Type } from "lucide-react";
 import { useCanvasStore } from "@/stores/canvasStore";
@@ -6,6 +6,7 @@ import type { TextNodeData } from "@/canvas/types";
 import { NodeShell } from "./NodeShell";
 import { useT } from "@/i18n";
 import { NumberInput } from "@/components/ui/NumberInput";
+import { sanitizePrompt } from "@/lib/validation";
 
 function TextNodeInner({ id, data }: NodeProps) {
   const d = data as unknown as TextNodeData;
@@ -31,6 +32,7 @@ function TextNodeInner({ id, data }: NodeProps) {
         onChange={(e) =>
           updateNodeData(id, { prompt: e.target.value } as Partial<TextNodeData>)
         }
+        onBlur={(e) => updateNodeData(id, { prompt: sanitizePrompt(e.target.value) } as Partial<TextNodeData>)}
         placeholder={t("text.placeholder")}
         rows={3}
         className="w-full resize-none rounded-md border border-slate-700 bg-slate-800 p-2 text-xs text-slate-100 placeholder:text-slate-500 focus:border-sky-500 focus:outline-none"

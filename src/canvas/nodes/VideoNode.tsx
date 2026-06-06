@@ -1,4 +1,4 @@
-﻿import { memo } from "react";
+import { memo } from "react";
 import { Handle, Position, type NodeProps } from "@xyflow/react";
 import { Film, Loader2 } from "lucide-react";
 import { useCanvasStore } from "@/stores/canvasStore";
@@ -6,6 +6,7 @@ import type { VideoNodeData } from "@/canvas/types";
 import { NodeShell } from "./NodeShell";
 import { useT } from "@/i18n";
 import { NumberInput } from "@/components/ui/NumberInput";
+import { sanitizePrompt } from "@/lib/validation";
 
 function VideoNodeInner({ id, data }: NodeProps) {
   const d = data as unknown as VideoNodeData;
@@ -31,6 +32,7 @@ function VideoNodeInner({ id, data }: NodeProps) {
         onChange={(e) =>
           updateNodeData(id, { prompt: e.target.value } as Partial<VideoNodeData>)
         }
+        onBlur={(e) => updateNodeData(id, { prompt: sanitizePrompt(e.target.value) } as Partial<VideoNodeData>)}
         placeholder={t("video.placeholder")}
         rows={3}
         className="w-full resize-none rounded-md border border-slate-700 bg-slate-800 p-2 text-xs text-slate-100 placeholder:text-slate-500 focus:border-amber-500 focus:outline-none"

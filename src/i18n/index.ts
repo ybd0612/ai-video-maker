@@ -1,4 +1,4 @@
-﻿// ────────────────────────────────────────────────────────────────────────────
+// ────────────────────────────────────────────────────────────────────────────
 // src/i18n/index.ts
 // Lightweight i18n system — no external deps, Zustand-driven language switch.
 // ────────────────────────────────────────────────────────────────────────────
@@ -54,6 +54,7 @@ const zh = {
   "settings.keyEmptyTest": "请先输入 API Key 再测试",
   "settings.connectionOk": "连接正常，模型响应成功。",
   "settings.connectionOkPreview": "连接正常，响应预览：",
+  "settings.invalidUrl": "请输入有效的 URL 地址",
   "settings.storageNote": "密钥存储在浏览器本地，仅在向配置的地址发起 API 请求时才会发送。",
   "settings.language": "语言",
 
@@ -215,6 +216,7 @@ const en = {
   "settings.keyEmptyTest": "Enter an API key before testing.",
   "settings.connectionOk": "Connection OK. Model responded successfully.",
   "settings.connectionOkPreview": "Connection OK. Response preview: ",
+  "settings.invalidUrl": "Please enter a valid URL",
   "settings.storageNote": "Keys are stored in your browser. They never leave your device except when making API calls to the configured base URL.",
   "settings.language": "Language",
 

@@ -1,4 +1,4 @@
-﻿// ────────────────────────────────────────────────────────────────────────────
+// ────────────────────────────────────────────────────────────────────────────
 // src/components/TaskManager.tsx
 // Task management — save/load canvas snapshots as named tasks.
 // Tab-style switcher with auto-save before switching.
@@ -10,6 +10,7 @@ import { useCanvasStore } from "@/stores/canvasStore";
 import { useTaskStore, type Task, type CanvasSnapshot, type HistoryEntry } from "@/stores/taskStore";
 import { useT } from "@/i18n";
 import { confirmDialog } from "@/components/ui/ConfirmDialog";
+import { sanitizeTaskName } from "@/lib/validation";
 
 /* ── Helpers ────────────────────────────────────────────────────────────── */
 
@@ -46,7 +47,8 @@ function TabButton({
   const t = useT();
 
   const commitRename = () => {
-    if (editName.trim()) onRename(editName.trim());
+    const sanitized = sanitizeTaskName(editName);
+    if (sanitized) onRename(sanitized);
     setEditing(false);
   };
 
@@ -160,7 +162,7 @@ export function TaskManager() {
       const snapshot = captureSnapshot();
       updateTask(activeTaskId, { canvasData: snapshot });
     }
-    const name = saveName.trim() || `Task ${tasks.length + 1}`;
+    const name = sanitizeTaskName(saveName) || `Task ${tasks.length + 1}`;
     const emptySnap: CanvasSnapshot = { nodes: [], edges: [], viewport: { x: 0, y: 0, zoom: 1 }, capturedAt: Date.now() };
     const task = createTask(name, emptySnap);
     loadSnapshotIntoCanvas(task.canvasData);

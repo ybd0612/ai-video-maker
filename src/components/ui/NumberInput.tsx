@@ -1,11 +1,11 @@
 import { useState, useCallback, useEffect, useRef, type InputHTMLAttributes } from "react";
+import { clampNumber } from "@/lib/validation";
 
 /**
  * NumberInput — 数字输入框组件
  *
  * 使用本地 state 编辑，仅在 blur 或 Enter 键时将值提交到外部。
- * 这避免了 <input type="number"> 的上下按钮在按住时
- * 连续触发 onChange 导致快速滚动的问题。
+ * 提交时自动 clamp 到 [min, max] 范围内。
  */
 interface NumberInputProps
   extends Omit<InputHTMLAttributes<HTMLInputElement>, "onChange" | "value"> {
@@ -13,7 +13,7 @@ interface NumberInputProps
   onChange: (value: number) => void;
 }
 
-export function NumberInput({ value, onChange, className, ...rest }: NumberInputProps) {
+export function NumberInput({ value, onChange, min, max, className, ...rest }: NumberInputProps) {
   const [localValue, setLocalValue] = useState(String(value));
   const committedRef = useRef(value);
 
@@ -27,14 +27,21 @@ export function NumberInput({ value, onChange, className, ...rest }: NumberInput
 
   const commit = useCallback(() => {
     const parsed = parseFloat(localValue);
-    if (!isNaN(parsed) && parsed !== committedRef.current) {
-      committedRef.current = parsed;
-      onChange(parsed);
-    } else {
+    if (isNaN(parsed)) {
       // 恢复为合法值
       setLocalValue(String(committedRef.current));
+      return;
     }
-  }, [localValue, onChange]);
+    const lo = min != null ? Number(min) : -Infinity;
+    const hi = max != null ? Number(max) : Infinity;
+    const clamped = clampNumber(parsed, lo, hi);
+    if (clamped !== committedRef.current) {
+      committedRef.current = clamped;
+      onChange(clamped);
+    }
+    // Normalize display
+    setLocalValue(String(clamped));
+  }, [localValue, onChange, min, max]);
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -52,6 +59,8 @@ export function NumberInput({ value, onChange, className, ...rest }: NumberInput
       onChange={(e) => setLocalValue(e.target.value)}
       onBlur={commit}
       onKeyDown={handleKeyDown}
+      min={min}
+      max={max}
       className={className}
       {...rest}
     />
