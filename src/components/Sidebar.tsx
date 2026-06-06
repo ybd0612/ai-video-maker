@@ -4,6 +4,7 @@ import { useCanvasStore } from "@/stores/canvasStore";
 import { TaskManager } from "@/components/TaskManager";
 import type { DragEvent } from 'react';
 import { useT } from '@/i18n';
+import { confirmDialog } from "@/components/ui/ConfirmDialog";
 
 interface PaletteItemProps {
   nodeType: string;
@@ -106,10 +107,15 @@ export function Sidebar() {
 <Settings size={13} /> {t("sidebar.settings")}
         </button>
         <button
-          onClick={() => {
-            if (nodeCount === 0 || confirm(t("sidebar.clearConfirm"))) {
-              clearAll();
-            }
+          onClick={async () => {
+            if (nodeCount === 0) { clearAll(); return; }
+            const ok = await confirmDialog({
+              title: t("sidebar.clearCanvas"),
+              message: t("sidebar.clearConfirm"),
+              confirmLabel: t("dialog.confirm"),
+              variant: "danger",
+            });
+            if (ok) clearAll();
           }}
           className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-xs text-red-400/70 transition hover:bg-red-950/40 hover:text-red-400"
         >

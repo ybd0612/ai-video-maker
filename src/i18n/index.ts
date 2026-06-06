@@ -1,4 +1,4 @@
-// ────────────────────────────────────────────────────────────────────────────
+﻿// ────────────────────────────────────────────────────────────────────────────
 // src/i18n/index.ts
 // Lightweight i18n system — no external deps, Zustand-driven language switch.
 // ────────────────────────────────────────────────────────────────────────────
@@ -35,6 +35,9 @@ const zh = {
   "task.historyEntries": "个历史版本",
   "task.restoreVersion": "恢复此版本",
   "task.deleteConfirm": "删除「{name}」？",
+  "dialog.confirm": "确认",
+  "dialog.cancel": "取消",
+  "dialog.delete": "删除",
 
   // Canvas
   "canvas.runWorkflow": "▶ 运行工作流",
@@ -188,6 +191,9 @@ const en = {
   "task.historyEntries": "history entries",
   "task.restoreVersion": "Restore this version",
   "task.deleteConfirm": "Delete \"{name}\"?",
+  "dialog.confirm": "Confirm",
+  "dialog.cancel": "Cancel",
+  "dialog.delete": "Delete",
 
   // Canvas
   "canvas.runWorkflow": "▶ Run Workflow",

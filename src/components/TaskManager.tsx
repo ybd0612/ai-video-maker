@@ -1,4 +1,4 @@
-// ────────────────────────────────────────────────────────────────────────────
+﻿// ────────────────────────────────────────────────────────────────────────────
 // src/components/TaskManager.tsx
 // Task management — save/load canvas snapshots as named tasks.
 // Tab-style switcher with auto-save before switching.
@@ -9,6 +9,7 @@ import { Save, FolderOpen, Trash2, Pencil, Check, X, Plus, ChevronDown, ChevronU
 import { useCanvasStore } from "@/stores/canvasStore";
 import { useTaskStore, type Task, type CanvasSnapshot, type HistoryEntry } from "@/stores/taskStore";
 import { useT } from "@/i18n";
+import { confirmDialog } from "@/components/ui/ConfirmDialog";
 
 /* ── Helpers ────────────────────────────────────────────────────────────── */
 
@@ -150,17 +151,21 @@ export function TaskManager() {
   const activeTaskId = useTaskStore((s) => s.activeTaskId);
   const setActiveTaskId = useTaskStore((s) => s.setActiveTaskId);
   const restoreFromHistory = useTaskStore((s) => s.restoreFromHistory);
-
-  const nodeCount = useCanvasStore((s) => s.nodes.length);
   const t = useT();
 
-  /* ── Save as new task ────────────────────────────────────────────────── */
+  /* ── New blank task ──────────────────────────────────────────────────── */
   const handleSaveNew = useCallback(() => {
+    // Auto-save current task before creating a new one
+    if (activeTaskId) {
+      const snapshot = captureSnapshot();
+      updateTask(activeTaskId, { canvasData: snapshot });
+    }
     const name = saveName.trim() || `Task ${tasks.length + 1}`;
-    const snapshot = captureSnapshot();
-    createTask(name, snapshot);
+    const emptySnap: CanvasSnapshot = { nodes: [], edges: [], viewport: { x: 0, y: 0, zoom: 1 }, capturedAt: Date.now() };
+    const task = createTask(name, emptySnap);
+    loadSnapshotIntoCanvas(task.canvasData);
     setSaveName("");
-  }, [saveName, tasks.length, createTask]);
+  }, [saveName, tasks.length, createTask, activeTaskId, updateTask]);
 
   /* ── Switch task (auto-saves current first) ──────────────────────────── */
   const handleSwitch = useCallback(
@@ -177,8 +182,14 @@ export function TaskManager() {
 
   /* ── Delete with confirmation ────────────────────────────────────────── */
   const handleDelete = useCallback(
-    (task: Task) => {
-      if (confirm(t("task.deleteConfirm", { name: task.name }))) deleteTask(task.id);
+    async (task: Task) => {
+      const ok = await confirmDialog({
+        title: t("dialog.delete"),
+        message: t("task.deleteConfirm", { name: task.name }),
+        confirmLabel: t("dialog.delete"),
+        variant: "danger",
+      });
+      if (ok) deleteTask(task.id);
     },
     [deleteTask, t],
   );
@@ -245,8 +256,7 @@ export function TaskManager() {
             />
             <button
               onClick={handleSaveNew}
-              disabled={nodeCount === 0}
-              title="Save current canvas as a new task"
+              title="Create a new blank task"
               className="shrink-0 flex items-center gap-1 rounded-md bg-emerald-600 px-2 py-1.5 text-[10px] font-medium text-white transition hover:bg-emerald-500 disabled:opacity-40 disabled:cursor-not-allowed"
             >
               <Plus size={11} /> {t("task.new")}
@@ -260,7 +270,6 @@ export function TaskManager() {
             </p>
           ) : (
             <div className="space-y-1">
-              <p className="text-[9px] text-slate-600 uppercase tracking-wider">{t("task.clickToSwitch")}</p>
               <div className="flex flex-wrap gap-1.5 max-h-48 overflow-y-auto overflow-x-hidden">
                 {[...tasks]
                   .map((task) => (
