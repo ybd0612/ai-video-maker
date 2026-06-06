@@ -6,7 +6,7 @@ import type { VideoNodeData } from "@/canvas/types";
 import { NodeShell } from "./NodeShell";
 import { useT } from "@/i18n";
 import { NumberInput } from "@/components/ui/NumberInput";
-import { sanitizePrompt } from "@/lib/validation";
+import { sanitizePrompt, calcNumFrames } from "@/lib/validation";
 import { HelpTooltip } from "@/components/ui/HelpTooltip";
 
 function VideoNodeInner({ id, data }: NodeProps) {
@@ -69,17 +69,28 @@ function VideoNodeInner({ id, data }: NodeProps) {
         </div>
         <div className="flex items-center gap-1">
           <label className="text-[11px] text-slate-500">{t("video.fps")}</label>
-          <NumberInput min={1} max={60} value={d.fps}
-            onChange={(v) => updateNodeData(id, { fps: v } as Partial<VideoNodeData>)}
+          <select
+            value={d.fps}
+            onChange={(e) => updateNodeData(id, { fps: parseInt(e.target.value) } as Partial<VideoNodeData>)}
             className="w-14 rounded border border-slate-700 bg-slate-800 px-1.5 py-0.5 text-xs text-slate-300 focus:border-amber-500 focus:outline-none"
-          />
+          >
+            <option value="24">24</option>
+            <option value="30">30</option>
+            <option value="60">60</option>
+          </select>
         </div>
         <div className="flex items-center gap-1">
           <label className="text-[11px] text-slate-500">{t("video.duration")}</label>
-          <NumberInput min={1} max={30} step={0.5} value={d.duration ?? 5}
-            onChange={(v) => updateNodeData(id, { duration: v } as Partial<VideoNodeData>)}
+          <select
+            value={d.duration ?? 5}
+            onChange={(e) => updateNodeData(id, { duration: parseFloat(e.target.value) } as Partial<VideoNodeData>)}
             className="w-14 rounded border border-slate-700 bg-slate-800 px-1.5 py-0.5 text-xs text-slate-300 focus:border-amber-500 focus:outline-none"
-          />
+          >
+            <option value="3">3s</option>
+            <option value="5">5s</option>
+            <option value="10">10s</option>
+            <option value="18">18s</option>
+          </select>
         </div>
         <div className="flex items-center gap-1">
           <label className="text-[11px] text-slate-500">{t("video.count")}</label>
@@ -94,6 +105,9 @@ function VideoNodeInner({ id, data }: NodeProps) {
             <option value="4">4</option>
             <option value="5">5</option>
           </select>
+        </div>
+        <div className="col-span-2 text-[11px] text-slate-500">
+          {t("video.numFrames")}: {calcNumFrames(d.duration ?? 5, d.fps)}
         </div>
       </div>
       {/* Seed */}
