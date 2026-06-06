@@ -1,6 +1,5 @@
 import { useState, useEffect, type ReactNode } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X } from "lucide-react";
 
 /**
  * Lightbox — 点击图片放大展示
@@ -49,15 +48,6 @@ export function Lightbox({
             className="fixed inset-0 z-[200] flex items-center justify-center bg-black/80 backdrop-blur-sm"
             onClick={() => setOpen(false)}
           >
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                setOpen(false);
-              }}
-              className="absolute right-4 top-4 rounded-full bg-slate-800/80 p-2 text-slate-300 transition hover:bg-slate-700 hover:text-white"
-            >
-              <X size={18} />
-            </button>
             <motion.img
               initial={{ scale: 0.9, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
@@ -65,7 +55,6 @@ export function Lightbox({
               src={src}
               alt={alt ?? ""}
               className="max-h-[90vh] max-w-[90vw] rounded-lg border border-slate-700 object-contain shadow-2xl"
-              onClick={(e) => e.stopPropagation()}
             />
           </motion.div>
         )}
