@@ -10,6 +10,7 @@ import type { Node } from "@xyflow/react";
 import { useCanvasStore } from "@/stores/canvasStore";
 import { useWorkflowRunner } from "@/canvas/hooks/useWorkflowRunner";
 import { useT } from "@/i18n";
+import { NumberInput } from "@/components/ui/NumberInput";
 import type {
   AnyNodeData,
   TextNodeData,
@@ -113,11 +114,11 @@ export function PropertiesPanel({ node, onClose }: PropertiesPanelProps) {
             type="text"
             value={d.label}
             onChange={(e) => updateNodeData(node.id, { label: e.target.value })}
-            className="w-full rounded-md border border-slate-700 bg-slate-800 px-2.5 py-1.5 text-xs text-slate-100 focus:border-emerald-500 focus:outline-none"
+            className="w-full rounded-md border border-slate-700 bg-slate-800 px-2.5 py-1.5 text-xs text-slate-100 focus:border-slate-500 focus:outline-none"
           />
         </Field>
 
-        {/* Node-type-specific fields */}
+        {/* Node-type specific fields */}
         {isTextNode(node) && <TextNodeFields nodeId={node.id} data={node.data as unknown as TextNodeData} />}
         {isImageNode(node) && <ImageNodeFields nodeId={node.id} data={node.data as unknown as ImageNodeData} />}
         {isVideoNode(node) && <VideoNodeFields nodeId={node.id} data={node.data as unknown as VideoNodeData} />}
@@ -151,23 +152,21 @@ function TextNodeFields({ nodeId, data }: { nodeId: string; data: TextNodeData }
         />
       </Field>
       <Field label={t("panel.temperature")}>
-        <input
-          type="number"
+        <NumberInput
           min={0}
           max={2}
           step={0.1}
           value={data.temperature}
-          onChange={(e) => updateNodeData(nodeId, { temperature: parseFloat(e.target.value) || 0.7 })}
+          onChange={(v) => updateNodeData(nodeId, { temperature: v })}
           className="w-24 rounded-md border border-slate-700 bg-slate-800 px-2 py-1 text-xs text-slate-100 focus:border-sky-500 focus:outline-none"
         />
       </Field>
       <Field label={t("panel.maxTokens")}>
-        <input
-          type="number"
+        <NumberInput
           min={1}
           max={8192}
           value={data.maxTokens}
-          onChange={(e) => updateNodeData(nodeId, { maxTokens: parseInt(e.target.value) || 1024 })}
+          onChange={(v) => updateNodeData(nodeId, { maxTokens: v })}
           className="w-24 rounded-md border border-slate-700 bg-slate-800 px-2 py-1 text-xs text-slate-100 focus:border-sky-500 focus:outline-none"
         />
       </Field>
@@ -250,30 +249,26 @@ function VideoNodeFields({ nodeId, data }: { nodeId: string; data: VideoNodeData
       </Field>
       <Field label={t("panel.resolution")}>
         <div className="flex items-center gap-2">
-          <input
-            type="number" min={256} max={1920} step={64} value={data.width}
-            onChange={(e) => updateNodeData(nodeId, { width: parseInt(e.target.value) || 768 })}
+          <NumberInput min={256} max={1920} step={64} value={data.width}
+            onChange={(v) => updateNodeData(nodeId, { width: v })}
             className="w-20 rounded-md border border-slate-700 bg-slate-800 px-2 py-1 text-xs text-slate-100 focus:border-amber-500 focus:outline-none"
           />
           <span className="text-xs text-slate-500">x</span>
-          <input
-            type="number" min={256} max={1920} step={64} value={data.height}
-            onChange={(e) => updateNodeData(nodeId, { height: parseInt(e.target.value) || 1152 })}
+          <NumberInput min={256} max={1920} step={64} value={data.height}
+            onChange={(v) => updateNodeData(nodeId, { height: v })}
             className="w-20 rounded-md border border-slate-700 bg-slate-800 px-2 py-1 text-xs text-slate-100 focus:border-amber-500 focus:outline-none"
           />
         </div>
       </Field>
       <Field label={t("panel.fpsFrames")}>
         <div className="flex items-center gap-2">
-          <input
-            type="number" min={1} max={60} value={data.fps}
-            onChange={(e) => updateNodeData(nodeId, { fps: parseInt(e.target.value) || 24 })}
+          <NumberInput min={1} max={60} value={data.fps}
+            onChange={(v) => updateNodeData(nodeId, { fps: v })}
             className="w-16 rounded-md border border-slate-700 bg-slate-800 px-2 py-1 text-xs text-slate-100 focus:border-amber-500 focus:outline-none"
           />
           <span className="text-xs text-slate-500">{t("panel.fps")}</span>
-          <input
-            type="number" min={1} max={300} value={data.numFrames}
-            onChange={(e) => updateNodeData(nodeId, { numFrames: parseInt(e.target.value) || 121 })}
+          <NumberInput min={1} max={300} value={data.numFrames}
+            onChange={(v) => updateNodeData(nodeId, { numFrames: v })}
             className="w-16 rounded-md border border-slate-700 bg-slate-800 px-2 py-1 text-xs text-slate-100 focus:border-amber-500 focus:outline-none"
           />
           <span className="text-xs text-slate-500">{t("panel.frames")}</span>

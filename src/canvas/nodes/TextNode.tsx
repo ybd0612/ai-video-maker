@@ -3,8 +3,9 @@ import { Handle, Position, type NodeProps } from "@xyflow/react";
 import { Type } from "lucide-react";
 import { useCanvasStore } from "@/stores/canvasStore";
 import type { TextNodeData } from "@/canvas/types";
-import { NodeShell } from "./NodeShell"
-import { useT } from '@/i18n';;
+import { NodeShell } from "./NodeShell";
+import { useT } from "@/i18n";
+import { NumberInput } from "@/components/ui/NumberInput";
 
 function TextNodeInner({ id, data }: NodeProps) {
   const d = data as unknown as TextNodeData;
@@ -37,22 +38,20 @@ function TextNodeInner({ id, data }: NodeProps) {
       {/* Parameters row */}
       <div className="flex items-center gap-2">
         <label className="text-[10px] text-slate-500">{t("text.temp")}</label>
-        <input
-          type="number"
+        <NumberInput
           min={0}
           max={2}
           step={0.1}
           value={d.temperature}
-          onChange={(e) => updateNodeData(id, { temperature: parseFloat(e.target.value) || 0.7 } as Partial<TextNodeData>)}
+          onChange={(v) => updateNodeData(id, { temperature: v } as Partial<TextNodeData>)}
           className="w-14 rounded border border-slate-700 bg-slate-800 px-1.5 py-0.5 text-[10px] text-slate-300 focus:border-sky-500 focus:outline-none"
         />
         <label className="text-[10px] text-slate-500">{t("text.maxTokens")}</label>
-        <input
-          type="number"
+        <NumberInput
           min={1}
           max={8192}
           value={d.maxTokens}
-          onChange={(e) => updateNodeData(id, { maxTokens: parseInt(e.target.value) || 1024 } as Partial<TextNodeData>)}
+          onChange={(v) => updateNodeData(id, { maxTokens: v } as Partial<TextNodeData>)}
           className="w-16 rounded border border-slate-700 bg-slate-800 px-1.5 py-0.5 text-[10px] text-slate-300 focus:border-sky-500 focus:outline-none"
         />
       </div>
