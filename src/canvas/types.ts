@@ -86,8 +86,7 @@ export interface TextNodeData extends BaseNodeData {
 export interface ImageNodeData extends BaseNodeData {
   modelId?: string;
   prompt: string;
-  width: number;
-  height: number;
+  size: string;
   quality: string;
   outputUrl?: string;
   revisedPrompt?: string;
@@ -237,8 +236,7 @@ export function createDefaultImageNodeData(t: (key: string, vars?: Record<string
     label: t("node.label.image"),
     modelId: getDefaultModelId("image"),
     prompt: "",
-    width: 1024,
-    height: 1024,
+    size: "1024x1024",
     quality: "standard",
     executionStatus: "idle",
     executionLogs: [],

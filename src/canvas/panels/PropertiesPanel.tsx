@@ -210,7 +210,7 @@ function ImageNodeFields({ nodeId, data }: { nodeId: string; data: ImageNodeData
             min={64}
             max={2048}
             step={64}
-            value={data.width}
+            value={data.width as number}
             onChange={(v) => updateNodeData(nodeId, { width: v })}
             className="w-20 rounded border border-slate-700 bg-slate-800 px-1.5 py-0.5 text-xs text-slate-300 focus:border-violet-500 focus:outline-none"
           />
@@ -219,7 +219,7 @@ function ImageNodeFields({ nodeId, data }: { nodeId: string; data: ImageNodeData
             min={64}
             max={2048}
             step={64}
-            value={data.height}
+            value={data.height as number}
             onChange={(v) => updateNodeData(nodeId, { height: v })}
             className="w-20 rounded border border-slate-700 bg-slate-800 px-1.5 py-0.5 text-xs text-slate-300 focus:border-violet-500 focus:outline-none"
           />

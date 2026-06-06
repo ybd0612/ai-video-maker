@@ -8,7 +8,7 @@ import { NodeShell } from "./NodeShell";
 import { useT } from '@/i18n';
 import { sanitizePrompt } from "@/lib/validation";
 import { HelpTooltip } from "@/components/ui/HelpTooltip";
-import { NumberInput } from "@/components/ui/NumberInput";
+
 import { Lightbox } from "@/components/ui/Lightbox";
 
 function ImageNodeInner({ id, data }: NodeProps) {
@@ -83,25 +83,24 @@ function ImageNodeInner({ id, data }: NodeProps) {
 
       {/* Size selector */}
       <div className="flex items-center gap-1 text-xs text-slate-500">{t("panel.imageSize")} <HelpTooltip>{t("hint.imageSize")}</HelpTooltip></div>
-      <div className="flex items-center gap-1">
-        <NumberInput
-          min={64}
-          max={2048}
-          step={64}
-          value={d.width}
-          onChange={(v) => updateNodeData(id, { width: v } as Partial<ImageNodeData>)}
-          className="w-20 rounded border border-slate-700 bg-slate-800 px-1.5 py-0.5 text-xs text-slate-300 focus:border-violet-500 focus:outline-none"
-        />
-        <span className="text-xs text-slate-600">×</span>
-        <NumberInput
-          min={64}
-          max={2048}
-          step={64}
-          value={d.height}
-          onChange={(v) => updateNodeData(id, { height: v } as Partial<ImageNodeData>)}
-          className="w-20 rounded border border-slate-700 bg-slate-800 px-1.5 py-0.5 text-xs text-slate-300 focus:border-violet-500 focus:outline-none"
-        />
-      </div>
+      <select
+        value={d.size}
+        onChange={(e) => updateNodeData(id, { size: e.target.value } as Partial<ImageNodeData>)}
+        className="w-full rounded border border-slate-700 bg-slate-800 px-2 py-1 text-xs text-slate-300 focus:border-violet-500 focus:outline-none"
+      >
+        <option value="1024x682">3:2</option>
+        <option value="682x1024">2:3</option>
+        <option value="1024x768">4:3</option>
+        <option value="768x1024">3:4</option>
+        <option value="1024x576">16:9</option>
+        <option value="576x1024">9:16</option>
+        <option value="1024x1024">1:1 (2k)</option>
+        <option value="1152x648">16:9 (2k)</option>
+        <option value="648x1152">9:16 (2k)</option>
+        <option value="1536x864">16:9 (4k)</option>
+        <option value="864x1536">9:16 (4k)</option>
+        <option value="auto">Auto</option>
+      </select>
 
       {/* Output */}
       {d.outputUrl ? (
