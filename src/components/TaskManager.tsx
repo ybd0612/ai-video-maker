@@ -127,6 +127,22 @@ export function TaskManager() {
   return () => window.removeEventListener("beforeunload", saveCurrent);
   }, [activeTaskId, updateTask]);
 
+  /* ── Load active task snapshot on mount (after store hydration) ─────── */
+  const didInitRef2 = useRef(false);
+  useEffect(() => {
+    if (didInitRef2.current) return;
+    didInitRef2.current = true;
+    // Delay to let zustand persist hydrate from localStorage
+    setTimeout(() => {
+      const { activeTaskId: currentId, tasks: currentTasks } = useTaskStore.getState();
+      if (!currentId) return;
+      const task = currentTasks.find((t) => t.id === currentId);
+      if (task) {
+        loadSnapshotIntoCanvas(task.canvasData);
+      }
+    }, 100);
+  }, []);
+
   /* ── New blank task ──────────────────────────────────────────────────── */
   const handleSaveNew = useCallback(() => {
     if (activeTaskId) {
