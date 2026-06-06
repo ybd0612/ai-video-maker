@@ -30,6 +30,7 @@ import { nodeTypes } from "./nodes";
 import { edgeTypes } from "./edges";
 import { validateCanvasConnection } from "./validateConnection";
 import { useCanvasStore, canvasLoadInProgress } from "@/stores/canvasStore";
+import { isSwitchingTask } from "@/components/TaskTreeView";
 import { useTaskStore } from "@/stores/taskStore";
 import { useSettingsStore } from "@/stores/settingsStore";
 import { useWorkflowRunner } from './hooks/useWorkflowRunner';
@@ -135,7 +136,7 @@ function CanvasInner() {
   const updateTask = useTaskStore((s) => s.updateTask);
   const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
-    if (!activeTaskId) return;
+    if (!activeTaskId || isSwitchingTask) return;
     // Debounce: save 500ms after last change
     if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
     autoSaveTimer.current = setTimeout(() => {

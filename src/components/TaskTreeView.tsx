@@ -18,6 +18,9 @@ import { ContextMenu, type ContextMenuItem } from "@/components/ui/ContextMenu";
 
 /* ── Helpers ────────────────────────────────────────────────────────────── */
 
+// Flag to prevent auto-save during task switching
+export let isSwitchingTask = false;
+
 function captureSnapshot(): CanvasSnapshot {
   const { nodes, edges, viewport } = useCanvasStore.getState();
   return { nodes, edges, viewport, capturedAt: Date.now() };
@@ -272,12 +275,15 @@ export function TaskTreeView() {
 
   const handleSwitch = useCallback(
     (task: Task) => {
+      isSwitchingTask = true;
       if (activeTaskId) {
         const snapshot = captureSnapshot();
         updateTask(activeTaskId, { canvasData: snapshot });
       }
       setActiveTaskId(task.id);
       loadSnapshotIntoCanvas(task.canvasData);
+      // Reset flag after a short delay to allow the effect to run
+      setTimeout(() => { isSwitchingTask = false; }, 100);
     },
     [activeTaskId, updateTask, setActiveTaskId],
   );
@@ -299,8 +305,6 @@ export function TaskTreeView() {
 
   const handleRootContextMenu = useCallback(
     (e: React.MouseEvent) => {
-      // Only trigger on the background, not on child items
-      if (e.target !== e.currentTarget) return;
       e.preventDefault();
       setRootCtx({
         x: e.clientX,
