@@ -172,6 +172,14 @@ export const ALLOWED_CONNECTIONS: ConnectionRule[] = [
   { sourceDataType: "video", targetDataType: "video", label: "Video → Video" },
 ];
 
+/* ── Handle colors by dataType (shared by nodes and edges) ───────────────── */
+
+export const HANDLE_COLORS: Record<string, { hex: string; tw: string }> = {
+  text:   { hex: "#38bdf8", tw: "!bg-sky-500" },
+  image:  { hex: "#a78bfa", tw: "!bg-violet-500" },
+  video:  { hex: "#fbbf24", tw: "!bg-amber-500" },
+};
+
 /* ── Handle registry per node type ──────────────────────────────────────── */
 
 export const NODE_HANDLES: Record<string, HandleSpec[]> = {

@@ -1,20 +1,26 @@
-// ────────────────────────────────────────────────────────────────────────────
+﻿// ────────────────────────────────────────────────────────────────────────────
 // src/canvas/edges/TypedEdge.tsx
 // Edge with color based on data type and animated style for running status.
 // ────────────────────────────────────────────────────────────────────────────
 
 import { memo } from "react";
 import { BaseEdge, getSmoothStepPath, type EdgeProps } from "@xyflow/react";
+import { NODE_HANDLES, HANDLE_COLORS } from "../types";
 
-const HANDLE_COLORS: Record<string, string> = {
-  "text-in": "#38bdf8",
-  "text-out": "#38bdf8",
-  "prompt-out": "#34d399",
-  "image-in": "#a78bfa",
-  "image-out": "#a78bfa",
-  "video-in": "#fbbf24",
-  "video-out": "#fbbf24",
-};
+/** Build a handleId → hex color lookup from the shared registry. */
+function buildHandleColorMap(): Record<string, string> {
+  const map: Record<string, string> = {};
+  for (const handles of Object.values(NODE_HANDLES)) {
+    for (const h of handles) {
+      if (h.direction === "source") {
+        map[h.id] = HANDLE_COLORS[h.dataType]?.hex ?? "#64748b";
+      }
+    }
+  }
+  return map;
+}
+
+const SOURCE_HANDLE_COLORS = buildHandleColorMap();
 
 function TypedEdgeInner({
   id,
@@ -38,7 +44,7 @@ function TypedEdgeInner({
     borderRadius: 16,
   });
 
-  const color = HANDLE_COLORS[sourceHandleId ?? ""] ?? "#64748b";
+  const color = SOURCE_HANDLE_COLORS[sourceHandleId ?? ""] ?? "#64748b";
 
   return (
     <BaseEdge

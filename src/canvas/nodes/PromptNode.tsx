@@ -1,4 +1,4 @@
-import { memo } from "react";
+﻿import { memo } from "react";
 import { Handle, Position, type NodeProps } from "@xyflow/react";
 import { MessageSquare } from "lucide-react";
 import { useCanvasStore } from "@/stores/canvasStore";
@@ -33,7 +33,7 @@ function PromptNodeInner({ id, data }: NodeProps) {
         rows={4}
         className="w-full resize-none rounded-md border border-slate-700 bg-slate-800 p-2 text-xs text-slate-100 placeholder:text-slate-500 focus:border-emerald-500 focus:outline-none"
       />
-      <Handle type="source" position={Position.Right} id="prompt-out" className="!h-3 !w-3 !bg-emerald-500" />
+      <Handle type="source" position={Position.Right} id="prompt-out" className="!h-3 !w-3 !bg-sky-500" />
     </NodeShell>
   );
 }
