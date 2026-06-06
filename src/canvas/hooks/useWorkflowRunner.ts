@@ -496,7 +496,7 @@ export function useWorkflowRunner() {
               const result = await callImageAPI(apiKey, baseUrl, {
                 model: data.modelId ?? "agnes-image-2.1-flash",
                 prompt: imagePrompt,
-                inputImageUrl: inputs.imageInputs[0] ?? data.inputImageUrl,
+                inputImageUrl: inputs.imageInputs[0],
                 size: data.size,
                 quality: data.quality,
 

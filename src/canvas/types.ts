@@ -89,7 +89,6 @@ export interface ImageNodeData extends BaseNodeData {
   outputUrl?: string;
   outputBlobKey?: string;
   revisedPrompt?: string;
-  inputImageUrl?: string;
 }
 
 /* ── Video generation / output node ─────────────────────────────────────── */

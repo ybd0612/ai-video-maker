@@ -1,12 +1,12 @@
-import { memo, useState } from "react";
+import { memo } from "react";
 import { Handle, Position, type NodeProps } from "@xyflow/react";
-import { ImageIcon, Link, Unlink } from "lucide-react";
+import { ImageIcon, Link } from "lucide-react";
 import { useCanvasStore } from "@/stores/canvasStore";
 import type { ImageNodeData } from "@/canvas/types";
 import type { AnyNodeData } from "@/canvas/types";
-import { NodeShell } from "./NodeShell"
-import { useT } from '@/i18n';;
-import { sanitizePrompt, isValidUrl } from "@/lib/validation";
+import { NodeShell } from "./NodeShell";
+import { useT } from '@/i18n';
+import { sanitizePrompt } from "@/lib/validation";
 import { HelpTooltip } from "@/components/ui/HelpTooltip";
 import { Lightbox } from "@/components/ui/Lightbox";
 
@@ -17,7 +17,6 @@ function ImageNodeInner({ id, data }: NodeProps) {
   const updateNodeData = useCanvasStore((s) => s.updateNodeData);
   const nodes = useCanvasStore((s) => s.nodes);
   const edges = useCanvasStore((s) => s.edges);
-  const [showUrlInput, setShowUrlInput] = useState(false);
   const t = useT();
 
   // Find connected upstream image via edges (image-in handle)
@@ -33,9 +32,7 @@ function ImageNodeInner({ id, data }: NodeProps) {
       })()
     : undefined;
 
-  // Effective input: connected upstream takes priority over manual URL
-  const effectiveInputUrl = upstreamImageUrl ?? d.inputImageUrl;
-  const hasInputImage = !!effectiveInputUrl;
+  const hasInputImage = !!upstreamImageUrl;
 
   return (
     <NodeShell
@@ -55,51 +52,20 @@ function ImageNodeInner({ id, data }: NodeProps) {
         )}
       </div>
 
-      {/* Input image preview */}
-      {hasInputImage ? (
+      {/* Input image preview from connected upstream node */}
+      {hasInputImage && (
         <div className="space-y-1">
           <div className="flex items-center gap-1 text-xs text-violet-400">
-            {upstreamImageUrl ? <Link size={10} /> : <Link size={10} />}
-            <span>{upstreamImageUrl ? t("image.connectedInput") : t("image.manualInput")}</span>
-            {upstreamImageUrl && (
-              <button
-                onClick={() => {}}
-                className="ml-auto text-slate-500 hover:text-slate-300"
-                title={t("image.disconnectTooltip")}
-              >
-                <Unlink size={10} />
-              </button>
-            )}
+            <Link size={10} />
+            <span>{t("image.connectedInput")}</span>
           </div>
-          <img
-            src={effectiveInputUrl}
-            alt="Input reference"
-            className="max-h-24 w-full rounded-md border border-violet-800/40 object-contain"
-          />
-        </div>
-      ) : null}
-
-      {/* Manual input image URL (only when not connected upstream) */}
-      {!upstreamImageUrl && (
-        <div>
-          <button
-            onClick={() => setShowUrlInput(!showUrlInput)}
-            className="text-xs text-slate-500 hover:text-violet-400 transition"
-          >
-            {showUrlInput ? t("image.hideInput") : t("image.showInput")} (img2img)
-          </button>
-          {showUrlInput && (
-            <input
-              type="text"
-              value={d.inputImageUrl ?? ""}
-              onChange={(e) =>
-                updateNodeData(id, { inputImageUrl: e.target.value || undefined } as Partial<ImageNodeData>)
-              }
-              onBlur={(e) => { const v = e.target.value.trim(); if (v && !isValidUrl(v)) { e.target.value = ""; updateNodeData(id, { inputImageUrl: undefined } as Partial<ImageNodeData>); } }}
-              placeholder="https://example.com/image.png"
-              className="mt-1 w-full rounded border border-slate-700 bg-slate-800 px-2 py-1 text-xs text-slate-300 placeholder:text-slate-600 focus:border-violet-500 focus:outline-none"
+          <Lightbox src={upstreamImageUrl} alt="Input reference">
+            <img
+              src={upstreamImageUrl}
+              alt="Input reference"
+              className="max-h-24 w-full rounded-md border border-violet-800/40 object-contain"
             />
-          )}
+          </Lightbox>
         </div>
       )}
 
@@ -115,7 +81,7 @@ function ImageNodeInner({ id, data }: NodeProps) {
       />
 
       {/* Size selector */}
-        <div className="flex items-center gap-1 text-xs text-slate-500">{t("panel.imageSize")} <HelpTooltip>{t("hint.imageSize")}</HelpTooltip></div>
+      <div className="flex items-center gap-1 text-xs text-slate-500">{t("panel.imageSize")} <HelpTooltip>{t("hint.imageSize")}</HelpTooltip></div>
       <select
         value={d.size}
         onChange={(e) => updateNodeData(id, { size: e.target.value } as Partial<ImageNodeData>)}
@@ -131,11 +97,11 @@ function ImageNodeInner({ id, data }: NodeProps) {
         <div className="space-y-1">
           <span className="text-xs text-slate-500">{t("image.output")}</span>
           <Lightbox src={d.outputUrl} alt="Generated">
-          <img
-            src={d.outputUrl}
-            alt="Generated"
-            className="max-h-40 w-full rounded-md border border-slate-700 object-contain"
-          />
+            <img
+              src={d.outputUrl}
+              alt="Generated"
+              className="max-h-40 w-full rounded-md border border-slate-700 object-contain"
+            />
           </Lightbox>
         </div>
       ) : d.executionStatus === "pending" ? (

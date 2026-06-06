@@ -1,4 +1,4 @@
-// ────────────────────────────────────────────────────────────────────────────
+﻿// ────────────────────────────────────────────────────────────────────────────
 // src/canvas/panels/PropertiesPanel.tsx
 // Right-side panel that shows the selected node's editable properties,
 // execution logs, and output preview.
@@ -217,13 +217,7 @@ function ImageNodeFields({ nodeId, data }: { nodeId: string; data: ImageNodeData
           ))}
         </select>
       </Field>
-      {data.inputImageUrl && (
-        <Field label={t("panel.inputImage")} hint={t("hint.inputImageUrl")}>
-          <Lightbox src={data.inputImageUrl} alt="Input">
-          <img src={data.inputImageUrl} alt="Input" className="w-full rounded-md border border-slate-700" />
-          </Lightbox>
-        </Field>
-      )}
+      {/* Input image from upstream is now shown in the canvas node */}
       {data.outputUrl && (
         <Field label={t("panel.outputImage")}>
           <Lightbox src={data.outputUrl} alt="Generated">
