@@ -7,6 +7,7 @@ import type { AnyNodeData } from "@/canvas/types";
 import { NodeShell } from "./NodeShell"
 import { useT } from '@/i18n';;
 import { sanitizePrompt, isValidUrl } from "@/lib/validation";
+import { HelpTooltip } from "@/components/ui/HelpTooltip";
 
 const SIZE_OPTIONS = ["512x512", "768x768", "1024x1024", "1024x1792", "1792x1024"];
 
@@ -113,6 +114,7 @@ function ImageNodeInner({ id, data }: NodeProps) {
       />
 
       {/* Size selector */}
+        <div className="flex items-center gap-1 text-xs text-slate-500">{t("panel.imageSize")} <HelpTooltip>{t("hint.imageSize")}</HelpTooltip></div>
       <select
         value={d.size}
         onChange={(e) => updateNodeData(id, { size: e.target.value } as Partial<ImageNodeData>)}

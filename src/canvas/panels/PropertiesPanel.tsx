@@ -11,6 +11,7 @@ import { useCanvasStore } from "@/stores/canvasStore";
 import { useWorkflowRunner } from "@/canvas/hooks/useWorkflowRunner";
 import { useT } from "@/i18n";
 import { NumberInput } from "@/components/ui/NumberInput";
+import { HelpTooltip } from "@/components/ui/HelpTooltip";
 import { sanitizeNodeLabel, sanitizePrompt, sanitizeRichText } from "@/lib/validation";
 import type {
   AnyNodeData,
@@ -46,10 +47,10 @@ function isUploadNode(n: Node<Record<string, unknown>>): n is Node<UploadNodeDat
 
 /* ── Reusable Field wrapper ──────────────────────────────────────────────── */
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+function Field({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
   return (
     <div>
-      <label className="mb-1 block text-xs font-medium text-slate-500 uppercase tracking-wider">{label}</label>
+      <label className="mb-1 flex items-center gap-1 text-xs font-medium text-slate-500 uppercase tracking-wider">{label}{hint && <HelpTooltip>{hint}</HelpTooltip>}</label>
       {children}
     </div>
   );
@@ -110,7 +111,7 @@ export function PropertiesPanel({ node, onClose }: PropertiesPanelProps) {
       {/* Body */}
       <div className="space-y-4 p-4">
         {/* Label editor */}
-        <Field label={t("panel.label")}>
+        <Field label={t("panel.label")} hint={t("hint.label")}>
           <input
             type="text"
             value={d.label}
@@ -154,7 +155,7 @@ function TextNodeFields({ nodeId, data }: { nodeId: string; data: TextNodeData }
           className="w-full resize-none rounded-md border border-slate-700 bg-slate-800 p-2 text-xs text-slate-100 placeholder:text-slate-600 focus:border-sky-500 focus:outline-none"
         />
       </Field>
-      <Field label={t("panel.temperature")}>
+      <Field label={t("panel.temperature")} hint={t("hint.temperature")}>
         <NumberInput
           min={0}
           max={2}
@@ -164,7 +165,7 @@ function TextNodeFields({ nodeId, data }: { nodeId: string; data: TextNodeData }
           className="w-24 rounded-md border border-slate-700 bg-slate-800 px-2 py-1 text-xs text-slate-100 focus:border-sky-500 focus:outline-none"
         />
       </Field>
-      <Field label={t("panel.maxTokens")}>
+      <Field label={t("panel.maxTokens")} hint={t("hint.maxTokens")}>
         <NumberInput
           min={1}
           max={8192}
@@ -204,7 +205,7 @@ function ImageNodeFields({ nodeId, data }: { nodeId: string; data: ImageNodeData
           className="w-full resize-none rounded-md border border-slate-700 bg-slate-800 p-2 text-xs text-slate-100 placeholder:text-slate-600 focus:border-violet-500 focus:outline-none"
         />
       </Field>
-      <Field label={t("panel.imageSize")}>
+      <Field label={t("panel.imageSize")} hint={t("hint.imageSize")}>
         <select
           value={data.size}
           onChange={(e) => updateNodeData(nodeId, { size: e.target.value })}
@@ -216,7 +217,7 @@ function ImageNodeFields({ nodeId, data }: { nodeId: string; data: ImageNodeData
         </select>
       </Field>
       {data.inputImageUrl && (
-        <Field label={t("panel.inputImage")}>
+        <Field label={t("panel.inputImage")} hint={t("hint.inputImageUrl")}>
           <img src={data.inputImageUrl} alt="Input" className="w-full rounded-md border border-slate-700" />
         </Field>
       )}
@@ -252,7 +253,7 @@ function VideoNodeFields({ nodeId, data }: { nodeId: string; data: VideoNodeData
           className="w-full resize-none rounded-md border border-slate-700 bg-slate-800 p-2 text-xs text-slate-100 placeholder:text-slate-600 focus:border-amber-500 focus:outline-none"
         />
       </Field>
-      <Field label={t("panel.resolution")}>
+      <Field label={t("panel.resolution")} hint={t("hint.resolution")}>
         <div className="flex items-center gap-2">
           <NumberInput min={256} max={1920} step={64} value={data.width}
             onChange={(v) => updateNodeData(nodeId, { width: v })}
@@ -265,7 +266,7 @@ function VideoNodeFields({ nodeId, data }: { nodeId: string; data: VideoNodeData
           />
         </div>
       </Field>
-      <Field label={t("panel.fpsFrames")}>
+      <Field label={t("panel.fpsFrames")} hint={t("hint.fps")}>
         <div className="flex items-center gap-2">
           <NumberInput min={1} max={60} value={data.fps}
             onChange={(v) => updateNodeData(nodeId, { fps: v })}
@@ -301,7 +302,7 @@ function PromptNodeFields({ nodeId, data }: { nodeId: string; data: PromptNodeDa
 
   return (
     <>
-      <Field label={t("panel.systemPrompt")}>
+      <Field label={t("panel.systemPrompt")} hint={t("hint.systemPrompt")}>
         <textarea
           value={data.systemPrompt ?? ""}
           onChange={(e) => updateNodeData(nodeId, { systemPrompt: e.target.value })}
@@ -311,7 +312,7 @@ function PromptNodeFields({ nodeId, data }: { nodeId: string; data: PromptNodeDa
           className="w-full resize-none rounded-md border border-slate-700 bg-slate-800 p-2 text-xs text-slate-100 placeholder:text-slate-600 focus:border-emerald-500 focus:outline-none"
         />
       </Field>
-      <Field label={t("panel.outputModality")}>
+      <Field label={t("panel.outputModality")} hint={t("hint.outputModality")}>
         <select
           value={data.outputModality}
           onChange={(e) => updateNodeData(nodeId, { outputModality: e.target.value as "text" | "image" | "video" })}

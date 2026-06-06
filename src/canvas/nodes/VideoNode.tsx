@@ -7,6 +7,7 @@ import { NodeShell } from "./NodeShell";
 import { useT } from "@/i18n";
 import { NumberInput } from "@/components/ui/NumberInput";
 import { sanitizePrompt } from "@/lib/validation";
+import { HelpTooltip } from "@/components/ui/HelpTooltip";
 
 function VideoNodeInner({ id, data }: NodeProps) {
   const d = data as unknown as VideoNodeData;
@@ -39,17 +40,17 @@ function VideoNodeInner({ id, data }: NodeProps) {
       />
       {/* Params row */}
       <div className="flex items-center gap-2">
-        <label className="text-xs text-slate-500">{t("video.width")}</label>
+        <label className="text-xs text-slate-500">{t("video.width")} <HelpTooltip>{t("hint.resolution")}</HelpTooltip></label>
         <NumberInput min={256} max={1920} step={64} value={d.width}
           onChange={(v) => updateNodeData(id, { width: v } as Partial<VideoNodeData>)}
           className="w-14 rounded border border-slate-700 bg-slate-800 px-1.5 py-0.5 text-xs text-slate-300 focus:border-amber-500 focus:outline-none"
         />
-        <label className="text-xs text-slate-500">{t("video.height")}</label>
+        <label className="text-xs text-slate-500">{t("video.height")} <HelpTooltip>{t("hint.resolution")}</HelpTooltip></label>
         <NumberInput min={256} max={1920} step={64} value={d.height}
           onChange={(v) => updateNodeData(id, { height: v } as Partial<VideoNodeData>)}
           className="w-14 rounded border border-slate-700 bg-slate-800 px-1.5 py-0.5 text-xs text-slate-300 focus:border-amber-500 focus:outline-none"
         />
-        <label className="text-xs text-slate-500">{t("video.fps")}</label>
+        <label className="text-xs text-slate-500">{t("video.fps")} <HelpTooltip>{t("hint.fps")}</HelpTooltip></label>
         <NumberInput min={1} max={60} value={d.fps}
           onChange={(v) => updateNodeData(id, { fps: v } as Partial<VideoNodeData>)}
           className="w-12 rounded border border-slate-700 bg-slate-800 px-1.5 py-0.5 text-xs text-slate-300 focus:border-amber-500 focus:outline-none"

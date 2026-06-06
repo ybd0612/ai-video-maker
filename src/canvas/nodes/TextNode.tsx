@@ -7,6 +7,7 @@ import { NodeShell } from "./NodeShell";
 import { useT } from "@/i18n";
 import { NumberInput } from "@/components/ui/NumberInput";
 import { sanitizePrompt } from "@/lib/validation";
+import { HelpTooltip } from "@/components/ui/HelpTooltip";
 
 function TextNodeInner({ id, data }: NodeProps) {
   const d = data as unknown as TextNodeData;
@@ -39,7 +40,7 @@ function TextNodeInner({ id, data }: NodeProps) {
       />
       {/* Parameters row */}
       <div className="flex items-center gap-2">
-        <label className="text-xs text-slate-500">{t("text.temp")}</label>
+        <label className="text-xs text-slate-500">{t("text.temp")} <HelpTooltip>{t("hint.temperature")}</HelpTooltip></label>
         <NumberInput
           min={0}
           max={2}
@@ -48,7 +49,7 @@ function TextNodeInner({ id, data }: NodeProps) {
           onChange={(v) => updateNodeData(id, { temperature: v } as Partial<TextNodeData>)}
           className="w-14 rounded border border-slate-700 bg-slate-800 px-1.5 py-0.5 text-xs text-slate-300 focus:border-sky-500 focus:outline-none"
         />
-        <label className="text-xs text-slate-500">{t("text.maxTokens")}</label>
+        <label className="text-xs text-slate-500">{t("text.maxTokens")} <HelpTooltip>{t("hint.maxTokens")}</HelpTooltip></label>
         <NumberInput
           min={1}
           max={8192}

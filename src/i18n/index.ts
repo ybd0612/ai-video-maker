@@ -103,6 +103,18 @@ const zh = {
   "panel.taskId": "任务ID",
   "panel.taskProgress": "进度",
 
+  // Tooltip hints
+  "hint.temperature": "控制输出的随机性。值越高越有创意，值越低越稳定保守。建议范围：0 ~ 2，默认 0.7。",
+  "hint.maxTokens": "单次生成的最大 Token 数量（约 1.5 个中文字 = 1 Token）。范围：1 ~ 8192。",
+  "hint.imageSize": "生成图像的分辨率。尺寸越大细节越丰富，但生成时间更长。",
+  "hint.resolution": "视频的画面尺寸（宽 x 高，单位像素）。范围：256 ~ 1920，步长 64。",
+  "hint.fps": "每秒播放的帧数。帧率越高动画越流畅，但生成时间更长。范围：1 ~ 60。",
+  "hint.numFrames": "视频的总帧数。帧数越多视频越长。范围：1 ~ 300。",
+  "hint.systemPrompt": "为 AI 设定角色、语气和约束规则。例如「你是一位专业的翻译家」。留空则使用默认行为。",
+  "hint.outputModality": "指定 Prompt 节点的输出类型，决定下游可连接的节点。",
+  "hint.inputImageUrl": "输入一张参考图片进行图生图变换。请输入完整的图片 URL 地址。",
+  "hint.label": "节点的显示名称，仅用于画布标识，不影响 AI 生成结果。",
+
   // Nodes
   "node.label.prompt": "提示词",
   "node.label.text": "文本生成",
@@ -264,6 +276,18 @@ const en = {
   "panel.output": "Output",
   "panel.taskId": "Task ID",
   "panel.taskProgress": "Progress",
+
+  // Tooltip hints
+  "hint.temperature": "Controls randomness. Higher = more creative, lower = more focused. Range: 0 ~ 2, default 0.7.",
+  "hint.maxTokens": "Maximum tokens per generation (~1.5 Chinese chars or ~0.75 English words = 1 token). Range: 1 ~ 8192.",
+  "hint.imageSize": "Output image resolution. Larger sizes produce more detail but take longer to generate.",
+  "hint.resolution": "Video frame size in pixels (width x height). Range: 256 ~ 1920, step 64.",
+  "hint.fps": "Frames per second. Higher = smoother animation but longer generation time. Range: 1 ~ 60.",
+  "hint.numFrames": "Total frames in the video. More frames = longer video. Range: 1 ~ 300.",
+  "hint.systemPrompt": "Set the AI role, tone, and constraints. E.g. You are a professional translator. Leave empty for default behavior.",
+  "hint.outputModality": "Specifies the output type of the Prompt node, determining which downstream nodes it can connect to.",
+  "hint.inputImageUrl": "Enter an image URL for img2img transformation. Must be a valid http(s) URL.",
+  "hint.label": "Display name on canvas. For identification only, does not affect AI output.",
 
   // Nodes
   "node.label.prompt": "Prompt",
