@@ -285,6 +285,15 @@ function VideoNodeFields({ nodeId, data }: { nodeId: string; data: VideoNodeData
           <span className="text-xs text-slate-500">{t("panel.frames")}</span>
         </div>
       </Field>
+      <Field label={t("panel.seed")} hint={t("hint.seedVideo")}>
+        <NumberInput
+          min={0}
+          max={2147483647}
+          value={data.seed ?? 0}
+          onChange={(v) => updateNodeData(nodeId, { seed: v })}
+          className="w-28 rounded-md border border-slate-700 bg-slate-800 px-2 py-1 text-xs text-slate-100 focus:border-amber-500 focus:outline-none"
+        />
+      </Field>
       {data.outputUrl && (
         <Field label={t("panel.outputVideo")}>
           <video
