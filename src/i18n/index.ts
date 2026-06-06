@@ -26,7 +26,7 @@ const zh = {
   "palette.video": "视频生成",
   "palette.video.desc": "AI 视频生成",
   "palette.upload": "上传图片",
-  "palette.upload.desc": "上传本地图片 (base64)",
+  "palette.upload.desc": "上传本地图片",
 
   // Task
   "task.title": "任务",
@@ -204,7 +204,7 @@ const en = {
   "palette.video": "Video Gen",
   "palette.video.desc": "AI video generation",
   "palette.upload": "Upload",
-  "palette.upload.desc": "Upload local image (base64)",
+  "palette.upload.desc": "Upload local image",
 
   // Task
   "task.title": "Tasks",
