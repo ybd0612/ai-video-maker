@@ -1,4 +1,4 @@
-// ────────────────────────────────────────────────────────────────────────────
+﻿// ────────────────────────────────────────────────────────────────────────────
 // src/providers/agnes/AgnesAdapter.ts
 // Concrete ModelProvider implementation for the Agnes AI API gateway.
 // Implements text, image, and video generation via a unified interface.
@@ -187,7 +187,7 @@ export class AgnesAdapter implements ModelProvider {
       body.extra_body = {
         ...(params.extraBody ?? {}),
         image: params.imageUrls,
-        mode: params.mode === "keyframe" ? "keyframes" : (params.mode ?? "normal"),
+        mode: params.mode === "keyframe" ? "keyframes" : "ti2vid",
       };
     } else if (params.imageUrl) {
       body.image = params.imageUrl;

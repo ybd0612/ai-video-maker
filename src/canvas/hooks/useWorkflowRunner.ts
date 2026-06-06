@@ -299,7 +299,7 @@ async function callVideoCreateAPI(apiKey: string, _baseUrl: string, params: Vide
     body.extra_body = {
       ...(params.extraBody ?? {}),
       image: params.imageUrls,
-      mode: params.mode === "keyframe" ? "keyframes" : (params.mode ?? "normal"),
+      mode: params.mode === "keyframe" ? "keyframes" : "ti2vid",
     };
   } else if (params.imageUrl) {
     body.image = params.imageUrl;
