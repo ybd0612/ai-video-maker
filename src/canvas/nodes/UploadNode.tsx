@@ -1,4 +1,4 @@
-import { memo, useRef } from "react";
+﻿import { memo, useRef } from "react";
 import { Handle, Position, type NodeProps } from "@xyflow/react";
 import { Upload, X } from "lucide-react";
 import { useCanvasStore } from "@/stores/canvasStore";
@@ -92,7 +92,7 @@ function UploadNodeInner({ id, data }: NodeProps) {
         /* Preview when image is loaded */
         <div className="space-y-1.5">
           <div className="flex items-center justify-between">
-            <span className="text-[10px] text-slate-400 truncate max-w-[180px]">
+            <span className="text-xs text-slate-400 truncate max-w-[180px]">
               {d.fileName} ({formatSize(d.fileSize ?? 0)})
             </span>
             <button
@@ -118,10 +118,10 @@ function UploadNodeInner({ id, data }: NodeProps) {
           className="flex h-28 cursor-pointer flex-col items-center justify-center gap-2 rounded-md border-2 border-dashed border-slate-700 transition hover:border-rose-500/60 hover:bg-slate-800/40"
         >
           <Upload size={20} className="text-slate-500" />
-          <span className="text-[10px] text-slate-500">
+          <span className="text-xs text-slate-500">
             {t("upload.dropHint")}
           </span>
-          <span className="text-[9px] text-slate-600">
+          <span className="text-[11px] text-slate-600">
             {t("upload.formats")}
           </span>
         </div>

@@ -1,4 +1,4 @@
-import { memo } from "react";
+﻿import { memo } from "react";
 import { Handle, Position, type NodeProps } from "@xyflow/react";
 import { Film, Loader2 } from "lucide-react";
 import { useCanvasStore } from "@/stores/canvasStore";
@@ -23,7 +23,7 @@ function VideoNodeInner({ id, data }: NodeProps) {
       errorMessage={d.errorMessage}
     >
       {/* Fixed model label */}
-      <div className="rounded border border-slate-700/50 bg-slate-800/50 px-2 py-1 text-[10px] text-slate-500">
+      <div className="rounded border border-slate-700/50 bg-slate-800/50 px-2 py-1 text-xs text-slate-500">
         {t("video.model")}: agnes-video-v2.0
       </div>
       <textarea
@@ -37,20 +37,20 @@ function VideoNodeInner({ id, data }: NodeProps) {
       />
       {/* Params row */}
       <div className="flex items-center gap-2">
-        <label className="text-[10px] text-slate-500">{t("video.width")}</label>
+        <label className="text-xs text-slate-500">{t("video.width")}</label>
         <NumberInput min={256} max={1920} step={64} value={d.width}
           onChange={(v) => updateNodeData(id, { width: v } as Partial<VideoNodeData>)}
-          className="w-14 rounded border border-slate-700 bg-slate-800 px-1.5 py-0.5 text-[10px] text-slate-300 focus:border-amber-500 focus:outline-none"
+          className="w-14 rounded border border-slate-700 bg-slate-800 px-1.5 py-0.5 text-xs text-slate-300 focus:border-amber-500 focus:outline-none"
         />
-        <label className="text-[10px] text-slate-500">{t("video.height")}</label>
+        <label className="text-xs text-slate-500">{t("video.height")}</label>
         <NumberInput min={256} max={1920} step={64} value={d.height}
           onChange={(v) => updateNodeData(id, { height: v } as Partial<VideoNodeData>)}
-          className="w-14 rounded border border-slate-700 bg-slate-800 px-1.5 py-0.5 text-[10px] text-slate-300 focus:border-amber-500 focus:outline-none"
+          className="w-14 rounded border border-slate-700 bg-slate-800 px-1.5 py-0.5 text-xs text-slate-300 focus:border-amber-500 focus:outline-none"
         />
-        <label className="text-[10px] text-slate-500">{t("video.fps")}</label>
+        <label className="text-xs text-slate-500">{t("video.fps")}</label>
         <NumberInput min={1} max={60} value={d.fps}
           onChange={(v) => updateNodeData(id, { fps: v } as Partial<VideoNodeData>)}
-          className="w-12 rounded border border-slate-700 bg-slate-800 px-1.5 py-0.5 text-[10px] text-slate-300 focus:border-amber-500 focus:outline-none"
+          className="w-12 rounded border border-slate-700 bg-slate-800 px-1.5 py-0.5 text-xs text-slate-300 focus:border-amber-500 focus:outline-none"
         />
       </div>
       {/* Progress bar */}
@@ -58,7 +58,7 @@ function VideoNodeInner({ id, data }: NodeProps) {
         <div className="space-y-1">
           <div className="flex items-center gap-2">
             <Loader2 size={12} className="animate-spin text-amber-400" />
-            <span className="text-[10px] text-slate-400">
+            <span className="text-xs text-slate-400">
               {d.taskProgress > 0 ? `${d.taskProgress}%` : t("video.creatingTask")}
             </span>
           </div>

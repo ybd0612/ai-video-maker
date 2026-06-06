@@ -1,4 +1,4 @@
-// ────────────────────────────────────────────────────────────────────────────
+﻿// ────────────────────────────────────────────────────────────────────────────
 // src/canvas/nodes/NodeShell.tsx
 // Shared node chrome: header bar with icon/label/status, action buttons,
 // error display, and consistent card styling.
@@ -81,7 +81,7 @@ export function NodeShell({
         {children}
         {errorMessage && (
           <div className="rounded-md border border-red-800/50 bg-red-950/30 p-2">
-            <p className="text-[10px] leading-tight text-red-400">{errorMessage}</p>
+            <p className="text-xs leading-tight text-red-400">{errorMessage}</p>
           </div>
         )}
       </div>

@@ -1,4 +1,4 @@
-// ────────────────────────────────────────────────────────────────────────────
+﻿// ────────────────────────────────────────────────────────────────────────────
 // src/canvas/panels/PropertiesPanel.tsx
 // Right-side panel that shows the selected node's editable properties,
 // execution logs, and output preview.
@@ -48,7 +48,7 @@ function isUploadNode(n: Node<Record<string, unknown>>): n is Node<UploadNodeDat
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div>
-      <label className="mb-1 block text-[10px] font-medium text-slate-500 uppercase tracking-wider">{label}</label>
+      <label className="mb-1 block text-xs font-medium text-slate-500 uppercase tracking-wider">{label}</label>
       {children}
     </div>
   );
@@ -353,7 +353,7 @@ function LogsSection({ logs }: { logs: NonNullable<AnyNodeData["executionLogs"]>
 
   return (
     <details open={count > 0} className="group">
-      <summary className="flex cursor-pointer items-center gap-1 text-[10px] font-medium text-slate-500 uppercase tracking-wider">
+      <summary className="flex cursor-pointer items-center gap-1 text-xs font-medium text-slate-500 uppercase tracking-wider">
         {count > 0 ? <ChevronDown size={10} /> : <ChevronUp size={10} />}
         {t("panel.logs")} ({count})
       </summary>
@@ -362,14 +362,14 @@ function LogsSection({ logs }: { logs: NonNullable<AnyNodeData["executionLogs"]>
           {logs.map((log, i) => (
             <div key={i} className="flex items-start gap-1.5">
               <span className="mt-0.5 inline-block h-1.5 w-1.5 flex-shrink-0 rounded-full" />
-              <span className="text-[9px] text-slate-400 leading-tight">
+              <span className="text-[11px] text-slate-400 leading-tight">
                 {new Date(log.timestamp).toLocaleTimeString()} — {log.message}
               </span>
             </div>
           ))}
         </div>
       ) : (
-        <p className="mt-1 text-[9px] text-slate-600">{t("panel.noLogs")}</p>
+        <p className="mt-1 text-[11px] text-slate-600">{t("panel.noLogs")}</p>
       )}
     </details>
   );

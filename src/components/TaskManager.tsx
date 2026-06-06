@@ -60,7 +60,7 @@ function TabButton({
           value={editName}
           onChange={(e) => setEditName(e.target.value)}
           onKeyDown={(e) => { if (e.key === "Enter") commitRename(); if (e.key === "Escape") setEditing(false); }}
-          maxLength={20} className="w-20 rounded border-0 bg-transparent px-0.5 text-[10px] text-slate-100 focus:outline-none"
+          maxLength={20} className="w-20 rounded border-0 bg-transparent px-0.5 text-xs text-slate-100 focus:outline-none"
         />
         <button onClick={commitRename} className="text-emerald-400"><Check size={11} /></button>
         <button onClick={() => setEditing(false)} className="text-slate-500"><X size={11} /></button>
@@ -72,7 +72,7 @@ function TabButton({
     <div className="w-full">
       <div
         onClick={onClick}
-        className={`group relative flex cursor-pointer items-center gap-1.5 rounded-md border px-2 py-1.5 text-[10px] transition select-none ${
+        className={`group relative flex cursor-pointer items-center gap-1.5 rounded-md border px-2 py-1.5 text-xs transition select-none ${
           isActive
             ? "border-emerald-500/60 bg-emerald-950/40 text-emerald-300 font-semibold"
             : "border-slate-700/50 bg-slate-800/40 text-slate-400 hover:border-slate-600 hover:text-slate-200"
@@ -80,13 +80,13 @@ function TabButton({
       >
         <FolderOpen size={10} className={isActive ? "text-emerald-400" : "text-slate-600"} />
         <span className="truncate max-w-[80px]">{task.name}</span>
-        <span className="text-[8px] text-slate-600">({task.canvasData.nodes.length})</span>
+        <span className="text-xs text-slate-600">({task.canvasData.nodes.length})</span>
 
         {/* History toggle */}
         {historyCount > 0 && (
           <button
             onClick={(e) => { e.stopPropagation(); setShowHistory(!showHistory); }}
-            className={`ml-auto flex items-center gap-0.5 rounded px-1 py-0.5 text-[8px] transition ${showHistory ? "text-amber-400 bg-amber-950/30" : "text-slate-600 hover:text-slate-400"}`}
+            className={`ml-auto flex items-center gap-0.5 rounded px-1 py-0.5 text-xs transition ${showHistory ? "text-amber-400 bg-amber-950/30" : "text-slate-600 hover:text-slate-400"}`}
             title={`${historyCount} ${t("task.historyEntries")}`}
           >
             <History size={9} /> {historyCount}
@@ -122,7 +122,7 @@ function TabButton({
               <button
                 key={entry.savedAt}
                 onClick={(e) => { e.stopPropagation(); onRestoreHistory(actualIndex); }}
-                className="flex w-full items-center gap-1.5 rounded px-1.5 py-1 text-[9px] text-slate-500 transition hover:bg-slate-800 hover:text-amber-300"
+                className="flex w-full items-center gap-1.5 rounded px-1.5 py-1 text-[11px] text-slate-500 transition hover:bg-slate-800 hover:text-amber-300"
                 title={t("task.restoreVersion")}
               >
                 <RotateCcw size={8} />
@@ -233,7 +233,7 @@ export function TaskManager() {
       {/* Header */}
       <button
         onClick={() => setExpanded(!expanded)}
-        className="flex w-full items-center gap-2 px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500 transition hover:text-slate-300"
+        className="flex w-full items-center gap-2 px-3 py-2 text-xs font-semibold uppercase tracking-wider text-slate-500 transition hover:text-slate-300"
       >
         <Save size={11} />
         {t("task.title")}
@@ -252,12 +252,12 @@ export function TaskManager() {
               onChange={(e) => setSaveName(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && handleSaveNew()}
               placeholder={t("task.newPlaceholder")}
-              className="flex-1 rounded-md border border-slate-700 bg-slate-800 px-2 py-1.5 text-[10px] text-slate-200 placeholder:text-slate-600 focus:border-emerald-500 focus:outline-none"
+              className="flex-1 rounded-md border border-slate-700 bg-slate-800 px-2 py-1.5 text-xs text-slate-200 placeholder:text-slate-600 focus:border-emerald-500 focus:outline-none"
             />
             <button
               onClick={handleSaveNew}
               title="Create a new blank task"
-              className="shrink-0 flex items-center gap-1 rounded-md bg-emerald-600 px-2 py-1.5 text-[10px] font-medium text-white transition hover:bg-emerald-500 disabled:opacity-40 disabled:cursor-not-allowed"
+              className="shrink-0 flex items-center gap-1 rounded-md bg-emerald-600 px-2 py-1.5 text-xs font-medium text-white transition hover:bg-emerald-500 disabled:opacity-40 disabled:cursor-not-allowed"
             >
               <Plus size={11} /> {t("task.new")}
             </button>
@@ -265,7 +265,7 @@ export function TaskManager() {
 
           {/* ── Task tabs ───────────────────────────────────────────────── */}
           {tasks.length === 0 ? (
-            <p className="py-3 text-center text-[10px] text-slate-600">
+            <p className="py-3 text-center text-xs text-slate-600">
               {t("task.noTasks")}
             </p>
           ) : (

@@ -1,4 +1,4 @@
-import { memo, useState } from "react";
+﻿import { memo, useState } from "react";
 import { Handle, Position, type NodeProps } from "@xyflow/react";
 import { ImageIcon, Link, Unlink } from "lucide-react";
 import { useCanvasStore } from "@/stores/canvasStore";
@@ -45,7 +45,7 @@ function ImageNodeInner({ id, data }: NodeProps) {
       errorMessage={d.errorMessage}
     >
       {/* Fixed model label */}
-      <div className="rounded border border-slate-700/50 bg-slate-800/50 px-2 py-1 text-[10px] text-slate-500">
+      <div className="rounded border border-slate-700/50 bg-slate-800/50 px-2 py-1 text-xs text-slate-500">
         {t("image.model")}: agnes-image-2.1-flash
         {hasInputImage && (
           <span className="ml-2 text-violet-400">+ {t("image.img2img")}</span>
@@ -55,7 +55,7 @@ function ImageNodeInner({ id, data }: NodeProps) {
       {/* Input image preview */}
       {hasInputImage ? (
         <div className="space-y-1">
-          <div className="flex items-center gap-1 text-[10px] text-violet-400">
+          <div className="flex items-center gap-1 text-xs text-violet-400">
             {upstreamImageUrl ? <Link size={10} /> : <Link size={10} />}
             <span>{upstreamImageUrl ? t("image.connectedInput") : t("image.manualInput")}</span>
             {upstreamImageUrl && (
@@ -81,7 +81,7 @@ function ImageNodeInner({ id, data }: NodeProps) {
         <div>
           <button
             onClick={() => setShowUrlInput(!showUrlInput)}
-            className="text-[10px] text-slate-500 hover:text-violet-400 transition"
+            className="text-xs text-slate-500 hover:text-violet-400 transition"
           >
             {showUrlInput ? t("image.hideInput") : t("image.showInput")} (img2img)
           </button>
@@ -93,7 +93,7 @@ function ImageNodeInner({ id, data }: NodeProps) {
                 updateNodeData(id, { inputImageUrl: e.target.value || undefined } as Partial<ImageNodeData>)
               }
               placeholder="https://example.com/image.png"
-              className="mt-1 w-full rounded border border-slate-700 bg-slate-800 px-2 py-1 text-[10px] text-slate-300 placeholder:text-slate-600 focus:border-violet-500 focus:outline-none"
+              className="mt-1 w-full rounded border border-slate-700 bg-slate-800 px-2 py-1 text-xs text-slate-300 placeholder:text-slate-600 focus:border-violet-500 focus:outline-none"
             />
           )}
         </div>
@@ -113,7 +113,7 @@ function ImageNodeInner({ id, data }: NodeProps) {
       <select
         value={d.size}
         onChange={(e) => updateNodeData(id, { size: e.target.value } as Partial<ImageNodeData>)}
-        className="w-full rounded border border-slate-700 bg-slate-800 px-2 py-1 text-[10px] text-slate-300 focus:border-violet-500 focus:outline-none"
+        className="w-full rounded border border-slate-700 bg-slate-800 px-2 py-1 text-xs text-slate-300 focus:border-violet-500 focus:outline-none"
       >
         {SIZE_OPTIONS.map((s) => (
           <option key={s} value={s}>{s}</option>
@@ -123,7 +123,7 @@ function ImageNodeInner({ id, data }: NodeProps) {
       {/* Output */}
       {d.outputUrl ? (
         <div className="space-y-1">
-          <span className="text-[10px] text-slate-500">{t("image.output")}</span>
+          <span className="text-xs text-slate-500">{t("image.output")}</span>
           <img
             src={d.outputUrl}
             alt="Generated"

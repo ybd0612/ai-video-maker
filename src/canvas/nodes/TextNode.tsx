@@ -1,4 +1,4 @@
-import { memo } from "react";
+﻿import { memo } from "react";
 import { Handle, Position, type NodeProps } from "@xyflow/react";
 import { Type } from "lucide-react";
 import { useCanvasStore } from "@/stores/canvasStore";
@@ -23,7 +23,7 @@ function TextNodeInner({ id, data }: NodeProps) {
       errorMessage={d.errorMessage}
     >
       {/* Fixed model label */}
-      <div className="rounded border border-slate-700/50 bg-slate-800/50 px-2 py-1 text-[10px] text-slate-500">
+      <div className="rounded border border-slate-700/50 bg-slate-800/50 px-2 py-1 text-xs text-slate-500">
         {t("text.model")}: agnes-2.0-flash
       </div>
       <textarea
@@ -37,22 +37,22 @@ function TextNodeInner({ id, data }: NodeProps) {
       />
       {/* Parameters row */}
       <div className="flex items-center gap-2">
-        <label className="text-[10px] text-slate-500">{t("text.temp")}</label>
+        <label className="text-xs text-slate-500">{t("text.temp")}</label>
         <NumberInput
           min={0}
           max={2}
           step={0.1}
           value={d.temperature}
           onChange={(v) => updateNodeData(id, { temperature: v } as Partial<TextNodeData>)}
-          className="w-14 rounded border border-slate-700 bg-slate-800 px-1.5 py-0.5 text-[10px] text-slate-300 focus:border-sky-500 focus:outline-none"
+          className="w-14 rounded border border-slate-700 bg-slate-800 px-1.5 py-0.5 text-xs text-slate-300 focus:border-sky-500 focus:outline-none"
         />
-        <label className="text-[10px] text-slate-500">{t("text.maxTokens")}</label>
+        <label className="text-xs text-slate-500">{t("text.maxTokens")}</label>
         <NumberInput
           min={1}
           max={8192}
           value={d.maxTokens}
           onChange={(v) => updateNodeData(id, { maxTokens: v } as Partial<TextNodeData>)}
-          className="w-16 rounded border border-slate-700 bg-slate-800 px-1.5 py-0.5 text-[10px] text-slate-300 focus:border-sky-500 focus:outline-none"
+          className="w-16 rounded border border-slate-700 bg-slate-800 px-1.5 py-0.5 text-xs text-slate-300 focus:border-sky-500 focus:outline-none"
         />
       </div>
       {/* Output */}

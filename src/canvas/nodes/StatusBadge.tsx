@@ -1,4 +1,4 @@
-import { Loader2, CheckCircle2, XCircle, Circle } from "lucide-react";
+﻿import { Loader2, CheckCircle2, XCircle, Circle } from "lucide-react";
 import type { NodeExecutionStatus } from "@/canvas/types";
 import { useT, type TranslationKey } from "@/i18n";
 
@@ -18,7 +18,7 @@ export function StatusBadge({ status }: { status: NodeExecutionStatus }) {
   return (
     <span className={`inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 ${bg} ${color}`}>
       <Icon size={10} className={status === "pending" ? "animate-spin" : ""} />
-      <span className="text-[9px] font-medium">{t(labelKey)}</span>
+      <span className="text-[11px] font-medium">{t(labelKey)}</span>
     </span>
   );
 }

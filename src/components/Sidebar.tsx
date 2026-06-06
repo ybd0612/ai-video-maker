@@ -1,4 +1,4 @@
-import { MessageSquare, Type, ImageIcon, Film, Upload, Settings, Trash2 } from "lucide-react";
+﻿import { MessageSquare, Type, ImageIcon, Film, Upload, Settings, Trash2 } from "lucide-react";
 import { useSettingsStore } from "@/stores/settingsStore";
 import { useCanvasStore } from "@/stores/canvasStore";
 import { TaskManager } from "@/components/TaskManager";
@@ -30,7 +30,7 @@ function PaletteItem({ nodeType, label, icon: Icon, color, description }: Palett
         <Icon size={14} className={color} />
         <span className="text-xs font-semibold text-slate-200">{label}</span>
       </div>
-      <p className="mt-1 text-[10px] text-slate-500">{description}</p>
+      <p className="mt-1 text-xs text-slate-500">{description}</p>
     </div>
   );
 }
@@ -48,12 +48,12 @@ export function Sidebar() {
         <h1 className="text-sm font-bold text-slate-100">
           <span className="text-emerald-400">AI</span> Canvas
         </h1>
-        <p className="text-[10px] text-slate-500">Infinite Canvas Creator</p>
+        <p className="text-xs text-slate-500">Infinite Canvas Creator</p>
       </div>
 
       {/* Node palette */}
       <div className="flex-1 overflow-y-auto p-3">
-        <p className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-slate-600">
+        <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-600">
 {t("sidebar.dragToCanvas")}
         </p>
         <div className="space-y-2">
