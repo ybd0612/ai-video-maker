@@ -149,7 +149,7 @@ src/
 │       ├── Lightbox.tsx       # Image lightbox
 │       └── NumberInput.tsx    # Number input
 ├── stores/                    # State management (Zustand)
-│   ├── canvasStore.ts         # Canvas state (IndexedDB + localStorage backup + version migration)
+│   ├── canvasStore.ts         # Canvas state (IndexedDB persistence + localStorage backup)
 │   ├── settingsStore.ts       # Global settings (localStorage)
 │   └── taskStore.ts           # Task management (folders + multi-canvas, localStorage)
 ├── providers/                 # AI model abstraction layer

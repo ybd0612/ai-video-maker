@@ -1,4 +1,4 @@
-# 连接规则
+﻿# 连接规则
 
 ## 概述
 
@@ -21,6 +21,8 @@ Handle 有 4 种数据类型（`dataType`）：
 | `image` | 图像数据流 | 紫色 `#a78bfa` |
 | `video` | 视频数据流 | 琥珀 `#fbbf24` |
 | `prompt` | 提示词输入 | 翡翠绿 `#34d399` |
+
+> **注意**：`prompt` 类型在 `ALLOWED_CONNECTIONS` 中定义了 `text → prompt` 规则，但当前没有任何 Handle 实际使用 `dataType: "prompt"`。Prompt 节点的 `prompt-out` Handle 的 `dataType` 为 `"text"`。因此 `text → prompt` 规则实际上是死代码，不影响当前行为。
 
 ### 方向
 
@@ -73,7 +75,7 @@ Handle 有 4 种数据类型（`dataType`）：
 | 源端口类型 | → | 目标端口类型 | 说明 |
 |-----------|---|-------------|------|
 | text | → | text | 文本 → 文本（串联 LLM） |
-| text | → | prompt | 文本 → 提示词 |
+| text | → | prompt | 文本 → 提示词（死规则，见上文注释） |
 | image | → | image | 图像 → 图像（串联处理） |
 | image | → | video | 图像 → 视频（图生视频） |
 | video | → | video | 视频 → 视频（串联处理） |

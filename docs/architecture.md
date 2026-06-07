@@ -1,4 +1,4 @@
-# 系统架构
+﻿# 系统架构
 
 ## 技术栈
 
@@ -9,7 +9,7 @@
 | 构建 | Vite | 8 | 开发服务器 + 生产打包 |
 | 画布 | React Flow (`@xyflow/react`) | v12 | 无限画布、节点、连线 |
 | 状态 | Zustand | v5 | 全局状态管理 |
-| 持久化 | localForage | — | IndexedDB 存储（画布图 + 二进制 Blob） |
+| 持久化 | localForage | — | IndexedDB 存储（画布图） |
 | 样式 | TailwindCSS | v4 | 原子化 CSS |
 | 动画 | Framer Motion | — | 过渡动画（SettingsDialog 等） |
 | 图标 | Lucide React | — | 图标库 |
@@ -43,10 +43,17 @@ src/
 │   └── panels/
 │       └── PropertiesPanel.tsx   # 右侧属性编辑面板
 ├── components/                   # UI 组件
-│   ├── Sidebar.tsx               # 左侧面板（节点调色板 + 任务管理器）
-│   ├── TaskManager.tsx           # 任务管理（多画布 + 历史回溯）
+│   ├── Sidebar.tsx               # 左侧面板（设置 + 清空画布）
+│   ├── TaskTreeView.tsx          # 树形任务管理器（文件夹 + 任务 + 右键菜单）
+│   ├── TaskManager.tsx           # 任务管理器（旧版，已弃用）
 │   ├── SettingsDialog.tsx        # 设置对话框
-│   └── ApiKeyBanner.tsx          # API Key 提示横幅
+│   ├── ApiKeyBanner.tsx          # API Key 提示横幅
+│   └── ui/                       # 通用 UI 组件
+│       ├── ConfirmDialog.tsx     # 确认对话框
+│       ├── ContextMenu.tsx       # 右键菜单
+│       ├── HelpTooltip.tsx       # 帮助提示
+│       ├── Lightbox.tsx          # 图片灯箱
+│       └── NumberInput.tsx       # 数字输入框
 ├── stores/                       # Zustand stores
 │   ├── canvasStore.ts            # 画布状态 + IndexedDB 持久化
 │   ├── settingsStore.ts          # 全局设置 + localStorage
@@ -56,7 +63,8 @@ src/
 │   └── agnes/
 │       └── AgnesAdapter.ts       # Agnes AI 适配器
 ├── lib/
-│   └── resolveBaseUrl.ts         # URL 清理工具
+│   ├── resolveBaseUrl.ts         # URL 清理工具
+│   └── validation.ts             # 校验工具（帧数计算、prompt 清理等）
 └── styles/
     └── globals.css               # 全局样式 + React Flow 覆写
 ```
@@ -66,12 +74,12 @@ src/
 ```
 ┌─────────────┐     ┌──────────────────┐     ┌──────────────────┐
 │   Sidebar    │────▶│  CanvasWorkspace  │────▶│ PropertiesPanel  │
-│  (拖拽添加)   │     │  (React Flow)     │     │  (属性编辑)       │
+│  (设置管理)   │     │  (React Flow)     │     │  (属性编辑)       │
 └─────────────┘     └────────┬─────────┘     └──────────────────┘
                              │
                     ┌────────▼─────────┐
                     │   canvasStore     │◀──── IndexedDB (localForage)
-                    │  (nodes/edges)    │
+                    │  (nodes/edges)    │◀──── localStorage (backup)
                     └────────┬─────────┘
                              │
                     ┌────────▼─────────┐     ┌──────────────────┐
@@ -86,9 +94,9 @@ src/
 - **CanvasWorkspace** → canvasStore, settingsStore, taskStore, useWorkflowRunner, nodeTypes, edgeTypes, validateConnection
 - **节点组件** → canvasStore, NodeShell, types（节点数据类型）
 - **useWorkflowRunner** → canvasStore, settingsStore, AgnesAdapter（通过 providers/types）
-- **TaskManager** → taskStore, canvasStore
+- **Sidebar** → settingsStore, canvasStore, TaskTreeView
+- **TaskTreeView** → taskStore, canvasStore
 - **SettingsDialog** → settingsStore
-- **Sidebar** → settingsStore, canvasStore, TaskManager
 
 ## 路径别名
 
@@ -100,4 +108,4 @@ src/
 - `verbatimModuleSyntax` — 类型导入必须用 `import type`
 - `erasableSyntaxOnly: true` — 禁止 enum 等需运行时擦除的语法
 - 节点数据采用判别联合（discriminated union）
-- 大二进制通过 IndexedDB Blob 存储，不放入 store state
+- 图片和视频输出存储为 URL（由 AI 模型返回），不存储为 base64 或二进制 Blob

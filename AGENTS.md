@@ -1,4 +1,4 @@
-﻿# wxhb — AI Canvas Creator
+# wxhb — AI Canvas Creator
 
 面向 AI 创作的无限画布工作台。基于 React Flow 构建节点式工作流编辑器，集成 Agnes AI 的文本、图像、视频三大模型，支持拖拽编排、拓扑执行和中英文切换。
 
@@ -103,10 +103,13 @@ src/
 
 ## 连接规则
 
-节点之间的 Handle 有类型约束（`text` / `image` / `video` / `prompt`），在 `ALLOWED_CONNECTIONS` 中定义：
-- `text → text` / `text → prompt`
-- `image → image` / `image → video`
-- `video → video`
+节点之间的 Handle 有类型约束（`text` / `image` / `video`），在 `ALLOWED_CONNECTIONS` 中定义：
+- `text → text`（文本串联）
+- `image → image`（图像串联）
+- `image → video`（图生视频）
+- `video → video`（视频串联）
+
+> 注：`ALLOWED_CONNECTIONS` 中的 `text → prompt` 规则实际无效（Prompt 节点的 `prompt-out` dataType 为 `text`，非 `prompt`）。
 
 ## 工作流约定（Agent 必须遵守）
 

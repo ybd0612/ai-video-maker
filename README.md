@@ -149,7 +149,7 @@ src/
 │       ├── Lightbox.tsx       # 图片灯箱
 │       └── NumberInput.tsx    # 数字输入框
 ├── stores/                    # 状态管理（Zustand）
-│   ├── canvasStore.ts         # 画布状态（IndexedDB 持久化）
+│   ├── canvasStore.ts         # 画布状态（IndexedDB 持久化 + localStorage 备份）
 │   ├── settingsStore.ts       # 全局设置（localStorage）
 │   └── taskStore.ts           # 任务管理（文件夹 + 多画布任务切换，localStorage）
 ├── providers/                 # AI 模型抽象层

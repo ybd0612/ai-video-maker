@@ -1,4 +1,4 @@
-# WXHB 使用指南
+﻿# WXHB 使用指南
 
 ## 目录
 
@@ -16,8 +16,8 @@
 
 ## 1. 环境准备
 
-- **Node.js** ≥ 22（推荐 22.17+）
-- **npm** ≥ 10
+- **Node.js** ≥ 18（推荐 18.20+）
+- **npm** ≥ 9
 - 一个 Agnes AI API Key（从 https://agnes-ai.com 获取）
 
 ## 2. 安装与启动
@@ -25,7 +25,7 @@
 ```bash
 cd wxhb
 npm install
-node node_modules/vite/bin/vite.js
+npm run dev
 ```
 
 浏览器打开 `http://127.0.0.1:3000`。
@@ -33,13 +33,15 @@ node node_modules/vite/bin/vite.js
 生产构建：
 
 ```bash
-node node_modules/vite/bin/vite.js build
-node node_modules/vite/bin/vite.js preview --port 5180
+npm run build
+npm run preview
 ```
+
+预览服务器运行在 `http://127.0.0.1:5180`。
 
 ## 3. 配置 API
 
-1. 点击界面右上角的 **齿轮图标**（Settings）
+1. 点击左侧边栏**底部**的 **⚙ 设置** 按钮
 2. 填写：
 
    | 字段 | 值 |
@@ -48,18 +50,19 @@ node node_modules/vite/bin/vite.js preview --port 5180
    | API Base URL | `https://apihub.agnes-ai.com/v1` |
 
 3. 点击 **Test Connection** — 看到绿色 "Connection OK" 即为成功
-4. 点击 **Save Settings** 保存（数据存在浏览器 IndexedDB，不会上传）
+4. 设置会自动保存到浏览器 localStorage，不会上传
 
 ## 4. 画布操作
 
 ### 添加节点
 
-从左侧面板 **拖拽** 节点类型到画布上：
+在画布空白处 **右键点击**，弹出节点创建菜单，选择要添加的节点类型：
 
 - 🟢 **Prompt** — 文本输入源
 - 🔵 **Text** — 文本生成
 - 🟣 **Image** — 图像生成
 - 🟡 **Video** — 视频生成
+- 📤 **Upload** — 图片上传
 
 ### 连接节点
 
@@ -91,8 +94,8 @@ node node_modules/vite/bin/vite.js preview --port 5180
 
 ### 示例 1：Prompt → Text（最简单）
 
-1. 拖入一个 **Prompt** 节点
-2. 拖入一个 **Text** 节点
+1. 右键画布空白处，添加一个 **Prompt** 节点
+2. 右键添加一个 **Text** 节点
 3. 从 Prompt 的输出端口连到 Text 的输入端口
 4. 在 Text 节点中输入 prompt（或留空，自动使用上游 Prompt 节点的内容）
 5. 点击 **▶ Run Workflow**
@@ -100,15 +103,15 @@ node node_modules/vite/bin/vite.js preview --port 5180
 ### 示例 2：Prompt → Text → Image
 
 1. 创建 Prompt → Text 链路
-2. 再拖入一个 **Image** 节点
+2. 再添加一个 **Image** 节点
 3. 从 Text 的输出端口连到 Image 的 `text-in` 端口
 4. Image 节点会使用上游 Text 的输出作为 prompt
 5. 点击 **▶ Run Workflow**
 
 ### 示例 3：Prompt → Image → Video
 
-1. 拖入 Prompt 和 Image 节点，连接
-2. 拖入 Video 节点
+1. 添加 Prompt 和 Image 节点，连接
+2. 添加 Video 节点
 3. 从 Image 的 `image-out` 连到 Video 的 `image-in`（图生视频）
 4. 从 Prompt 或 Text 的 `text-out` 连到 Video 的 `text-in`（提供文本 prompt）
 5. 点击 **▶ Run Workflow**
@@ -154,8 +157,18 @@ node node_modules/vite/bin/vite.js preview --port 5180
 |------|------|--------|
 | Model | 图像模型 | agnes-image-2.1-flash |
 | Prompt | 图像描述 | 空 |
-| Size | 图像尺寸 | 1024x1024 |
+| Size | 图像尺寸（下拉选择） | 1024x1024 |
+| Count | 批量生成数量 | 1（范围 1-10） |
 | Quality | 质量 | standard |
+
+尺寸选项（按比例从小到大）：
+```
+9:16 (576x1024), 9:16 (648x1152), 2:3 (682x1024), 3:4 (768x1024), 9:16 (864x1536),
+1:1 (1024x1024), 4:3 (1024x768), 3:2 (1024x682), 16:9 (1024x576),
+16:9 (1152x648), 16:9 (1536x864), Auto
+```
+
+当 Count > 1 时，生成多张图片并以网格展示。
 
 ### Video 节点
 
@@ -163,9 +176,20 @@ node node_modules/vite/bin/vite.js preview --port 5180
 |------|------|--------|
 | Model | 视频模型 | agnes-video-v2.0 |
 | Prompt | 视频描述 | 空 |
-| W / H | 分辨率 | 768 x 1152 |
-| FPS | 帧率 | 24 |
-| Frames | 总帧数 | 121 |
+| Negative Prompt | 负面提示词（排除不想要的内容） | 空 |
+| Size | 分辨率（下拉选择） | 1280x720 |
+| FPS | 帧率（下拉选择） | 24（可选 24/30/60） |
+| Duration | 时长（下拉选择） | 自动（可选 3/5/10/18 秒） |
+| Frames | 总帧数（自动计算） | 121 |
+| Count | 批量生成数量 | 1（范围 1-5） |
+| Seed | 随机种子 | 0（= 随机） |
+
+尺寸选项：
+```
+横屏 1280x720, 竖屏 720x1280, 方形 1024x1024, 宽屏 1792x1024, 1024x1792, Auto
+```
+
+帧数通过 Duration × FPS 自动计算，无需手动设置。Seed 设为 0 表示随机。
 
 ## 8. 模型替换
 
@@ -220,4 +244,4 @@ export interface ModelProvider {
 | 图像生成 400 错误 | 确认使用 `agnes-image-2.1-flash`，不要手动设置 `response_format` |
 | 视频超时 | 视频生成最长 10 分钟，复杂场景可能超时；尝试降低分辨率或帧数 |
 | 页面空白 | 打开浏览器控制台（F12）查看错误信息 |
-| 设置不保存 | 确认浏览器未禁用 IndexedDB（隐私模式可能受限） |
+| 设置不保存 | 确认浏览器未禁用 localStorage（隐私模式可能受限） |

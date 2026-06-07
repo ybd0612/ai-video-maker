@@ -1,4 +1,4 @@
-# AI Provider 架构
+﻿# AI Provider 架构
 
 ## 概述
 
@@ -141,13 +141,12 @@ POST `{baseUrl}/images/generations`
   "model": "agnes-image-2.1-flash",
   "prompt": "...",
   "size": "1024x1024",
-  "return_base64": true,
   "image": ["input_image_url"],
   "extra_body": {}
 }
 ```
 
-注意：始终使用 `return_base64: true`。当返回 `b64_json` 时，自动拼接为 `data:image/png;base64,` 前缀的 data URL。
+注意：图片返回为 URL，不再使用 `return_base64: true`。如果返回的 URL 不以 `http://` 或 `https://` 开头，会自动补上 `https://` 前缀。
 
 ### callVideoCreateAPI()
 
@@ -157,10 +156,12 @@ POST `{baseUrl}/videos`
 {
   "model": "agnes-video-v2.0",
   "prompt": "...",
+  "negative_prompt": "...",
   "num_frames": 121,
   "frame_rate": 24,
-  "width": 768,
-  "height": 1152,
+  "width": 1280,
+  "height": 720,
+  "seed": null,
   "image": "single_image_url",
   "extra_body": {
     "image": ["url1", "url2"],
@@ -168,6 +169,8 @@ POST `{baseUrl}/videos`
   }
 }
 ```
+
+注意：`width` / `height` 从 `size` 字符串解析。`seed` 为 0 时传 `undefined`（随机）。`negative_prompt` 字段会被包含在请求中。
 
 ### callVideoPollAPI()
 
@@ -189,7 +192,6 @@ GET `{baseUrl}/videos/{taskId}`
 | 特性 | runner 内部函数 | AgnesAdapter |
 |------|----------------|-------------|
 | 调用者 | useWorkflowRunner 直接调用 | 未被调用（待重构） |
-| b64_json 处理 | 拼接 data URL 前缀 | 返回原始值 |
 | 模型发现 | 无 | `discover()` 方法 |
 | 错误消息前缀 | `Text API` / `Image API` | `Text API error` / `Image API error` |
 

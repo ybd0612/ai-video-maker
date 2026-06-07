@@ -1,4 +1,4 @@
-# 状态管理
+﻿# 状态管理
 
 ## 概述
 
@@ -23,6 +23,7 @@ src/stores/
 - **实例名**：`wxhb`
 - **存储名**：`canvas-graph`（图数据）、`canvas-blobs`（二进制）
 - **策略**：Zustand persist + 自定义 localForage adapter
+- **备份**：`saveBackup()` / `loadBackup()` 将图数据备份到 localStorage（键名 `wxhb-canvas-backup`），启动时可自动恢复丢失的任务
 
 ### 状态
 
@@ -33,6 +34,10 @@ interface CanvasState {
   viewport: Viewport;  // { x, y, zoom }
 }
 ```
+
+### 版本迁移
+
+`version: 2`，migrate 函数将 v1 的 `width` / `height` 字段迁移为统一的 `size` 字符串。
 
 ### Graph 操作
 
@@ -60,11 +65,11 @@ interface CanvasState {
 | 方法 | 说明 |
 |------|------|
 | `loadSnapshot(snap)` | 从快照恢复（设置 canvasLoadInProgress 标志） |
-| `clearAll()` | 清空 IndexedDB + 重置状态 |
+| `clearAll()` | 清空 IndexedDB（graphStore + blobStore）并重置状态 |
 
 ### Blob 存储
 
-大二进制（图片/视频）不放入 store state，通过独立的 IndexedDB 实例管理：
+图片和视频输出存储为 URL（由 AI 模型返回），不存储为 base64 或二进制 Blob。大二进制通过独立的 IndexedDB 实例管理：
 
 ```typescript
 // 导出函数
@@ -132,11 +137,16 @@ interface SettingsState {
 interface Task {
   id: string;              // "task__{timestamp}_{counter}"
   name: string;
-  description: string;
+  folderId: string | null; // null = 根级别
   canvasData: CanvasSnapshot;
-  history: HistoryEntry[]; // 最多 20 条
   createdAt: number;
   updatedAt: number;
+}
+
+interface Folder {
+  id: string;              // "folder__{timestamp}_{counter}"
+  name: string;
+  createdAt: number;
 }
 
 interface CanvasSnapshot {
@@ -145,12 +155,6 @@ interface CanvasSnapshot {
   viewport: Viewport;
   capturedAt: number;
 }
-
-interface HistoryEntry {
-  canvasData: CanvasSnapshot;
-  savedAt: number;
-  label: string;
-}
 ```
 
 ### 状态
@@ -158,34 +162,42 @@ interface HistoryEntry {
 ```typescript
 interface TaskState {
   tasks: Task[];
+  folders: Folder[];
   activeTaskId: string | null;
 }
 ```
 
-### 操作
+### 版本迁移
+
+`version: 2`，migrate 函数将 v1 的 `width` / `height` 字段迁移为统一的 `size` 字符串。
+
+### 文件夹操作
 
 | 方法 | 说明 |
 |------|------|
-| `createTask(name, canvasData, desc?)` | 创建新任务并设为激活 |
-| `updateTask(id, updates)` | 更新任务（canvasData 变更时自动推历史） |
+| `createFolder(name)` | 创建文件夹 |
+| `renameFolder(id, name)` | 重命名文件夹 |
+| `deleteFolder(id)` | 删除文件夹（其下任务移至根级别） |
+
+### 任务操作
+
+| 方法 | 说明 |
+|------|------|
+| `createTask(name, canvasData, folderId?)` | 创建新任务并设为激活 |
+| `updateTask(id, updates)` | 更新任务字段（包括 canvasData） |
 | `deleteTask(id)` | 删除任务 |
+| `moveTask(taskId, folderId)` | 移动任务到指定文件夹（null = 根级别） |
 | `setActiveTaskId(id)` | 设置激活任务 |
 | `getTaskById(id)` | 查询任务 |
-| `pushHistory(taskId, label?)` | 手动推入历史快照 |
-| `restoreFromHistory(taskId, index)` | 从历史恢复（当前状态推入历史） |
-
-### 历史回溯机制
-
-- `updateTask()` 更新 canvasData 时，自动将旧数据推入 history
-- `restoreFromHistory()` 恢复前，将当前状态推入 history（防止丢失）
-- history 最多保留 20 条（`slice(-20)`）
-- 每条 history 的 label 默认为保存时间
 
 ### ID 生成
 
 ```typescript
-function newId(): string {
+function newId(prefix: string): string {
   counter += 1;
-  return `task__${Date.now()}_${counter}`;
+  return `${prefix}__${Date.now()}_${counter}`;
 }
 ```
+
+- Task: `newId("task")` → `task__1717800000000_1`
+- Folder: `newId("folder")` → `folder__1717800000000_2`
