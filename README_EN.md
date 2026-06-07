@@ -98,13 +98,16 @@ npm run preview
 
 ```
 Prompt ──→ Text ──→ Image ──→ Video
-                         ↑
-Upload ──────────────────┘
+                    ↑        ↑
+Upload ─────────────┘────────┘
 ```
 
-- `text-out` → `text-in` / `prompt-out`
-- `image-out` → `image-in` / `video-in`
-- `video-out` → `video-in`
+- `prompt-out` → `text-in` (Prompt outputs text to Text node)
+- `text-out` → `text-in` (Text can be chained)
+- `image-out` → `image-in` (Image can be chained, supports img2img)
+- `image-out` → `video-in` (Image as video input)
+- `video-out` → `video-in` (Video can be chained)
+- Upload node outputs `image-out`, connectable to Image or Video nodes
 
 ### Task Management
 

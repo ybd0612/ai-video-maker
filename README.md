@@ -98,13 +98,16 @@ npm run preview
 
 ```
 Prompt ──→ Text ──→ Image ──→ Video
-                         ↑
-Upload ──────────────────┘
+                    ↑        ↑
+Upload ─────────────┘────────┘
 ```
 
-- `text-out` → `text-in` / `prompt-out`
-- `image-out` → `image-in` / `video-in`
-- `video-out` → `video-in`
+- `prompt-out` → `text-in`（Prompt 输出文本到 Text 节点）
+- `text-out` → `text-in`（文本可串联）
+- `image-out` → `image-in`（图像可串联，也支持图生图）
+- `image-out` → `video-in`（图像作为视频输入）
+- `video-out` → `video-in`（视频可串联）
+- Upload 节点输出 `image-out`，可连接到 Image 或 Video 节点
 
 ### 任务管理
 
