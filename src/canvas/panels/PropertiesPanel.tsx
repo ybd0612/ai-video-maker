@@ -12,7 +12,7 @@ import { useWorkflowRunner } from "@/canvas/hooks/useWorkflowRunner";
 import { useT } from "@/i18n";
 import { NumberInput } from "@/components/ui/NumberInput";
 import { HelpTooltip } from "@/components/ui/HelpTooltip";
-import { sanitizeNodeLabel, sanitizePrompt, sanitizeRichText } from "@/lib/validation";
+import { sanitizeNodeLabel, sanitizePrompt, sanitizeRichText, calcNumFrames } from "@/lib/validation";
 import type {
   AnyNodeData,
   TextNodeData,
@@ -245,6 +245,8 @@ function VideoNodeFields({ nodeId, data }: { nodeId: string; data: VideoNodeData
   const updateNodeData = useCanvasStore((s) => s.updateNodeData);
   const t = useT();
 
+  const computedFrames = calcNumFrames(data.duration ?? 5, data.fps);
+
   return (
     <>
       <Field label={t("panel.videoPrompt")}>
@@ -254,6 +256,15 @@ function VideoNodeFields({ nodeId, data }: { nodeId: string; data: VideoNodeData
           onBlur={(e) => updateNodeData(nodeId, { prompt: sanitizePrompt(e.target.value) })}
           placeholder={t("panel.promptPlaceholder")}
           rows={4}
+          className="w-full resize-none rounded-md border border-slate-700 bg-slate-800 p-2 text-xs text-slate-100 placeholder:text-slate-600 focus:border-amber-500 focus:outline-none"
+        />
+      </Field>
+      <Field label={t("panel.negativePrompt")}>
+        <textarea
+          value={String(data.negativePrompt ?? "")}
+          onChange={(e) => updateNodeData(nodeId, { negativePrompt: e.target.value })}
+          placeholder={t("panel.negativePlaceholder")}
+          rows={3}
           className="w-full resize-none rounded-md border border-slate-700 bg-slate-800 p-2 text-xs text-slate-100 placeholder:text-slate-600 focus:border-amber-500 focus:outline-none"
         />
       </Field>
@@ -272,35 +283,51 @@ function VideoNodeFields({ nodeId, data }: { nodeId: string; data: VideoNodeData
           <option value="auto">Auto</option>
         </select>
       </Field>
-      <Field label={t("panel.fpsFrames")} hint={t("hint.fps")}>
-        <div className="flex items-center gap-2">
-          <NumberInput min={1} max={60} value={data.fps}
-            onChange={(v) => updateNodeData(nodeId, { fps: v })}
-            className="w-16 rounded-md border border-slate-700 bg-slate-800 px-2 py-1 text-xs text-slate-100 focus:border-amber-500 focus:outline-none"
-          />
-          <span className="text-xs text-slate-500">{t("panel.fps")}</span>
-          <NumberInput min={1} max={441} value={data.numFrames}
-            onChange={(v) => updateNodeData(nodeId, { numFrames: v })}
-            className="w-16 rounded-md border border-slate-700 bg-slate-800 px-2 py-1 text-xs text-slate-100 focus:border-amber-500 focus:outline-none"
-          />
-          <span className="text-xs text-slate-500">{t("panel.frames")}</span>
-        </div>
+      <Field label={t("panel.fps")} hint={t("hint.fps")}>
+        <select
+          value={data.fps}
+          onChange={(e) => updateNodeData(nodeId, { fps: parseInt(e.target.value) })}
+          className="w-20 rounded border border-slate-700 bg-slate-800 px-2 py-1 text-xs text-slate-300 focus:border-amber-500 focus:outline-none"
+        >
+          <option value="24">24</option>
+          <option value="30">30</option>
+          <option value="60">60</option>
+        </select>
       </Field>
-      <Field label={t("panel.negativePrompt")}>
-        <textarea
-          value={String(data.negativePrompt ?? "")}
-          onChange={(e) => updateNodeData(nodeId, { negativePrompt: e.target.value })}
-          placeholder={t("panel.negativePlaceholder")}
-          rows={3}
-          className="w-full resize-none rounded-md border border-slate-700 bg-slate-800 p-2 text-xs text-slate-100 placeholder:text-slate-600 focus:border-amber-500 focus:outline-none"
-        />
+      <Field label={t("video.duration")}>
+        <select
+          value={data.duration ?? 5}
+          onChange={(e) => updateNodeData(nodeId, { duration: parseFloat(e.target.value) })}
+          className="w-20 rounded border border-slate-700 bg-slate-800 px-2 py-1 text-xs text-slate-300 focus:border-amber-500 focus:outline-none"
+        >
+          <option value="3">3s</option>
+          <option value="5">5s</option>
+          <option value="10">10s</option>
+          <option value="18">18s</option>
+        </select>
+      </Field>
+      <Field label={t("video.numFrames")}>
+        <p className="text-xs text-slate-300">{computedFrames}</p>
+      </Field>
+      <Field label={t("video.count")}>
+        <select
+          value={data.count}
+          onChange={(e) => updateNodeData(nodeId, { count: parseInt(e.target.value) })}
+          className="w-20 rounded border border-slate-700 bg-slate-800 px-2 py-1 text-xs text-slate-300 focus:border-amber-500 focus:outline-none"
+        >
+          <option value="1">1</option>
+          <option value="2">2</option>
+          <option value="3">3</option>
+          <option value="4">4</option>
+          <option value="5">5</option>
+        </select>
       </Field>
       <Field label={t("panel.seed")} hint={t("hint.seedVideo")}>
         <NumberInput
           min={0}
           max={2147483647}
           value={data.seed ?? 0}
-          onChange={(v) => updateNodeData(nodeId, { seed: v })}
+          onChange={(v) => updateNodeData(nodeId, { seed: v === 0 ? undefined : v })}
           className="w-28 rounded-md border border-slate-700 bg-slate-800 px-2 py-1 text-xs text-slate-100 focus:border-amber-500 focus:outline-none"
         />
       </Field>
@@ -314,10 +341,24 @@ function VideoNodeFields({ nodeId, data }: { nodeId: string; data: VideoNodeData
           />
         </Field>
       )}
+      {data.outputUrls && data.outputUrls.length > 1 && (
+        <Field label={t("panel.outputVideo") + "s"}>
+          <div className="space-y-1">
+            {data.outputUrls.map((url, i) => (
+              <video
+                key={i}
+                src={url}
+                controls
+                loop
+                className="w-full rounded-md border border-slate-700"
+              />
+            ))}
+          </div>
+        </Field>
+      )}
     </>
   );
 }
-
 /* ── Prompt Node Fields ──────────────────────────────────────────────────── */
 
 function PromptNodeFields({ nodeId, data }: { nodeId: string; data: PromptNodeData }) {
