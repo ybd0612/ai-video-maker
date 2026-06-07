@@ -1,11 +1,12 @@
-import { useRef, useCallback, useEffect, type TextareaHTMLAttributes } from "react";
+import { useRef, useEffect, type TextareaHTMLAttributes } from "react";
 
 /**
  * IMEAwareTextarea — textarea that correctly handles CJK IME composition.
  *
- * During IME composition (compositionstart → compositionend), the controlled
- * `value` is NOT pushed back to the DOM, so the browser's IME candidate window
- * stays intact.  Once composition ends, the final value is committed via onChange.
+ * Uses an uncontrolled textarea internally so that React re-renders from
+ * external state changes (e.g. Zustand store) don't reset the DOM value
+ * mid-composition.  The value is synced via ref when the external `value`
+ * prop changes from a different source (e.g. task switch).
  */
 interface IMEAwareTextareaProps
   extends Omit<TextareaHTMLAttributes<HTMLTextAreaElement>, "onChange" | "value"> {
@@ -14,46 +15,50 @@ interface IMEAwareTextareaProps
 }
 
 export function IMEAwareTextarea({ value, onChange, ...rest }: IMEAwareTextareaProps) {
-  const composingRef = useRef(false);
-  const localRef = useRef(value);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const composingRef = useRef(false);
+  const lastExternalRef = useRef(value);
+  const committedRef = useRef(value);
 
-  // Keep localRef in sync when external value changes (e.g. task switch)
+  // Sync DOM when external value changes from a DIFFERENT source
+  // (e.g. task switch, undo), but NOT from our own onChange callback.
   useEffect(() => {
-    if (!composingRef.current) {
-      localRef.current = value;
+    if (value !== lastExternalRef.current) {
+      lastExternalRef.current = value;
+      if (!composingRef.current) {
+        committedRef.current = value;
+        if (textareaRef.current && textareaRef.current.value !== value) {
+          textareaRef.current.value = value;
+        }
+      }
     }
   }, [value]);
 
-  const handleChange = useCallback(
-    (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-      const v = e.target.value;
-      localRef.current = v;
-      if (!composingRef.current) {
-        onChange(v);
-      }
-    },
-    [onChange],
-  );
-
-  const handleCompositionStart = useCallback(() => {
-    composingRef.current = true;
-  }, []);
-
-  const handleCompositionEnd = useCallback(
-    (e: React.CompositionEvent<HTMLTextAreaElement>) => {
-      composingRef.current = false;
-      const v = e.currentTarget.value;
-      localRef.current = v;
+  const handleChange = () => {
+    const v = textareaRef.current?.value ?? "";
+    if (!composingRef.current) {
+      committedRef.current = v;
+      lastExternalRef.current = v;
       onChange(v);
-    },
-    [onChange],
-  );
+    }
+  };
+
+  const handleCompositionStart = () => {
+    composingRef.current = true;
+  };
+
+  const handleCompositionEnd = () => {
+    composingRef.current = false;
+    const v = textareaRef.current?.value ?? "";
+    committedRef.current = v;
+    lastExternalRef.current = v;
+    onChange(v);
+  };
 
   return (
     <textarea
       ref={textareaRef}
-      value={composingRef.current ? localRef.current : value}
+      defaultValue={value}
       onChange={handleChange}
       onCompositionStart={handleCompositionStart}
       onCompositionEnd={handleCompositionEnd}
