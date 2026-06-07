@@ -1,10 +1,11 @@
-﻿import { memo, useRef } from "react";
+import { memo, useRef } from "react";
 import { Handle, Position, type NodeProps } from "@xyflow/react";
-import { Upload, X, Link } from "lucide-react";
+import { Upload, X } from "lucide-react";
 import { useCanvasStore } from "@/stores/canvasStore";
 import type { UploadNodeData } from "@/canvas/types";
 import { NodeShell } from "./NodeShell"
-import { useT } from '@/i18n';;
+import { useT } from '@/i18n';
+import { Lightbox } from "@/components/ui/Lightbox";;
 
 const ACCEPTED = "image/png,image/jpeg,image/webp,image/gif";
 
@@ -98,21 +99,6 @@ function UploadNodeInner({ id, data }: NodeProps) {
       errorParams={d.errorParams}
       runnable={false}
     >
-      {/* Upstream image from connected node */}
-      {hasInputImage && (
-        <div className="space-y-1">
-          <div className="flex items-center gap-1 text-xs text-rose-400">
-            <Link size={10} />
-            <span>{t("image.connectedInput")}</span>
-          </div>
-          <img
-            src={upstreamImageUrl!}
-            alt="Input"
-            className="max-h-24 w-full rounded-md border border-rose-800/40 object-contain"
-          />
-        </div>
-      )}
-
       {/* Hidden file input */}
       <input
         ref={inputRef}
@@ -122,8 +108,17 @@ function UploadNodeInner({ id, data }: NodeProps) {
         className="hidden"
       />
 
-      {d.base64Data ? (
-        /* Preview when image is loaded */
+      {hasInputImage ? (
+        /* Show upstream image — no upload needed */
+        <Lightbox src={upstreamImageUrl!} alt="Input">
+          <img
+            src={upstreamImageUrl!}
+            alt="Input"
+            className="max-h-40 w-full rounded-md border border-rose-800/40 object-contain cursor-pointer"
+          />
+        </Lightbox>
+      ) : d.base64Data ? (
+        /* Preview when local image is loaded */
         <div className="space-y-1.5">
           <div className="flex items-center justify-between">
             <span className="text-xs text-slate-400 truncate max-w-[180px]">
@@ -137,14 +132,16 @@ function UploadNodeInner({ id, data }: NodeProps) {
               <X size={12} />
             </button>
           </div>
-          <img
-            src={d.base64Data}
-            alt={d.fileName ?? "Uploaded"}
-            className="max-h-40 w-full rounded-md border border-slate-700 object-contain"
-          />
+          <Lightbox src={d.base64Data} alt={d.fileName ?? "Uploaded"}>
+            <img
+              src={d.base64Data}
+              alt={d.fileName ?? "Uploaded"}
+              className="max-h-40 w-full rounded-md border border-slate-700 object-contain cursor-pointer"
+            />
+          </Lightbox>
         </div>
       ) : (
-        /* Drop zone when empty */
+        /* Drop zone when empty and no upstream */
         <div
           onClick={() => inputRef.current?.click()}
           onDrop={handleDrop}

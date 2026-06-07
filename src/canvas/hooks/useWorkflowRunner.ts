@@ -199,6 +199,7 @@ function gatherInputs(
       case "upload": {
         const ud = data as UploadNodeData;
         if (ud.base64Data) imageInputs.push(ud.base64Data);
+        else if (ud.imageUrl) imageInputs.push(ud.imageUrl);
         break;
       }
     }
@@ -468,6 +469,22 @@ export function useWorkflowRunner() {
 
         try {
           switch (node.type) {
+            /* ---- UPLOAD (image container, no execution needed) ---- */
+            case "upload": {
+              const ud = nodeData as UploadNodeData;
+              const hasUpstream = inputs.imageInputs.length > 0;
+              if (hasUpstream && !ud.base64Data) {
+                store.updateNodeData(nodeId, {
+                  imageUrl: inputs.imageInputs[0],
+                  executionStatus: "success",
+                  errorMessage: undefined,
+                });
+              } else {
+                store.setNodeExecutionStatus(nodeId, "success");
+              }
+              break;
+            }
+
             /* ── TEXT / PROMPT ─────────────────────────────────────── */
             case "prompt":
             case "text": {
