@@ -7,7 +7,7 @@ import { NodeShell } from "./NodeShell";
 import { useT } from "@/i18n";
 import { NumberInput } from "@/components/ui/NumberInput";
 import { calcNumFrames } from "@/lib/validation";
-import { HelpTooltip } from "@/components/ui/HelpTooltip";
+
 import { IMEAwareTextarea } from "@/components/ui/IMEAwareTextarea";
 
 function VideoNodeInner({ id, data }: NodeProps) {
@@ -107,16 +107,48 @@ function VideoNodeInner({ id, data }: NodeProps) {
           {t("video.numFrames")}: {calcNumFrames(d.duration ?? 5, d.fps)}
         </div>
       </div>
-      {/* Seed */}
-      <div className="flex items-center gap-1">
-        <label className="text-xs text-slate-500">{t("panel.seed")} <HelpTooltip>{t("hint.seedVideo")}</HelpTooltip></label>
-        <NumberInput
-          min={0}
-          max={2147483647}
-          value={d.seed ?? 0}
-          onChange={(v) => updateNodeData(id, { seed: v === 0 ? undefined : v } as Partial<VideoNodeData>)}
-          className="w-24 rounded border border-slate-700 bg-slate-800 px-1.5 py-0.5 text-xs text-slate-300 focus:border-amber-500 focus:outline-none"
-        />
+      {/* Seed — lock/unlock toggle + dice button */}
+      <div className="space-y-1">
+        <div className="flex items-center gap-2">
+          <label className="text-xs text-slate-500">{t("panel.seed")}</label>
+          <button
+            onClick={() => {
+              if (d.seed && d.seed > 0) {
+                // Unlock -> random
+                updateNodeData(id, { seed: undefined } as Partial<VideoNodeData>);
+              } else {
+                // Lock -> generate a random seed
+                updateNodeData(id, { seed: Math.floor(Math.random() * 2147483647) } as Partial<VideoNodeData>);
+              }
+            }}
+            className={`rounded px-1.5 py-0.5 text-[10px] font-medium transition ${
+              d.seed && d.seed > 0
+                ? "bg-amber-600/30 text-amber-400 hover:bg-amber-600/50"
+                : "bg-slate-700/50 text-slate-500 hover:bg-slate-700"
+            }`}
+            title={d.seed && d.seed > 0 ? t("video.seedUnlock") : t("video.seedLock")}
+          >
+            {d.seed && d.seed > 0 ? "🔒 " + t("video.seedLocked") : "🎲 " + t("video.seedRandom")}
+          </button>
+        </div>
+        {d.seed && d.seed > 0 && (
+          <div className="flex items-center gap-1">
+            <NumberInput
+              min={1}
+              max={2147483647}
+              value={d.seed}
+              onChange={(v) => updateNodeData(id, { seed: v } as Partial<VideoNodeData>)}
+              className="w-28 rounded border border-slate-700 bg-slate-800 px-1.5 py-0.5 text-xs text-slate-300 focus:border-amber-500 focus:outline-none"
+            />
+            <button
+              onClick={() => updateNodeData(id, { seed: Math.floor(Math.random() * 2147483647) } as Partial<VideoNodeData>)}
+              className="rounded p-1 text-slate-500 hover:bg-slate-700 hover:text-amber-400 transition"
+              title={t("video.seedReroll")}
+            >
+              🎲
+            </button>
+          </div>
+        )}
       </div>
       {/* Progress bar */}
       {d.executionStatus === "pending" && (

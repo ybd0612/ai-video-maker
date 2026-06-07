@@ -320,14 +320,43 @@ function VideoNodeFields({ nodeId, data }: { nodeId: string; data: VideoNodeData
           <option value="5">5</option>
         </select>
       </Field>
-      <Field label={t("panel.seed")} hint={t("hint.seedVideo")}>
-        <NumberInput
-          min={0}
-          max={2147483647}
-          value={data.seed ?? 0}
-          onChange={(v) => updateNodeData(nodeId, { seed: v === 0 ? undefined : v })}
-          className="w-28 rounded-md border border-slate-700 bg-slate-800 px-2 py-1 text-xs text-slate-100 focus:border-amber-500 focus:outline-none"
-        />
+      <Field label={t("panel.seed")}>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => {
+              if (data.seed && data.seed > 0) {
+                updateNodeData(nodeId, { seed: undefined });
+              } else {
+                updateNodeData(nodeId, { seed: Math.floor(Math.random() * 2147483647) });
+              }
+            }}
+            className={`rounded px-2 py-1 text-[11px] font-medium transition ${
+              data.seed && data.seed > 0
+                ? "bg-amber-600/30 text-amber-400 hover:bg-amber-600/50"
+                : "bg-slate-700/50 text-slate-500 hover:bg-slate-700"
+            }`}
+          >
+            {data.seed && data.seed > 0 ? "🔒 " + t("video.seedLocked") : "🎲 " + t("video.seedRandom")}
+          </button>
+          {data.seed && data.seed > 0 && (
+            <>
+              <NumberInput
+                min={1}
+                max={2147483647}
+                value={data.seed}
+                onChange={(v) => updateNodeData(nodeId, { seed: v })}
+                className="w-28 rounded-md border border-slate-700 bg-slate-800 px-2 py-1 text-xs text-slate-100 focus:border-amber-500 focus:outline-none"
+              />
+              <button
+                onClick={() => updateNodeData(nodeId, { seed: Math.floor(Math.random() * 2147483647) })}
+                className="rounded p-1 text-slate-500 hover:bg-slate-800 hover:text-amber-400 transition"
+                title={t("video.seedReroll")}
+              >
+                🎲
+              </button>
+            </>
+          )}
+        </div>
       </Field>
       {data.outputUrl && (
         <Field label={t("panel.outputVideo")}>
