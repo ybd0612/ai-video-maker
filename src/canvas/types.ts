@@ -121,6 +121,8 @@ export interface VideoNodeData extends BaseNodeData {
 export interface UploadNodeData extends BaseNodeData {
   /** The raw base64 data URL (data:image/png;base64,...) stored after upload */
   base64Data?: string;
+  /** Image URL received from upstream image node */
+  imageUrl?: string;
   /** Original filename for display */
   fileName?: string;
   /** File MIME type */
@@ -192,6 +194,7 @@ export const NODE_HANDLES: Record<string, HandleSpec[]> = {
     { id: "prompt-out", direction: "source", dataType: "text" },
   ],
   upload: [
+    { id: "image-in", direction: "target", dataType: "image" },
     { id: "image-out", direction: "source", dataType: "image" },
   ],
   text: [

@@ -1,6 +1,6 @@
 ﻿import { memo, useRef } from "react";
 import { Handle, Position, type NodeProps } from "@xyflow/react";
-import { Upload, X } from "lucide-react";
+import { Upload, X, Link } from "lucide-react";
 import { useCanvasStore } from "@/stores/canvasStore";
 import type { UploadNodeData } from "@/canvas/types";
 import { NodeShell } from "./NodeShell"
@@ -26,8 +26,25 @@ function formatSize(bytes: number): string {
 function UploadNodeInner({ id, data }: NodeProps) {
   const d = data as unknown as UploadNodeData;
   const updateNodeData = useCanvasStore((s) => s.updateNodeData);
+  const nodes = useCanvasStore((s) => s.nodes);
+  const edges = useCanvasStore((s) => s.edges);
   const inputRef = useRef<HTMLInputElement>(null);
   const t = useT();
+
+  // Check for connected upstream image
+  const connectedImageEdge = edges.find(
+    (e) => e.target === id && e.targetHandle === "image-in"
+  );
+  const upstreamImageUrl: string | undefined = connectedImageEdge
+    ? (() => {
+        const srcNode = nodes.find((n) => n.id === connectedImageEdge.source);
+        if (!srcNode) return undefined;
+        const srcData = srcNode.data as Record<string, unknown>;
+        return (srcData.outputUrl as string) || undefined;
+      })()
+    : undefined;
+
+  const hasInputImage = !!upstreamImageUrl;
 
   const handleFile = async (file: File) => {
     if (!file.type.startsWith("image/")) return;
@@ -74,13 +91,28 @@ function UploadNodeInner({ id, data }: NodeProps) {
       label={d.label}
       icon={Upload}
       iconColor="text-rose-400"
-      borderColor={d.base64Data ? "border-rose-500/80" : "border-rose-800/60"}
+      borderColor={(d.base64Data || hasInputImage) ? "border-rose-500/80" : "border-rose-800/60"}
       status={d.executionStatus}
       errorMessage={d.errorMessage}
       errorKey={d.errorKey}
       errorParams={d.errorParams}
       runnable={false}
     >
+      {/* Upstream image from connected node */}
+      {hasInputImage && (
+        <div className="space-y-1">
+          <div className="flex items-center gap-1 text-xs text-rose-400">
+            <Link size={10} />
+            <span>{t("image.connectedInput")}</span>
+          </div>
+          <img
+            src={upstreamImageUrl!}
+            alt="Input"
+            className="max-h-24 w-full rounded-md border border-rose-800/40 object-contain"
+          />
+        </div>
+      )}
+
       {/* Hidden file input */}
       <input
         ref={inputRef}
@@ -129,6 +161,7 @@ function UploadNodeInner({ id, data }: NodeProps) {
         </div>
       )}
 
+      <Handle type="target" position={Position.Left} id="image-in" className="!h-3 !w-3 !bg-rose-500" />
       <Handle
         type="source"
         position={Position.Right}

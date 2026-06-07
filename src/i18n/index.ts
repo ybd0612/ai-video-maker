@@ -25,8 +25,8 @@ const zh = {
   "palette.image.desc": "AI 图像创作",
   "palette.video": "视频生成",
   "palette.video.desc": "AI 视频生成",
-  "palette.upload": "上传图片",
-  "palette.upload.desc": "上传本地图片",
+  "palette.upload": "图片",
+  "palette.upload.desc": "上传或接收图片",
 
   // Task
   "task.title": "任务",
@@ -137,7 +137,7 @@ const zh = {
   "node.label.text": "文本生成",
   "node.label.image": "图像生成",
   "node.label.video": "视频生成",
-  "node.label.upload": "上传图片",
+  "node.label.upload": "图片",
   "node.untitled": "未命名",
   "node.runTooltip": "运行此节点及下游",
   "node.deleteTooltip": "删除节点",
@@ -228,8 +228,8 @@ const en = {
   "palette.image.desc": "AI image creation",
   "palette.video": "Video Gen",
   "palette.video.desc": "AI video generation",
-  "palette.upload": "Upload",
-  "palette.upload.desc": "Upload local image",
+  "palette.upload": "Image",
+  "palette.upload.desc": "Upload or receive image",
 
   // Task
   "task.title": "Tasks",
@@ -340,7 +340,7 @@ const en = {
   "node.label.text": "Text Generation",
   "node.label.image": "Image Generation",
   "node.label.video": "Video Generation",
-  "node.label.upload": "Upload Image",
+  "node.label.upload": "Image",
   "node.untitled": "Untitled",
   "node.runTooltip": "Run this node and downstream",
   "node.deleteTooltip": "Delete node",
