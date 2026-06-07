@@ -67,6 +67,26 @@ export async function deleteBlob(key: string): Promise<void> {
   await blobStore.removeItem(key);
 }
 
+/* ── localStorage backup ───────────────────────────────────────────────── */
+const BACKUP_KEY = "wxhb-canvas-backup";
+
+function saveBackup(data: { nodes: StoreNode[]; edges: Edge[]; viewport: Viewport }) {
+  try {
+    localStorage.setItem(BACKUP_KEY, JSON.stringify(data));
+  } catch {
+    // Ignore quota errors
+  }
+}
+
+export function loadBackup(): { nodes: StoreNode[]; edges: Edge[]; viewport: Viewport } | null {
+  try {
+    const raw = localStorage.getItem(BACKUP_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
 /* ── Store state shape ──────────────────────────────────────────────────── */
 
 interface CanvasState {
@@ -113,8 +133,14 @@ export const useCanvasStore = create<CanvasState>()(
 
       /* ── Graph mutations ──────────────────────────────────────────────── */
 
-      setNodes: (nodes) => set({ nodes }),
-      setEdges: (edges) => set({ edges }),
+      setNodes: (nodes) => set((state) => {
+        saveBackup({ nodes, edges: state.edges, viewport: state.viewport });
+        return { nodes };
+      }),
+      setEdges: (edges) => set((state) => {
+        saveBackup({ nodes: state.nodes, edges, viewport: state.viewport });
+        return { edges };
+      }),
       setViewport: (viewport) => set({ viewport }),
 
       addNode: (node) =>

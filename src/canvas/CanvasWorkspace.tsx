@@ -140,11 +140,12 @@ function CanvasInner() {
     // Debounce: save 500ms after last change
     if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
     autoSaveTimer.current = setTimeout(() => {
+      const currentViewport = useCanvasStore.getState().viewport;
       updateTask(activeTaskId, {
         canvasData: {
           nodes,
           edges,
-          viewport: { x: 0, y: 0, zoom: 1 },
+          viewport: currentViewport,
           capturedAt: Date.now(),
         },
       });

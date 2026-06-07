@@ -139,6 +139,30 @@ export const useTaskStore = create<TaskState>()(
       setActiveTaskId: (id) => set({ activeTaskId: id }),
       getTaskById: (id) => get().tasks.find((t) => t.id === id),
     }),
-    { name: "wxhb-tasks" },
+    {
+      name: "wxhb-tasks",
+      version: 2,
+      migrate: (persistedState: unknown, version: number) => {
+        if (version === 0 || version === 1) {
+          // Migrate from v1: width/height -> size in canvasData
+          const state = persistedState as { tasks?: Array<{ canvasData?: { nodes?: Array<{ data?: Record<string, unknown> }> } }> };
+          if (state.tasks) {
+            state.tasks = state.tasks.map((task) => {
+              if (task.canvasData?.nodes) {
+                task.canvasData.nodes = task.canvasData.nodes.map((node) => {
+                  if (node.data && 'width' in node.data && 'height' in node.data && !('size' in node.data)) {
+                    const { width, height, ...rest } = node.data;
+                    return { ...node, data: { ...rest, size: `${width}x${height}` } };
+                  }
+                  return node;
+                });
+              }
+              return task;
+            });
+          }
+        }
+        return persistedState as TaskState;
+      },
+    },
   ),
 );

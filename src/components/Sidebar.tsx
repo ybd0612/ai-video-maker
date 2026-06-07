@@ -1,6 +1,7 @@
 import { Settings, Trash2 } from "lucide-react";
 import { useSettingsStore } from "@/stores/settingsStore";
 import { useCanvasStore } from "@/stores/canvasStore";
+import { useTaskStore } from "@/stores/taskStore";
 import { TaskTreeView } from "@/components/TaskTreeView";
 import { useT } from '@/i18n';
 import { confirmDialog } from "@/components/ui/ConfirmDialog";
@@ -9,6 +10,11 @@ export function Sidebar() {
   const openSettings = useSettingsStore((s) => s.setSettingsDialogOpen);
   const t = useT();
   const clearAll = useCanvasStore((s) => s.clearAll);
+  const clearTasks = useTaskStore(() => {
+    return () => {
+      useTaskStore.setState({ tasks: [], folders: [], activeTaskId: null });
+    };
+  });
   const nodeCount = useCanvasStore((s) => s.nodes.length);
 
   return (
@@ -36,14 +42,14 @@ export function Sidebar() {
         </button>
         <button
           onClick={async () => {
-            if (nodeCount === 0) { clearAll(); return; }
+            if (nodeCount === 0) { clearAll(); clearTasks(); return; }
             const ok = await confirmDialog({
               title: t("sidebar.clearCanvas"),
               message: t("sidebar.clearConfirm"),
               confirmLabel: t("dialog.confirm"),
               variant: "danger",
             });
-            if (ok) clearAll();
+            if (ok) { clearAll(); clearTasks(); }
           }}
           className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-xs text-red-400/70 transition hover:bg-red-950/40 hover:text-red-400"
         >

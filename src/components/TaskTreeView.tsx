@@ -10,7 +10,7 @@ import {
   Check,
   X,
 } from "lucide-react";
-import { useCanvasStore } from "@/stores/canvasStore";
+import { useCanvasStore, loadBackup } from "@/stores/canvasStore";
 import { useTaskStore, type Task, type Folder as FolderType, type CanvasSnapshot } from "@/stores/taskStore";
 import { useT } from "@/i18n";
 import { confirmDialog } from "@/components/ui/ConfirmDialog";
@@ -248,12 +248,40 @@ export function TaskTreeView() {
   useEffect(() => {
     if (didInitRef.current) return;
     didInitRef.current = true;
-    setTimeout(() => {
+    // Wait for both stores to be ready (IndexedDB can be slow)
+    const init = async () => {
+      // Wait for localForage to be ready
+      await new Promise<void>((resolve) => {
+        const check = () => {
+          const { tasks } = useTaskStore.getState();
+          // If tasks array exists (even empty), store is hydrated
+          if (Array.isArray(tasks)) {
+            resolve();
+          } else {
+            setTimeout(check, 50);
+          }
+        };
+        check();
+      });
+      // Small extra delay to ensure hydration is complete
+      await new Promise((r) => setTimeout(r, 200));
       const { activeTaskId: currentId, tasks: currentTasks } = useTaskStore.getState();
+      
+      // If no tasks exist but we have a backup, try to recover
+      if (currentTasks.length === 0) {
+        const backup = loadBackup();
+        if (backup && backup.nodes.length > 0) {
+          // Create a recovered task from backup
+          const { createTask } = useTaskStore.getState();
+          createTask(t("task.recovered"), { ...backup, capturedAt: Date.now() });
+          return;
+        }
+      }
       if (!currentId) return;
       const task = currentTasks.find((tk) => tk.id === currentId);
       if (task) loadSnapshotIntoCanvas(task.canvasData);
-    }, 100);
+    };
+    init();
   }, []);
 
   /* ── Actions ────────────────────────────────────────────────────────── */
