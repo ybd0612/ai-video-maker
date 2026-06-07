@@ -557,10 +557,7 @@ export function useWorkflowRunner() {
               });
               store.appendNodeLog(nodeId, log("info", getTranslation("log.imageGeneratedSuccess")));
 
-              // Distribute generated images to downstream connected image nodes.
-              // If downstream has fewer nodes than generated images, only the
-              // first N images are distributed (front-to-back). If downstream
-              // has more nodes than images, excess nodes get nothing.
+              // Output routing: distribute or auto-create
               if (imageUrls.length > 0) {
                 const downstreamImageEdges = store.edges.filter(
                   (e) => e.source === nodeId && e.sourceHandle === "image-out"
@@ -570,6 +567,7 @@ export function useWorkflowRunner() {
                   .filter((n): n is RFNode => n != null && (n.type === "image" || n.type === "upload"));
 
                 if (downstreamImageNodes.length > 0) {
+                  // Has downstream nodes: distribute images to them (front-to-back)
                   const count = Math.min(imageUrls.length, downstreamImageNodes.length);
                   for (let di = 0; di < count; di++) {
                     store.updateNodeData(downstreamImageNodes[di].id, {
@@ -579,6 +577,47 @@ export function useWorkflowRunner() {
                     });
                   }
                   store.appendNodeLog(nodeId, log("info", getTranslation("log.imageDistributed", { count: String(count) })));
+                } else {
+                  // No downstream nodes: auto-create one upload node per image
+                  const sourceNode = store.nodes.find((n) => n.id === nodeId);
+                  const sourcePos = sourceNode?.position ?? { x: 0, y: 0 };
+                  const nodeWidth = 320;
+                  const gapX = 60;
+                  const newEdges: Edge[] = [];
+
+                  for (let gi = 0; gi < imageUrls.length; gi++) {
+                    const outNodeId = `upload__auto_${Date.now()}_${gi}`;
+                    const outNode: RFNode = {
+                      id: outNodeId,
+                      type: "upload",
+                      position: {
+                        x: sourcePos.x + nodeWidth + gapX,
+                        y: sourcePos.y + gi * 360,
+                      },
+                      data: {
+                        label: `${data.label || "Image"} #${gi + 1}`,
+                        imageUrl: imageUrls[gi],
+                        executionStatus: "success" as const,
+                        executionLogs: [] as NodeExecutionLog[],
+                      } as unknown as Record<string, unknown>,
+                    };
+                    store.addNode(outNode);
+
+                    newEdges.push({
+                      id: `edge__auto_${Date.now()}_${gi}`,
+                      source: nodeId,
+                      sourceHandle: "image-out",
+                      target: outNodeId,
+                      targetHandle: "image-in",
+                      type: "typed",
+                      animated: true,
+                    });
+                  }
+
+                  if (newEdges.length > 0) {
+                    store.setEdges([...store.edges, ...newEdges]);
+                  }
+                  store.appendNodeLog(nodeId, log("info", getTranslation("log.imageAutoCreated", { count: String(imageUrls.length) })));
                 }
               }
 
