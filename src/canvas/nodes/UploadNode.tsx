@@ -45,7 +45,8 @@ function UploadNodeInner({ id, data }: NodeProps) {
       })()
     : undefined;
 
-  const hasInputImage = !!upstreamImageUrl;
+  const hasInputImage = !!upstreamImageUrl || !!d.imageUrl;
+  const displayImageUrl = d.imageUrl || upstreamImageUrl;
 
   const handleFile = async (file: File) => {
     if (!file.type.startsWith("image/")) return;
@@ -110,9 +111,9 @@ function UploadNodeInner({ id, data }: NodeProps) {
 
       {hasInputImage ? (
         /* Show upstream image — no upload needed */
-        <Lightbox src={upstreamImageUrl!} alt="Input">
+        <Lightbox src={displayImageUrl!} alt="Input">
           <img
-            src={upstreamImageUrl!}
+            src={displayImageUrl!}
             alt="Input"
             className="max-h-40 w-full rounded-md border border-rose-800/40 object-contain cursor-pointer"
           />

@@ -567,13 +567,13 @@ export function useWorkflowRunner() {
                 );
                 const downstreamImageNodes = downstreamImageEdges
                   .map((e) => store.nodes.find((n) => n.id === e.target))
-                  .filter((n): n is RFNode => n != null && n.type === "image");
+                  .filter((n): n is RFNode => n != null && (n.type === "image" || n.type === "upload"));
 
                 if (downstreamImageNodes.length > 0) {
                   const count = Math.min(imageUrls.length, downstreamImageNodes.length);
                   for (let di = 0; di < count; di++) {
                     store.updateNodeData(downstreamImageNodes[di].id, {
-                      outputUrl: imageUrls[di],
+                      imageUrl: imageUrls[di],
                       executionStatus: "success" as const,
                       executionLogs: [] as NodeExecutionLog[],
                     });
