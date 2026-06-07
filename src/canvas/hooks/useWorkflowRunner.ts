@@ -496,6 +496,7 @@ export function useWorkflowRunner() {
             }
 
             /* ── IMAGE ────────────────────────────────────────────── */
+            /* ── IMAGE ────────────────────────────────────────────── */
             case "image": {
               const data = nodeData as ImageNodeData;
               const imagePrompt = inputs.textInputs.length > 0
@@ -504,18 +505,35 @@ export function useWorkflowRunner() {
 
               if (!imagePrompt) throw new LocalizedError("error.noImagePrompt");
 
-              const result = await callImageAPI(apiKey, baseUrl, {
-                model: data.modelId ?? "agnes-image-2.1-flash",
-                prompt: imagePrompt,
-                inputImageUrl: inputs.imageInputs[0] ?? data.referenceImageUrl,
-                size: data.size,
-                quality: data.quality,
+              const imageCount = data.count ?? 1;
+              const imageUrls: string[] = [];
+              let lastRevisedPrompt: string | undefined;
 
-              });
+              for (let i = 0; i < imageCount; i++) {
+                if (opts.signal?.aborted) throw new Error("Cancelled");
+                if (imageCount > 1) {
+                  store.appendNodeLog(nodeId, log("info", getTranslation("log.imageProgress", { current: i + 1, total: imageCount })));
+                }
+                const result = await callImageAPI(apiKey, baseUrl, {
+                  model: data.modelId ?? "agnes-image-2.1-flash",
+                  prompt: imagePrompt,
+                  inputImageUrl: inputs.imageInputs[0] ?? data.referenceImageUrl,
+                  size: data.size,
+                  quality: data.quality,
+                });
+                // Ensure URL has protocol
+                let url = result.url;
+                if (url && !url.startsWith("http://") && !url.startsWith("https://")) {
+                  url = "https://" + url;
+                }
+                imageUrls.push(url);
+                lastRevisedPrompt = result.revisedPrompt;
+              }
 
               store.updateNodeData(nodeId, {
-                outputUrl: result.url,
-                revisedPrompt: result.revisedPrompt,
+                outputUrl: imageUrls[0],
+                outputUrls: imageUrls,
+                revisedPrompt: lastRevisedPrompt,
                 executionStatus: "success",
                 errorMessage: undefined,
               });
@@ -537,50 +555,79 @@ export function useWorkflowRunner() {
               const width = sizeParts[0];
               const height = sizeParts[1];
 
-              const videoId = await callVideoCreateAPI(apiKey, baseUrl, {
-                model: data.modelId ?? "agnes-video-v2.0",
-                prompt: videoPrompt,
-                negativePrompt: data.negativePrompt as string | undefined,
-                imageUrl: inputs.imageInputs[0],
-                imageUrls: inputs.imageInputs.length > 1 ? inputs.imageInputs : undefined,
-                width: width,
-                height: height,
-                numFrames: calcNumFrames(data.duration ?? 5, data.fps),
-                fps: data.fps,
-                mode: data.mode,
-                seed: data.seed,
-              });
+              const videoCount = data.count ?? 1;
+              const effectiveSeed = (data.seed && data.seed > 0) ? data.seed : undefined;
+              const outputUrlsArr: string[] = [];
+              const coverUrlsArr: string[] = [];
+              let lastDuration: number | undefined;
 
-              store.updateNodeData(nodeId, { videoId, taskProgress: 0 });
-              store.appendNodeLog(nodeId, log("info", getTranslation("log.videoCreated", { videoId })));
-
-              /* Poll until completion or timeout */
-              const deadline = Date.now() + VIDEO_POLL_TIMEOUT_MS;
-              let finalStatus: VideoTaskStatus | undefined;
-
-              while (Date.now() < deadline) {
-                if (opts.signal?.aborted) throw new Error(getTranslation("error.videoPollCancelled"));
-
-                await new Promise<void>((r) => setTimeout(r, VIDEO_POLL_INTERVAL_MS));
-                finalStatus = await callVideoPollAPI(apiKey, baseUrl, videoId);
-
-                store.updateNodeData(nodeId, { taskProgress: finalStatus.progress });
-                store.appendNodeLog(nodeId, log("info", getTranslation("log.videoProgress", { progress: finalStatus.progress, status: finalStatus.status })));
-
-                if (finalStatus.status === "completed") break;
-                if (finalStatus.status === "failed") {
-                  throw new Error(getTranslation("error.videoGenerationFailed", { reason: finalStatus.error ?? "unknown error" }));
+              for (let vi = 0; vi < videoCount; vi++) {
+                if (opts.signal?.aborted) throw new Error("Cancelled");
+                if (videoCount > 1) {
+                  store.appendNodeLog(nodeId, log("info", getTranslation("log.videoBatchProgress", { current: vi + 1, total: videoCount })));
                 }
-              }
 
-              if (!finalStatus || finalStatus.status !== "completed") {
-                throw new Error(getTranslation("error.videoGenerationTimedOut"));
+                const newVideoId = await callVideoCreateAPI(apiKey, baseUrl, {
+                  model: data.modelId ?? "agnes-video-v2.0",
+                  prompt: videoPrompt,
+                  negativePrompt: data.negativePrompt as string | undefined,
+                  imageUrl: inputs.imageInputs[0],
+                  imageUrls: inputs.imageInputs.length > 1 ? inputs.imageInputs : undefined,
+                  width: width,
+                  height: height,
+                  numFrames: calcNumFrames(data.duration ?? 5, data.fps),
+                  fps: data.fps,
+                  mode: data.mode,
+                  seed: effectiveSeed,
+                });
+
+                store.updateNodeData(nodeId, { videoId: newVideoId, taskProgress: 0 });
+                store.appendNodeLog(nodeId, log("info", getTranslation("log.videoCreated", { videoId: newVideoId })));
+
+                /* Poll until completion or timeout */
+                const deadline = Date.now() + VIDEO_POLL_TIMEOUT_MS;
+                let finalStatus: VideoTaskStatus | undefined;
+
+                while (Date.now() < deadline) {
+                  if (opts.signal?.aborted) throw new Error(getTranslation("error.videoPollCancelled"));
+
+                  await new Promise<void>((r) => setTimeout(r, VIDEO_POLL_INTERVAL_MS));
+                  finalStatus = await callVideoPollAPI(apiKey, baseUrl, newVideoId);
+
+                  store.updateNodeData(nodeId, { taskProgress: finalStatus.progress });
+                  store.appendNodeLog(nodeId, log("info", getTranslation("log.videoProgress", { progress: finalStatus.progress, status: finalStatus.status })));
+
+                  if (finalStatus.status === "completed") break;
+                  if (finalStatus.status === "failed") {
+                    throw new Error(getTranslation("error.videoGenerationFailed", { reason: finalStatus.error ?? "unknown error" }));
+                  }
+                }
+
+                if (!finalStatus || finalStatus.status !== "completed") {
+                  throw new Error(getTranslation("error.videoGenerationTimedOut"));
+                }
+
+                // Ensure video URL has protocol
+                let videoUrl = finalStatus.videoUrl ?? "";
+                if (videoUrl && !videoUrl.startsWith("http://") && !videoUrl.startsWith("https://")) {
+                  videoUrl = "https://" + videoUrl;
+                }
+                let coverUrl = finalStatus.coverImageUrl ?? "";
+                if (coverUrl && !coverUrl.startsWith("http://") && !coverUrl.startsWith("https://")) {
+                  coverUrl = "https://" + coverUrl;
+                }
+
+                outputUrlsArr.push(videoUrl);
+                if (coverUrl) coverUrlsArr.push(coverUrl);
+                lastDuration = finalStatus.duration;
               }
 
               store.updateNodeData(nodeId, {
-                outputUrl: finalStatus.videoUrl,
-                coverImageUrl: finalStatus.coverImageUrl,
-                duration: finalStatus.duration,
+                outputUrl: outputUrlsArr[0],
+                outputUrls: outputUrlsArr,
+                coverImageUrl: coverUrlsArr[0],
+                coverImageUrls: coverUrlsArr,
+                duration: lastDuration,
                 taskProgress: 100,
                 executionStatus: "success",
                 errorMessage: undefined,
