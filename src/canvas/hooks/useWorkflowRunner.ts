@@ -540,51 +540,28 @@ export function useWorkflowRunner() {
               });
               store.appendNodeLog(nodeId, log("info", getTranslation("log.imageGeneratedSuccess")));
 
-              // Auto-create output image nodes for each generated image
+              // Distribute generated images to downstream connected image nodes.
+              // If downstream has fewer nodes than generated images, only the
+              // first N images are distributed (front-to-back). If downstream
+              // has more nodes than images, excess nodes get nothing.
               if (imageUrls.length > 0) {
-                const sourceNode = store.nodes.find((n) => n.id === nodeId);
-                const sourcePos = sourceNode?.position ?? { x: 0, y: 0 };
-                const nodeWidth = 320; // w-80
-                const gapX = 60;
-                const newEdges: Edge[] = [];
+                const downstreamImageEdges = store.edges.filter(
+                  (e) => e.source === nodeId && e.sourceHandle === "image-out"
+                );
+                const downstreamImageNodes = downstreamImageEdges
+                  .map((e) => store.nodes.find((n) => n.id === e.target))
+                  .filter((n): n is RFNode => n != null && n.type === "image");
 
-                for (let gi = 0; gi < imageUrls.length; gi++) {
-                  const outNodeId = `image__out_${Date.now()}_${gi}`;
-                  const outNode: RFNode = {
-                    id: outNodeId,
-                    type: "image",
-                    position: {
-                      x: sourcePos.x + nodeWidth + gapX,
-                      y: sourcePos.y + gi * 360,
-                    },
-                    data: {
-                      label: `${data.label || "Image"} #${gi + 1}`,
-                      modelId: data.modelId ?? "agnes-image-2.1-flash",
-                      prompt: data.prompt,
-                      size: data.size,
-                      count: 1,
-                      quality: data.quality,
-                      outputUrl: imageUrls[gi],
+                if (downstreamImageNodes.length > 0) {
+                  const count = Math.min(imageUrls.length, downstreamImageNodes.length);
+                  for (let di = 0; di < count; di++) {
+                    store.updateNodeData(downstreamImageNodes[di].id, {
+                      outputUrl: imageUrls[di],
                       executionStatus: "success" as const,
                       executionLogs: [] as NodeExecutionLog[],
-                    } as unknown as Record<string, unknown>,
-                  };
-                  store.addNode(outNode);
-
-                  newEdges.push({
-                    id: `edge__out_${Date.now()}_${gi}`,
-                    source: nodeId,
-                    sourceHandle: "image-out",
-                    target: outNodeId,
-                    targetHandle: "image-in",
-                    type: "typed",
-                    animated: true,
-                  });
-                }
-
-                // Add edges to store
-                if (newEdges.length > 0) {
-                  store.setEdges([...store.edges, ...newEdges]);
+                    });
+                  }
+                  store.appendNodeLog(nodeId, log("info", getTranslation("log.imageDistributed", { count: String(count) })));
                 }
               }
 
