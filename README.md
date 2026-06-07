@@ -28,9 +28,11 @@
 | 🎨 **图像生成** | 集成 `agnes-image-2.1-flash`，支持文生图和图生图（URL 管线） |
 | 🎬 **视频生成** | 集成 `agnes-video-v2.0`，异步任务 + 进度轮询 |
 | 📤 **图片上传** | 拖拽/点击上传本地图片，自动转为 base64 数据用于 API 调用 |
-| 🔗 **智能连线** | 规则化 Handle 验证，防止错误数据类型连接 |
+| 🔗 **智能连线** | 规则化 Handle 验证，右键删除连线 |
+| 📐 **预设尺寸** | 图像/视频支持多种预设尺寸（1:1、16:9、9:16 等） |
+| 📦 **批量生成** | 图像支持 1-10 张批量生成，视频支持 1-5 个批量生成 |
 | ⚡ **工作流执行** | 拓扑排序 + 循环检测 + 级联失败 + 局部执行 |
-| 💾 **任务管理** | 多画布任务切换、自动保存、历史版本回溯（最多 20 版） |
+| 💾 **任务管理** | 文件夹 + 树形任务管理、多画布切换、自动保存 + 备份恢复 |
 | 🌐 **中英文切换** | 内置轻量 i18n 系统，一键切换中文/English |
 | 🔧 **模型可替换** | 抽象 Provider 层，替换模型只需修改注册表或实现适配器 |
 
@@ -78,7 +80,7 @@ npm run preview
 |------|------|
 | 添加节点 | 从左侧面板拖拽节点到画布 |
 | 连接节点 | 从一个节点的输出 Handle 拖向另一个节点的输入 Handle |
-| 删除连线 | 点击连线选中后按 `Delete` / `Backspace` |
+| 删除连线 | 右键点击连线，选择删除 |
 | 选中节点 | 单击节点，右侧面板显示属性编辑 |
 | 画布控制 | 左下角工具栏：放大、缩小、适应视图 |
 
@@ -88,8 +90,8 @@ npm run preview
 |------|------|------|------|
 | **Prompt** | 自由文本输入 | — | 文本 |
 | **Text** | LLM 文本生成 | 文本 | 文本 |
-| **Image** | AI 图像生成 | 文本 + 图像（可选） | 图像 |
-| **Video** | AI 视频生成 | 图像（可选） | 视频 |
+| **Image** | AI 图像生成（支持批量 1-10 张、预设尺寸） | 文本 + 图像（可选） | 图像 |
+| **Video** | AI 视频生成（支持批量 1-5、自动计算帧数） | 图像（可选） | 视频 |
 | **Upload** | 本地图片上传 | — | 图像 |
 
 ### 连接规则
@@ -106,11 +108,11 @@ Upload ──────────────────┘
 
 ### 任务管理
 
-- **新建任务**：输入名称点击 New，当前画布保存为新任务
-- **切换任务**：点击任务 Tab（自动保存当前画布后切换）
-- **保存进度**：点击 Save to "任务名" 手动保存
-- **历史回溯**：展开任务历史列表，点击任意版本恢复
-- **重命名/删除**：悬停任务 Tab 显示操作按钮
+- **新建任务**：在任务树空白区域右键，选择新建任务或新建文件夹
+- **切换任务**：点击任务名称（自动保存当前画布后切换）
+- **自动保存**：画布修改后 500ms 自动保存到当前任务
+- **重命名/删除**：右键点击任务或文件夹，弹出操作菜单
+- **数据恢复**：如果任务数据丢失，系统会自动从 localStorage 备份恢复
 
 ## 🏗️ 项目结构
 
@@ -133,19 +135,27 @@ src/
 │   ├── edges/                 # 自定义连线样式
 │   └── panels/                # 属性编辑面板
 ├── components/                # UI 组件
-│   ├── Sidebar.tsx            # 左侧拖拽面板
-│   ├── TaskManager.tsx        # 任务管理器
+│   ├── Sidebar.tsx            # 左侧面板（设置 + 清空画布）
+│   ├── TaskTreeView.tsx       # 树形任务管理器（文件夹 + 任务 + 右键菜单）
 │   ├── SettingsDialog.tsx     # 设置对话框
-│   └── ApiKeyBanner.tsx       # API Key 提示横幅
+│   ├── ApiKeyBanner.tsx       # API Key 提示横幅
+│   └── ui/                    # 通用 UI 组件
+│       ├── ConfirmDialog.tsx  # 确认对话框
+│       ├── ContextMenu.tsx    # 右键菜单
+│       ├── HelpTooltip.tsx    # 帮助提示
+│       ├── Lightbox.tsx       # 图片灯箱
+│       └── NumberInput.tsx    # 数字输入框
 ├── stores/                    # 状态管理（Zustand）
 │   ├── canvasStore.ts         # 画布状态（IndexedDB 持久化）
 │   ├── settingsStore.ts       # 全局设置（localStorage）
-│   └── taskStore.ts           # 任务管理（localStorage）
+│   └── taskStore.ts           # 任务管理（文件夹 + 多画布任务切换，localStorage）
 ├── providers/                 # AI 模型抽象层
 │   ├── types.ts               # ModelProvider 接口
 │   └── agnes/
 │       └── AgnesAdapter.ts    # Agnes AI 适配器
-├── lib/                       # 工具函数
+├── lib/
+│   ├── resolveBaseUrl.ts      # API 地址解析工具
+│   └── validation.ts          # 校验工具（帧数计算、prompt 清理等）
 ├── styles/
 │   └── globals.css            # 全局样式 + React Flow 覆写
 ├── App.tsx                    # 根组件
@@ -180,10 +190,11 @@ export const MODEL_REGISTRY: Record<Modality, ModelEntry[]> = {
 ```typescript
 export interface ModelProvider {
   readonly name: string;
-  readonly baseUrl: string;
-  generateText(params: TextGenerationParams): Promise<TextResult>;
-  generateImage(params: ImageGenerationParams): Promise<ImageResult>;
-  generateVideo(params: VideoGenerationParams): Promise<VideoResult>;
+  discover(apiKey: string, baseUrl: string): Promise<AIModel[]>;
+  generateText(apiKey: string, baseUrl: string, params: TextParams): Promise<TextResult>;
+  generateImage(apiKey: string, baseUrl: string, params: ImageParams): Promise<ImageResult>;
+  createVideoTask(apiKey: string, baseUrl: string, params: VideoParams): Promise<string>;
+  pollVideoTask(apiKey: string, baseUrl: string, taskId: string): Promise<VideoTaskStatus>;
 }
 ```
 
@@ -209,7 +220,7 @@ export interface ModelProvider {
 
 ## 📄 许可证
 
-[MIT License](./LICENSE)
+MIT License
 
 ## 🤝 贡献
 

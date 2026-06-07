@@ -27,21 +27,28 @@ src/
 │   ├── edges/                 # 自定义连线样式（TypedEdge）
 │   └── panels/                # 属性编辑面板（PropertiesPanel）
 ├── components/                # UI 组件
-│   ├── Sidebar.tsx            # 左侧拖拽面板
-│   ├── TaskManager.tsx        # 任务管理器
+│   ├── Sidebar.tsx            # 左侧面板（设置 + 清空画布）
+│   ├── TaskTreeView.tsx       # 树形任务管理器（文件夹 + 任务 + 右键菜单）
+│   ├── TaskManager.tsx        # 任务管理器（旧版，已弃用）
 │   ├── SettingsDialog.tsx     # 设置对话框
 │   ├── ApiKeyBanner.tsx       # API Key 提示横幅
 │   └── ui/                    # 通用 UI 组件
+│       ├── ConfirmDialog.tsx  # 确认对话框
+│       ├── ContextMenu.tsx    # 右键菜单
+│       ├── HelpTooltip.tsx    # 帮助提示
+│       ├── Lightbox.tsx       # 图片灯箱
+│       └── NumberInput.tsx    # 数字输入框
 ├── stores/                    # Zustand stores
-│   ├── canvasStore.ts         # 画布状态（nodes/edges/viewport，IndexedDB 持久化）
+│   ├── canvasStore.ts         # 画布状态（IndexedDB 持久化 + localStorage 备份 + 版本迁移）
 │   ├── settingsStore.ts       # 全局设置（apiKey/baseUrl/language/darkMode，localStorage）
-│   └── taskStore.ts           # 任务管理（多画布 + 最多 20 版历史回溯，localStorage）
+│   └── taskStore.ts           # 任务管理（文件夹 + 多画布任务切换，localStorage）
 ├── providers/                 # AI 模型抽象层
 │   ├── types.ts               # ModelProvider 接口 + 参数/结果类型定义
 │   └── agnes/
 │       └── AgnesAdapter.ts    # Agnes AI 适配器（文本/图像/视频）
 ├── lib/
-│   └── resolveBaseUrl.ts      # API 地址解析工具
+│   ├── resolveBaseUrl.ts      # API 地址解析工具
+│   └── validation.ts          # 校验工具（帧数计算、prompt 清理等）
 ├── styles/
 │   └── globals.css            # 全局样式 + React Flow 覆写
 ├── App.tsx                    # 根组件
@@ -66,6 +73,8 @@ src/
 - 节点数据类型采用判别联合（discriminated union），在 `src/canvas/types.ts` 集中定义
 - 状态管理使用 Zustand + persist 中间件：画布数据走 IndexedDB，设置走 localStorage
 - 图片和视频输出存储为 URL（由 AI 模型返回），不存储为 base64 或二进制 Blob
+- canvasStore 自动备份到 localStorage，启动时可自动恢复丢失的任务
+- Zustand persist 使用 version 字段 + migrate 函数处理数据结构变更
 - 国际化使用自研 `useT()` hook，翻译键在 `src/i18n/index.ts` 的 `zh` / `en` 字典中
 - 新增翻译键时必须同时添加 zh 和 en 两个字典
 
@@ -86,6 +95,11 @@ src/
 - **级联失败**：上游失败自动标记所有下游为 failed
 - **视频轮询**：异步任务 + 3 秒间隔轮询，10 分钟超时
 - 支持 AbortController 取消
+
+## 节点参数
+
+- **Image 节点**：size（预设尺寸下拉）、count（1-10 批量生成）
+- **Video 节点**：size（预设尺寸下拉）、count（1-5 批量生成）、fps（24/30/60）、duration（3/5/10/18s，自动计算帧数 8n+1 ≤ 441）、seed（可选，0 = 随机）
 
 ## 连接规则
 

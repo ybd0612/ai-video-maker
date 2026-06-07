@@ -25,12 +25,14 @@ A node-based AI workflow editor built on React Flow, integrating Agnes AI's text
 |---------|-------------|
 | 🖼️ **Infinite Canvas** | Node-based canvas powered by React Flow — zoom, pan, minimap |
 | 🤖 **Text Generation** | `agnes-2.0-flash` model with system prompts and custom parameters |
-| 🎨 **Image Generation** | `agnes-image-2.1-flash` — text-to-image and image-to-image (base64 pipeline) |
+| 🎨 **Image Generation** | `agnes-image-2.1-flash` — text-to-image and image-to-image (URL pipeline, batch 1-10) |
 | 🎬 **Video Generation** | `agnes-video-v2.0` — async task creation with progress polling |
 | 📤 **Image Upload** | Drag-and-drop or click to upload local images as base64 |
-| 🔗 **Smart Connections** | Rule-based handle validation prevents invalid data type connections |
+| 🔗 **Smart Connections** | Rule-based handle validation, right-click to delete edges |
+| 📐 **Preset Sizes** | Image/Video support multiple preset sizes (1:1, 16:9, 9:16, etc.) |
+| 📦 **Batch Generation** | Image batch 1-10, Video batch 1-5 |
 | ⚡ **Workflow Execution** | Topological sort + cycle detection + cascading failure + partial execution |
-| 💾 **Task Management** | Multi-canvas task switching, auto-save, version history (up to 20) |
+| 💾 **Task Management** | Folder tree, multi-canvas switching, auto-save + backup recovery |
 | 🌐 **i18n** | Built-in lightweight i18n — switch between Chinese and English instantly |
 | 🔧 **Swappable Models** | Abstract provider layer — swap models by changing the registry or implementing an adapter |
 
@@ -78,7 +80,7 @@ npm run preview
 |--------|--------|
 | Add node | Drag from the left palette onto the canvas |
 | Connect nodes | Drag from an output handle to an input handle |
-| Delete connection | Click the edge to select, then press `Delete` / `Backspace` |
+| Delete connection | Right-click the edge, then select Delete |
 | Select node | Click a node — the right panel shows editable properties |
 | Canvas controls | Bottom-left toolbar: zoom in, zoom out, fit view |
 
@@ -88,8 +90,8 @@ npm run preview
 |------|----------|-------|--------|
 | **Prompt** | Freeform text input | — | Text |
 | **Text** | LLM text generation | Text | Text |
-| **Image** | AI image generation | Text + Image (optional) | Image |
-| **Video** | AI video generation | Image (optional) | Video |
+| **Image** | AI image generation (batch 1-10, preset sizes) | Text + Image (optional) | Image |
+| **Video** | AI video generation (batch 1-5, auto frame calc) | Image (optional) | Video |
 | **Upload** | Local image upload | — | Image |
 
 ### Connection Rules
@@ -106,11 +108,11 @@ Upload ──────────────────┘
 
 ### Task Management
 
-- **New task**: Enter a name and click New — current canvas is saved as a new task
-- **Switch task**: Click a task tab (auto-saves current canvas before switching)
-- **Save progress**: Click Save to "task name" to manually save
-- **Version history**: Expand the history list and click any version to restore
-- **Rename / Delete**: Hover over a task tab to reveal action buttons
+- **New task**: Right-click the empty area in the task tree, select New Task or New Folder
+- **Switch task**: Click a task name (auto-saves current canvas before switching)
+- **Auto-save**: Canvas changes are auto-saved 500ms after the last edit
+- **Rename / Delete**: Right-click a task or folder for context menu actions
+- **Data recovery**: If task data is lost, the system auto-recovers from localStorage backup
 
 ## 🏗️ Project Structure
 
@@ -133,19 +135,27 @@ src/
 │   ├── edges/                 # Custom edge styling
 │   └── panels/                # Property editing panel
 ├── components/                # UI components
-│   ├── Sidebar.tsx            # Left drag palette
-│   ├── TaskManager.tsx        # Task manager
+│   ├── Sidebar.tsx            # Left panel (settings + clear canvas)
+│   ├── TaskTreeView.tsx       # Tree task manager (folders + tasks + context menu)
 │   ├── SettingsDialog.tsx     # Settings dialog
-│   └── ApiKeyBanner.tsx       # API key prompt banner
+│   ├── ApiKeyBanner.tsx       # API key prompt banner
+│   └── ui/                    # Shared UI components
+│       ├── ConfirmDialog.tsx  # Confirmation dialog
+│       ├── ContextMenu.tsx    # Context menu
+│       ├── HelpTooltip.tsx    # Help tooltip
+│       ├── Lightbox.tsx       # Image lightbox
+│       └── NumberInput.tsx    # Number input
 ├── stores/                    # State management (Zustand)
-│   ├── canvasStore.ts         # Canvas state (IndexedDB persistence)
+│   ├── canvasStore.ts         # Canvas state (IndexedDB + localStorage backup + version migration)
 │   ├── settingsStore.ts       # Global settings (localStorage)
-│   └── taskStore.ts           # Task management (localStorage)
+│   └── taskStore.ts           # Task management (folders + multi-canvas, localStorage)
 ├── providers/                 # AI model abstraction layer
 │   ├── types.ts               # ModelProvider interface
 │   └── agnes/
 │       └── AgnesAdapter.ts    # Agnes AI adapter
-├── lib/                       # Utilities
+├── lib/
+│   ├── resolveBaseUrl.ts      # API base URL resolver
+│   └── validation.ts          # Validation utilities (frame calc, prompt sanitize)
 ├── styles/
 │   └── globals.css            # Global styles + React Flow overrides
 ├── App.tsx                    # Root component
@@ -180,10 +190,11 @@ Implement the `ModelProvider` interface in `src/providers/types.ts`:
 ```typescript
 export interface ModelProvider {
   readonly name: string;
-  readonly baseUrl: string;
-  generateText(params: TextGenerationParams): Promise<TextResult>;
-  generateImage(params: ImageGenerationParams): Promise<ImageResult>;
-  generateVideo(params: VideoGenerationParams): Promise<VideoResult>;
+  discover(apiKey: string, baseUrl: string): Promise<AIModel[]>;
+  generateText(apiKey: string, baseUrl: string, params: TextParams): Promise<TextResult>;
+  generateImage(apiKey: string, baseUrl: string, params: ImageParams): Promise<ImageResult>;
+  createVideoTask(apiKey: string, baseUrl: string, params: VideoParams): Promise<string>;
+  pollVideoTask(apiKey: string, baseUrl: string, taskId: string): Promise<VideoTaskStatus>;
 }
 ```
 
@@ -209,7 +220,7 @@ The project includes a lightweight i18n system with zero dependencies:
 
 ## 📄 License
 
-[MIT License](./LICENSE)
+MIT License
 
 ## 🤝 Contributing
 
