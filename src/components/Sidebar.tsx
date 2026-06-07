@@ -10,12 +10,25 @@ export function Sidebar() {
   const openSettings = useSettingsStore((s) => s.setSettingsDialogOpen);
   const t = useT();
   const clearAll = useCanvasStore((s) => s.clearAll);
-  const clearTasks = useTaskStore(() => {
-    return () => {
-      useTaskStore.setState({ tasks: [], folders: [], activeTaskId: null });
-    };
-  });
   const nodeCount = useCanvasStore((s) => s.nodes.length);
+
+  const handleClear = async () => {
+    if (nodeCount === 0) {
+      clearAll();
+      useTaskStore.setState({ tasks: [], folders: [], activeTaskId: null });
+      return;
+    }
+    const ok = await confirmDialog({
+      title: t("sidebar.clearCanvas"),
+      message: t("sidebar.clearConfirm"),
+      confirmLabel: t("dialog.confirm"),
+      variant: "danger",
+    });
+    if (ok) {
+      clearAll();
+      useTaskStore.setState({ tasks: [], folders: [], activeTaskId: null });
+    }
+  };
 
   return (
     <div className="flex h-full w-56 flex-col border-r border-slate-800 bg-slate-950">
@@ -41,16 +54,7 @@ export function Sidebar() {
           <Settings size={13} /> {t("sidebar.settings")}
         </button>
         <button
-          onClick={async () => {
-            if (nodeCount === 0) { clearAll(); clearTasks(); return; }
-            const ok = await confirmDialog({
-              title: t("sidebar.clearCanvas"),
-              message: t("sidebar.clearConfirm"),
-              confirmLabel: t("dialog.confirm"),
-              variant: "danger",
-            });
-            if (ok) { clearAll(); clearTasks(); }
-          }}
+          onClick={handleClear}
           className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-xs text-red-400/70 transition hover:bg-red-950/40 hover:text-red-400"
         >
           <Trash2 size={13} /> {t("sidebar.clearCanvas")}
