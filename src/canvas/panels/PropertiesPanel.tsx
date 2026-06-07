@@ -12,7 +12,8 @@ import { useWorkflowRunner } from "@/canvas/hooks/useWorkflowRunner";
 import { useT } from "@/i18n";
 import { NumberInput } from "@/components/ui/NumberInput";
 import { HelpTooltip } from "@/components/ui/HelpTooltip";
-import { sanitizeNodeLabel, sanitizePrompt, sanitizeRichText, calcNumFrames } from "@/lib/validation";
+import { sanitizeNodeLabel, calcNumFrames } from "@/lib/validation";
+import { IMEAwareTextarea } from "@/components/ui/IMEAwareTextarea";
 import type {
   AnyNodeData,
   TextNodeData,
@@ -146,10 +147,9 @@ function TextNodeFields({ nodeId, data }: { nodeId: string; data: TextNodeData }
   return (
     <>
       <Field label={t("panel.promptText")}>
-        <textarea
+        <IMEAwareTextarea
           value={data.prompt}
-          onChange={(e) => updateNodeData(nodeId, { prompt: e.target.value })}
-          onBlur={(e) => updateNodeData(nodeId, { prompt: sanitizePrompt(e.target.value) })}
+          onChange={(v) => updateNodeData(nodeId, { prompt: v })}
           placeholder={t("panel.promptPlaceholder")}
           rows={4}
           className="w-full resize-none rounded-md border border-slate-700 bg-slate-800 p-2 text-xs text-slate-100 placeholder:text-slate-600 focus:border-sky-500 focus:outline-none"
@@ -195,10 +195,9 @@ function ImageNodeFields({ nodeId, data }: { nodeId: string; data: ImageNodeData
   return (
     <>
       <Field label={t("panel.imagePrompt")}>
-        <textarea
+        <IMEAwareTextarea
           value={data.prompt}
-          onChange={(e) => updateNodeData(nodeId, { prompt: e.target.value })}
-          onBlur={(e) => updateNodeData(nodeId, { prompt: sanitizePrompt(e.target.value) })}
+          onChange={(v) => updateNodeData(nodeId, { prompt: v })}
           placeholder={t("panel.promptPlaceholder")}
           rows={4}
           className="w-full resize-none rounded-md border border-slate-700 bg-slate-800 p-2 text-xs text-slate-100 placeholder:text-slate-600 focus:border-violet-500 focus:outline-none"
@@ -207,7 +206,7 @@ function ImageNodeFields({ nodeId, data }: { nodeId: string; data: ImageNodeData
       <Field label={t("panel.imageSize")} hint={t("hint.imageSize")}>
         <select
           value={data.size}
-          onChange={(e) => updateNodeData(nodeId, { size: e.target.value })}
+          onChange={(v) => updateNodeData(nodeId, { size: v })}
           className="w-full rounded border border-slate-700 bg-slate-800 px-2 py-1 text-xs text-slate-300 focus:border-violet-500 focus:outline-none"
         >
           <option value="576x1024">9:16 (576x1024)</option>
@@ -250,19 +249,18 @@ function VideoNodeFields({ nodeId, data }: { nodeId: string; data: VideoNodeData
   return (
     <>
       <Field label={t("panel.videoPrompt")}>
-        <textarea
+        <IMEAwareTextarea
           value={data.prompt}
-          onChange={(e) => updateNodeData(nodeId, { prompt: e.target.value })}
-          onBlur={(e) => updateNodeData(nodeId, { prompt: sanitizePrompt(e.target.value) })}
+          onChange={(v) => updateNodeData(nodeId, { prompt: v })}
           placeholder={t("panel.promptPlaceholder")}
           rows={4}
           className="w-full resize-none rounded-md border border-slate-700 bg-slate-800 p-2 text-xs text-slate-100 placeholder:text-slate-600 focus:border-amber-500 focus:outline-none"
         />
       </Field>
       <Field label={t("panel.negativePrompt")}>
-        <textarea
+        <IMEAwareTextarea
           value={String(data.negativePrompt ?? "")}
-          onChange={(e) => updateNodeData(nodeId, { negativePrompt: e.target.value })}
+          onChange={(v) => updateNodeData(nodeId, { negativePrompt: v })}
           placeholder={t("panel.negativePlaceholder")}
           rows={3}
           className="w-full resize-none rounded-md border border-slate-700 bg-slate-800 p-2 text-xs text-slate-100 placeholder:text-slate-600 focus:border-amber-500 focus:outline-none"
@@ -271,7 +269,7 @@ function VideoNodeFields({ nodeId, data }: { nodeId: string; data: VideoNodeData
       <Field label={t("panel.resolution")} hint={t("hint.resolution")}>
         <select
           value={String(data.size ?? "")}
-          onChange={(e) => updateNodeData(nodeId, { size: e.target.value })}
+          onChange={(v) => updateNodeData(nodeId, { size: v })}
           className="w-full rounded border border-slate-700 bg-slate-800 px-2 py-1 text-xs text-slate-300 focus:border-amber-500 focus:outline-none"
         >
           <option value="1152x768">横屏 1152x768 (推荐)</option>
@@ -368,10 +366,9 @@ function PromptNodeFields({ nodeId, data }: { nodeId: string; data: PromptNodeDa
   return (
     <>
       <Field label={t("panel.systemPrompt")} hint={t("hint.systemPrompt")}>
-        <textarea
+        <IMEAwareTextarea
           value={data.systemPrompt ?? ""}
-          onChange={(e) => updateNodeData(nodeId, { systemPrompt: e.target.value })}
-          onBlur={(e) => updateNodeData(nodeId, { systemPrompt: sanitizeRichText(e.target.value) })}
+          onChange={(v) => updateNodeData(nodeId, { systemPrompt: v })}
           placeholder={t("panel.systemPromptPlaceholder")}
           rows={2}
           className="w-full resize-none rounded-md border border-slate-700 bg-slate-800 p-2 text-xs text-slate-100 placeholder:text-slate-600 focus:border-emerald-500 focus:outline-none"

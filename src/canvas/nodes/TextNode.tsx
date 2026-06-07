@@ -6,8 +6,8 @@ import type { TextNodeData } from "@/canvas/types";
 import { NodeShell } from "./NodeShell";
 import { useT } from "@/i18n";
 import { NumberInput } from "@/components/ui/NumberInput";
-import { sanitizePrompt } from "@/lib/validation";
 import { HelpTooltip } from "@/components/ui/HelpTooltip";
+import { IMEAwareTextarea } from "@/components/ui/IMEAwareTextarea";
 
 function TextNodeInner({ id, data }: NodeProps) {
   const d = data as unknown as TextNodeData;
@@ -30,12 +30,9 @@ function TextNodeInner({ id, data }: NodeProps) {
       <div className="rounded border border-slate-700/50 bg-slate-800/50 px-2 py-1 text-xs text-slate-500">
         {t("text.model")}: agnes-2.0-flash
       </div>
-      <textarea
+      <IMEAwareTextarea
         value={d.prompt}
-        onChange={(e) =>
-          updateNodeData(id, { prompt: e.target.value } as Partial<TextNodeData>)
-        }
-        onBlur={(e) => updateNodeData(id, { prompt: sanitizePrompt(e.target.value) } as Partial<TextNodeData>)}
+        onChange={(v) => updateNodeData(id, { prompt: v } as Partial<TextNodeData>)}
         placeholder={t("text.placeholder")}
         rows={3}
         className="w-full resize-none rounded-md border border-slate-700 bg-slate-800 p-2 text-xs text-slate-100 placeholder:text-slate-500 focus:border-sky-500 focus:outline-none"

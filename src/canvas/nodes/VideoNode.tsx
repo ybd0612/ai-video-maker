@@ -6,8 +6,9 @@ import type { VideoNodeData } from "@/canvas/types";
 import { NodeShell } from "./NodeShell";
 import { useT } from "@/i18n";
 import { NumberInput } from "@/components/ui/NumberInput";
-import { sanitizePrompt, calcNumFrames } from "@/lib/validation";
+import { calcNumFrames } from "@/lib/validation";
 import { HelpTooltip } from "@/components/ui/HelpTooltip";
+import { IMEAwareTextarea } from "@/components/ui/IMEAwareTextarea";
 
 function VideoNodeInner({ id, data }: NodeProps) {
   const d = data as unknown as VideoNodeData;
@@ -30,22 +31,17 @@ function VideoNodeInner({ id, data }: NodeProps) {
       <div className="rounded border border-slate-700/50 bg-slate-800/50 px-2 py-1 text-xs text-slate-500">
         {t("video.model")}: agnes-video-v2.0
       </div>
-      <textarea
+      <IMEAwareTextarea
         value={d.prompt}
-        onChange={(e) =>
-          updateNodeData(id, { prompt: e.target.value } as Partial<VideoNodeData>)
-        }
-        onBlur={(e) => updateNodeData(id, { prompt: sanitizePrompt(e.target.value) } as Partial<VideoNodeData>)}
+        onChange={(v) => updateNodeData(id, { prompt: v } as Partial<VideoNodeData>)}
         placeholder={t("video.placeholder")}
         rows={3}
         className="w-full resize-none rounded-md border border-slate-700 bg-slate-800 p-2 text-xs text-slate-100 placeholder:text-slate-500 focus:border-amber-500 focus:outline-none"
       />
       {/* Negative prompt */}
-      <textarea
+      <IMEAwareTextarea
         value={String(d.negativePrompt ?? "")}
-        onChange={(e) =>
-          updateNodeData(id, { negativePrompt: e.target.value } as Partial<VideoNodeData>)
-        }
+        onChange={(v) => updateNodeData(id, { negativePrompt: v } as Partial<VideoNodeData>)}
         placeholder={t("panel.negativePlaceholder")}
         rows={2}
         className="w-full resize-none rounded-md border border-slate-700/60 bg-slate-800/80 p-2 text-xs text-slate-400 placeholder:text-slate-600 focus:border-amber-500 focus:outline-none"

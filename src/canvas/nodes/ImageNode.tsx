@@ -6,9 +6,9 @@ import type { ImageNodeData } from "@/canvas/types";
 import type { AnyNodeData } from "@/canvas/types";
 import { NodeShell } from "./NodeShell";
 import { useT } from '@/i18n';
-import { sanitizePrompt } from "@/lib/validation";
 import { HelpTooltip } from "@/components/ui/HelpTooltip";
 import { Lightbox } from "@/components/ui/Lightbox";
+import { IMEAwareTextarea } from "@/components/ui/IMEAwareTextarea";
 
 function ImageNodeInner({ id, data }: NodeProps) {
   const d = data as unknown as ImageNodeData;
@@ -121,12 +121,9 @@ function ImageNodeInner({ id, data }: NodeProps) {
         </div>
       )}
 
-      <textarea
+      <IMEAwareTextarea
         value={d.prompt}
-        onChange={(e) =>
-          updateNodeData(id, { prompt: e.target.value } as Partial<ImageNodeData>)
-        }
-        onBlur={(e) => updateNodeData(id, { prompt: sanitizePrompt(e.target.value) } as Partial<ImageNodeData>)}
+        onChange={(v) => updateNodeData(id, { prompt: v } as Partial<ImageNodeData>)}
         placeholder={(hasInputImage || d.referenceImageUrl) ? t("image.img2imgPlaceholder") : t("image.placeholder")}
         rows={3}
         className="w-full resize-none rounded-md border border-slate-700 bg-slate-800 p-2 text-xs text-slate-100 placeholder:text-slate-500 focus:border-violet-500 focus:outline-none"
