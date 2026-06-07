@@ -324,14 +324,14 @@ async function callVideoCreateAPI(apiKey: string, _baseUrl: string, params: Vide
   }
 
   const json = await resp.json();
-  const taskId: string | undefined = json.task_id ?? json.id;
-    const videoId: string | undefined = json.video_id;
-  if (!taskId) throw new Error(getTranslation("error.videoCreateNoTaskId"));
-    return videoId ?? taskId;
+  const videoId: string | undefined = json.video_id ?? json.task_id ?? json.id;
+  if (!videoId) throw new Error(getTranslation("error.videoCreateNoVideoId"));
+  return videoId;
+
 }
 
-async function callVideoPollAPI(apiKey: string, _baseUrl: string, taskId: string): Promise<VideoTaskStatus> {
-    const pollUrl = taskId.startsWith("video_") ? `${resolveBaseUrl(_baseUrl)}/agnesapi?video_id=${taskId}` : `${resolveBaseUrl(_baseUrl)}/videos/${taskId}`;
+async function callVideoPollAPI(apiKey: string, _baseUrl: string, videoId: string): Promise<VideoTaskStatus> {
+    const pollUrl = videoId.startsWith("video_") ? `${resolveBaseUrl(_baseUrl)}/agnesapi?video_id=${videoId}` : `${resolveBaseUrl(_baseUrl)}/videos/${videoId}`;
     const resp = await fetch(pollUrl, {
     headers: { Authorization: `Bearer ${apiKey}` },
   });
@@ -354,7 +354,7 @@ async function callVideoPollAPI(apiKey: string, _baseUrl: string, taskId: string
   }
 
   return {
-    taskId,
+    videoId,
     status,
     progress: json.progress ?? 0,
     videoUrl: json.video_url ?? json.output?.video_url,
@@ -537,7 +537,7 @@ export function useWorkflowRunner() {
               const width = sizeParts[0];
               const height = sizeParts[1];
 
-              const taskId = await callVideoCreateAPI(apiKey, baseUrl, {
+              const videoId = await callVideoCreateAPI(apiKey, baseUrl, {
                 model: data.modelId ?? "agnes-video-v2.0",
                 prompt: videoPrompt,
                 negativePrompt: data.negativePrompt as string | undefined,
@@ -551,8 +551,8 @@ export function useWorkflowRunner() {
                 seed: data.seed,
               });
 
-              store.updateNodeData(nodeId, { taskId, taskProgress: 0 });
-              store.appendNodeLog(nodeId, log("info", getTranslation("log.videoTaskCreated", { taskId })));
+              store.updateNodeData(nodeId, { videoId, taskProgress: 0 });
+              store.appendNodeLog(nodeId, log("info", getTranslation("log.videoCreated", { videoId })));
 
               /* Poll until completion or timeout */
               const deadline = Date.now() + VIDEO_POLL_TIMEOUT_MS;
@@ -562,7 +562,7 @@ export function useWorkflowRunner() {
                 if (opts.signal?.aborted) throw new Error(getTranslation("error.videoPollCancelled"));
 
                 await new Promise<void>((r) => setTimeout(r, VIDEO_POLL_INTERVAL_MS));
-                finalStatus = await callVideoPollAPI(apiKey, baseUrl, taskId);
+                finalStatus = await callVideoPollAPI(apiKey, baseUrl, videoId);
 
                 store.updateNodeData(nodeId, { taskProgress: finalStatus.progress });
                 store.appendNodeLog(nodeId, log("info", getTranslation("log.videoProgress", { progress: finalStatus.progress, status: finalStatus.status })));

@@ -105,7 +105,7 @@ export interface VideoNodeData extends BaseNodeData {
   fps: number;
   mode: "normal" | "keyframe";
   seed?: number;
-  taskId?: string;
+  videoId?: string;
   taskProgress: number;
   outputUrl?: string;
   outputUrls?: string[];

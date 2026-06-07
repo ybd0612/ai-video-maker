@@ -114,7 +114,7 @@ const zh = {
   "panel.guidance": "引导强度",
   "panel.seed": "随机种子",
   "panel.output": "输出",
-  "panel.taskId": "任务ID",
+  "panel.videoId": "视频ID",
   "panel.taskProgress": "进度",
 
   // Tooltip hints
@@ -187,7 +187,7 @@ const zh = {
   "error.noImagePrompt": "图像生成没有可用的提示词。",
   "error.noVideoPrompt": "视频生成没有可用的提示词。",
   "error.apiError": "API 请求失败 ({status}): {detail}",
-  "error.videoCreateNoTaskId": "视频 API 未返回任务 ID。",
+  "error.videoCreateNoVideoId": "视频 API 未返回 video_id。",
   "error.videoPollCancelled": "视频轮询已取消。",
   "error.videoGenerationFailed": "视频生成失败: {reason}",
   "error.videoGenerationTimedOut": "视频生成超时。",
@@ -198,7 +198,7 @@ const zh = {
   "log.generatedChars": "生成了 {count} 个字符。",
   "log.imageGeneratedSuccess": "图像生成成功。",
   "log.imageProgress": "生成第 {current}/{total} 张...",
-  "log.videoTaskCreated": "视频任务已创建: {taskId}",
+  "log.videoCreated": "视频任务已创建: {videoId}",
   "log.videoProgress": "进度: {progress}% — {status}",
   "log.videoCompleted": "视频生成完成。",
   "log.failed": "失败: {message}",
@@ -311,7 +311,7 @@ const en = {
   "panel.guidance": "Guidance Scale",
   "panel.seed": "Seed",
   "panel.output": "Output",
-  "panel.taskId": "Task ID",
+  "panel.videoId": "Video ID",
   "panel.taskProgress": "Progress",
 
   // Tooltip hints
@@ -384,7 +384,7 @@ const en = {
   "error.noImagePrompt": "No prompt text available for image generation.",
   "error.noVideoPrompt": "No prompt text available for video generation.",
   "error.apiError": "API request failed ({status}): {detail}",
-  "error.videoCreateNoTaskId": "Video API did not return a task_id.",
+  "error.videoCreateNoVideoId": "Video API did not return a video_id.",
   "error.videoPollCancelled": "Video polling cancelled.",
   "error.videoGenerationFailed": "Video generation failed: {reason}",
   "error.videoGenerationTimedOut": "Video generation timed out.",
@@ -395,7 +395,7 @@ const en = {
   "log.generatedChars": "Generated {count} chars.",
   "log.imageGeneratedSuccess": "Image generated successfully.",
   "log.imageProgress": "Generating {current}/{total}...",
-  "log.videoTaskCreated": "Video task created: {taskId}",
+  "log.videoCreated": "Video task created: {videoId}",
   "log.videoProgress": "Progress: {progress}% — {status}",
   "log.videoCompleted": "Video completed.",
   "log.failed": "Failed: {message}",

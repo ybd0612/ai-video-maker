@@ -1,4 +1,4 @@
-﻿// ────────────────────────────────────────────────────────────────────────────
+// ────────────────────────────────────────────────────────────────────────────
 // src/providers/agnes/AgnesAdapter.ts
 // Concrete ModelProvider implementation for the Agnes AI API gateway.
 // Implements text, image, and video generation via a unified interface.
@@ -212,9 +212,9 @@ export class AgnesAdapter implements ModelProvider {
     }
 
     const json = await resp.json();
-    const taskId: string | undefined = json.task_id ?? json.id;
-    if (!taskId) throw new Error("Video API did not return a task_id.");
-    return taskId;
+    const videoId: string | undefined = json.video_id ?? json.task_id ?? json.id;
+    if (!videoId) throw new Error("Video API did not return a video_id.");
+    return videoId;
   }
 
   /* ── Video: poll task ─────────────────────────────────────────────────── */
@@ -222,9 +222,9 @@ export class AgnesAdapter implements ModelProvider {
   async pollVideoTask(
     apiKey: string,
     baseUrl: string,
-    taskId: string,
+    videoId: string,
   ): Promise<VideoTaskStatus> {
-    const resp = await fetch(`${baseUrl}/videos/${taskId}`, {
+    const resp = await fetch(`${baseUrl}/videos/${videoId}`, {
       headers: { Authorization: `Bearer ${apiKey}` },
     });
 
@@ -259,7 +259,7 @@ export class AgnesAdapter implements ModelProvider {
     }
 
     return {
-      taskId,
+      videoId,
       status,
       progress: json.progress ?? 0,
       videoUrl: json.video_url ?? json.output?.video_url,

@@ -103,7 +103,7 @@ export interface ImageResult {
 }
 
 export interface VideoTaskStatus {
-  taskId: string;
+  videoId: string;
   status: TaskStatus;
   /** 0–100 */
   progress: number;
@@ -139,7 +139,7 @@ export interface ModelProvider {
   createVideoTask(apiKey: string, baseUrl: string, params: VideoParams): Promise<string>;
 
   /** Poll an async video task until it completes or fails. */
-  pollVideoTask(apiKey: string, baseUrl: string, taskId: string): Promise<VideoTaskStatus>;
+  pollVideoTask(apiKey: string, baseUrl: string, videoId: string): Promise<VideoTaskStatus>;
 }
 
 /* ── Canvas execution status (shared across all node data types) ────────── */
