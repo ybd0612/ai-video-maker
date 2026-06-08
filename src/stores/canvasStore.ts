@@ -147,12 +147,14 @@ export const useCanvasStore = create<CanvasState>()(
         set((state) => ({ nodes: [...state.nodes, node] })),
 
       removeNode: (nodeId) =>
-        set((state) => ({
-          nodes: state.nodes.filter((n) => n.id !== nodeId),
-          edges: state.edges.filter(
+        set((state) => {
+          const newNodes = state.nodes.filter((n) => n.id !== nodeId);
+          const newEdges = state.edges.filter(
             (e) => e.source !== nodeId && e.target !== nodeId,
-          ),
-        })),
+          );
+          saveBackup({ nodes: newNodes, edges: newEdges, viewport: state.viewport });
+          return { nodes: newNodes, edges: newEdges };
+        }),
 
       updateNodeData: (nodeId, data) =>
         set((state) => ({

@@ -254,6 +254,7 @@ async function callImageAPI(apiKey: string, _baseUrl: string, params: ImageParam
     model: params.model,
     prompt: params.prompt,
     size: params.size ?? "1024x1024",
+    ...(params.quality ? { quality: params.quality } : {}),
   };
 
   // Per Agnes Image API docs:

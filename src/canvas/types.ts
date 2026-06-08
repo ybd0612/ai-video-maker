@@ -106,6 +106,7 @@ export interface VideoNodeData extends BaseNodeData {
   numFrames: number;
   fps: number;
   mode: "normal" | "keyframe";
+  negativePrompt?: string;
   seed?: number;
   videoId?: string;
   taskProgress: number;
@@ -173,7 +174,6 @@ export interface ConnectionRule {
 
 export const ALLOWED_CONNECTIONS: ConnectionRule[] = [
   { sourceDataType: "text", targetDataType: "text", label: "Text → Text" },
-  { sourceDataType: "text", targetDataType: "prompt", label: "Text → Prompt" },
   { sourceDataType: "image", targetDataType: "image", label: "Image → Image" },
   { sourceDataType: "image", targetDataType: "video", label: "Image → Video" },
   { sourceDataType: "video", targetDataType: "video", label: "Video → Video" },

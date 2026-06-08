@@ -127,7 +127,7 @@ export class AgnesAdapter implements ModelProvider {
       model: params.model,
       prompt: params.prompt,
       size: params.size ?? "1024x1024",
-
+      ...(params.quality ? { quality: params.quality } : {}),
     };
 
     // Per Agnes Image API: input image (URL or data URI) goes in top-level `image` array
@@ -177,6 +177,7 @@ export class AgnesAdapter implements ModelProvider {
     const body: Record<string, unknown> = {
       model: params.model,
       prompt: params.prompt,
+      ...(params.negativePrompt ? { negative_prompt: params.negativePrompt } : {}),
       num_frames: params.numFrames,
       frame_rate: params.fps,
     };
@@ -243,8 +244,9 @@ export class AgnesAdapter implements ModelProvider {
       case "queued":
         status = "pending";
         break;
-      case "processing": case "running": case "in_progress": status = "processing"; break;
+      case "processing":
       case "running":
+      case "in_progress":
         status = "processing";
         break;
       case "completed":
