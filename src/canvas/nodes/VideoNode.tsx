@@ -53,7 +53,9 @@ function VideoNodeInner({ id, data }: NodeProps) {
           <select
             value={["1152x768","1280x720","720x1280","1024x1024","1792x1024","1024x1792","auto"].includes(d.size) ? d.size : "custom"}
             onChange={(e) => {
-              if (e.target.value !== "custom") {
+              if (e.target.value === "custom") {
+                updateNodeData(id, { size: "1280x768" } as Partial<VideoNodeData>);
+              } else {
                 updateNodeData(id, { size: e.target.value } as Partial<VideoNodeData>);
               }
             }}
