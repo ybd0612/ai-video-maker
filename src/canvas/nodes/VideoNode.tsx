@@ -51,8 +51,12 @@ function VideoNodeInner({ id, data }: NodeProps) {
         <div className="col-span-2">
           <label className="text-[11px] text-slate-500">{t("video.size")}</label>
           <select
-            value={d.size}
-            onChange={(e) => updateNodeData(id, { size: e.target.value } as Partial<VideoNodeData>)}
+            value={["1152x768","1280x720","720x1280","1024x1024","1792x1024","1024x1792","auto"].includes(d.size) ? d.size : "custom"}
+            onChange={(e) => {
+              if (e.target.value !== "custom") {
+                updateNodeData(id, { size: e.target.value } as Partial<VideoNodeData>);
+              }
+            }}
             className="w-full rounded border border-slate-700 bg-slate-800 px-2 py-1 text-xs text-slate-300 focus:border-amber-500 focus:outline-none"
           >
             <option value="1152x768">横屏 1152x768 (推荐)</option>
@@ -62,7 +66,40 @@ function VideoNodeInner({ id, data }: NodeProps) {
             <option value="1792x1024">宽屏 1792x1024</option>
             <option value="1024x1792">1024x1792</option>
             <option value="auto">Auto</option>
+            <option value="custom">自定义尺寸</option>
           </select>
+          {(() => {
+            const presets = ["1152x768","1280x720","720x1280","1024x1024","1792x1024","1024x1792","auto"];
+            if (presets.includes(d.size)) return null;
+            const parts = d.size.split("x");
+            const w = parts[0] ?? "";
+            const h = parts[1] ?? "";
+            return (
+              <div className="flex items-center gap-1 mt-1">
+                <input
+                  type="number"
+                  value={w}
+                  min={1}
+                  max={2048}
+                  step={8}
+                  onChange={(e) => updateNodeData(id, { size: `${e.target.value}x${h}` } as Partial<VideoNodeData>)}
+                  className="w-1/2 rounded border border-slate-700 bg-slate-800 px-2 py-1 text-xs text-slate-300 focus:border-amber-500 focus:outline-none"
+                  placeholder="宽"
+                />
+                <span className="text-xs text-slate-600">×</span>
+                <input
+                  type="number"
+                  value={h}
+                  min={1}
+                  max={2048}
+                  step={8}
+                  onChange={(e) => updateNodeData(id, { size: `${w}x${e.target.value}` } as Partial<VideoNodeData>)}
+                  className="w-1/2 rounded border border-slate-700 bg-slate-800 px-2 py-1 text-xs text-slate-300 focus:border-amber-500 focus:outline-none"
+                  placeholder="高"
+                />
+              </div>
+            );
+          })()}
         </div>
         <div className="flex items-center gap-1">
           <label className="text-[11px] text-slate-500">{t("video.fps")}</label>
