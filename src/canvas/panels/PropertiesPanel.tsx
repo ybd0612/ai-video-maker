@@ -448,6 +448,7 @@ function UploadNodeFields({ data }: { nodeId: string; data: UploadNodeData }) {
 function LogsSection({ logs }: { logs: NonNullable<AnyNodeData["executionLogs"]> }) {
   const t = useT();
   const count = logs.length;
+  const reversedLogs = [...logs].reverse();
 
   return (
     <details open={count > 0} className="group">
@@ -457,7 +458,7 @@ function LogsSection({ logs }: { logs: NonNullable<AnyNodeData["executionLogs"]>
       </summary>
       {count > 0 ? (
         <div className="mt-2 max-h-40 space-y-1 overflow-y-auto rounded-md border border-slate-800 bg-slate-900/50 p-2">
-          {logs.map((log, i) => (
+          {reversedLogs.map((log, i) => (
             <div key={i} className="flex items-start gap-1.5">
               <span className="mt-0.5 inline-block h-1.5 w-1.5 flex-shrink-0 rounded-full" />
               <span className="text-[11px] text-slate-400 leading-tight">
