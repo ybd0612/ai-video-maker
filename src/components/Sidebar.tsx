@@ -14,8 +14,12 @@ export function Sidebar() {
 
   const handleClear = async () => {
     if (nodeCount === 0) {
-      clearAll();
-      useTaskStore.setState({ tasks: [], folders: [], activeTaskId: null });
+      const { activeTaskId, updateTask } = useTaskStore.getState();
+      if (activeTaskId) {
+        updateTask(activeTaskId, {
+          canvasData: { nodes: [], edges: [], viewport: { x: 0, y: 0, zoom: 1 }, capturedAt: Date.now() },
+        });
+      }
       return;
     }
     const ok = await confirmDialog({
@@ -25,8 +29,13 @@ export function Sidebar() {
       variant: "danger",
     });
     if (ok) {
+      const { activeTaskId, updateTask } = useTaskStore.getState();
+      if (activeTaskId) {
+        updateTask(activeTaskId, {
+          canvasData: { nodes: [], edges: [], viewport: { x: 0, y: 0, zoom: 1 }, capturedAt: Date.now() },
+        });
+      }
       clearAll();
-      useTaskStore.setState({ tasks: [], folders: [], activeTaskId: null });
     }
   };
 
