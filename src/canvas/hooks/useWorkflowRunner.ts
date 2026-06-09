@@ -371,7 +371,7 @@ async function callVideoPollAPI(apiKey: string, _baseUrl: string, videoId: strin
     videoUrl,
     coverImageUrl: json.cover_image_url,
     duration: json.seconds ?? json.output?.duration ?? json.duration,
-    error: json.error ?? undefined,
+    error: typeof json.error === "string" ? json.error : json.error?.message ?? (json.error ? JSON.stringify(json.error) : undefined),
     usage: json.usage ? { videoFrames: json.usage.total_frames ?? json.usage.video_frames } : undefined,
   };
 }
@@ -726,7 +726,7 @@ export function useWorkflowRunner() {
 
                   if (finalStatus.status === "completed") break;
                   if (finalStatus.status === "failed") {
-                    throw new Error(getTranslation("error.videoGenerationFailed", { reason: finalStatus.error ?? "unknown error" }));
+                    throw new Error(getTranslation("error.videoGenerationFailed", { reason: (typeof finalStatus.error === "string" ? finalStatus.error : finalStatus.error ? JSON.stringify(finalStatus.error) : "unknown error") }));
                   }
                 }
 
@@ -887,7 +887,7 @@ export function useWorkflowRunner() {
 
             if (finalStatus.status === "completed") break;
             if (finalStatus.status === "failed") {
-              throw new Error(getTranslation("error.videoGenerationFailed", { reason: finalStatus.error ?? "unknown error" }));
+              throw new Error(getTranslation("error.videoGenerationFailed", { reason: (typeof finalStatus.error === "string" ? finalStatus.error : finalStatus.error ? JSON.stringify(finalStatus.error) : "unknown error") }));
             }
           }
 
