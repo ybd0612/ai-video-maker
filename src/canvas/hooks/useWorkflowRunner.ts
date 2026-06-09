@@ -334,7 +334,7 @@ async function callVideoCreateAPI(apiKey: string, _baseUrl: string, params: Vide
 }
 
 async function callVideoPollAPI(apiKey: string, _baseUrl: string, videoId: string): Promise<VideoTaskStatus> {
-    const pollUrl = videoId.startsWith("video_") ? `${resolveBaseUrl(_baseUrl)}/agnesapi?video_id=${videoId}` : `${resolveBaseUrl(_baseUrl)}/videos/${videoId}`;
+    const pollUrl = `${resolveBaseUrl(_baseUrl)}/videos/${videoId}`;
     const resp = await fetch(pollUrl, {
     headers: { Authorization: `Bearer ${apiKey}` },
   });
