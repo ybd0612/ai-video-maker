@@ -216,6 +216,7 @@ const zh = {
   "log.videoBatchProgress": "批量生成 {current}/{total}...",
   "log.videoProgress": "进度: {progress}% — {status}",
   "log.videoCompleted": "视频生成完成。",
+  "log.videoResumingPoll": "恢复视频轮询: {videoId}",
   "log.failed": "失败: {message}",
 } as const;
 
@@ -428,6 +429,7 @@ const en = {
   "log.videoBatchProgress": "Batch {current}/{total}...",
   "log.videoProgress": "Progress: {progress}% — {status}",
   "log.videoCompleted": "Video completed.",
+  "log.videoResumingPoll": "Resuming video poll: {videoId}",
   "log.failed": "Failed: {message}",
 } as const;
 

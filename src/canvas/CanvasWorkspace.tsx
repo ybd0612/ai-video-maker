@@ -334,7 +334,10 @@ function CanvasInner() {
   );
 
   /* ── Workflow runner ──────────────────────────────────────────────────── */
-  const { run, retryFailed } = useWorkflowRunner();
+  const { run, retryFailed, resumePendingVideoPolls } = useWorkflowRunner();
+
+  // Resume polling for any video tasks that were pending before refresh
+  useEffect(() => { resumePendingVideoPolls(); }, [resumePendingVideoPolls]);
 
   const hasFailedNodes = nodes.some((n) => (n.data as Record<string, unknown>).executionStatus === "failed");
 

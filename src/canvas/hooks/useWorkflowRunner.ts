@@ -853,7 +853,83 @@ export function useWorkflowRunner() {
     [runWorkflow],
   );
 
-  return { run, cancel, retryFailed };
+  const resumePendingVideoPolls = useCallback(
+    async () => {
+      const store = useCanvasStore.getState();
+      const pendingVideoNodes = store.nodes.filter((n) => {
+        const d = n.data as unknown as AnyNodeData;
+        return n.type === "video" && d.executionStatus === "pending" && "videoId" in d && (d as VideoNodeData).videoId;
+      });
+
+      if (pendingVideoNodes.length === 0) return;
+
+      const { providerConfig } = useSettingsStore.getState();
+      const { apiKey, baseUrl } = providerConfig;
+      if (!apiKey || !baseUrl) return;
+
+      for (const node of pendingVideoNodes) {
+        const data = node.data as unknown as VideoNodeData;
+        const vid = data.videoId!;
+        const nodeLog = (level: NodeExecutionLog["level"], message: string): NodeExecutionLog => ({ timestamp: Date.now(), level, message });
+
+        store.appendNodeLog(node.id, nodeLog("info", getTranslation("log.videoResumingPoll", { videoId: vid })));
+
+        const deadline = Date.now() + VIDEO_POLL_TIMEOUT_MS;
+        let finalStatus: VideoTaskStatus | undefined;
+
+        try {
+          while (Date.now() < deadline) {
+            await new Promise<void>((r) => setTimeout(r, VIDEO_POLL_INTERVAL_MS));
+            finalStatus = await callVideoPollAPI(apiKey, baseUrl, vid);
+
+            store.updateNodeData(node.id, { taskProgress: finalStatus.progress });
+            store.appendNodeLog(node.id, nodeLog("info", getTranslation("log.videoProgress", { progress: finalStatus.progress, status: finalStatus.status })));
+
+            if (finalStatus.status === "completed") break;
+            if (finalStatus.status === "failed") {
+              throw new Error(getTranslation("error.videoGenerationFailed", { reason: finalStatus.error ?? "unknown error" }));
+            }
+          }
+
+          if (!finalStatus || finalStatus.status !== "completed") {
+            throw new Error(getTranslation("error.videoGenerationTimedOut"));
+          }
+
+          let videoUrl = finalStatus.videoUrl ?? "";
+          if (videoUrl && !videoUrl.startsWith("http://") && !videoUrl.startsWith("https://")) {
+            videoUrl = "https://" + videoUrl;
+          }
+          let coverUrl = finalStatus.coverImageUrl ?? "";
+          if (coverUrl && !coverUrl.startsWith("http://") && !coverUrl.startsWith("https://")) {
+            coverUrl = "https://" + coverUrl;
+          }
+
+          store.updateNodeData(node.id, {
+            outputUrl: videoUrl,
+            outputUrls: [videoUrl],
+            coverImageUrl: coverUrl,
+            coverImageUrls: coverUrl ? [coverUrl] : undefined,
+            duration: finalStatus.duration,
+            taskProgress: 100,
+            executionStatus: "success",
+            errorMessage: undefined,
+          });
+          store.appendNodeLog(node.id, nodeLog("info", getTranslation("log.videoCompleted")));
+        } catch (err) {
+          const message = err instanceof Error ? err.message : String(err);
+          store.cascadeNodeStates([{
+            nodeId: node.id,
+            status: "failed",
+            errorMessage: message,
+            log: nodeLog("error", getTranslation("log.failed", { message })),
+          }]);
+        }
+      }
+    },
+    [],
+  );
+
+  return { run, cancel, retryFailed, resumePendingVideoPolls };
 }
 
 
