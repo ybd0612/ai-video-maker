@@ -91,6 +91,8 @@ export interface ImageNodeData extends BaseNodeData {
   quality: string;
   outputUrl?: string;
   outputUrls?: string[];
+  /** Partial results during concurrent generation — tracks which slots are filled */
+  pendingUrls?: (string | undefined)[];
   revisedPrompt?: string;
   /** Manually selected reference image URL from canvas gallery */
   referenceImageUrl?: string;
@@ -112,7 +114,6 @@ export interface VideoNodeData extends BaseNodeData {
   taskProgress: number;
   outputUrl?: string;
   outputUrls?: string[];
-  coverImageUrl?: string;
   coverImageUrls?: string[];
   duration?: number;
 }

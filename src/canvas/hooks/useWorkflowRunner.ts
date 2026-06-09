@@ -525,41 +525,80 @@ export function useWorkflowRunner() {
               if (!imagePrompt) throw new LocalizedError("error.noImagePrompt");
 
               const imageCount = data.count ?? 1;
-              const imageUrls: string[] = [];
+              const imageUrls: (string | undefined)[] = new Array(imageCount).fill(undefined);
               let lastRevisedPrompt: string | undefined;
 
-              for (let i = 0; i < imageCount; i++) {
-                if (opts.signal?.aborted) throw new Error("Cancelled");
-                if (imageCount > 1) {
-                  store.appendNodeLog(nodeId, log("info", getTranslation("log.imageProgress", { current: i + 1, total: imageCount })));
-                }
-                const result = await callImageAPI(apiKey, baseUrl, {
-                  model: data.modelId ?? "agnes-image-2.1-flash",
-                  prompt: imagePrompt,
-                  inputImageUrl: inputs.imageInputs[0] ?? data.referenceImageUrl,
-                  size: data.size,
-                  quality: data.quality,
-                });
-                // Ensure URL has protocol
-                let url = result.url;
-                if (url && !url.startsWith("http://") && !url.startsWith("https://")) {
-                  url = "https://" + url;
-                }
-                imageUrls.push(url);
-                lastRevisedPrompt = result.revisedPrompt;
+              // Initialize pendingUrls with empty slots for real-time rendering
+              store.updateNodeData(nodeId, {
+                pendingUrls: new Array(imageCount).fill(undefined),
+                executionStatus: "pending" as const,
+                errorMessage: undefined,
+              });
+
+              if (imageCount > 1) {
+                store.appendNodeLog(nodeId, log("info", getTranslation("log.imageBatchStart", { total: String(imageCount) })));
               }
 
+              // Fire all requests concurrently
+              const tasks = Array.from({ length: imageCount }, (_, i) => i);
+              const settled = await Promise.allSettled(
+                tasks.map(async (i) => {
+                  if (opts.signal?.aborted) throw new Error("Cancelled");
+                  const result = await callImageAPI(apiKey, baseUrl, {
+                    model: data.modelId ?? "agnes-image-2.1-flash",
+                    prompt: imagePrompt,
+                    inputImageUrl: inputs.imageInputs[0] ?? data.referenceImageUrl,
+                    size: data.size,
+                    quality: data.quality,
+                  });
+                  let url = result.url;
+                  if (url && !url.startsWith("http://") && !url.startsWith("https://")) {
+                    url = "https://" + url;
+                  }
+                  return { index: i, url, revisedPrompt: result.revisedPrompt };
+                }),
+              );
+
+              // Process results: update UI as each finishes, collect errors
+              let hasAnySuccess = false;
+              const errors: string[] = [];
+              for (const result of settled) {
+                if (result.status === "fulfilled") {
+                  const { index, url, revisedPrompt } = result.value;
+                  imageUrls[index] = url;
+                  if (revisedPrompt) lastRevisedPrompt = revisedPrompt;
+                  hasAnySuccess = true;
+                  // Real-time update: write partial results so ImageNode renders immediately
+                  store.updateNodeData(nodeId, {
+                    pendingUrls: [...imageUrls],
+                    outputUrl: imageUrls.find(Boolean),
+                    outputUrls: imageUrls.filter(Boolean) as string[],
+                    revisedPrompt: lastRevisedPrompt,
+                  });
+                  store.appendNodeLog(nodeId, log("info", getTranslation("log.imageSingleReady", { current: String(index + 1), total: String(imageCount) })));
+                } else {
+                  errors.push(result.reason instanceof Error ? result.reason.message : String(result.reason));
+                }
+              }
+
+              // If all failed, throw
+              if (!hasAnySuccess) {
+                throw new Error(errors[0] ?? getTranslation("error.imageGenerationFailed"));
+              }
+
+              const validUrls = imageUrls.filter(Boolean) as string[];
               store.updateNodeData(nodeId, {
-                outputUrl: imageUrls[0],
-                outputUrls: imageUrls,
+                outputUrl: validUrls[0],
+                outputUrls: validUrls,
+                pendingUrls: undefined,
                 revisedPrompt: lastRevisedPrompt,
-                executionStatus: "success",
-                errorMessage: undefined,
+                executionStatus: "success" as const,
+                errorMessage: errors.length > 0 ? errors.join("; ") : undefined,
               });
               store.appendNodeLog(nodeId, log("info", getTranslation("log.imageGeneratedSuccess")));
 
               // Output routing: distribute or auto-create
-              if (imageUrls.length > 0) {
+              if (validUrls.length > 0) {
                 const downstreamImageEdges = store.edges.filter(
                   (e) => e.source === nodeId && e.sourceHandle === "image-out"
                 );
@@ -568,25 +607,23 @@ export function useWorkflowRunner() {
                   .filter((n): n is RFNode => n != null && (n.type === "image" || n.type === "upload"));
 
                 if (downstreamImageNodes.length > 0) {
-                  // Has downstream nodes: distribute images to them (front-to-back)
-                  const count = Math.min(imageUrls.length, downstreamImageNodes.length);
+                  const count = Math.min(validUrls.length, downstreamImageNodes.length);
                   for (let di = 0; di < count; di++) {
                     store.updateNodeData(downstreamImageNodes[di].id, {
-                      imageUrl: imageUrls[di],
+                      imageUrl: validUrls[di],
                       executionStatus: "success" as const,
                       executionLogs: [] as NodeExecutionLog[],
                     });
                   }
                   store.appendNodeLog(nodeId, log("info", getTranslation("log.imageDistributed", { count: String(count) })));
                 } else {
-                  // No downstream nodes: auto-create one upload node per image
                   const sourceNode = store.nodes.find((n) => n.id === nodeId);
                   const sourcePos = sourceNode?.position ?? { x: 0, y: 0 };
                   const nodeWidth = 320;
                   const gapX = 60;
                   const newEdges: Edge[] = [];
 
-                  for (let gi = 0; gi < imageUrls.length; gi++) {
+                  for (let gi = 0; gi < validUrls.length; gi++) {
                     const outNodeId = `upload__auto_${Date.now()}_${gi}`;
                     const outNode: RFNode = {
                       id: outNodeId,
@@ -597,7 +634,7 @@ export function useWorkflowRunner() {
                       },
                       data: {
                         label: `${data.label || "Image"} #${gi + 1}`,
-                        imageUrl: imageUrls[gi],
+                        imageUrl: validUrls[gi],
                         executionStatus: "success" as const,
                         executionLogs: [] as NodeExecutionLog[],
                       } as unknown as Record<string, unknown>,
@@ -618,14 +655,13 @@ export function useWorkflowRunner() {
                   if (newEdges.length > 0) {
                     store.setEdges([...store.edges, ...newEdges]);
                   }
-                  store.appendNodeLog(nodeId, log("info", getTranslation("log.imageAutoCreated", { count: String(imageUrls.length) })));
+                  store.appendNodeLog(nodeId, log("info", getTranslation("log.imageAutoCreated", { count: String(validUrls.length) })));
                 }
               }
 
               break;
             }
-
-            /* ── VIDEO ────────────────────────────────────────────── */
+/* ── VIDEO ────────────────────────────────────────────── */
             case "video": {
               const data = nodeData as VideoNodeData;
               const videoPrompt = inputs.textInputs.length > 0

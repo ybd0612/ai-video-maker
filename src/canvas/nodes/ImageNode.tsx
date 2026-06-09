@@ -170,7 +170,33 @@ function ImageNodeInner({ id, data }: NodeProps) {
       </select>
 
       {/* Output */}
-      {d.outputUrls && d.outputUrls.length > 0 ? (
+      {d.pendingUrls && d.pendingUrls.length > 0 ? (
+        <div className="space-y-1">
+          <div className="flex items-center justify-between">
+            <span className="text-xs text-slate-500">{t("image.output")}</span>
+            <span className="text-xs text-slate-600">
+              {d.pendingUrls.filter(Boolean).length}/{d.pendingUrls.length}
+            </span>
+          </div>
+          <div className="grid grid-cols-2 gap-1">
+            {d.pendingUrls.map((url, index) => (
+              url ? (
+                <Lightbox key={index} src={url} alt={"Generated " + (index + 1)}>
+                  <img
+                    src={url}
+                    alt={"Generated " + (index + 1)}
+                    className="max-h-20 w-full rounded-md border border-slate-700 object-contain"
+                  />
+                </Lightbox>
+              ) : (
+                <div key={index} className="flex h-20 items-center justify-center rounded-md border border-dashed border-slate-700 animate-pulse">
+                  <span className="text-xs text-slate-600">#{index + 1}</span>
+                </div>
+              )
+            ))}
+          </div>
+        </div>
+      ) : d.outputUrls && d.outputUrls.length > 0 ? (
         <div className="space-y-1">
           <span className="text-xs text-slate-500">{t("image.output")}</span>
           <div className="grid grid-cols-2 gap-1">
@@ -201,7 +227,6 @@ function ImageNodeInner({ id, data }: NodeProps) {
           <span className="text-xs text-slate-500">{t("image.generating")}</span>
         </div>
       ) : null}
-
       <Handle type="target" position={Position.Left} id="text-in" className="!h-3 !w-3 !bg-sky-500" />
       <Handle type="target" position={Position.Left} id="image-in" className="!-mt-4 !h-3 !w-3 !bg-violet-500" />
       <Handle type="source" position={Position.Right} id="image-out" className="!h-3 !w-3 !bg-violet-500" />
