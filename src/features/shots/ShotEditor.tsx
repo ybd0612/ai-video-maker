@@ -1,0 +1,119 @@
+// ────────────────────────────────────────────────────────────────────────────
+// src/features/shots/ShotEditor.tsx
+// Right panel: edit the selected shot's script text and visual prompt.
+// ────────────────────────────────────────────────────────────────────────────
+
+import { useProjectStore, type Shot } from "@/stores/projectStore";
+import { useT } from "@/i18n";
+import { RefreshCw, X } from "lucide-react";
+
+interface ShotEditorProps {
+  shot: Shot | null;
+  onClose: () => void;
+  onRegenerateImage: (shotId: string) => void;
+  onRegenerateVideo: (shotId: string) => void;
+  isProcessing: boolean;
+}
+
+export function ShotEditor({
+  shot,
+  onClose,
+  onRegenerateImage,
+  onRegenerateVideo,
+  isProcessing,
+}: ShotEditorProps) {
+  const updateShot = useProjectStore((s) => s.updateShot);
+  const t = useT();
+
+  if (!shot) {
+    return (
+      <div className="flex flex-1 items-center justify-center p-4">
+        <p className="text-xs text-slate-600 text-center">
+          {t("pipeline.selectShot")}
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-3 overflow-y-auto p-4">
+      <div className="flex items-center justify-between">
+        <h3 className="text-sm font-semibold text-slate-200">
+          {t("pipeline.shot")} {shot.index + 1}
+        </h3>
+        <button onClick={onClose} className="text-slate-500 hover:text-slate-300">
+          <X size={14} />
+        </button>
+      </div>
+
+      {/* Script text */}
+      <div className="space-y-1">
+        <label className="text-[11px] font-medium text-slate-500">
+          {t("pipeline.scriptText")}
+        </label>
+        <textarea
+          value={shot.scriptText}
+          onChange={(e) => updateShot(shot.id, { scriptText: e.target.value })}
+          rows={3}
+          className="w-full resize-none rounded-md border border-slate-700 bg-slate-800 p-2 text-xs text-slate-100 focus:border-sky-500 focus:outline-none"
+        />
+      </div>
+
+      {/* Visual prompt */}
+      <div className="space-y-1">
+        <label className="text-[11px] font-medium text-slate-500">
+          {t("pipeline.visualPrompt")}
+        </label>
+        <textarea
+          value={shot.visualPrompt}
+          onChange={(e) => updateShot(shot.id, { visualPrompt: e.target.value })}
+          rows={4}
+          className="w-full resize-none rounded-md border border-slate-700 bg-slate-800 p-2 text-xs text-slate-100 focus:border-violet-500 focus:outline-none"
+        />
+      </div>
+
+      {/* Duration */}
+      <div className="space-y-1">
+        <label className="text-[11px] font-medium text-slate-500">
+          {t("pipeline.duration")}
+        </label>
+        <select
+          value={shot.duration}
+          onChange={(e) => updateShot(shot.id, { duration: parseInt(e.target.value) })}
+          className="w-full rounded-md border border-slate-700 bg-slate-800 px-2 py-1.5 text-xs text-slate-300 focus:border-amber-500 focus:outline-none"
+        >
+          <option value={3}>3s</option>
+          <option value={5}>5s</option>
+          <option value={8}>8s</option>
+        </select>
+      </div>
+
+      {/* Actions */}
+      <div className="flex flex-col gap-2 pt-2">
+        <button
+          onClick={() => onRegenerateImage(shot.id)}
+          disabled={isProcessing}
+          className="flex items-center justify-center gap-1.5 rounded-md border border-violet-700 bg-violet-950/30 px-3 py-1.5 text-xs text-violet-300 transition hover:bg-violet-900/40 disabled:opacity-50"
+        >
+          <RefreshCw size={11} />
+          {t("pipeline.regenerateImage")}
+        </button>
+        <button
+          onClick={() => onRegenerateVideo(shot.id)}
+          disabled={isProcessing || !shot.imageUrl}
+          className="flex items-center justify-center gap-1.5 rounded-md border border-amber-700 bg-amber-950/30 px-3 py-1.5 text-xs text-amber-300 transition hover:bg-amber-900/40 disabled:opacity-50"
+        >
+          <RefreshCw size={11} />
+          {t("pipeline.regenerateVideo")}
+        </button>
+      </div>
+
+      {/* Error */}
+      {shot.error && (
+        <div className="rounded-md border border-red-800 bg-red-950/30 p-2 text-[11px] text-red-300">
+          {shot.error}
+        </div>
+      )}
+    </div>
+  );
+}

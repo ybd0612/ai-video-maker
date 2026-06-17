@@ -1,0 +1,153 @@
+// ────────────────────────────────────────────────────────────────────────────
+// src/services/videoService.ts
+// Generates videos for shots using the Agnes Video API (async + polling).
+// ────────────────────────────────────────────────────────────────────────────
+
+const VIDEO_POLL_INTERVAL_MS = 5_000;
+const VIDEO_POLL_TIMEOUT_MS = 10 * 60 * 1000;
+
+interface CreateVideoOptions {
+  apiKey: string;
+  baseUrl: string;
+  prompt: string;
+  imageUrl?: string;
+  size: string;
+  duration: number;
+  fps?: number;
+}
+
+interface VideoResult {
+  videoUrl: string;
+  coverImageUrl?: string;
+  duration?: number;
+}
+
+/**
+ * Map aspect ratio to video size.
+ */
+export function aspectRatioToVideoSize(ratio: string): string {
+  switch (ratio) {
+    case "9:16":
+      return "720x1280";
+    case "16:9":
+      return "1280x720";
+    case "1:1":
+      return "1024x1024";
+    default:
+      return "1280x720";
+  }
+}
+
+/**
+ * Create an async video task and poll until completion.
+ * Returns the final video URL.
+ */
+export async function generateVideo(
+  opts: CreateVideoOptions,
+  onProgress?: (progress: number) => void,
+  signal?: AbortSignal,
+): Promise<VideoResult> {
+  const baseUrl = opts.baseUrl.replace(/\/+$/, "");
+  const fps = opts.fps ?? 24;
+  const numFrames = calcNumFrames(opts.duration, fps);
+
+  // Create task
+  const body: Record<string, unknown> = {
+    model: "agnes-video-v2.0",
+    prompt: opts.prompt,
+    num_frames: numFrames,
+    frame_rate: fps,
+  };
+
+  // Parse size
+  const [w, h] = opts.size.split("x").map(Number);
+  if (w && h) {
+    body.width = w;
+    body.height = h;
+  }
+
+  if (opts.imageUrl) {
+    body.image = opts.imageUrl;
+  }
+
+  const createResp = await fetch(`${baseUrl}/videos`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${opts.apiKey}`,
+    },
+    body: JSON.stringify(body),
+  });
+
+  if (!createResp.ok) {
+    const text = await createResp.text().catch(() => "");
+    throw new Error(`Video create error ${createResp.status}: ${text}`);
+  }
+
+  const createJson = await createResp.json();
+  const videoId: string | undefined = createJson.video_id ?? createJson.task_id ?? createJson.id;
+  if (!videoId) throw new Error("Video API did not return a video_id.");
+
+  // Poll
+  const deadline = Date.now() + VIDEO_POLL_TIMEOUT_MS;
+  let videoUrl = "";
+  let coverImageUrl: string | undefined;
+  let duration: number | undefined;
+
+  while (Date.now() < deadline) {
+    if (signal?.aborted) throw new Error("Video polling cancelled.");
+
+    await new Promise<void>((r) => setTimeout(r, VIDEO_POLL_INTERVAL_MS));
+    if (signal?.aborted) throw new Error("Video polling cancelled.");
+
+    const pollResp = await fetch(`${baseUrl}/videos/${videoId}`, {
+      headers: { Authorization: `Bearer ${opts.apiKey}` },
+    });
+
+    if (!pollResp.ok) {
+      const text = await pollResp.text().catch(() => "");
+      throw new Error(`Video poll error ${pollResp.status}: ${text}`);
+    }
+
+    const pollJson = await pollResp.json();
+    const rawStatus: string = pollJson.status ?? "pending";
+    const progress: number = pollJson.progress ?? 0;
+
+    onProgress?.(progress);
+
+    if (rawStatus === "completed" || rawStatus === "succeeded") {
+      videoUrl = pollJson.video_url ?? pollJson.output?.video_url ?? "";
+      coverImageUrl = pollJson.cover_image_url;
+      duration = pollJson.seconds ?? pollJson.output?.duration ?? pollJson.duration;
+      break;
+    }
+
+    if (rawStatus === "failed" || rawStatus === "cancelled") {
+      const errDetail = typeof pollJson.error === "string"
+        ? pollJson.error
+        : pollJson.error
+          ? JSON.stringify(pollJson.error)
+          : "unknown error";
+      throw new Error(`Video generation failed: ${errDetail}`);
+    }
+  }
+
+  if (!videoUrl) throw new Error("Video generation timed out.");
+
+  // Ensure URL has protocol
+  if (!videoUrl.startsWith("http://") && !videoUrl.startsWith("https://")) {
+    videoUrl = "https://" + videoUrl;
+  }
+
+  return { videoUrl, coverImageUrl, duration };
+}
+
+/**
+ * Calculate num_frames from duration and fps using the 8n+1 rule (max 441).
+ */
+function calcNumFrames(durationSec: number, fps: number): number {
+  const raw = durationSec * fps;
+  // 8n+1 formula
+  const n = Math.floor((raw - 1) / 8);
+  return Math.min(n * 8 + 1, 441);
+}
