@@ -34,7 +34,7 @@ src/
 │   ├── videoService.ts            # 视频生成（异步创建 + 轮询）
 │   └── renderService.ts           # FFmpeg.wasm 视频拼接
 ├── stores/                        # Zustand stores
-│   ├── projectStore.ts            # 项目状态（shots + 进度，localStorage 持久化）
+│   ├── projectStore.ts            # 多项目管理（projects[] + activeProjectId + history[]，localStorage 持久化，v1→v2 迁移）
 │   └── settingsStore.ts           # 全局设置（apiKey/baseUrl/language，localStorage）
 ├── providers/                     # AI 模型抽象层
 │   ├── types.ts                   # ModelProvider 接口定义
@@ -104,9 +104,19 @@ src/
 
 ## 数据模型
 
-- **Project**：项目（title / aspectRatio / style / language / shots / status / error）
+- **Project**：项目（title / aspectRatio / style / language / shots / status / error / createdAt / updatedAt）
 - **Shot**：分镜（scriptText / visualPrompt / duration / imageUrl / videoUrl / status）
+- **HistoryEntry**：操作记录（projectId / action / description / timestamp）
 - 状态流转：`idle → scripted → imaged → videoed`（可卡在 `failed`）
+- 多项目存储：`projects[]` + `activeProjectId`，通过 `getActiveProject()` 派生活跃项目
+- 历史记录保留最近 200 条，按日期分组展示
+
+## 多项目管理
+
+- 左侧面板三个标签：**项目**（ProjectSidebar）、**分镜**（ShotList）、**历史**（HistoryPanel）
+- 项目操作：创建 / 切换 / 删除 / 复制
+- 复制项目时保留分镜结构，重置状态为 idle
+- v1 → v2 存储迁移：旧单项目自动转换为新多项目格式
 
 ## 工作流约定（Agent 必须遵守）
 
