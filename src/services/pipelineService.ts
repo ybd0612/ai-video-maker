@@ -73,6 +73,13 @@ export async function runPipeline(prompt: string, opts: RunOptions = {}) {
 
   try {
     await runParallel(shotsAfterScript, 3, opts.signal, async (shot) => {
+      // Skip shots with empty visual prompt
+      if (!shot.visualPrompt?.trim()) {
+        store.setShotStatus(shot.id, "failed", "画面描述为空，跳过图片生成。");
+        opts.onShotUpdate?.(shot.id, "failed", { error: "画面描述为空" });
+        throw new Error(`Shot ${shot.id} has empty visualPrompt.`);
+      }
+
       store.setShotStatus(shot.id, "imaging");
       opts.onShotUpdate?.(shot.id, "imaging");
 
@@ -110,6 +117,18 @@ export async function runPipeline(prompt: string, opts: RunOptions = {}) {
 
   try {
     await runParallel(shotsAfterImage, 2, opts.signal, async (shot) => {
+      // Skip shots with empty visual prompt or missing image
+      if (!shot.visualPrompt?.trim()) {
+        store.setShotStatus(shot.id, "failed", "画面描述为空，跳过视频生成。");
+        opts.onShotUpdate?.(shot.id, "failed", { error: "画面描述为空" });
+        throw new Error(`Shot ${shot.id} has empty visualPrompt.`);
+      }
+      if (!shot.imageUrl) {
+        store.setShotStatus(shot.id, "failed", "缺少参考图，跳过视频生成。");
+        opts.onShotUpdate?.(shot.id, "failed", { error: "缺少参考图" });
+        throw new Error(`Shot ${shot.id} has no imageUrl.`);
+      }
+
       store.setShotStatus(shot.id, "videoing");
       opts.onShotUpdate?.(shot.id, "videoing");
 
@@ -163,6 +182,7 @@ export async function runSingleShot(shotId: string, opts: RunOptions = {}) {
 
   const shot = project.shots.find((s) => s.id === shotId);
   if (!shot) throw new Error("Shot not found.");
+  if (!shot.visualPrompt?.trim()) throw new Error("镜头画面描述为空，无法生成。");
 
   const imageSize = aspectRatioToImageSize(project.aspectRatio);
   const videoSize = aspectRatioToVideoSize(project.aspectRatio);
