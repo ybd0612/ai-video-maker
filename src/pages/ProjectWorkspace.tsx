@@ -13,7 +13,7 @@ import { ShotList } from "@/features/shots/ShotList";
 import { ShotEditor } from "@/features/shots/ShotEditor";
 import { ShotPreview } from "@/features/preview/ShotPreview";
 import { FinalPreview } from "@/features/preview/FinalPreview";
-import { runPipeline } from "@/services/pipelineService";
+import { runPipeline, runSingleShot } from "@/services/pipelineService";
 import { generateScript } from "@/services/scriptService";
 import { generateImage, aspectRatioToImageSize } from "@/services/imageService";
 import { generateVideo, aspectRatioToVideoSize } from "@/services/videoService";
@@ -111,7 +111,7 @@ export function ProjectWorkspace() {
   }, []);
 
 
-  // Retry all failed shots
+  // Retry all failed shots (skip script phase, only re-run image+video)
   const handleRetryFailed = useCallback(async () => {
     const proj = useProjectStore.getState().project;
     if (!proj) return;
@@ -123,7 +123,9 @@ export function ProjectWorkspace() {
     setIsRunning(true);
     abortRef.current = new AbortController();
     try {
-      await runPipeline("", { signal: abortRef.current.signal });
+      await Promise.allSettled(
+        failedShotIds.map((id) => runSingleShot(id, { signal: abortRef.current!.signal })),
+      );
     } catch (err) {
       if (err instanceof Error && err.message !== "Pipeline cancelled.") alert(err.message);
     } finally {
@@ -195,6 +197,7 @@ export function ProjectWorkspace() {
       variant: "danger",
     });
     if (ok) {
+      abortRef.current?.abort();
       clearProject();
       setSelectedShotId(null);
       setHasProject(false);

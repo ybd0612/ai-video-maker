@@ -3,6 +3,8 @@
 // Generates images for shots using the Agnes Image API.
 // ────────────────────────────────────────────────────────────────────────────
 
+import { MODELS } from "@/lib/models";
+
 interface GenerateImageOptions {
   apiKey: string;
   baseUrl: string;
@@ -17,7 +19,7 @@ interface GenerateImageOptions {
 export async function generateImage(opts: GenerateImageOptions): Promise<string> {
   const url = `${opts.baseUrl.replace(/\/+$/, "")}/images/generations`;
   const body: Record<string, unknown> = {
-    model: "agnes-image-2.1-flash",
+    model: MODELS.image,
     prompt: opts.prompt,
     size: opts.size,
     extra_body: { response_format: "url" },

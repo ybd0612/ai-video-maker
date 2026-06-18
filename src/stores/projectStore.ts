@@ -53,7 +53,7 @@ export interface Project {
   language: "zh" | "en";
   shots: Shot[];
   status: ProjectStatus;
-  outputUrl?: string;
+  error?: string;
   createdAt: number;
   updatedAt: number;
 }
@@ -116,13 +116,14 @@ export const useProjectStore = create<ProjectState>()(
           return { project: { ...s.project, ...updates, updatedAt: Date.now() } };
         }),
 
-      setProjectStatus: (status, _error) =>
+      setProjectStatus: (status, error) =>
         set((s) => {
           if (!s.project) return s;
           return {
             project: {
               ...s.project,
               status,
+              error,
               updatedAt: Date.now(),
             },
           };

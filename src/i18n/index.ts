@@ -222,6 +222,8 @@ const zh = {
   // Pipeline
   "pipeline.title": "AI 一键成片",
   "pipeline.newProject": "新项目",
+  "pipeline.apiKeyRequired": "未配置 API Key，请先设置密钥以使用 AI 功能。",
+  "pipeline.openSettings": "打开设置",
   "pipeline.scriptPanelTitle": "输入你的想法",
   "pipeline.scriptPanelHint": "描述你想制作的视频主题，系统会自动拆分为分镜。",
   "pipeline.scriptPlaceholder": "例如：一个关于城市早晨的治愈系视频，展现日出、咖啡、通勤的画面...",
@@ -483,6 +485,8 @@ const en = {
 
   "pipeline.title": "AI Video Creator",
   "pipeline.newProject": "New Project",
+  "pipeline.apiKeyRequired": "API Key not configured. Please set your key to use AI features.",
+  "pipeline.openSettings": "Open Settings",
   "pipeline.scriptPanelTitle": "Enter your idea",
   "pipeline.scriptPanelHint": "Describe the video topic and the system will auto-generate a storyboard.",
   "pipeline.scriptPlaceholder": "e.g. A healing morning routine video showing sunrise, coffee, commute...",

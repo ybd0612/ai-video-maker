@@ -4,6 +4,7 @@
 // ────────────────────────────────────────────────────────────────────────────
 
 import type { Shot } from "@/stores/projectStore";
+import { MODELS } from "@/lib/models";
 
 interface GenerateScriptOptions {
   apiKey: string;
@@ -75,7 +76,7 @@ Requirements:
       Authorization: `Bearer ${opts.apiKey}`,
     },
     body: JSON.stringify({
-      model: "agnes-2.0-flash",
+      model: MODELS.text,
       messages: [
         { role: "system", content: systemPrompt },
         { role: "user", content: opts.prompt },

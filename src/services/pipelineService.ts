@@ -222,7 +222,9 @@ async function runParallel<T>(
   }
 
   const workers = Array.from({ length: Math.min(concurrency, items.length) }, () => worker());
-  await Promise.all(workers);
+  const results = await Promise.allSettled(workers);
+  const firstFailure = results.find((r) => r.status === "rejected") as PromiseRejectedResult | undefined;
+  if (firstFailure) throw firstFailure.reason;
 }
 
 

@@ -14,17 +14,11 @@ export interface ProviderConfig {
 }
 
 interface SettingsState {
-  showGrid: boolean;
-  showMinimap: boolean;
-  snapToGrid: boolean;
   darkMode: boolean;
   language: Language;
   settingsDialogOpen: boolean;
   providerConfig: ProviderConfig;
 
-  toggleGrid: () => void;
-  toggleMinimap: () => void;
-  toggleSnapToGrid: () => void;
   toggleDarkMode: () => void;
   setLanguage: (lang: Language) => void;
   setSettingsDialogOpen: (open: boolean) => void;
@@ -34,9 +28,6 @@ interface SettingsState {
 export const useSettingsStore = create<SettingsState>()(
   persist(
     (set) => ({
-      showGrid: true,
-      showMinimap: true,
-      snapToGrid: false,
       darkMode: true,
       language: 'zh',
       settingsDialogOpen: false,
@@ -45,9 +36,6 @@ export const useSettingsStore = create<SettingsState>()(
         baseUrl: "https://apihub.agnes-ai.com/v1",
       },
 
-      toggleGrid: () => set((s) => ({ showGrid: !s.showGrid })),
-      toggleMinimap: () => set((s) => ({ showMinimap: !s.showMinimap })),
-      toggleSnapToGrid: () => set((s) => ({ snapToGrid: !s.snapToGrid })),
       toggleDarkMode: () => set((s) => ({ darkMode: !s.darkMode })),
       setLanguage: (language) => set({ language }),
       setSettingsDialogOpen: (open) => set({ settingsDialogOpen: open }),

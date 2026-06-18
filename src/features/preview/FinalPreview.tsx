@@ -11,15 +11,14 @@ import { Download, Loader2, Scissors } from "lucide-react";
 
 export function FinalPreview() {
   const project = useProjectStore((s) => s.project);
-  const updateProject = useProjectStore((s) => s.updateProject);
   const t = useT();
   const [isRendering, setIsRendering] = useState(false);
   const [renderProgress, setRenderProgress] = useState(0);
+  const [renderedUrl, setRenderedUrl] = useState<string | null>(null);
 
   const shots = project?.shots ?? [];
   const videoedShots = shots.filter((s) => s.videoUrl);
   const canRender = videoedShots.length === shots.length && shots.length > 0;
-  const outputUrl = project?.outputUrl;
 
   const handleRender = useCallback(async () => {
     if (!canRender) return;
@@ -31,21 +30,21 @@ export function FinalPreview() {
         videoUrls: urls,
         onProgress: setRenderProgress,
       });
-      updateProject({ outputUrl: url } as never);
+      setRenderedUrl(url);
     } catch (err) {
       alert(err instanceof Error ? err.message : String(err));
     } finally {
       setIsRendering(false);
     }
-  }, [canRender, shots, updateProject]);
+  }, [canRender, shots]);
 
   const handleDownload = useCallback(() => {
-    if (!outputUrl) return;
+    if (!renderedUrl) return;
     const a = document.createElement("a");
-    a.href = outputUrl;
+    a.href = renderedUrl;
     a.download = `${project?.title ?? "video"}.mp4`;
     a.click();
-  }, [outputUrl, project?.title]);
+  }, [renderedUrl, project?.title]);
 
   return (
     <div className="flex h-full flex-col gap-4 overflow-y-auto p-6">
@@ -59,7 +58,7 @@ export function FinalPreview() {
       </div>
 
       {/* Render button */}
-      {!outputUrl && (
+      {!renderedUrl && (
         <button
           onClick={handleRender}
           disabled={!canRender || isRendering}
@@ -100,10 +99,10 @@ export function FinalPreview() {
       )}
 
       {/* Output video */}
-      {outputUrl && (
+      {renderedUrl && (
         <div className="space-y-3">
           <video
-            src={outputUrl}
+            src={renderedUrl}
             controls
             loop
             className="w-full rounded-lg border border-slate-700"

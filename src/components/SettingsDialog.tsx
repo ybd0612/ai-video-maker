@@ -6,6 +6,7 @@ import { resolveBaseUrl } from '@/lib/resolveBaseUrl';
 import { useT } from '@/i18n';
 import type { Language } from '@/stores/settingsStore';
 import { isValidUrl } from "@/lib/validation";
+import { MODELS } from "@/lib/models";
 
 export function SettingsDialog() {
   const open = useSettingsStore((s) => s.settingsDialogOpen);
@@ -72,7 +73,7 @@ export function SettingsDialog() {
           Authorization: `Bearer ${apiKey.trim()}`,
         },
         body: JSON.stringify({
-          model: "agnes-2.0-flash",
+          model: MODELS.text,
           messages: [{ role: "user", content: "Reply with exactly: ping-ok" }],
           temperature: 0,
           max_tokens: 32,

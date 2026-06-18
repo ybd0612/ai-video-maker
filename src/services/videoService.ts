@@ -3,6 +3,8 @@
 // Generates videos for shots using the Agnes Video API (async + polling).
 // ────────────────────────────────────────────────────────────────────────────
 
+import { MODELS } from "@/lib/models";
+
 const VIDEO_POLL_INTERVAL_MS = 5_000;
 const VIDEO_POLL_TIMEOUT_MS = 10 * 60 * 1000;
 
@@ -53,7 +55,7 @@ export async function generateVideo(
 
   // Create task
   const body: Record<string, unknown> = {
-    model: "agnes-video-v2.0",
+    model: MODELS.video,
     prompt: opts.prompt,
     num_frames: numFrames,
     frame_rate: fps,
