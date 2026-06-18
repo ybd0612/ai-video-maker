@@ -10,7 +10,7 @@ import { concatenateVideos } from "@/services/renderService";
 import { Download, Loader2, Scissors } from "lucide-react";
 
 export function FinalPreview() {
-  const project = useProjectStore((s) => s.project);
+  const project = useProjectStore((s) => s.getActiveProject());
   const t = useT();
   const [isRendering, setIsRendering] = useState(false);
   const [renderProgress, setRenderProgress] = useState(0);

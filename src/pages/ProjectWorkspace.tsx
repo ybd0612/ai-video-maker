@@ -1,7 +1,7 @@
 // ────────────────────────────────────────────────────────────────────────────
 // src/pages/ProjectWorkspace.tsx
-// Main page: replaces CanvasWorkspace with the pipeline-based UI.
-// Layout: left shot list | center preview | right shot editor.
+// Main page: pipeline-based UI with multi-project management.
+// Layout: left sidebar (projects/shots) | center preview | right editor.
 // ────────────────────────────────────────────────────────────────────────────
 
 import { useState, useCallback, useRef } from "react";
@@ -17,28 +17,36 @@ import { runPipeline, runSingleShot } from "@/services/pipelineService";
 import { generateScript } from "@/services/scriptService";
 import { generateImage, aspectRatioToImageSize } from "@/services/imageService";
 import { generateVideo, aspectRatioToVideoSize } from "@/services/videoService";
-import { Settings, Trash2, Play, Square, RotateCcw } from "lucide-react";
+import { ProjectSidebar } from "@/features/projects/ProjectSidebar";
+import { HistoryPanel } from "@/features/history/HistoryPanel";
+import {
+  Settings, Trash2, Play, Square, RotateCcw,
+  FolderOpen, Clock, Layers,
+} from "lucide-react";
 import { ApiKeyBanner } from "@/components/ApiKeyBanner";
 import { confirmDialog } from "@/components/ui/ConfirmDialog";
 
 type AspectRatio = "9:16" | "16:9" | "1:1";
+type LeftTab = "projects" | "shots" | "history";
 
 export function ProjectWorkspace() {
   const t = useT();
-  const project = useProjectStore((s) => s.project);
+  const project = useProjectStore((s) => s.getActiveProject());
+  const projects = useProjectStore((s) => s.projects);
   const createProject = useProjectStore((s) => s.createProject);
   const updateProject = useProjectStore((s) => s.updateProject);
   const clearProject = useProjectStore((s) => s.clearProject);
   const setShots = useProjectStore((s) => s.setShots);
   const setShotStatus = useProjectStore((s) => s.setShotStatus);
   const updateShot = useProjectStore((s) => s.updateShot);
+  const addHistory = useProjectStore((s) => s.addHistory);
   const openSettings = useSettingsStore((s) => s.setSettingsDialogOpen);
 
   const [selectedShotId, setSelectedShotId] = useState<string | null>(null);
   const [isScripting, setIsScripting] = useState(false);
   const [isRunning, setIsRunning] = useState(false);
-  const [hasProject, setHasProject] = useState(!!project);
   const [previewTab, setPreviewTab] = useState<"shot" | "final">("shot");
+  const [leftTab, setLeftTab] = useState<LeftTab>("shots");
   const abortRef = useRef<AbortController | null>(null);
 
   // Create project if needed, then generate script
@@ -50,10 +58,9 @@ export function ProjectWorkspace() {
         return;
       }
 
-      let proj = useProjectStore.getState().project;
+      let proj = useProjectStore.getState().getActiveProject();
       if (!proj) {
-        proj = createProject(prompt.slice(0, 30) || t("pipeline.newProject"), prompt);
-        setHasProject(true);
+        proj = createProject(prompt.slice(0, 30) || t("pipeline.newProject"));
       }
 
       setIsScripting(true);
@@ -74,46 +81,49 @@ export function ProjectWorkspace() {
         }));
 
         setShots(shots);
+        addHistory("script_generated", `生成 ${shots.length} 个分镜`);
       } catch (err) {
         alert(err instanceof Error ? err.message : String(err));
       } finally {
         setIsScripting(false);
       }
     },
-    [createProject, setShots, openSettings, t],
+    [createProject, setShots, openSettings, t, addHistory],
   );
 
   // Run full pipeline
   const handleRunAll = useCallback(async () => {
-    const proj = useProjectStore.getState().project;
+    const proj = useProjectStore.getState().getActiveProject();
     if (!proj || proj.shots.length === 0) return;
 
     setIsRunning(true);
     abortRef.current = new AbortController();
+    addHistory("pipeline_started", "开始一键成片");
 
     try {
       await runPipeline("", {
         signal: abortRef.current.signal,
       });
+      addHistory("pipeline_completed", "一键成片完成");
     } catch (err) {
       if (err instanceof Error && err.message !== "Pipeline cancelled.") {
         alert(err.message);
+        addHistory("pipeline_failed", `成片失败: ${err.message}`);
       }
     } finally {
       setIsRunning(false);
       abortRef.current = null;
     }
-  }, []);
+  }, [addHistory]);
 
   // Cancel running pipeline
   const handleCancel = useCallback(() => {
     abortRef.current?.abort();
   }, []);
 
-
   // Retry all failed shots (skip script phase, only re-run image+video)
   const handleRetryFailed = useCallback(async () => {
-    const proj = useProjectStore.getState().project;
+    const proj = useProjectStore.getState().getActiveProject();
     if (!proj) return;
     const failedShotIds = proj.shots.filter((s) => s.status === "failed").map((s) => s.id);
     if (failedShotIds.length === 0) return;
@@ -139,7 +149,7 @@ export function ProjectWorkspace() {
     const { providerConfig } = useSettingsStore.getState();
     if (!providerConfig.apiKey || !providerConfig.baseUrl) return;
 
-    const proj = useProjectStore.getState().project;
+    const proj = useProjectStore.getState().getActiveProject();
     if (!proj) return;
 
     const shot = proj.shots.find((s) => s.id === shotId);
@@ -155,17 +165,18 @@ export function ProjectWorkspace() {
         size,
       });
       updateShot(shotId, { imageUrl, status: "imaged" });
+      addHistory("shot_regenerated", `重新生成镜头 ${shot.index + 1} 的图片`);
     } catch (err) {
       setShotStatus(shotId, "failed", err instanceof Error ? err.message : String(err));
     }
-  }, [setShotStatus, updateShot]);
+  }, [setShotStatus, updateShot, addHistory]);
 
   // Regenerate video for a single shot
   const handleRegenerateVideo = useCallback(async (shotId: string) => {
     const { providerConfig } = useSettingsStore.getState();
     if (!providerConfig.apiKey || !providerConfig.baseUrl) return;
 
-    const proj = useProjectStore.getState().project;
+    const proj = useProjectStore.getState().getActiveProject();
     if (!proj) return;
 
     const shot = proj.shots.find((s) => s.id === shotId);
@@ -183,10 +194,11 @@ export function ProjectWorkspace() {
         duration: shot.duration,
       });
       updateShot(shotId, { videoUrl: result.videoUrl, status: "videoed" });
+      addHistory("shot_regenerated", `重新生成镜头 ${shot.index + 1} 的视频`);
     } catch (err) {
       setShotStatus(shotId, "failed", err instanceof Error ? err.message : String(err));
     }
-  }, [setShotStatus, updateShot]);
+  }, [setShotStatus, updateShot, addHistory]);
 
   // Clear project
   const handleClear = useCallback(async () => {
@@ -200,7 +212,6 @@ export function ProjectWorkspace() {
       abortRef.current?.abort();
       clearProject();
       setSelectedShotId(null);
-      setHasProject(false);
     }
   }, [clearProject, t]);
 
@@ -218,6 +229,11 @@ export function ProjectWorkspace() {
           {project && (
             <span className="text-xs text-slate-500">
               {project.title}
+            </span>
+          )}
+          {projects.length > 1 && (
+            <span className="rounded bg-slate-800 px-1.5 py-0.5 text-[10px] text-slate-500">
+              {projects.length} {t("pipeline.projectCount")}
             </span>
           )}
         </div>
@@ -294,22 +310,65 @@ export function ProjectWorkspace() {
 
       {/* Main content */}
       <div className="flex flex-1 overflow-hidden">
-        {/* Left panel: shot list */}
+        {/* Left panel: tabs for projects / shots / history */}
         <aside className="flex w-60 flex-col border-r border-slate-800 bg-slate-950">
-          <div className="border-b border-slate-800 px-3 py-2">
-            <span className="text-xs font-medium text-slate-400">
+          {/* Tab bar */}
+          <div className="flex border-b border-slate-800">
+            <button
+              onClick={() => setLeftTab("projects")}
+              className={`flex flex-1 items-center justify-center gap-1 py-2 text-[10px] font-medium transition ${
+                leftTab === "projects"
+                  ? "border-b-2 border-emerald-500 text-emerald-400"
+                  : "text-slate-600 hover:text-slate-400"
+              }`}
+            >
+              <FolderOpen size={10} />
+              {t("pipeline.tabProjects")}
+            </button>
+            <button
+              onClick={() => setLeftTab("shots")}
+              className={`flex flex-1 items-center justify-center gap-1 py-2 text-[10px] font-medium transition ${
+                leftTab === "shots"
+                  ? "border-b-2 border-emerald-500 text-emerald-400"
+                  : "text-slate-600 hover:text-slate-400"
+              }`}
+            >
+              <Layers size={10} />
               {t("pipeline.shots")} ({shots.length})
-            </span>
+            </button>
+            <button
+              onClick={() => setLeftTab("history")}
+              className={`flex flex-1 items-center justify-center gap-1 py-2 text-[10px] font-medium transition ${
+                leftTab === "history"
+                  ? "border-b-2 border-emerald-500 text-emerald-400"
+                  : "text-slate-600 hover:text-slate-400"
+              }`}
+            >
+              <Clock size={10} />
+              {t("pipeline.tabHistory")}
+            </button>
           </div>
-          <ShotList
-            selectedShotId={selectedShotId}
-            onSelect={setSelectedShotId}
-          />
+
+          {/* Tab content */}
+          {leftTab === "projects" && <ProjectSidebar />}
+          {leftTab === "shots" && (
+            <ShotList
+              selectedShotId={selectedShotId}
+              onSelect={setSelectedShotId}
+            />
+          )}
+          {leftTab === "history" && <HistoryPanel />}
         </aside>
 
         {/* Center: preview or script input */}
         <main className="flex-1 overflow-hidden">
-          {!hasProject && shots.length === 0 ? (
+          {!project ? (
+            <div className="flex h-full items-center justify-center">
+              <div className="w-full max-w-lg">
+                <ScriptPanel onGenerate={handleGenerateScript} isGenerating={isScripting} />
+              </div>
+            </div>
+          ) : shots.length === 0 ? (
             <div className="flex h-full items-center justify-center">
               <div className="w-full max-w-lg">
                 <ScriptPanel onGenerate={handleGenerateScript} isGenerating={isScripting} />
@@ -318,9 +377,7 @@ export function ProjectWorkspace() {
           ) : (
             <div className="flex h-full flex-col">
               {/* Pipeline progress bar */}
-              {shots.length > 0 && (
-                <PipelineProgress shots={shots} isRunning={isRunning} />
-              )}
+              <PipelineProgress shots={shots} isRunning={isRunning} />
               {/* Tab switcher */}
               <div className="flex border-b border-slate-800">
                 <button
@@ -426,5 +483,3 @@ function PipelineProgress({
     </div>
   );
 }
-
-

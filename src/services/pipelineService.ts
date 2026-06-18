@@ -29,7 +29,7 @@ export async function runPipeline(prompt: string, opts: RunOptions = {}) {
   if (!apiKey || !baseUrl) throw new Error("API key is not configured.");
 
   const store = useProjectStore.getState();
-  const project = store.project;
+  const project = store.getActiveProject();
   if (!project) throw new Error("No active project.");
 
   const imageSize = aspectRatioToImageSize(project.aspectRatio);
@@ -69,7 +69,7 @@ export async function runPipeline(prompt: string, opts: RunOptions = {}) {
   opts.onPhaseStart?.("image");
   store.setProjectStatus("imaging");
 
-  const shotsAfterScript = useProjectStore.getState().project!.shots;
+  const shotsAfterScript = useProjectStore.getState().getActiveProject()!.shots;
 
   try {
     await runParallel(shotsAfterScript, 3, opts.signal, async (shot) => {
@@ -95,7 +95,7 @@ export async function runPipeline(prompt: string, opts: RunOptions = {}) {
     });
   } catch {
     // Some shots may have failed; continue to check
-    const anyFailed = useProjectStore.getState().project!.shots.some((s) => s.status === "failed");
+    const anyFailed = useProjectStore.getState().getActiveProject()!.shots.some((s) => s.status === "failed");
     if (anyFailed) {
       store.setProjectStatus("failed", "Some shots failed during image generation.");
       return;
@@ -106,7 +106,7 @@ export async function runPipeline(prompt: string, opts: RunOptions = {}) {
   opts.onPhaseStart?.("video");
   store.setProjectStatus("videoing");
 
-  const shotsAfterImage = useProjectStore.getState().project!.shots;
+  const shotsAfterImage = useProjectStore.getState().getActiveProject()!.shots;
 
   try {
     await runParallel(shotsAfterImage, 2, opts.signal, async (shot) => {
@@ -139,7 +139,7 @@ export async function runPipeline(prompt: string, opts: RunOptions = {}) {
       }
     });
   } catch {
-    const anyFailed = useProjectStore.getState().project!.shots.some((s) => s.status === "failed");
+    const anyFailed = useProjectStore.getState().getActiveProject()!.shots.some((s) => s.status === "failed");
     if (anyFailed) {
       store.setProjectStatus("failed", "Some shots failed during video generation.");
       return;
@@ -158,7 +158,7 @@ export async function runSingleShot(shotId: string, opts: RunOptions = {}) {
   if (!apiKey || !baseUrl) throw new Error("API key is not configured.");
 
   const store = useProjectStore.getState();
-  const project = store.project;
+  const project = store.getActiveProject();
   if (!project) throw new Error("No active project.");
 
   const shot = project.shots.find((s) => s.id === shotId);

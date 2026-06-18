@@ -32,7 +32,7 @@ const statusConfig: Record<ShotStatus, { icon: typeof Hash; color: string }> = {
 };
 
 export function ShotList({ selectedShotId, onSelect }: ShotListProps) {
-  const project = useProjectStore((s) => s.project);
+  const project = useProjectStore((s) => s.getActiveProject());
   const shots = project?.shots ?? [];
   const removeShot = useProjectStore((s) => s.removeShot);
   const t = useT();

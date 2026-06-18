@@ -13,7 +13,7 @@ interface ShotPreviewProps {
 }
 
 export function ShotPreview({ shotId }: ShotPreviewProps) {
-  const project = useProjectStore((s) => s.project);
+  const project = useProjectStore((s) => s.getActiveProject());
   const shot = project?.shots.find((sh) => sh.id === shotId) ?? null;
   const t = useT();
 
