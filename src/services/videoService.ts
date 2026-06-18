@@ -1,12 +1,17 @@
 // ────────────────────────────────────────────────────────────────────────────
 // src/services/videoService.ts
 // Generates videos for shots using the Agnes Video API (async + polling).
+//
+// API 规格：
+//   创建任务：POST /videos → 返回 { video_id }
+//   查询结果：GET {baseUrl}?video_id=<VIDEO_ID>
 // ────────────────────────────────────────────────────────────────────────────
 
 import { MODELS } from "@/lib/models";
 
 const VIDEO_POLL_INTERVAL_MS = 5_000;
 const VIDEO_POLL_TIMEOUT_MS = 10 * 60 * 1000;
+const VIDEO_POLL_MAX_NOT_EXIST_RETRIES = 6; // 最多等待 30 秒让任务注册
 
 interface CreateVideoOptions {
   apiKey: string;
@@ -41,27 +46,61 @@ export function aspectRatioToVideoSize(ratio: string): string {
 }
 
 /**
+ * Sanitize prompt before sending to the Video API.
+ */
+function sanitizePrompt(prompt: string): string {
+  const cleaned = prompt
+    .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (!cleaned) {
+    throw new Error("Video prompt is empty after sanitization.");
+  }
+  return cleaned;
+}
+
+/**
+ * Derive the video API base URL from the configured provider base URL.
+ *
+ * 用户配置的 baseUrl 通常是 `https://apihub.agnes-ai.com/v1`（文本/图片 API），
+ * 视频 API 端点在 `https://apihub.agnes-ai.com/agnesapi`。
+ * 此函数提取域名部分并拼接 `/agnesapi`。
+ */
+function resolveVideoBaseUrl(configuredUrl: string): string {
+  try {
+    const url = new URL(configuredUrl);
+    return `${url.origin}/agnesapi`;
+  } catch {
+    // Fallback: strip path and append /agnesapi
+    const match = configuredUrl.match(/^(https?:\/\/[^/]+)/);
+    return match ? `${match[1]}/agnesapi` : configuredUrl.replace(/\/+$/, "");
+  }
+}
+
+/**
  * Create an async video task and poll until completion.
  * Returns the final video URL.
+ *
+ * 创建端点：POST {videoBaseUrl}/videos
+ * 查询端点：GET {videoBaseUrl}?video_id=<VIDEO_ID>
  */
 export async function generateVideo(
   opts: CreateVideoOptions,
   onProgress?: (progress: number) => void,
   signal?: AbortSignal,
 ): Promise<VideoResult> {
-  const baseUrl = opts.baseUrl.replace(/\/+$/, "");
+  const videoBaseUrl = resolveVideoBaseUrl(opts.baseUrl);
   const fps = opts.fps ?? 24;
   const numFrames = calcNumFrames(opts.duration, fps);
 
-  // Create task
+  // ── Create task ────────────────────────────────────────────────────────
   const body: Record<string, unknown> = {
     model: MODELS.video,
-    prompt: opts.prompt,
+    prompt: sanitizePrompt(opts.prompt),
     num_frames: numFrames,
     frame_rate: fps,
   };
 
-  // Parse size
   const [w, h] = opts.size.split("x").map(Number);
   if (w && h) {
     body.width = w;
@@ -72,7 +111,7 @@ export async function generateVideo(
     body.image = opts.imageUrl;
   }
 
-  const createResp = await fetch(`${baseUrl}/videos`, {
+  const createResp = await fetch(`${videoBaseUrl}/videos`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -87,30 +126,54 @@ export async function generateVideo(
   }
 
   const createJson = await createResp.json();
-  const videoId: string | undefined = createJson.video_id ?? createJson.task_id ?? createJson.id;
-  if (!videoId) throw new Error("Video API did not return a video_id.");
 
-  // Poll
+  // Extract video_id — API 文档指定字段名为 video_id
+  const videoId: string | undefined =
+    createJson.video_id ?? createJson.task_id ?? createJson.id;
+  if (!videoId) {
+    throw new Error(
+      `Video API 未返回 video_id。响应: ${JSON.stringify(createJson).slice(0, 300)}`,
+    );
+  }
+
+  // ── Poll for result ────────────────────────────────────────────────────
+  // 正确端点：GET {baseUrl}?video_id=<VIDEO_ID>
+  const pollUrl = `${videoBaseUrl}?video_id=${encodeURIComponent(videoId)}`;
   const deadline = Date.now() + VIDEO_POLL_TIMEOUT_MS;
   let videoUrl = "";
   let coverImageUrl: string | undefined;
   let duration: number | undefined;
+  let notExistCount = 0;
 
   while (Date.now() < deadline) {
-    if (signal?.aborted) throw new Error("Video polling cancelled.");
+    if (signal?.aborted) throw new Error("视频轮询已取消。");
 
     await new Promise<void>((r) => setTimeout(r, VIDEO_POLL_INTERVAL_MS));
-    if (signal?.aborted) throw new Error("Video polling cancelled.");
+    if (signal?.aborted) throw new Error("视频轮询已取消。");
 
-    const pollResp = await fetch(`${baseUrl}/videos/${videoId}`, {
+    const pollResp = await fetch(pollUrl, {
       headers: { Authorization: `Bearer ${opts.apiKey}` },
     });
 
     if (!pollResp.ok) {
       const text = await pollResp.text().catch(() => "");
+
+      // 任务尚未注册 — 等待后重试
+      if (text.includes("task_not_exist")) {
+        notExistCount++;
+        if (notExistCount > VIDEO_POLL_MAX_NOT_EXIST_RETRIES) {
+          throw new Error(
+            `视频任务 ${videoId} 持续不存在（已重试 ${notExistCount} 次）。可能原因：任务创建失败或 API 端点配置错误。`,
+          );
+        }
+        continue;
+      }
+
       throw new Error(`Video poll error ${pollResp.status}: ${text}`);
     }
 
+    // 成功获取响应，重置 not_exist 计数
+    notExistCount = 0;
     const pollJson = await pollResp.json();
     const rawStatus: string = pollJson.status ?? "pending";
     const progress: number = pollJson.progress ?? 0;
@@ -130,13 +193,12 @@ export async function generateVideo(
         : pollJson.error
           ? JSON.stringify(pollJson.error)
           : "unknown error";
-      throw new Error(`Video generation failed: ${errDetail}`);
+      throw new Error(`视频生成失败: ${errDetail}`);
     }
   }
 
-  if (!videoUrl) throw new Error("Video generation timed out.");
+  if (!videoUrl) throw new Error("视频生成超时。");
 
-  // Ensure URL has protocol
   if (!videoUrl.startsWith("http://") && !videoUrl.startsWith("https://")) {
     videoUrl = "https://" + videoUrl;
   }
@@ -149,7 +211,6 @@ export async function generateVideo(
  */
 function calcNumFrames(durationSec: number, fps: number): number {
   const raw = durationSec * fps;
-  // 8n+1 formula
   const n = Math.floor((raw - 1) / 8);
   return Math.min(n * 8 + 1, 441);
 }
