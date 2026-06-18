@@ -41,6 +41,7 @@ export interface Shot {
   status: ShotStatus;
   imageUrl?: string;
   videoUrl?: string;
+  videoProgress?: number;
   error?: string;
 }
 
@@ -210,4 +211,6 @@ export const useProjectStore = create<ProjectState>()(
     },
   ),
 );
+
+
 

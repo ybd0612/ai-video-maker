@@ -5,7 +5,7 @@
 
 import { useProjectStore, type Shot } from "@/stores/projectStore";
 import { useT } from "@/i18n";
-import { RefreshCw, X } from "lucide-react";
+import { RefreshCw, X, RotateCcw } from "lucide-react";
 
 interface ShotEditorProps {
   shot: Shot | null;
@@ -34,6 +34,8 @@ export function ShotEditor({
       </div>
     );
   }
+
+  const isFailed = shot.status === "failed";
 
   return (
     <div className="flex flex-col gap-3 overflow-y-auto p-4">
@@ -90,6 +92,20 @@ export function ShotEditor({
 
       {/* Actions */}
       <div className="flex flex-col gap-2 pt-2">
+        {/* Retry button for failed shots */}
+        {isFailed && (
+          <button
+            onClick={() => {
+              updateShot(shot.id, { status: "idle", error: undefined, videoProgress: undefined });
+            }}
+            disabled={isProcessing}
+            className="flex items-center justify-center gap-1.5 rounded-md border border-red-700 bg-red-950/30 px-3 py-1.5 text-xs text-red-300 transition hover:bg-red-900/40 disabled:opacity-50"
+          >
+            <RotateCcw size={11} />
+            {t("pipeline.retryShot")}
+          </button>
+        )}
+
         <button
           onClick={() => onRegenerateImage(shot.id)}
           disabled={isProcessing}

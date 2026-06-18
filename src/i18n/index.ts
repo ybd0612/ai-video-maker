@@ -252,6 +252,17 @@ const zh = {
   "pipeline.phaseVideo": "视频",
   "pipeline.failed": "失败",
   "pipeline.running": "执行中...",
+  "pipeline.retryShot": "重试此镜头",
+  "pipeline.retryFailed": "重试失败",
+  "pipeline.finalVideo": "成片预览",
+  "pipeline.finalVideoHint": "所有镜头视频生成完成后，可拼接为一段完整视频。",
+  "pipeline.concatVideos": "拼接成片",
+  "pipeline.rendering": "渲染中",
+  "pipeline.download": "下载视频",
+  "pipeline.needAllVideos": "还有 {done}/{total} 个镜头未生成视频",
+  "pipeline.tabShot": "单镜头",
+  "pipeline.tabFinal": "成片",
+
 } as const;
 
 const en = {
@@ -468,6 +479,8 @@ const en = {
 
 
   // Pipeline
+
+
   "pipeline.title": "AI Video Creator",
   "pipeline.newProject": "New Project",
   "pipeline.scriptPanelTitle": "Enter your idea",
@@ -500,6 +513,16 @@ const en = {
   "pipeline.phaseVideo": "Video",
   "pipeline.failed": "failed",
   "pipeline.running": "Running...",
+  "pipeline.retryShot": "Retry This Shot",
+  "pipeline.retryFailed": "Retry Failed",
+  "pipeline.finalVideo": "Final Preview",
+  "pipeline.finalVideoHint": "After all shot videos are ready, concatenate them into one video.",
+  "pipeline.concatVideos": "Concatenate Videos",
+  "pipeline.rendering": "Rendering",
+  "pipeline.download": "Download Video",
+  "pipeline.needAllVideos": "{done}/{total} shots have videos",
+  "pipeline.tabShot": "Shot",
+  "pipeline.tabFinal": "Final",
 } as const;
 
 export type TranslationKey = keyof typeof zh;

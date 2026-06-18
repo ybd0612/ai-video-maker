@@ -12,11 +12,12 @@ import { ScriptPanel } from "@/features/script/ScriptPanel";
 import { ShotList } from "@/features/shots/ShotList";
 import { ShotEditor } from "@/features/shots/ShotEditor";
 import { ShotPreview } from "@/features/preview/ShotPreview";
+import { FinalPreview } from "@/features/preview/FinalPreview";
 import { runPipeline } from "@/services/pipelineService";
 import { generateScript } from "@/services/scriptService";
 import { generateImage, aspectRatioToImageSize } from "@/services/imageService";
 import { generateVideo, aspectRatioToVideoSize } from "@/services/videoService";
-import { Settings, Trash2, Play, Square } from "lucide-react";
+import { Settings, Trash2, Play, Square, RotateCcw } from "lucide-react";
 import { ApiKeyBanner } from "@/components/ApiKeyBanner";
 import { confirmDialog } from "@/components/ui/ConfirmDialog";
 
@@ -37,6 +38,7 @@ export function ProjectWorkspace() {
   const [isScripting, setIsScripting] = useState(false);
   const [isRunning, setIsRunning] = useState(false);
   const [hasProject, setHasProject] = useState(!!project);
+  const [previewTab, setPreviewTab] = useState<"shot" | "final">("shot");
   const abortRef = useRef<AbortController | null>(null);
 
   // Create project if needed, then generate script
@@ -106,6 +108,28 @@ export function ProjectWorkspace() {
   // Cancel running pipeline
   const handleCancel = useCallback(() => {
     abortRef.current?.abort();
+  }, []);
+
+
+  // Retry all failed shots
+  const handleRetryFailed = useCallback(async () => {
+    const proj = useProjectStore.getState().project;
+    if (!proj) return;
+    const failedShotIds = proj.shots.filter((s) => s.status === "failed").map((s) => s.id);
+    if (failedShotIds.length === 0) return;
+    for (const id of failedShotIds) {
+      useProjectStore.getState().setShotStatus(id, "idle");
+    }
+    setIsRunning(true);
+    abortRef.current = new AbortController();
+    try {
+      await runPipeline("", { signal: abortRef.current.signal });
+    } catch (err) {
+      if (err instanceof Error && err.message !== "Pipeline cancelled.") alert(err.message);
+    } finally {
+      setIsRunning(false);
+      abortRef.current = null;
+    }
   }, []);
 
   // Regenerate image for a single shot
@@ -209,7 +233,7 @@ export function ProjectWorkspace() {
             </select>
           )}
 
-          {/* Run all / Cancel */}
+          {/* Run all / Cancel / Retry */}
           {shots.length > 0 && (
             isRunning ? (
               <button
@@ -220,13 +244,24 @@ export function ProjectWorkspace() {
                 {t("pipeline.cancel")}
               </button>
             ) : (
-              <button
-                onClick={handleRunAll}
-                className="flex items-center gap-1.5 rounded-md bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-emerald-500"
-              >
-                <Play size={12} />
-                {t("pipeline.runAll")}
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={handleRunAll}
+                  className="flex items-center gap-1.5 rounded-md bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-emerald-500"
+                >
+                  <Play size={12} />
+                  {t("pipeline.runAll")}
+                </button>
+                {shots.some((s) => s.status === "failed") && (
+                  <button
+                    onClick={handleRetryFailed}
+                    className="flex items-center gap-1.5 rounded-md bg-amber-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-amber-500"
+                  >
+                    <RotateCcw size={12} />
+                    {t("pipeline.retryFailed")}
+                  </button>
+                )}
+              </div>
             )
           )}
 
@@ -283,8 +318,35 @@ export function ProjectWorkspace() {
               {shots.length > 0 && (
                 <PipelineProgress shots={shots} isRunning={isRunning} />
               )}
+              {/* Tab switcher */}
+              <div className="flex border-b border-slate-800">
+                <button
+                  onClick={() => setPreviewTab("shot")}
+                  className={`px-4 py-1.5 text-xs font-medium transition ${
+                    previewTab === "shot"
+                      ? "border-b-2 border-emerald-500 text-emerald-400"
+                      : "text-slate-500 hover:text-slate-300"
+                  }`}
+                >
+                  {t("pipeline.tabShot")}
+                </button>
+                <button
+                  onClick={() => setPreviewTab("final")}
+                  className={`px-4 py-1.5 text-xs font-medium transition ${
+                    previewTab === "final"
+                      ? "border-b-2 border-emerald-500 text-emerald-400"
+                      : "text-slate-500 hover:text-slate-300"
+                  }`}
+                >
+                  {t("pipeline.tabFinal")}
+                </button>
+              </div>
               <div className="flex-1 overflow-y-auto">
-                <ShotPreview shotId={selectedShotId} />
+                {previewTab === "shot" ? (
+                  <ShotPreview shotId={selectedShotId} />
+                ) : (
+                  <FinalPreview />
+                )}
               </div>
             </div>
           )}

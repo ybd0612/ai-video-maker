@@ -21,13 +21,14 @@
     "vite": "^8.0.12"
   },
   "dependencies": {
+    "@ffmpeg/ffmpeg": "^0.12.15",
+    "@ffmpeg/util": "^0.12.2",
     "@tailwindcss/vite": "^4.3.0",
-    "@xyflow/react": "^12.11.0",
     "clsx": "^2.1.1",
     "framer-motion": "^12.40.0",
-    "immer": "^11.1.8",
-    "localforage": "^1.10.0",
     "lucide-react": "^1.17.0",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7",
     "tailwindcss": "^4.3.0",
     "zustand": "^5.0.14"
   }

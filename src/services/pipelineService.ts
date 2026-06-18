@@ -119,8 +119,8 @@ export async function runPipeline(prompt: string, opts: RunOptions = {}) {
             size: videoSize,
             duration: shot.duration,
           },
-          (_progress) => {
-            // Could update progress in store if needed
+          (progress) => {
+            useProjectStore.getState().updateShot(shot.id, { videoProgress: progress });
           },
           opts.signal,
         );
@@ -224,6 +224,7 @@ async function runParallel<T>(
   const workers = Array.from({ length: Math.min(concurrency, items.length) }, () => worker());
   await Promise.all(workers);
 }
+
 
 
 

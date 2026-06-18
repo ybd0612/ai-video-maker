@@ -6,7 +6,7 @@
 import { useProjectStore } from "@/stores/projectStore";
 import { useT } from "@/i18n";
 import { Lightbox } from "@/components/ui/Lightbox";
-import { Image as ImageIcon, Film, Loader2 } from "lucide-react";
+import { Image as ImageIcon, Film, Loader2, AlertCircle } from "lucide-react";
 
 interface ShotPreviewProps {
   shotId: string | null;
@@ -74,11 +74,23 @@ export function ShotPreview({ shotId }: ShotPreviewProps) {
           {t("pipeline.video")}
         </h3>
         {shot.status === "videoing" ? (
-          <div className="flex h-48 items-center justify-center rounded-lg border border-dashed border-amber-700 bg-amber-950/20">
-            <div className="text-center space-y-2">
-              <Loader2 size={20} className="mx-auto animate-spin text-amber-400" />
-              <p className="text-xs text-amber-400">{t("pipeline.generatingVideo")}</p>
+          <div className="space-y-2 rounded-lg border border-dashed border-amber-700 bg-amber-950/20 p-4">
+            <div className="flex items-center gap-2">
+              <Loader2 size={14} className="animate-spin text-amber-400" />
+              <span className="text-xs text-amber-400">
+                {(shot.videoProgress ?? 0) > 0
+                  ? `${shot.videoProgress}%`
+                  : t("pipeline.generatingVideo")}
+              </span>
             </div>
+            {(shot.videoProgress ?? 0) > 0 && (
+              <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-800">
+                <div
+                  className="h-full rounded-full bg-amber-500 transition-all duration-500"
+                  style={{ width: `${shot.videoProgress}%` }}
+                />
+              </div>
+            )}
           </div>
         ) : shot.videoUrl ? (
           <video
@@ -87,6 +99,13 @@ export function ShotPreview({ shotId }: ShotPreviewProps) {
             loop
             className="max-h-64 w-full rounded-lg border border-slate-700"
           />
+        ) : shot.status === "failed" ? (
+          <div className="flex h-32 items-center justify-center rounded-lg border border-red-800 bg-red-950/20">
+            <div className="text-center space-y-1">
+              <AlertCircle size={18} className="mx-auto text-red-400" />
+              <p className="text-xs text-red-400">{shot.error || t("pipeline.failed")}</p>
+            </div>
+          </div>
         ) : (
           <div className="flex h-48 items-center justify-center rounded-lg border border-dashed border-slate-700 bg-slate-800/30">
             <p className="text-xs text-slate-600">{t("pipeline.noVideoYet")}</p>
@@ -96,4 +115,3 @@ export function ShotPreview({ shotId }: ShotPreviewProps) {
     </div>
   );
 }
-
