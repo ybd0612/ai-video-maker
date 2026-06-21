@@ -281,6 +281,22 @@ const zh = {
   "pipeline.tabShot": "单镜头",
   "pipeline.tabFinal": "成片",
 
+  // AI Assist
+  "aiAssist.title": "AI 优化",
+  "aiAssist.placeholder": "描述你想调整的内容...",
+  "aiAssist.send": "发送",
+  "aiAssist.apply": "应用",
+  "aiAssist.applied": "已应用",
+  "aiAssist.thinking": "AI 思考中...",
+  "aiAssist.close": "关闭",
+  "aiAssist.error": "请求失败，请重试",
+  "aiAssist.currentContent": "当前内容",
+  "aiAssist.newConversation": "新对话",
+  "aiAssist.optimizeScriptText": "AI 优化文案",
+  "aiAssist.optimizeVisualPrompt": "AI 优化画面描述",
+  "aiAssist.optimizeMainPrompt": "AI 优化主题",
+  "aiAssist.emptyField": "当前字段为空",
+
 } as const;
 
 const en = {
@@ -559,6 +575,22 @@ const en = {
   "pipeline.needAllVideos": "{done}/{total} shots have videos",
   "pipeline.tabShot": "Shot",
   "pipeline.tabFinal": "Final",
+
+  // AI Assist
+  "aiAssist.title": "AI Optimize",
+  "aiAssist.placeholder": "Describe what you want to change...",
+  "aiAssist.send": "Send",
+  "aiAssist.apply": "Apply",
+  "aiAssist.applied": "Applied",
+  "aiAssist.thinking": "AI thinking...",
+  "aiAssist.close": "Close",
+  "aiAssist.error": "Request failed, please retry",
+  "aiAssist.currentContent": "Current Content",
+  "aiAssist.newConversation": "New Conversation",
+  "aiAssist.optimizeScriptText": "AI Optimize Script",
+  "aiAssist.optimizeVisualPrompt": "AI Optimize Visual Prompt",
+  "aiAssist.optimizeMainPrompt": "AI Optimize Topic",
+  "aiAssist.emptyField": "Current field is empty",
 } as const;
 
 export type TranslationKey = keyof typeof zh;

@@ -5,13 +5,14 @@
 
 import { useProjectStore, type Shot } from "@/stores/projectStore";
 import { useT } from "@/i18n";
-import { RefreshCw, X, RotateCcw } from "lucide-react";
+import { RefreshCw, X, RotateCcw, Sparkles } from "lucide-react";
 
 interface ShotEditorProps {
   shot: Shot | null;
   onClose: () => void;
   onRegenerateImage: (shotId: string) => void;
   onRegenerateVideo: (shotId: string) => void;
+  onOpenAiAssist: (field: "scriptText" | "visualPrompt", currentValue: string) => void;
   isProcessing: boolean;
 }
 
@@ -20,6 +21,7 @@ export function ShotEditor({
   onClose,
   onRegenerateImage,
   onRegenerateVideo,
+  onOpenAiAssist,
   isProcessing,
 }: ShotEditorProps) {
   const updateShot = useProjectStore((s) => s.updateShot);
@@ -50,9 +52,18 @@ export function ShotEditor({
 
       {/* Script text */}
       <div className="space-y-1">
-        <label className="text-[11px] font-medium text-slate-500">
-          {t("pipeline.scriptText")}
-        </label>
+        <div className="flex items-center justify-between">
+          <label className="text-[11px] font-medium text-slate-500">
+            {t("pipeline.scriptText")}
+          </label>
+          <button
+            onClick={() => onOpenAiAssist("scriptText", shot.scriptText)}
+            className="rounded p-0.5 text-slate-600 transition hover:bg-slate-700 hover:text-emerald-400"
+            title={t("aiAssist.optimizeScriptText")}
+          >
+            <Sparkles size={11} />
+          </button>
+        </div>
         <textarea
           value={shot.scriptText}
           onChange={(e) => updateShot(shot.id, { scriptText: e.target.value })}
@@ -63,9 +74,18 @@ export function ShotEditor({
 
       {/* Visual prompt */}
       <div className="space-y-1">
-        <label className="text-[11px] font-medium text-slate-500">
-          {t("pipeline.visualPrompt")}
-        </label>
+        <div className="flex items-center justify-between">
+          <label className="text-[11px] font-medium text-slate-500">
+            {t("pipeline.visualPrompt")}
+          </label>
+          <button
+            onClick={() => onOpenAiAssist("visualPrompt", shot.visualPrompt)}
+            className="rounded p-0.5 text-slate-600 transition hover:bg-slate-700 hover:text-emerald-400"
+            title={t("aiAssist.optimizeVisualPrompt")}
+          >
+            <Sparkles size={11} />
+          </button>
+        </div>
         <textarea
           value={shot.visualPrompt}
           onChange={(e) => updateShot(shot.id, { visualPrompt: e.target.value })}

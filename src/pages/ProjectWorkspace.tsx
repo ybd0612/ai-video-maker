@@ -17,6 +17,8 @@ import { runPipeline, runSingleShot, retryFailedVideos } from "@/services/pipeli
 import { generateScript } from "@/services/scriptService";
 import { generateImage, aspectRatioToImageSize } from "@/services/imageService";
 import { generateVideo, aspectRatioToVideoSize } from "@/services/videoService";
+import { SYSTEM_PROMPT_SCRIPT_TEXT, SYSTEM_PROMPT_VISUAL_PROMPT, SYSTEM_PROMPT_MAIN_PROMPT } from "@/services/chatService";
+import { AiAssistDrawer } from "@/components/ui/AiAssistDrawer";
 import { ProjectSidebar } from "@/features/projects/ProjectSidebar";
 import { HistoryPanel } from "@/features/history/HistoryPanel";
 import {
@@ -49,6 +51,16 @@ export function ProjectWorkspace() {
   const [leftTab, setLeftTab] = useState<LeftTab>("shots");
   const abortRef = useRef<AbortController | null>(null);
 
+  // AI Assist drawer state
+  const [aiAssistTarget, setAiAssistTarget] = useState<{
+    field: "scriptText" | "visualPrompt" | "mainPrompt";
+    shotId?: string;
+    currentValue: string;
+    fieldName: string;
+    systemPrompt: string;
+  } | null>(null);
+  const [mainPromptOverride, setMainPromptOverride] = useState<string | undefined>(undefined);
+
   // Auto-retry failed videos on page load
   useEffect(() => {
     if (!project) return;
@@ -69,6 +81,50 @@ export function ProjectWorkspace() {
         abortRef.current = null;
       });
   }, [project?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // AI Assist handlers
+  const handleOpenShotAiAssist = useCallback(
+    (field: "scriptText" | "visualPrompt", currentValue: string) => {
+      const systemPrompt = field === "scriptText"
+        ? SYSTEM_PROMPT_SCRIPT_TEXT
+        : SYSTEM_PROMPT_VISUAL_PROMPT;
+      const fieldName = field === "scriptText"
+        ? t("pipeline.scriptText")
+        : t("pipeline.visualPrompt");
+      setAiAssistTarget({
+        field,
+        shotId: selectedShotId ?? undefined,
+        currentValue,
+        fieldName,
+        systemPrompt,
+      });
+    },
+    [selectedShotId, t],
+  );
+
+  const handleOpenMainPromptAiAssist = useCallback(
+    (currentValue: string) => {
+      setAiAssistTarget({
+        field: "mainPrompt",
+        currentValue,
+        fieldName: t("pipeline.scriptPanelTitle"),
+        systemPrompt: SYSTEM_PROMPT_MAIN_PROMPT,
+      });
+    },
+    [t],
+  );
+
+  const handleAiAssistApply = useCallback(
+    (value: string) => {
+      if (!aiAssistTarget) return;
+      if (aiAssistTarget.field === "mainPrompt") {
+        setMainPromptOverride(value);
+      } else if (aiAssistTarget.shotId) {
+        updateShot(aiAssistTarget.shotId, { [aiAssistTarget.field]: value });
+      }
+    },
+    [aiAssistTarget, updateShot],
+  );
 
   // Create project if needed, then generate script
   const handleGenerateScript = useCallback(
@@ -386,13 +442,13 @@ export function ProjectWorkspace() {
           {!project ? (
             <div className="flex h-full items-center justify-center">
               <div className="w-full max-w-lg">
-                <ScriptPanel onGenerate={handleGenerateScript} isGenerating={isScripting} />
+                <ScriptPanel onGenerate={handleGenerateScript} isGenerating={isScripting} onOpenAiAssist={handleOpenMainPromptAiAssist} promptOverride={mainPromptOverride} />
               </div>
             </div>
           ) : shots.length === 0 ? (
             <div className="flex h-full items-center justify-center">
               <div className="w-full max-w-lg">
-                <ScriptPanel onGenerate={handleGenerateScript} isGenerating={isScripting} />
+                <ScriptPanel onGenerate={handleGenerateScript} isGenerating={isScripting} onOpenAiAssist={handleOpenMainPromptAiAssist} promptOverride={mainPromptOverride} />
               </div>
             </div>
           ) : (
@@ -441,11 +497,22 @@ export function ProjectWorkspace() {
               onClose={() => setSelectedShotId(null)}
               onRegenerateImage={handleRegenerateImage}
               onRegenerateVideo={handleRegenerateVideo}
+              onOpenAiAssist={handleOpenShotAiAssist}
               isProcessing={isRunning}
             />
           </aside>
         )}
       </div>
+
+      {/* AI Assist Drawer */}
+      <AiAssistDrawer
+        open={aiAssistTarget !== null}
+        onClose={() => setAiAssistTarget(null)}
+        currentValue={aiAssistTarget?.currentValue ?? ""}
+        fieldName={aiAssistTarget?.fieldName ?? ""}
+        systemPrompt={aiAssistTarget?.systemPrompt ?? ""}
+        onApply={handleAiAssistApply}
+      />
     </div>
   );
 }

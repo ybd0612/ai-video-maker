@@ -3,18 +3,27 @@
 // Input area for the user prompt + "generate" button + loading overlay.
 // ────────────────────────────────────────────────────────────────────────────
 
-import { useState } from "react";
-import { Sparkles, Loader2 } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Sparkles, Loader2, Wand2 } from "lucide-react";
 import { useT } from "@/i18n";
 
 interface ScriptPanelProps {
   onGenerate: (prompt: string) => void;
   isGenerating: boolean;
+  onOpenAiAssist: (currentValue: string) => void;
+  promptOverride?: string;
 }
 
-export function ScriptPanel({ onGenerate, isGenerating }: ScriptPanelProps) {
+export function ScriptPanel({ onGenerate, isGenerating, onOpenAiAssist, promptOverride }: ScriptPanelProps) {
   const [prompt, setPrompt] = useState("");
   const t = useT();
+
+  // Sync external override into local state
+  useEffect(() => {
+    if (promptOverride !== undefined) {
+      setPrompt(promptOverride);
+    }
+  }, [promptOverride]);
 
   const handleSubmit = () => {
     const trimmed = prompt.trim();
@@ -24,9 +33,20 @@ export function ScriptPanel({ onGenerate, isGenerating }: ScriptPanelProps) {
 
   return (
     <div className="flex flex-col gap-3 p-4">
-      <h2 className="text-sm font-semibold text-slate-200">
-        {t("pipeline.scriptPanelTitle")}
-      </h2>
+      <div className="flex items-center justify-between">
+        <h2 className="text-sm font-semibold text-slate-200">
+          {t("pipeline.scriptPanelTitle")}
+        </h2>
+        {prompt.trim() && (
+          <button
+            onClick={() => onOpenAiAssist(prompt)}
+            className="rounded p-1 text-slate-600 transition hover:bg-slate-700 hover:text-emerald-400"
+            title={t("aiAssist.optimizeMainPrompt")}
+          >
+            <Wand2 size={13} />
+          </button>
+        )}
+      </div>
       <p className="text-xs text-slate-500">
         {t("pipeline.scriptPanelHint")}
       </p>
