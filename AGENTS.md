@@ -62,7 +62,7 @@ src/
 
 ## 命令
 
-- `npm run dev` — 启动开发服务器（端口 3000）
+- `npm run dev` — 启动开发服务器（端口 5173）
 - `npm run build` — TypeScript 检查 + Vite 生产构建
 - `npm run preview` — 预览生产版本（端口 5180）
 
@@ -107,7 +107,8 @@ src/
 - **Project**：项目（title / aspectRatio / style / language / shots / status / error / createdAt / updatedAt）
 - **Shot**：分镜（scriptText / visualPrompt / duration / imageUrl / videoUrl / status）
 - **HistoryEntry**：操作记录（projectId / action / description / timestamp）
-- 状态流转：`idle → scripted → imaged → videoed`（可卡在 `failed`）
+- 项目状态流转：`idle → scripting → imaging → videoing → rendering → done`（可卡在 `failed`）
+- 分镜状态流转：`idle → scripting → scripted → imaging → imaged → videoing → videoed`（可卡在 `failed`）
 - 多项目存储：`projects[]` + `activeProjectId`，通过 `getActiveProject()` 派生活跃项目
 - 历史记录保留最近 200 条，按日期分组展示
 
@@ -122,7 +123,7 @@ src/
 
 每次完成代码编写任务后，执行以下流程：
 
-1. **文档同步检查** — 审查所有相关文档（README.md、AGENTS.md、docs/ 等），确保与代码变动一致。如有新增/删除/重命名的文件、接口变更、功能变更等，必须同步更新文档。
+1. **文档同步检查** — 审查相关文档（README.md、AGENTS.md 等），确保与代码变动一致。如有新增/删除/重命名的文件、接口变更、功能变更等，必须同步更新文档。
 2. **提交代码** — 使用 `git add` + `git commit` 提交所有变更，commit message 遵循约定式提交格式（`feat:` / `fix:` / `docs:` / `refactor:` 等）。
 3. **推送代码** — 执行 `git push` 推送到远程仓库。
 
