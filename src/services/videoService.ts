@@ -4,7 +4,7 @@
 //
 // API 规格：
 //   创建任务：POST {baseUrl}/videos → 返回 { video_id }
-//   查询结果：GET {baseUrl}/videos/{taskId}
+//   查询结果：GET {baseUrl}/videos?video_id=<VIDEO_ID>
 // ────────────────────────────────────────────────────────────────────────────
 
 import { MODELS } from "@/lib/models";
@@ -94,7 +94,7 @@ function sanitizePrompt(prompt: string): string {
  * Returns the final video URL.
  *
  * 创建端点：POST {baseUrl}/videos
- * 查询端点：GET {baseUrl}/videos/{taskId}
+ * 查询端点：GET {baseUrl}/videos?video_id={taskId}
  */
 export async function generateVideo(
   opts: CreateVideoOptions,
@@ -158,8 +158,8 @@ export async function generateVideo(
   const videoId = extractRealVideoId(rawVideoId);
 
   // ── Poll for result ────────────────────────────────────────────────────
-  // 正确端点：GET {baseUrl}/videos/{taskId}
-  const pollUrl = `${baseUrl}/videos/${encodeURIComponent(videoId)}`;
+  // 正确端点：GET {baseUrl}/videos?video_id={taskId}
+  const pollUrl = `${baseUrl}/videos?video_id=${encodeURIComponent(videoId)}`;
   const deadline = Date.now() + VIDEO_POLL_TIMEOUT_MS;
   let videoUrl = "";
   let coverImageUrl: string | undefined;
@@ -180,17 +180,18 @@ export async function generateVideo(
       const text = await pollResp.text().catch(() => "");
 
       // 任务尚未注册 — 等待后重试
-      if (text.includes("task_not_exist")) {
+      if (text.includes("task_not_exist") || pollResp.status === 404) {
         notExistCount++;
         if (notExistCount > VIDEO_POLL_MAX_NOT_EXIST_RETRIES) {
           throw new Error(
-            `视频任务 ${videoId} 持续不存在（已重试 ${notExistCount} 次）。可能原因：任务创建失败或 API 端点配置错误。`,
+            `视频任务 ${videoId} 持续不存在（已重试 ${notExistCount} 次，HTTP ${pollResp.status}）。` +
+            `轮询 URL: ${pollUrl}。响应: ${text.slice(0, 300)}`,
           );
         }
         continue;
       }
 
-      throw new Error(`Video poll error ${pollResp.status}: ${text}`);
+      throw new Error(`Video poll error ${pollResp.status}: ${text.slice(0, 500)}`);
     }
 
     // 成功获取响应，重置 not_exist 计数
