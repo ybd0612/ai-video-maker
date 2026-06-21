@@ -4,7 +4,7 @@
 
 ## 技术栈
 
-- React 18 + TypeScript + Vite
+- React 19 + TypeScript + Vite
 - Zustand v5 — 状态管理（localStorage 持久化）
 - FFmpeg.wasm — 客户端视频拼接
 - TailwindCSS v4 + Framer Motion — 样式与动画
@@ -24,9 +24,13 @@ src/
 │   ├── shots/
 │   │   ├── ShotList.tsx           # 左侧分镜列表（状态徽标 + 缩略图）
 │   │   └── ShotEditor.tsx         # 右侧分镜编辑器（文案 / 画面描述 / 时长）
-│   └── preview/
-│       ├── ShotPreview.tsx        # 单镜头预览（图片 + 视频）
-│       └── FinalPreview.tsx       # 成片预览（FFmpeg 拼接 + 下载）
+│   ├── preview/
+│   │   ├── ShotPreview.tsx        # 单镜头预览（图片 + 视频）
+│   │   └── FinalPreview.tsx       # 成片预览（FFmpeg 拼接 + 下载）
+│   ├── projects/
+│   │   └── ProjectSidebar.tsx     # 项目管理面板
+│   └── history/
+│       └── HistoryPanel.tsx       # 操作历史面板
 ├── services/                      # Pipeline 服务层
 │   ├── pipelineService.ts         # 编排引擎（脚本 → 图片 → 视频，含并发控制）
 │   ├── scriptService.ts           # 文本模型调用，生成结构化分镜
