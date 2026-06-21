@@ -4,7 +4,7 @@
 //
 // API 规格：
 //   创建任务：POST {baseUrl}/videos → 返回 { video_id }
-//   查询结果：GET {baseUrl}/videos?video_id=<VIDEO_ID>
+//   查询结果：GET {baseUrl}/videos/{taskId}
 // ────────────────────────────────────────────────────────────────────────────
 
 import { MODELS } from "@/lib/models";
@@ -46,36 +46,6 @@ export function aspectRatioToVideoSize(ratio: string): string {
 }
 
 /**
- * Extract the real video_id from a potentially compound identifier.
- *
- * Agnes API may return a compound video_id in the format:
- *   "video_<base64>"
- * where base64 decodes to a semicolon-separated metadata string like:
- *   "litelll;custom_llm_provider:openai;model_id:...;video_id:video_xxxxx"
- *
- * This function decodes the base64 and extracts the actual video_id field.
- * If decoding fails or no video_id is found, returns the original string.
- */
-function extractRealVideoId(rawId: string): string {
-  // Match compound format: video_<base64payload>
-  const match = rawId.match(/^video_([A-Za-z0-9+/=]{20,})$/);
-  if (!match) return rawId;
-
-  try {
-    const decoded = atob(match[1]);
-    // Parse semicolon-separated key:value pairs
-    for (const part of decoded.split(";")) {
-      const [key, value] = part.split(":");
-      if (key === "video_id" && value) return value;
-    }
-  } catch {
-    // Not valid base64, use raw ID
-  }
-
-  return rawId;
-}
-
-/**
  * Sanitize prompt before sending to the Video API.
  */
 function sanitizePrompt(prompt: string): string {
@@ -94,7 +64,10 @@ function sanitizePrompt(prompt: string): string {
  * Returns the final video URL.
  *
  * 创建端点：POST {baseUrl}/videos
- * 查询端点：GET {baseUrl}/videos?video_id={videoId}
+ * 查询端点：GET {baseUrl}/videos/{taskId}
+ *
+ * 注意：轮询必须使用 create 响应中的 id 字段（完整复合标识符），
+ * 而不是 video_id（内部短 ID）。参考官方实现 github.com/chenpipi0807/Agnes-API
  */
 export async function generateVideo(
   opts: CreateVideoOptions,
@@ -147,19 +120,19 @@ export async function generateVideo(
 
   const createJson = await createResp.json();
 
-  // Extract video_id — API 可能返回 base64 复合标识符，需解析真实 ID
-  const rawVideoId: string | undefined =
-    createJson.video_id ?? createJson.task_id ?? createJson.id;
-  if (!rawVideoId) {
+  // Extract taskId — 轮询必须使用 id 字段（完整复合标识符）
+  // id 格式如 "video_<base64>"，包含 provider/model/video_id 等元数据
+  const taskId: string | undefined =
+    createJson.id ?? createJson.task_id ?? createJson.video_id;
+  if (!taskId) {
     throw new Error(
-      `Video API 未返回 video_id。响应: ${JSON.stringify(createJson).slice(0, 300)}`,
+      `Video API 未返回任务 ID。响应: ${JSON.stringify(createJson).slice(0, 300)}`,
     );
   }
-  const videoId = extractRealVideoId(rawVideoId);
 
   // ── Poll for result ────────────────────────────────────────────────────
-  // 正确端点：GET {baseUrl}/videos?video_id={videoId}
-  const pollUrl = `${baseUrl}/videos?video_id=${encodeURIComponent(videoId)}`;
+  // 正确端点：GET {baseUrl}/videos/{taskId}
+  const pollUrl = `${baseUrl}/videos/${encodeURIComponent(taskId)}`;
   const deadline = Date.now() + VIDEO_POLL_TIMEOUT_MS;
   let videoUrl = "";
   let coverImageUrl: string | undefined;
@@ -184,7 +157,7 @@ export async function generateVideo(
         notExistCount++;
         if (notExistCount > VIDEO_POLL_MAX_NOT_EXIST_RETRIES) {
           throw new Error(
-            `视频任务 ${videoId} 持续不存在（已重试 ${notExistCount} 次，HTTP ${pollResp.status}）。` +
+            `视频任务 ${taskId} 持续不存在（已重试 ${notExistCount} 次，HTTP ${pollResp.status}）。` +
             `轮询 URL: ${pollUrl}。响应: ${text.slice(0, 300)}`,
           );
         }
