@@ -29,6 +29,23 @@ export interface RenderOptions {
 }
 
 /**
+ * Rewrite a remote URL to use the local Vite dev proxy
+ * to avoid CORS issues when fetching video files.
+ */
+function toProxyUrl(url: string): string {
+  try {
+    const parsed = new URL(url);
+    // In dev mode, route through Vite proxy to avoid CORS
+    if (typeof window !== "undefined" && window.location.hostname === "127.0.0.1") {
+      return `/cdn-proxy${parsed.pathname}`;
+    }
+  } catch {
+    // Not a valid URL, use as-is
+  }
+  return url;
+}
+
+/**
  * Concatenate multiple video URLs into a single MP4.
  * Returns a blob URL of the final video.
  */
@@ -42,7 +59,8 @@ export async function concatenateVideos(opts: RenderOptions): Promise<string> {
   try {
     // Download all videos into FFmpeg virtual filesystem
     for (let i = 0; i < videoUrls.length; i++) {
-      const data = await fetchFile(videoUrls[i]);
+      const proxyUrl = toProxyUrl(videoUrls[i]);
+      const data = await fetchFile(proxyUrl);
       await ffmpeg.writeFile(`input${i}.mp4`, data);
       onProgress?.(Math.round(((i + 1) / (videoUrls.length + 1)) * 50));
     }

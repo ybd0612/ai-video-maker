@@ -14,6 +14,13 @@ export default defineConfig({
     port: 5173,
     host: "127.0.0.1",
     open: true,
+    proxy: {
+      "/cdn-proxy": {
+        target: "https://platform-outputs.agnes-ai.space",
+        changeOrigin: true,
+        rewrite: (p) => p.replace(/^\/cdn-proxy/, ""),
+      },
+    },
   },
   preview: {
     port: 5180,
