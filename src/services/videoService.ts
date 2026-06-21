@@ -94,7 +94,7 @@ function sanitizePrompt(prompt: string): string {
  * Returns the final video URL.
  *
  * 创建端点：POST {baseUrl}/videos
- * 查询端点：GET {baseUrl}/videos?video_id={taskId}
+ * 查询端点：GET {baseUrl}/videos?video_id={videoId}
  */
 export async function generateVideo(
   opts: CreateVideoOptions,
@@ -158,7 +158,7 @@ export async function generateVideo(
   const videoId = extractRealVideoId(rawVideoId);
 
   // ── Poll for result ────────────────────────────────────────────────────
-  // 正确端点：GET {baseUrl}/videos?video_id={taskId}
+  // 正确端点：GET {baseUrl}/videos?video_id={videoId}
   const pollUrl = `${baseUrl}/videos?video_id=${encodeURIComponent(videoId)}`;
   const deadline = Date.now() + VIDEO_POLL_TIMEOUT_MS;
   let videoUrl = "";
