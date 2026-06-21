@@ -1,0 +1,104 @@
+# 知识卡导出索引文件
+schema_version: 1
+locale: zh-CN
+branch: main
+nodes_managed: true
+exported_at: "2026-06-21T05:00:39Z"
+modules:
+    "":
+        dir_name: AI 视频分镜生成与流水线编排
+        title: AI 视频分镜生成与流水线编排
+        scope:
+            - README.md
+            - README_EN.md
+            - AGENTS.md
+            - .gitignore
+            - package.json
+            - package-lock.json
+            - tsconfig.json
+            - vite.config.ts
+            - index.html
+            - src/
+            - docs/
+            - .env.example
+            - docs\README.md
+            - docs\REFACTOR_DESIGN.md
+            - docs\USER_GUIDE.md
+            - docs\architecture.md
+            - docs\canvas.md
+            - docs\components.md
+            - docs\connections.md
+            - docs\edges.md
+            - docs\i18n.md
+            - docs\nodes\README.md
+            - docs\nodes\image.md
+            - docs\nodes\prompt.md
+            - docs\nodes\text.md
+            - docs\nodes\upload.md
+            - docs\nodes\video.md
+            - docs\providers.md
+            - docs\stores.md
+            - docs\workflow.md
+            - preview_server.err
+            - preview_server.out
+            - prompt-text-workflow.mjs
+            - serve.mjs
+            - server-err.txt
+            - server-out.txt
+            - server-ready.flag
+            - server.cjs
+            - server2.cjs
+            - src\App.tsx
+            - src\assets\hero.png
+            - src\assets\typescript.svg
+            - src\assets\vite.svg
+            - src\components\ApiKeyBanner.tsx
+            - src\components\SettingsDialog.tsx
+            - src\components\ui\ConfirmDialog.tsx
+            - src\components\ui\ContextMenu.tsx
+            - src\components\ui\HelpTooltip.tsx
+            - src\components\ui\IMEAwareTextarea.tsx
+            - src\components\ui\Lightbox.tsx
+            - src\components\ui\NumberInput.tsx
+            - src\features\history\HistoryPanel.tsx
+            - src\features\preview\FinalPreview.tsx
+            - src\features\preview\ShotPreview.tsx
+            - src\features\projects\ProjectSidebar.tsx
+            - src\features\script\ScriptPanel.tsx
+            - src\features\shots\ShotEditor.tsx
+            - src\features\shots\ShotList.tsx
+            - src\i18n\index.ts
+            - src\lib\models.ts
+            - src\lib\resolveBaseUrl.ts
+            - src\lib\validation.ts
+            - src\main.tsx
+            - src\pages\ProjectWorkspace.tsx
+            - src\providers\agnes\AgnesAdapter.ts
+            - src\providers\types.ts
+            - src\services\imageService.ts
+            - src\services\pipelineService.ts
+            - src\services\renderService.ts
+            - src\services\scriptService.ts
+            - src\services\videoService.ts
+            - src\stores\projectStore.ts
+            - src\stores\settingsStore.ts
+            - src\styles\globals.css
+            - test_server.txt
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    configuration_system:
+        dir_name: 配置系统：环境变量与运行时状态管理
+        title: 配置系统：环境变量与运行时状态管理
+        scope: []
+        source_files:
+            - .env.example
+            - src/stores/settingsStore.ts
+            - src/components/SettingsDialog.tsx
+            - src/lib/models.ts
+            - src/lib/resolveBaseUrl.ts
+            - vite.config.ts
+        children: []
+        depends_on: []
+        related_to: []

@@ -77,9 +77,11 @@ export function ShotPreview({ shotId }: ShotPreviewProps) {
             <div className="flex items-center gap-2">
               <Loader2 size={14} className="animate-spin text-amber-400" />
               <span className="text-xs text-amber-400">
-                {(shot.videoProgress ?? 0) > 0
-                  ? `${shot.videoProgress}%`
-                  : t("pipeline.generatingVideo")}
+                {(shot.videoRetryCount ?? 0) > 0
+                  ? t("pipeline.retryVideo", { count: String(shot.videoRetryCount), max: "3" })
+                  : (shot.videoProgress ?? 0) > 0
+                    ? `${shot.videoProgress}%`
+                    : t("pipeline.generatingVideo")}
               </span>
             </div>
             {(shot.videoProgress ?? 0) > 0 && (
@@ -102,7 +104,7 @@ export function ShotPreview({ shotId }: ShotPreviewProps) {
           <div className="flex h-32 items-center justify-center rounded-lg border border-red-800 bg-red-950/20">
             <div className="text-center space-y-1">
               <AlertCircle size={18} className="mx-auto text-red-400" />
-              <p className="text-xs text-red-400">{shot.error || t("pipeline.failed")}</p>
+              <p className="text-xs text-red-300">{shot.error || t("pipeline.failed")}</p>
             </div>
           </div>
         ) : (

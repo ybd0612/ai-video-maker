@@ -74,7 +74,7 @@ export function ShotList({ selectedShotId, onSelect }: ShotListProps) {
             </div>
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-1">
-                <span className="font-medium text-slate-300">
+                <span className="font-medium text-white">
                   {t("pipeline.shot")} {shot.index + 1}
                 </span>
                 <Icon size={11} className={cfg.color} />

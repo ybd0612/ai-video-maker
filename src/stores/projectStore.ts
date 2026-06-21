@@ -42,6 +42,7 @@ export interface Shot {
   imageUrl?: string;
   videoUrl?: string;
   videoProgress?: number;
+  videoRetryCount?: number;
   error?: string;
 }
 

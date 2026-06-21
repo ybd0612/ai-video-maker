@@ -4,7 +4,7 @@
 // Layout: left sidebar (projects/shots) | center preview | right editor.
 // ────────────────────────────────────────────────────────────────────────────
 
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import { useProjectStore, selectActiveProject, type Shot } from "@/stores/projectStore";
 import { useSettingsStore } from "@/stores/settingsStore";
 import { useT } from "@/i18n";
@@ -13,7 +13,7 @@ import { ShotList } from "@/features/shots/ShotList";
 import { ShotEditor } from "@/features/shots/ShotEditor";
 import { ShotPreview } from "@/features/preview/ShotPreview";
 import { FinalPreview } from "@/features/preview/FinalPreview";
-import { runPipeline, runSingleShot } from "@/services/pipelineService";
+import { runPipeline, runSingleShot, retryFailedVideos } from "@/services/pipelineService";
 import { generateScript } from "@/services/scriptService";
 import { generateImage, aspectRatioToImageSize } from "@/services/imageService";
 import { generateVideo, aspectRatioToVideoSize } from "@/services/videoService";
@@ -48,6 +48,27 @@ export function ProjectWorkspace() {
   const [previewTab, setPreviewTab] = useState<"shot" | "final">("shot");
   const [leftTab, setLeftTab] = useState<LeftTab>("shots");
   const abortRef = useRef<AbortController | null>(null);
+
+  // Auto-retry failed videos on page load
+  useEffect(() => {
+    if (!project) return;
+    const failedVideoShots = project.shots.filter(
+      (s) => s.status === "failed" && s.imageUrl && !s.videoUrl && (s.videoRetryCount ?? 0) < 3,
+    );
+    if (failedVideoShots.length === 0) return;
+
+    const { providerConfig } = useSettingsStore.getState();
+    if (!providerConfig.apiKey || !providerConfig.baseUrl) return;
+
+    setIsRunning(true);
+    abortRef.current = new AbortController();
+    retryFailedVideos({ signal: abortRef.current.signal })
+      .catch(() => { /* ignore — already handled in store */ })
+      .finally(() => {
+        setIsRunning(false);
+        abortRef.current = null;
+      });
+  }, [project?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Create project if needed, then generate script
   const handleGenerateScript = useCallback(

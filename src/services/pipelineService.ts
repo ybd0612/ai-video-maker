@@ -11,6 +11,9 @@ import { generateVideo, aspectRatioToVideoSize } from "./videoService";
 
 type PipelinePhase = "script" | "image" | "video" | "render";
 
+const VIDEO_MAX_RETRIES = 3;
+const VIDEO_RETRY_DELAY_MS = 5_000;
+
 interface RunOptions {
   signal?: AbortSignal;
   onPhaseStart?: (phase: PipelinePhase) => void;
@@ -132,8 +135,8 @@ export async function runPipeline(prompt: string, opts: RunOptions = {}) {
       store.setShotStatus(shot.id, "videoing");
       opts.onShotUpdate?.(shot.id, "videoing");
 
-      try {
-        const result = await generateVideo(
+      await generateVideoWithRetry(
+          shot.id,
           {
             apiKey,
             baseUrl,
@@ -142,20 +145,11 @@ export async function runPipeline(prompt: string, opts: RunOptions = {}) {
             size: videoSize,
             duration: shot.duration,
           },
-          (progress) => {
-            useProjectStore.getState().updateShot(shot.id, { videoProgress: progress });
-          },
           opts.signal,
         );
 
-        store.updateShot(shot.id, { videoUrl: result.videoUrl, status: "videoed" });
-        opts.onShotUpdate?.(shot.id, "videoed", { videoUrl: result.videoUrl });
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err);
-        store.setShotStatus(shot.id, "failed", msg);
-        opts.onShotUpdate?.(shot.id, "failed", { error: msg });
-        throw err;
-      }
+        store.updateShot(shot.id, { status: "videoed" });
+        opts.onShotUpdate?.(shot.id, "videoed");
     });
   } catch {
     const anyFailed = selectActiveProject(useProjectStore.getState())!.shots.some((s) => s.status === "failed");
@@ -207,7 +201,8 @@ export async function runSingleShot(shotId: string, opts: RunOptions = {}) {
   // Video
   store.setShotStatus(shotId, "videoing");
   try {
-    const result = await generateVideo(
+    await generateVideoWithRetry(
+      shotId,
       {
         apiKey,
         baseUrl,
@@ -216,17 +211,144 @@ export async function runSingleShot(shotId: string, opts: RunOptions = {}) {
         size: videoSize,
         duration: shot.duration,
       },
-      (progress) => {
-        useProjectStore.getState().updateShot(shotId, { videoProgress: progress });
-      },
       opts.signal,
     );
-    store.updateShot(shotId, { videoUrl: result.videoUrl, status: "videoed" });
+    store.updateShot(shotId, { status: "videoed" });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     store.setShotStatus(shotId, "failed", msg);
     throw err;
   }
+}
+
+/**
+ * Retry all failed video shots in the active project.
+ * Only retries shots that failed during video phase (have imageUrl but no videoUrl).
+ */
+export async function retryFailedVideos(opts: RunOptions = {}) {
+  const { providerConfig } = useSettingsStore.getState();
+  const { apiKey, baseUrl } = providerConfig;
+  if (!apiKey || !baseUrl) throw new Error("API key is not configured.");
+
+  const store = useProjectStore.getState();
+  const project = selectActiveProject(store);
+  if (!project) throw new Error("No active project.");
+
+  const failedVideoShots = project.shots.filter(
+    (s) => s.status === "failed" && s.imageUrl && !s.videoUrl,
+  );
+  if (failedVideoShots.length === 0) return;
+
+  const videoSize = aspectRatioToVideoSize(project.aspectRatio);
+  store.setProjectStatus("videoing");
+
+  try {
+    await runParallel(failedVideoShots, 2, opts.signal, async (shot) => {
+      store.setShotStatus(shot.id, "videoing");
+      store.updateShot(shot.id, { videoRetryCount: 0, videoProgress: undefined });
+
+      await generateVideoWithRetry(
+        shot.id,
+        {
+          apiKey,
+          baseUrl,
+          prompt: shot.visualPrompt,
+          imageUrl: shot.imageUrl!,
+          size: videoSize,
+          duration: shot.duration,
+        },
+        opts.signal,
+      );
+      store.updateShot(shot.id, { status: "videoed" });
+    });
+  } catch {
+    const anyFailed = selectActiveProject(useProjectStore.getState())!.shots.some(
+      (s) => s.status === "failed",
+    );
+    if (anyFailed) {
+      store.setProjectStatus("failed", "部分视频生成失败，已自动重试。");
+      return;
+    }
+  }
+
+  store.setProjectStatus("done");
+}
+
+/**
+ * Generate video with automatic retry on transient failures.
+ * Retries up to VIDEO_MAX_RETRIES times with delay between attempts.
+ */
+async function generateVideoWithRetry(
+  shotId: string,
+  opts: {
+    apiKey: string;
+    baseUrl: string;
+    prompt: string;
+    imageUrl: string;
+    size: string;
+    duration: number;
+  },
+  signal?: AbortSignal,
+): Promise<void> {
+  const store = useProjectStore.getState();
+  let lastError: Error | null = null;
+
+  for (let attempt = 0; attempt <= VIDEO_MAX_RETRIES; attempt++) {
+    if (signal?.aborted) throw new Error("Pipeline cancelled.");
+
+    // Delay before retry (not on first attempt)
+    if (attempt > 0) {
+      store.updateShot(shotId, {
+        videoRetryCount: attempt,
+        error: `第 ${attempt} 次重试中…（共 ${VIDEO_MAX_RETRIES} 次）`,
+      });
+      await new Promise<void>((r) => setTimeout(r, VIDEO_RETRY_DELAY_MS));
+      if (signal?.aborted) throw new Error("Pipeline cancelled.");
+    }
+
+    try {
+      const result = await generateVideo(
+        opts,
+        (progress) => {
+          useProjectStore.getState().updateShot(shotId, { videoProgress: progress });
+        },
+        signal,
+      );
+      useProjectStore.getState().updateShot(shotId, {
+        videoUrl: result.videoUrl,
+        videoRetryCount: attempt,
+        error: undefined,
+      });
+      return;
+    } catch (err) {
+      lastError = err instanceof Error ? err : new Error(String(err));
+
+      if (!isRetriableError(lastError) || attempt === VIDEO_MAX_RETRIES) {
+        store.setShotStatus(
+          shotId,
+          "failed",
+          attempt > 0
+            ? `已重试 ${attempt} 次仍失败: ${lastError.message}`
+            : lastError.message,
+        );
+        throw lastError;
+      }
+    }
+  }
+
+  throw lastError ?? new Error("Video generation failed after retries.");
+}
+
+/**
+ * Check if an error is transient and worth retrying.
+ */
+function isRetriableError(err: Error): boolean {
+  const msg = err.message.toLowerCase();
+  if (msg.includes("failed to fetch") || msg.includes("networkerror")) return true;
+  if (msg.includes("timeout") || msg.includes("aborted")) return true;
+  if (/error 5\d{2}/.test(msg)) return true;
+  if (msg.includes("ssl") || msg.includes("econnrefused") || msg.includes("enetunreach")) return true;
+  return false;
 }
 
 /* ── Helpers ────────────────────────────────────────────────────────────── */
