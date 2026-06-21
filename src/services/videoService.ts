@@ -186,7 +186,7 @@ export async function generateVideo(
     onProgress?.(progress);
 
     if (rawStatus === "completed" || rawStatus === "succeeded") {
-      videoUrl = pollJson.video_url ?? pollJson.output?.video_url ?? "";
+      videoUrl = pollJson.video_url ?? pollJson.remixed_from_video_id ?? pollJson.output?.video_url ?? "";
       coverImageUrl = pollJson.cover_image_url;
       duration = pollJson.seconds ?? pollJson.output?.duration ?? pollJson.duration;
       break;
