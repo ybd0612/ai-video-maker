@@ -128,6 +128,14 @@ Requirements:
       throw new Error(`Script API error ${resp.status}: ${body}`);
     }
 
+    const contentType = resp.headers.get("content-type") ?? "";
+    if (!contentType.includes("application/json")) {
+      const body = await resp.text().catch(() => "");
+      throw new Error(
+        `Script API 返回了非 JSON 响应 (Content-Type: ${contentType})。请检查 Base URL 是否正确。响应前 200 字符：${body.slice(0, 200)}`,
+      );
+    }
+
     const json = await resp.json();
     const content: string = json.choices?.[0]?.message?.content ?? "";
 

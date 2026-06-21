@@ -39,6 +39,14 @@ export async function generateImage(opts: GenerateImageOptions): Promise<string>
     throw new Error(`Image API error ${resp.status}: ${text}`);
   }
 
+  const contentType = resp.headers.get("content-type") ?? "";
+  if (!contentType.includes("application/json")) {
+    const text = await resp.text().catch(() => "");
+    throw new Error(
+      `Image API 返回了非 JSON 响应 (Content-Type: ${contentType})。请检查 Base URL 是否正确。响应前 200 字符：${text.slice(0, 200)}`,
+    );
+  }
+
   const json = await resp.json();
   let imageUrl: string = json.data?.[0]?.url ?? "";
   if (imageUrl && !imageUrl.startsWith("http://") && !imageUrl.startsWith("https://")) {

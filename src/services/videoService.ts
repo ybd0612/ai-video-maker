@@ -125,6 +125,14 @@ export async function generateVideo(
     throw new Error(`Video create error ${createResp.status}: ${text}`);
   }
 
+  const createContentType = createResp.headers.get("content-type") ?? "";
+  if (!createContentType.includes("application/json")) {
+    const text = await createResp.text().catch(() => "");
+    throw new Error(
+      `Video API 返回了非 JSON 响应 (Content-Type: ${createContentType})。请检查 Base URL 是否正确。响应前 200 字符：${text.slice(0, 200)}`,
+    );
+  }
+
   const createJson = await createResp.json();
 
   // Extract video_id — API 文档指定字段名为 video_id
@@ -174,6 +182,15 @@ export async function generateVideo(
 
     // 成功获取响应，重置 not_exist 计数
     notExistCount = 0;
+
+    const pollContentType = pollResp.headers.get("content-type") ?? "";
+    if (!pollContentType.includes("application/json")) {
+      const text = await pollResp.text().catch(() => "");
+      throw new Error(
+        `Video 轮询返回了非 JSON 响应 (Content-Type: ${pollContentType})。响应前 200 字符：${text.slice(0, 200)}`,
+      );
+    }
+
     const pollJson = await pollResp.json();
     const rawStatus: string = pollJson.status ?? "pending";
     const progress: number = pollJson.progress ?? 0;
