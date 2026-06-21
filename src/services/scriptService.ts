@@ -154,11 +154,28 @@ Requirements:
         throw new Error("Model returned empty or invalid shots array.");
       }
 
-      return parsed.shots.map((s) => ({
+      const shots = parsed.shots.map((s) => ({
         scriptText: s.scriptText ?? "",
         visualPrompt: s.visualPrompt ?? "",
         duration: [3, 5, 8].includes(s.duration) ? s.duration : 5,
       }));
+
+      // Validate: every shot must have a non-empty visualPrompt
+      // If empty, generate a fallback from scriptText
+      for (const shot of shots) {
+        if (!shot.visualPrompt.trim() && shot.scriptText.trim()) {
+          shot.visualPrompt = `Cinematic shot: ${shot.scriptText.trim()}, professional lighting, high quality, detailed composition`;
+        }
+      }
+
+      // If any shot still has empty visualPrompt, reject and retry
+      const hasEmpty = shots.some((s) => !s.visualPrompt.trim());
+      if (hasEmpty && attempt < MAX_SCRIPT_RETRIES) {
+        lastError = new Error("部分分镜缺少画面描述，自动重试...");
+        continue;
+      }
+
+      return shots;
     } catch (parseErr) {
       lastError = new Error(
         `JSON 解析失败（第 ${attempt + 1} 次尝试）：${parseErr instanceof Error ? parseErr.message : String(parseErr)}。提取内容：${jsonStr.slice(0, 200)}`,
