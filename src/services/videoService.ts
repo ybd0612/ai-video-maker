@@ -46,6 +46,36 @@ export function aspectRatioToVideoSize(ratio: string): string {
 }
 
 /**
+ * Extract the real video_id from a potentially compound identifier.
+ *
+ * Agnes API may return a compound video_id in the format:
+ *   "video_<base64>"
+ * where base64 decodes to a semicolon-separated metadata string like:
+ *   "litelll;custom_llm_provider:openai;model_id:...;video_id:video_xxxxx"
+ *
+ * This function decodes the base64 and extracts the actual video_id field.
+ * If decoding fails or no video_id is found, returns the original string.
+ */
+function extractRealVideoId(rawId: string): string {
+  // Match compound format: video_<base64payload>
+  const match = rawId.match(/^video_([A-Za-z0-9+/=]{20,})$/);
+  if (!match) return rawId;
+
+  try {
+    const decoded = atob(match[1]);
+    // Parse semicolon-separated key:value pairs
+    for (const part of decoded.split(";")) {
+      const [key, value] = part.split(":");
+      if (key === "video_id" && value) return value;
+    }
+  } catch {
+    // Not valid base64, use raw ID
+  }
+
+  return rawId;
+}
+
+/**
  * Sanitize prompt before sending to the Video API.
  */
 function sanitizePrompt(prompt: string): string {
@@ -117,14 +147,15 @@ export async function generateVideo(
 
   const createJson = await createResp.json();
 
-  // Extract video_id — API 文档指定字段名为 video_id
-  const videoId: string | undefined =
+  // Extract video_id — API 可能返回 base64 复合标识符，需解析真实 ID
+  const rawVideoId: string | undefined =
     createJson.video_id ?? createJson.task_id ?? createJson.id;
-  if (!videoId) {
+  if (!rawVideoId) {
     throw new Error(
       `Video API 未返回 video_id。响应: ${JSON.stringify(createJson).slice(0, 300)}`,
     );
   }
+  const videoId = extractRealVideoId(rawVideoId);
 
   // ── Poll for result ────────────────────────────────────────────────────
   // 正确端点：GET {baseUrl}/videos/{taskId}
