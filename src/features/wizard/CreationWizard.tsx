@@ -8,13 +8,14 @@ import { useT } from "@/i18n";
 import { StepIndicator } from "./StepIndicator";
 import { StepIdea } from "./StepIdea";
 import { StepStoryboard } from "./StepStoryboard";
+import { StepImages } from "./StepImages";
+import { StepVideos } from "./StepVideos";
+import { StepAssembly } from "./StepAssembly";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 
-interface CreationWizardProps {
-  children?: React.ReactNode;
-}
+interface CreationWizardProps {}
 
-export function CreationWizard({ children }: CreationWizardProps) {
+export function CreationWizard({}: CreationWizardProps) {
   const t = useT();
   const project = useProjectStore(selectActiveProject);
   const setWizardStep = useProjectStore((s) => s.setWizardStep);
@@ -56,7 +57,9 @@ export function CreationWizard({ children }: CreationWizardProps) {
       <div className="flex-1 overflow-y-auto">
         {currentStep === 1 && <StepIdea />}
         {currentStep === 2 && <StepStoryboard />}
-        {currentStep >= 3 && children}
+        {currentStep === 3 && <StepImages />}
+        {currentStep === 4 && <StepVideos />}
+        {currentStep === 5 && <StepAssembly />}
       </div>
 
       {/* Navigation buttons */}
