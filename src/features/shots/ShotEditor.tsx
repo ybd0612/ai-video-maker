@@ -55,8 +55,8 @@ export function ShotEditor({
         </button>
       </div>
 
-      {/* Drama mode: character selector + dialogue editor */}
-      {isDramaMode && characters.length > 0 && (
+      {/* Character selector (both modes) */}
+      {characters.length > 0 && (
         <div className="space-y-1.5">
           <label className="flex items-center gap-1 text-[11px] font-medium text-slate-500">
             <Users size={10} />
