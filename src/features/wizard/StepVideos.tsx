@@ -8,6 +8,7 @@ import { useProjectStore, selectActiveProject } from "@/stores/projectStore";
 import { useT } from "@/i18n";
 import { ShotCard } from "./ShotCard";
 import { PromptSubFields } from "./PromptSubFields";
+import { Lightbox } from "@/components/ui/Lightbox";
 import { useWizardActions } from "./useWizardActions";
 import { RefreshCw } from "lucide-react";
 
@@ -87,13 +88,15 @@ export function StepVideos() {
             {/* Show reference image + generated video side by side */}
             <div className="flex gap-2">
               {shot.imageUrl && (
-                <div className="w-1/3 overflow-hidden rounded-md border border-slate-700">
-                  <img
-                    src={shot.imageUrl}
-                    alt={`Ref ${shot.index + 1}`}
-                    className="w-full object-cover h-24"
-                  />
-                </div>
+                <Lightbox src={shot.imageUrl} alt={`Ref ${shot.index + 1}`}>
+                  <div className="w-1/3 overflow-hidden rounded-md border border-slate-700">
+                    <img
+                      src={shot.imageUrl}
+                      alt={`Ref ${shot.index + 1}`}
+                      className="w-full object-cover h-24"
+                    />
+                  </div>
+                </Lightbox>
               )}
               {shot.videoUrl ? (
                 <div className="flex-1 overflow-hidden rounded-md border border-slate-700">

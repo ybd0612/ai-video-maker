@@ -8,6 +8,7 @@ import { useProjectStore, selectActiveProject } from "@/stores/projectStore";
 import { useT } from "@/i18n";
 import { ShotCard } from "./ShotCard";
 import { PromptSubFields } from "./PromptSubFields";
+import { Lightbox } from "@/components/ui/Lightbox";
 import { useWizardActions } from "./useWizardActions";
 import { RefreshCw } from "lucide-react";
 
@@ -84,15 +85,17 @@ export function StepImages() {
             onReroll={() => rerollImage(shot.id)}
             isGenerating={shot.status === "imaging"}
           >
-            {/* Show generated image */}
+            {/* Show generated image with lightbox */}
             {shot.imageUrl && (
-              <div className="overflow-hidden rounded-md border border-slate-700">
-                <img
-                  src={shot.imageUrl}
-                  alt={`Shot ${shot.index + 1}`}
-                  className="w-full object-contain max-h-48"
-                />
-              </div>
+              <Lightbox src={shot.imageUrl} alt={`Shot ${shot.index + 1}`}>
+                <div className="overflow-hidden rounded-md border border-slate-700">
+                  <img
+                    src={shot.imageUrl}
+                    alt={`Shot ${shot.index + 1}`}
+                    className="w-full object-contain max-h-48"
+                  />
+                </div>
+              </Lightbox>
             )}
 
             {/* Edit sub-elements */}
