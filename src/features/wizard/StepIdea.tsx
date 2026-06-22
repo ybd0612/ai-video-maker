@@ -9,7 +9,7 @@ import { useSettingsStore } from "@/stores/settingsStore";
 import { useT } from "@/i18n";
 import {
   Sparkles, Loader2, Monitor, Smartphone, Square, Send, Bot, User,
-  MessageSquare, Lightbulb, ChevronDown,
+  MessageSquare, ChevronDown,
 } from "lucide-react";
 import { useWizardActions } from "./useWizardActions";
 import { chatCompletion } from "@/services/chatService";
@@ -121,17 +121,11 @@ export function StepIdea({ onGenerated }: StepIdeaProps) {
 
   return (
     <div className="mx-auto flex max-w-2xl flex-col gap-5 py-8">
-      {/* Title with tooltip hint */}
-      <div className="flex items-center justify-center gap-2">
+      {/* Title */}
+      <div className="text-center">
         <h2 className="text-lg font-bold text-slate-100">
           {t("wizard.enterIdea")}
         </h2>
-        <div className="group relative">
-          <Lightbulb size={14} className="text-slate-500 cursor-help" />
-          <div className="pointer-events-none absolute left-1/2 top-full z-50 mt-2 w-64 -translate-x-1/2 rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-[11px] leading-relaxed text-slate-400 opacity-0 shadow-xl transition-opacity group-hover:opacity-100">
-            {t("wizard.ideaPlaceholder")}
-          </div>
-        </div>
       </div>
 
       {/* Prompt textarea (taller) */}
