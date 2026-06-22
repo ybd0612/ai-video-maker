@@ -1,13 +1,14 @@
 // ────────────────────────────────────────────────────────────────────────────
 // src/features/wizard/StepIdea.tsx
 // Step 1: Input topic/idea, select aspect ratio, generate storyboard.
+// AI refine is integrated into the textarea — one ✨ button to refine.
 // ────────────────────────────────────────────────────────────────────────────
 
-import { useState, useCallback, useRef, useEffect } from "react";
+import { useState } from "react";
 import { useProjectStore, selectActiveProject } from "@/stores/projectStore";
 import { useSettingsStore } from "@/stores/settingsStore";
 import { useT } from "@/i18n";
-import { Sparkles, Loader2, Monitor, Smartphone, Square, MessageCircle, Send, ArrowDown } from "lucide-react";
+import { Sparkles, Loader2, Monitor, Smartphone, Square, Wand2 } from "lucide-react";
 import { useWizardActions } from "./useWizardActions";
 import { chatCompletion } from "@/services/chatService";
 
@@ -23,73 +24,41 @@ export function StepIdea({ onGenerated }: StepIdeaProps) {
   const { generateAndAdvance } = useWizardActions();
   const [prompt, setPrompt] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isRefining, setIsRefining] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  // AI brainstorm chat state
-  const [showChat, setShowChat] = useState(false);
-  const [chatMessages, setChatMessages] = useState<Array<{ role: "user" | "assistant"; content: string }>>([]);
-  const [chatInput, setChatInput] = useState("");
-  const [isChatting, setIsChatting] = useState(false);
-  const chatEndRef = useRef<HTMLDivElement>(null);
 
   const aspectRatio = project?.aspectRatio ?? "16:9";
 
-  // Auto-scroll chat
-  useEffect(() => {
-    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [chatMessages]);
-
-  const handleChatSend = useCallback(async () => {
-    const input = chatInput.trim();
-    if (!input || isChatting || !providerConfig.apiKey) return;
-
-    const userMsg = { role: "user" as const, content: input };
-    setChatMessages((prev) => [...prev, userMsg]);
-    setChatInput("");
-    setIsChatting(true);
-
+  /** Ask AI to refine the current idea, replace textarea content */
+  const handleRefine = async () => {
+    if (!prompt.trim() || isRefining || !providerConfig.apiKey) return;
+    setIsRefining(true);
     try {
-      const systemPrompt = `你是一位专业的短视频创意策划师。用户正在构思一个短视频的主题和想法，你需要帮助用户完善和细化他们的想法。
+      const systemPrompt = `你是一位专业的短视频创意策划师。用户给你一段初步的视频想法，请帮助完善和细化。
 
 要求：
 - 帮助用户明确视频主题、情感基调、视觉风格
-- 提供具体的场景建议和叙事方向
+- 补充具体的场景建议和叙事方向
 - 建议要具体、有画面感、可操作
-- 每次回复简洁有力，不超过 100 字
-- 如果用户的想法已经足够好，可以建议他们直接点击"生成分镜"
-- 如果用户提供了初步想法，帮助他们补充细节和情感
-
-当前用户的初步想法：${prompt || "（尚未输入）"}`;
-
-      const messages = [
-        { role: "system" as const, content: systemPrompt },
-        ...chatMessages,
-        userMsg,
-      ];
+- 直接返回完善后的想法文本，不要加任何解释说明或前缀
+- 保持用户原始意图，只做补充和润色
+- 回复不超过 200 字`;
 
       const result = await chatCompletion({
         apiKey: providerConfig.apiKey,
         baseUrl: providerConfig.baseUrl,
-        messages,
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: prompt },
+        ],
       });
 
-      setChatMessages((prev) => [
-        ...prev,
-        { role: "assistant" as const, content: result.content },
-      ]);
+      setPrompt(result.content);
     } catch {
-      setChatMessages((prev) => [
-        ...prev,
-        { role: "assistant" as const, content: "抱歉，请求失败，请重试。" },
-      ]);
+      // Silently fail — user can retry
     } finally {
-      setIsChatting(false);
+      setIsRefining(false);
     }
-  }, [chatInput, isChatting, chatMessages, prompt, providerConfig]);
-
-  const handleApplySuggestion = (content: string) => {
-    // Extract the suggestion and append to prompt
-    setPrompt((prev) => (prev ? `${prev}\n${content}` : content));
   };
 
   const handleGenerate = async () => {
@@ -125,7 +94,7 @@ export function StepIdea({ onGenerated }: StepIdeaProps) {
         </p>
       </div>
 
-      {/* Prompt input */}
+      {/* Prompt input with integrated AI refine */}
       <div className="relative">
         <textarea
           value={prompt}
@@ -133,9 +102,26 @@ export function StepIdea({ onGenerated }: StepIdeaProps) {
           onKeyDown={handleKeyDown}
           placeholder={t("wizard.ideaPlaceholder")}
           rows={5}
-          disabled={isGenerating}
-          className="w-full resize-none rounded-xl border border-slate-700 bg-slate-800 p-4 text-sm text-slate-100 placeholder:text-slate-600 focus:border-emerald-500 focus:outline-none disabled:opacity-50"
+          disabled={isGenerating || isRefining}
+          className="w-full resize-none rounded-xl border border-slate-700 bg-slate-800 p-4 pr-12 text-sm text-slate-100 placeholder:text-slate-600 focus:border-emerald-500 focus:outline-none disabled:opacity-50"
         />
+
+        {/* AI refine button — inside textarea, top-right */}
+        <button
+          onClick={handleRefine}
+          disabled={!prompt.trim() || isRefining || isGenerating || !providerConfig.apiKey}
+          className="absolute right-3 top-3 flex items-center gap-1 rounded-lg bg-slate-700/80 px-2 py-1 text-[11px] text-emerald-400 transition hover:bg-emerald-900/50 hover:text-emerald-300 disabled:opacity-30 disabled:cursor-not-allowed backdrop-blur-sm"
+          title={t("wizard.chatWithAi") || "AI 完善想法"}
+        >
+          {isRefining ? (
+            <Loader2 size={12} className="animate-spin" />
+          ) : (
+            <Wand2 size={12} />
+          )}
+          {isRefining ? (t("wizard.aiThinking") || "完善中...") : (t("wizard.chatWithAi") || "AI 完善")}
+        </button>
+
+        {/* Generating overlay */}
         {isGenerating && (
           <div className="absolute inset-0 flex items-center justify-center rounded-xl bg-slate-900/80 backdrop-blur-sm">
             <div className="flex flex-col items-center gap-2">
@@ -166,97 +152,6 @@ export function StepIdea({ onGenerated }: StepIdeaProps) {
             {label}
           </button>
         ))}
-      </div>
-
-      {/* AI Brainstorm Chat */}
-      <div className="rounded-xl border border-slate-700 bg-slate-900/50 overflow-hidden">
-        <button
-          onClick={() => setShowChat(!showChat)}
-          className="flex w-full items-center justify-between px-4 py-3 text-left transition hover:bg-slate-800/50"
-        >
-          <div className="flex items-center gap-2">
-            <MessageCircle size={14} className="text-emerald-400" />
-            <span className="text-sm font-medium text-slate-300">
-              {t("wizard.chatWithAi" as any) || "和 AI 聊天完善想法"}
-            </span>
-          </div>
-          <ArrowDown
-            size={14}
-            className={`text-slate-500 transition-transform ${showChat ? "rotate-180" : ""}`}
-          />
-        </button>
-
-        {showChat && (
-          <div className="border-t border-slate-700/50">
-            {/* Chat messages */}
-            <div className="max-h-60 overflow-y-auto px-4 py-3 space-y-3">
-              {chatMessages.length === 0 && (
-                <p className="text-center text-xs text-slate-600 py-4">
-                  {t("wizard.chatHint" as any) || "告诉 AI 你的想法，让它帮你完善"}
-                </p>
-              )}
-              {chatMessages.map((msg, i) => (
-                <div
-                  key={i}
-                  className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
-                >
-                  <div
-                    className={`max-w-[80%] rounded-lg px-3 py-2 text-xs leading-relaxed ${
-                      msg.role === "user"
-                        ? "bg-emerald-900/40 text-emerald-200"
-                        : "bg-slate-800 text-slate-300"
-                    }`}
-                  >
-                    <p className="whitespace-pre-wrap">{msg.content}</p>
-                    {msg.role === "assistant" && (
-                      <button
-                        onClick={() => handleApplySuggestion(msg.content)}
-                        className="mt-1.5 flex items-center gap-1 text-[10px] text-emerald-400 hover:text-emerald-300 transition"
-                      >
-                        <Sparkles size={9} />
-                        {t("wizard.applyIdea" as any) || "应用到想法"}
-                      </button>
-                    )}
-                  </div>
-                </div>
-              ))}
-              {isChatting && (
-                <div className="flex justify-start">
-                  <div className="flex items-center gap-2 rounded-lg bg-slate-800 px-3 py-2 text-xs text-slate-400">
-                    <Loader2 size={11} className="animate-spin text-emerald-400" />
-                    {t("wizard.aiThinking" as any) || "AI 思考中..."}
-                  </div>
-                </div>
-              )}
-              <div ref={chatEndRef} />
-            </div>
-
-            {/* Chat input */}
-            <div className="flex gap-2 border-t border-slate-700/50 px-4 py-3">
-              <input
-                type="text"
-                value={chatInput}
-                onChange={(e) => setChatInput(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && !e.shiftKey) {
-                    e.preventDefault();
-                    handleChatSend();
-                  }
-                }}
-                placeholder={t("wizard.chatPlaceholder" as any) || "描述你想调整的内容..."}
-                disabled={isChatting}
-                className="flex-1 rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-xs text-slate-100 placeholder:text-slate-600 focus:border-emerald-500 focus:outline-none disabled:opacity-50"
-              />
-              <button
-                onClick={handleChatSend}
-                disabled={!chatInput.trim() || isChatting}
-                className="flex items-center justify-center rounded-lg bg-emerald-600 px-3 py-2 text-white transition hover:bg-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <Send size={13} />
-              </button>
-            </div>
-          </div>
-        )}
       </div>
 
       {/* Generate button */}
