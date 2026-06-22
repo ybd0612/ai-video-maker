@@ -364,6 +364,11 @@ const zh = {
   "wizard.promptMotionSpeed": "运动速率",
   "wizard.negativePrompt": "负向提示词",
   "wizard.negativeMotionPrompt": "负向动态提示",
+  "wizard.chatWithAi": "和 AI 聊天完善想法",
+  "wizard.chatHint": "告诉 AI 你的想法，让它帮你完善",
+  "wizard.chatPlaceholder": "描述你想调整的内容...",
+  "wizard.applyIdea": "应用到想法",
+  "wizard.aiThinking": "AI 思考中...",
 
 } as const;
 
@@ -727,6 +732,11 @@ const en = {
   "wizard.promptMotionSpeed": "Motion Speed",
   "wizard.negativePrompt": "Negative Prompt",
   "wizard.negativeMotionPrompt": "Negative Motion Prompt",
+  "wizard.chatWithAi": "Chat with AI to refine idea",
+  "wizard.chatHint": "Tell AI your idea and let it help you refine",
+  "wizard.chatPlaceholder": "Describe what you want to adjust...",
+  "wizard.applyIdea": "Apply to idea",
+  "wizard.aiThinking": "AI thinking...",
 } as const;
 
 export type TranslationKey = keyof typeof zh;
