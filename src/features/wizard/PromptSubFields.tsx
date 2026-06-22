@@ -52,7 +52,7 @@ export function PromptSubFields({
             value={shot.subjectDesc ?? ""}
             onChange={(v) => handleChange("subjectDesc", v)}
             onAiAssist={() => handleAiAssist("subjectDesc", shot.subjectDesc ?? "")}
-            placeholder="A young woman with long dark hair"
+            placeholder="一位长发黑色长发的年轻女性"
             color="violet"
           />
           <PromptField
@@ -60,7 +60,7 @@ export function PromptSubFields({
             value={shot.sceneDesc ?? ""}
             onChange={(v) => handleChange("sceneDesc", v)}
             onAiAssist={() => handleAiAssist("sceneDesc", shot.sceneDesc ?? "")}
-            placeholder="sitting in a sunlit cafe by the window"
+            placeholder="坐在阳光充足的咖啡馆窗边"
             color="violet"
           />
           <PromptField
@@ -68,7 +68,7 @@ export function PromptSubFields({
             value={shot.detailDesc ?? ""}
             onChange={(v) => handleChange("detailDesc", v)}
             onAiAssist={() => handleAiAssist("detailDesc", shot.detailDesc ?? "")}
-            placeholder="wearing a white blouse, delicate jewelry"
+            placeholder="穿着白色衬衫，精致首饰"
             color="violet"
           />
           <PromptField
@@ -76,7 +76,7 @@ export function PromptSubFields({
             value={shot.lightingDesc ?? ""}
             onChange={(v) => handleChange("lightingDesc", v)}
             onAiAssist={() => handleAiAssist("lightingDesc", shot.lightingDesc ?? "")}
-            placeholder="warm golden hour light, cinematic rim light"
+            placeholder="温暖的金色夕阳光，电影感轮廓光"
             color="violet"
           />
           <PromptField
@@ -84,7 +84,7 @@ export function PromptSubFields({
             value={shot.styleDesc ?? ""}
             onChange={(v) => handleChange("styleDesc", v)}
             onAiAssist={() => handleAiAssist("styleDesc", shot.styleDesc ?? "")}
-            placeholder="photorealistic, 8k, ultra-detailed"
+            placeholder="写实风格，8K，超精细"
             color="violet"
           />
         </div>
@@ -102,7 +102,7 @@ export function PromptSubFields({
             value={shot.actionDesc ?? ""}
             onChange={(v) => handleChange("actionDesc", v)}
             onAiAssist={() => handleAiAssist("actionDesc", shot.actionDesc ?? "")}
-            placeholder="slowly turns her head and smiles gently"
+            placeholder="缓缓转头，温柔微笑"
             color="amber"
           />
           <PromptField
@@ -110,7 +110,7 @@ export function PromptSubFields({
             value={shot.cameraDesc ?? ""}
             onChange={(v) => handleChange("cameraDesc", v)}
             onAiAssist={() => handleAiAssist("cameraDesc", shot.cameraDesc ?? "")}
-            placeholder="camera slowly dollies in, close-up tracking shot"
+            placeholder="镜头缓缓推进，特写跟踪镜头"
             color="amber"
           />
           <PromptField
@@ -118,7 +118,7 @@ export function PromptSubFields({
             value={shot.envChangeDesc ?? ""}
             onChange={(v) => handleChange("envChangeDesc", v)}
             onAiAssist={() => handleAiAssist("envChangeDesc", shot.envChangeDesc ?? "")}
-            placeholder="steam rising from the coffee cup, leaves swaying outside"
+            placeholder="咖啡杯蒸汽上升，窗外树叶摇曳"
             color="amber"
           />
           <PromptField
@@ -126,7 +126,7 @@ export function PromptSubFields({
             value={shot.motionSpeedDesc ?? ""}
             onChange={(v) => handleChange("motionSpeedDesc", v)}
             onAiAssist={() => handleAiAssist("motionSpeedDesc", shot.motionSpeedDesc ?? "")}
-            placeholder="cinematic slow-motion, 24fps"
+            placeholder="电影感慢动作，24fps"
             color="amber"
           />
         </div>
@@ -139,7 +139,7 @@ export function PromptSubFields({
             label={t("wizard.negativePrompt")}
             value={shot.negativePrompt ?? ""}
             onChange={(v) => handleChange("negativePrompt", v)}
-            placeholder="bad anatomy, extra limbs, blurry, deformed"
+            placeholder="解刨异常，多余肢体，模糊，变形"
             color="red"
             rows={1}
           />
@@ -147,7 +147,7 @@ export function PromptSubFields({
             label={t("wizard.negativeMotionPrompt")}
             value={shot.negativeMotionPrompt ?? ""}
             onChange={(v) => handleChange("negativeMotionPrompt", v)}
-            placeholder="morphing, flickering, sudden cuts, shaky camera"
+            placeholder="变形，闪烁，突兀剪辑，镜头抖动"
             color="red"
             rows={1}
           />

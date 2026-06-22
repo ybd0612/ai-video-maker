@@ -93,42 +93,52 @@ const SIMPLE_PROMPT_ZH = `你是一位专业的短视频分镜策划师。用户
   "shots": [
     {
       "scriptText": "该镜头的旁白/文案（中文，简短有力）",
-      "subjectDesc": "主体描述（英文，如 A young woman with long dark hair）",
-      "sceneDesc": "场景/背景描述（英文，如 sitting in a sunlit cafe by the window）",
-      "detailDesc": "细节/服饰描述（英文，如 wearing a white blouse, delicate jewelry）",
-      "lightingDesc": "光影/色调（英文，如 warm golden hour light, cinematic rim light）",
-      "styleDesc": "艺术风格（英文，如 photorealistic, 8k, ultra-detailed）",
-      "negativePrompt": "负向提示词（英文，如 bad anatomy, extra limbs, blurry）",
-      "actionDesc": "主体动作（英文，如 slowly turns her head and smiles gently）",
-      "cameraDesc": "镜头运镜（英文，如 camera slowly dollies in, close-up tracking shot）",
-      "envChangeDesc": "环境变化（英文，如 steam rising from the coffee cup, leaves swaying）",
-      "motionSpeedDesc": "运动速率（英文，如 cinematic slow-motion, 24fps）",
-      "negativeMotionPrompt": "负向动态提示（英文，如 morphing, flickering, shaky camera）",
+      "visualPrompt": "文生图英文提示词（完整的英文描述，用于 AI 绘图 API 调用）",
+      "motionPrompt": "图生视频英文提示词（完整的英文动态描述，用于 AI 视频 API 调用）",
+      "subjectDesc": "主体描述（中文，如 一位长发黑色长发的年轻女性）",
+      "sceneDesc": "场景/背景描述（中文，如 坐在阳光充足的咖啡馆窗边）",
+      "detailDesc": "细节/服饰描述（中文，如 穿着白色衬衫，精致首饰）",
+      "lightingDesc": "光影/色调（中文，如 温暖的金色夕阳光，电影感轮廓光）",
+      "styleDesc": "艺术风格（中文，如 写实风格，8K，超精细）",
+      "negativePrompt": "负向提示词（中文，如 解刨异常，多余肢体，模糊）",
+      "actionDesc": "主体动作（中文，如 缓缓转头，温柔微笑）",
+      "cameraDesc": "镜头运镜（中文，如 镜头缓缓推进，特写跟踪镜头）",
+      "envChangeDesc": "环境变化（中文，如 咖啡杯蒸汽上升，窗外树叶摇曳）",
+      "motionSpeedDesc": "运动速率（中文，如 电影感慢动作，24fps）",
+      "negativeMotionPrompt": "负向动态提示（中文，如 变形，闪烁，抖动）",
       "duration": 5
     }
   ]
 }
 
-文生图子字段要求（subjectDesc/sceneDesc/detailDesc/lightingDesc/styleDesc）：
-- 必须用英文，逗号分隔短语
-- subjectDesc：主体外貌描述，姿态自然稳定，中景或特写
-- sceneDesc：场景/背景，有空间层次（前景/中景/远景）
+重要：visualPrompt 和 motionPrompt 必须用英文，它们是直接发送给 AI 绘图/视频 API 的提示词。
+
+visualPrompt 要求（英文）：
+- 将上面所有子字段的内容翻译并组合为一段完整的英文提示词
+- 用逗号分隔短语，包含主体、场景、细节、光影、风格
+- 主体姿态要自然稳定
+- 示例：A young woman with long black hair, sitting in a sunlit cafe by the window, wearing a white blouse with delicate jewelry, warm golden hour light with cinematic rim light, photorealistic, 8k, ultra-detailed
+
+motionPrompt 要求（英文）：
+- 将动作、运镜、环境变化、速率组合为一段完整的英文提示词
+- 使用专业镜头语言（dolly, pan, tilt, tracking shot）
+- 示例：slowly turns her head and smiles gently, camera slowly dollies in for a close-up tracking shot, steam rising from the coffee cup and leaves swaying outside the window, cinematic slow-motion at 24fps
+
+中文子字段要求（给用户看的，用中文填写）：
+- subjectDesc：主体外貌描述，姿态自然稳定
+- sceneDesc：场景/背景，有空间层次
 - detailDesc：服饰、道具、细节
 - lightingDesc：光线类型、色调氛围
 - styleDesc：艺术风格、渲染质量
-- negativePrompt：不希望出现的元素
-
-图生视频子字段要求（actionDesc/cameraDesc/envChangeDesc/motionSpeedDesc）：
-- 必须用英文
-- actionDesc：主体动作，只给 1-2 个核心动作
-- cameraDesc：使用专业镜头语言（dolly, pan, tilt, tracking shot）
-- envChangeDesc：环境动态变化（烟雾、光影变化、物体运动）
+- actionDesc：主体动作，1-2 个核心动作
+- cameraDesc：镜头运镜方式
+- envChangeDesc：环境动态变化
 - motionSpeedDesc：运动速率和帧率
-- negativeMotionPrompt：不希望出现的动态效果（变形、闪烁、抖动）
+- negativePrompt / negativeMotionPrompt：不希望出现的元素
 
 其他要求：
 - 每个镜头 duration 为 3、5 或 8 秒
-- scriptText 用用户相同的语言
+- scriptText 用中文
 - 整体节奏要有起承转合
 - 总镜头数 4-6 个`;
 
@@ -201,38 +211,29 @@ ${charSection}
         { "characterId": "char_xxx", "text": "角色台词", "delivery": "温柔地" }
       ],
       "scriptText": "该镜头旁白摘要（简短有力）",
-      "subjectDesc": "主体描述（英文，如 A young woman with long dark hair）",
-      "sceneDesc": "场景/背景描述（英文，如 sitting in a sunlit cafe by the window）",
-      "detailDesc": "细节/服饰描述（英文，如 wearing a white blouse, delicate jewelry）",
-      "lightingDesc": "光影/色调（英文，如 warm golden hour light, cinematic rim light）",
-      "styleDesc": "艺术风格（英文，如 photorealistic, 8k, ultra-detailed）",
-      "negativePrompt": "负向提示词（英文，如 bad anatomy, extra limbs, blurry）",
-      "actionDesc": "主体动作（英文，如 slowly turns her head and smiles gently）",
-      "cameraDesc": "镜头运镜（英文，如 camera slowly dollies in, close-up tracking shot）",
-      "envChangeDesc": "环境变化（英文，如 steam rising from the coffee cup, leaves swaying）",
-      "motionSpeedDesc": "运动速率（英文，如 cinematic slow-motion, 24fps）",
-      "negativeMotionPrompt": "负向动态提示（英文，如 morphing, flickering, shaky camera）",
+      "visualPrompt": "文生图英文提示词（完整的英文描述，必须包含出场角色完整外貌）",
+      "motionPrompt": "图生视频英文提示词（完整的英文动态描述）",
+      "subjectDesc": "主体描述（中文，如 一位长发黑色长发的年轻女性）",
+      "sceneDesc": "场景/背景描述（中文，如 坐在阳光充足的咖啡馆窗边）",
+      "detailDesc": "细节/服饰描述（中文，如 穿着白色衬衫，精致首饰）",
+      "lightingDesc": "光影/色调（中文，如 温暖的金色夕阳光，电影感轮廓光）",
+      "styleDesc": "艺术风格（中文，如 写实风格，8K，超精细）",
+      "negativePrompt": "负向提示词（中文，如 解刨异常，多余肢体，模糊）",
+      "actionDesc": "主体动作（中文，如 缓缓转头，温柔微笑）",
+      "cameraDesc": "镜头运镜（中文，如 镜头缓缓推进，特写跟踪镜头）",
+      "envChangeDesc": "环境变化（中文，如 咖啡杯蒸汽上升，窗外树叶摇曳）",
+      "motionSpeedDesc": "运动速率（中文，如 电影感慢动作，24fps）",
+      "negativeMotionPrompt": "负向动态提示（中文，如 变形，闪烁，抖动）",
       "duration": 5
     }
   ]
 }
 
-文生图子字段要求（subjectDesc/sceneDesc/detailDesc/lightingDesc/styleDesc）：
-- 必须用英文，逗号分隔短语
-- subjectDesc：主体外貌描述，必须包含出场角色的完整外貌（与角色设定一致）
-- sceneDesc：场景/背景，有空间层次（前景/中景/远景）
-- detailDesc：服饰、道具、细节
-- lightingDesc：光线类型、色调氛围
-- styleDesc：艺术风格、渲染质量
-- negativePrompt：不希望出现的元素
+重要：visualPrompt 和 motionPrompt 必须用英文，它们直接用于 AI 绘图/视频 API。
+- visualPrompt 必须包含出场角色的完整外貌描述（与角色设定一致）
+- motionPrompt 使用专业镜头语言
 
-图生视频子字段要求（actionDesc/cameraDesc/envChangeDesc/motionSpeedDesc）：
-- 必须用英文
-- actionDesc：主体动作，只给 1-2 个核心动作
-- cameraDesc：使用专业镜头语言（dolly, pan, tilt, tracking shot）
-- envChangeDesc：环境动态变化（烟雾、光影变化、物体运动）
-- motionSpeedDesc：运动速率和帧率
-- negativeMotionPrompt：不希望出现的动态效果（变形、闪烁、抖动）
+中文子字段是给用户在界面上看的，用中文填写。
 
 对话要求：
 - characterId 为 null 表示旁白，否则使用角色 ID
@@ -241,7 +242,7 @@ ${charSection}
 
 其他要求：
 - 每个镜头 duration 为 3、5 或 8 秒
-- scriptText 用用户相同的语言
+- scriptText 用中文
 - 整体节奏要有起承转合
 - 总镜头数 4-8 个`;
 }
