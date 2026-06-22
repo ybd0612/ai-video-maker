@@ -29,6 +29,7 @@ import {
 } from "lucide-react";
 import { ApiKeyBanner } from "@/components/ApiKeyBanner";
 import { confirmDialog } from "@/components/ui/ConfirmDialog";
+import { CreationWizard } from "@/features/wizard/CreationWizard";
 
 type AspectRatio = "9:16" | "16:9" | "1:1";
 type LeftTab = "projects" | "shots" | "characters" | "history";
@@ -456,7 +457,7 @@ export function ProjectWorkspace() {
           {leftTab === "characters" && <CharacterPanel />}
         </aside>
 
-        {/* Center: preview or script input */}
+        {/* Center: wizard or script input */}
         <main className="flex-1 overflow-hidden">
           {!project ? (
             <div className="flex h-full items-center justify-center">
@@ -464,47 +465,51 @@ export function ProjectWorkspace() {
                 <ScriptPanel onGenerate={handleGenerateScript} isGenerating={isScripting} onOpenAiAssist={handleOpenMainPromptAiAssist} promptOverride={mainPromptOverride} />
               </div>
             </div>
-          ) : shots.length === 0 ? (
-            <div className="flex h-full items-center justify-center">
-              <div className="w-full max-w-lg">
-                <ScriptPanel onGenerate={handleGenerateScript} isGenerating={isScripting} onOpenAiAssist={handleOpenMainPromptAiAssist} promptOverride={mainPromptOverride} />
-              </div>
-            </div>
           ) : (
-            <div className="flex h-full flex-col">
-              {/* Pipeline progress bar */}
-              <PipelineProgress shots={shots} isRunning={isRunning} />
-              {/* Tab switcher */}
-              <div className="flex border-b border-slate-800">
-                <button
-                  onClick={() => setPreviewTab("shot")}
-                  className={`px-4 py-1.5 text-xs font-medium transition ${
-                    previewTab === "shot"
-                      ? "border-b-2 border-emerald-500 text-emerald-400"
-                      : "text-slate-500 hover:text-slate-300"
-                  }`}
-                >
-                  {t("pipeline.tabShot")}
-                </button>
-                <button
-                  onClick={() => setPreviewTab("final")}
-                  className={`px-4 py-1.5 text-xs font-medium transition ${
-                    previewTab === "final"
-                      ? "border-b-2 border-emerald-500 text-emerald-400"
-                      : "text-slate-500 hover:text-slate-300"
-                  }`}
-                >
-                  {t("pipeline.tabFinal")}
-                </button>
-              </div>
-              <div className="flex-1 overflow-y-auto">
-                {previewTab === "shot" ? (
-                  <ShotPreview shotId={selectedShotId} />
-                ) : (
-                  <FinalPreview />
-                )}
-              </div>
-            </div>
+            <CreationWizard>
+              {shots.length === 0 ? (
+                <div className="flex h-full items-center justify-center">
+                  <div className="w-full max-w-lg">
+                    <ScriptPanel onGenerate={handleGenerateScript} isGenerating={isScripting} onOpenAiAssist={handleOpenMainPromptAiAssist} promptOverride={mainPromptOverride} />
+                  </div>
+                </div>
+              ) : (
+                <div className="flex h-full flex-col">
+                  {/* Pipeline progress bar */}
+                  <PipelineProgress shots={shots} isRunning={isRunning} />
+                  {/* Tab switcher */}
+                  <div className="flex border-b border-slate-800">
+                    <button
+                      onClick={() => setPreviewTab("shot")}
+                      className={`px-4 py-1.5 text-xs font-medium transition ${
+                        previewTab === "shot"
+                          ? "border-b-2 border-emerald-500 text-emerald-400"
+                          : "text-slate-500 hover:text-slate-300"
+                      }`}
+                    >
+                      {t("pipeline.tabShot")}
+                    </button>
+                    <button
+                      onClick={() => setPreviewTab("final")}
+                      className={`px-4 py-1.5 text-xs font-medium transition ${
+                        previewTab === "final"
+                          ? "border-b-2 border-emerald-500 text-emerald-400"
+                          : "text-slate-500 hover:text-slate-300"
+                      }`}
+                    >
+                      {t("pipeline.tabFinal")}
+                    </button>
+                  </div>
+                  <div className="flex-1 overflow-y-auto">
+                    {previewTab === "shot" ? (
+                      <ShotPreview shotId={selectedShotId} />
+                    ) : (
+                      <FinalPreview />
+                    )}
+                  </div>
+                </div>
+              )}
+            </CreationWizard>
           )}
         </main>
 

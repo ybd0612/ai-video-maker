@@ -31,6 +31,7 @@ export type ShotStatus =
 export type AspectRatio = "9:16" | "16:9" | "1:1";
 
 export type ProjectMode = "simple" | "drama";
+export type WizardStep = 1 | 2 | 3 | 4 | 5;
 
 /* ── Data models ────────────────────────────────────────────────────────── */
 
@@ -64,12 +65,26 @@ export interface Shot {
   videoProgress?: number;
   videoRetryCount?: number;
   error?: string;
+  // Structured sub-elements for text-to-image (optional, composed into visualPrompt)
+  subjectDesc?: string;      // Subject: "A young woman with long dark hair"
+  sceneDesc?: string;        // Scene/background: "sitting in a sunlit cafe"
+  detailDesc?: string;       // Details/clothing: "wearing a white blouse"
+  lightingDesc?: string;     // Lighting/color: "warm golden hour light"
+  styleDesc?: string;        // Art style: "photorealistic, 8k"
+  negativePrompt?: string;   // Negative prompt: "bad anatomy, extra limbs"
+  // Structured sub-elements for image-to-video (optional, composed into motionPrompt)
+  actionDesc?: string;       // Subject action: "slowly turns her head"
+  cameraDesc?: string;       // Camera movement: "camera slowly dollies in"
+  envChangeDesc?: string;    // Environment changes: "steam rising from cup"
+  motionSpeedDesc?: string;  // Motion speed: "cinematic slow-motion, 24fps"
+  negativeMotionPrompt?: string; // Negative motion: "morphing, flickering"
 }
 
 export interface Project {
   id: string;
   title: string;
   mode: ProjectMode;
+  wizardStep: WizardStep;
   characters: Character[];
   aspectRatio: AspectRatio;
   style: string;
@@ -141,6 +156,9 @@ interface ProjectState {
   /* Project mode */
   setProjectMode: (mode: ProjectMode) => void;
 
+  /* Wizard step */
+  setWizardStep: (step: WizardStep) => void;
+
   /* Dialogue actions */
   addDialogueLine: (shotId: string, line: Omit<DialogueLine, "id">) => void;
   updateDialogueLine: (shotId: string, lineId: string, updates: Partial<Omit<DialogueLine, "id">>) => void;
@@ -181,6 +199,7 @@ export const useProjectStore = create<ProjectState>()(
           id: newId("proj"),
           title,
           mode: "simple",
+          wizardStep: 1 as WizardStep,
           characters: [],
           aspectRatio: "16:9",
           style: "",
@@ -239,6 +258,7 @@ export const useProjectStore = create<ProjectState>()(
           id: newId("proj"),
           title: `${source.title} (副本)`,
           status: "idle",
+          wizardStep: 1 as WizardStep,
           shots: source.shots.map((sh, i) => ({
             ...sh,
             id: newId("shot"),
@@ -410,6 +430,15 @@ export const useProjectStore = create<ProjectState>()(
           })),
         })),
 
+      setWizardStep: (step) =>
+        set((s) => ({
+          projects: updateActive(s.projects, s.activeProjectId, (p) => ({
+            ...p,
+            wizardStep: step,
+            updatedAt: Date.now(),
+          })),
+        })),
+
       /* ── Dialogue actions ────────────────────────────────────────────── */
 
       addDialogueLine: (shotId, line) => {
@@ -505,7 +534,7 @@ export const useProjectStore = create<ProjectState>()(
     }),
     {
       name: "wxhb-project",
-      version: 3,
+      version: 4,
       migrate: (persisted: unknown, version: number) => {
         // Migrate from v1 (single project) to v2 (multi-project)
         if (version < 2) {
@@ -535,6 +564,19 @@ export const useProjectStore = create<ProjectState>()(
                   activeCharacterIds: [],
                 }),
               ),
+            }));
+          }
+        }
+
+        // Migrate from v3 to v4: add wizardStep + structured prompt sub-elements
+        if (version < 4) {
+          const state = persisted as {
+            projects?: Array<Record<string, unknown>>;
+          };
+          if (state.projects) {
+            state.projects = state.projects.map((p) => ({
+              ...p,
+              wizardStep: 1,
             }));
           }
         }
