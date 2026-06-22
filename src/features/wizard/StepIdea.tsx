@@ -9,7 +9,7 @@ import { useSettingsStore } from "@/stores/settingsStore";
 import { useT } from "@/i18n";
 import {
   Sparkles, Loader2, Monitor, Smartphone, Square, Send, Bot, User,
-  MessageSquare, ChevronDown,
+  History,
 } from "lucide-react";
 import { useWizardActions } from "./useWizardActions";
 import { chatCompletion } from "@/services/chatService";
@@ -131,11 +131,48 @@ export function StepIdea({ onGenerated }: StepIdeaProps) {
 
   return (
     <div className="mx-auto flex max-w-2xl flex-col gap-5 py-8">
-      {/* Title */}
-      <div className="text-center">
+      {/* Title + history icon */}
+      <div className="flex items-center justify-center gap-3">
         <h2 className="text-lg font-bold text-slate-100">
           {t("wizard.enterIdea")}
         </h2>
+        {chatHistory.length > 0 && (
+          <div className="relative">
+            <button
+              onClick={() => setShowHistory(!showHistory)}
+              className="text-slate-600 transition hover:text-slate-400"
+              title={t("wizard.chatHistory" as any) || "对话历史"}
+            >
+              <History size={14} />
+            </button>
+            {showHistory && (
+              <>
+                {/* Backdrop */}
+                <div className="fixed inset-0 z-40" onClick={() => setShowHistory(false)} />
+                {/* Popover */}
+                <div className="absolute right-0 top-full z-50 mt-2 w-80 max-h-64 overflow-y-auto rounded-xl border border-slate-700 bg-slate-900 p-3 shadow-2xl space-y-2">
+                  {chatHistory.map((msg, i) => (
+                    <div key={i} className="flex gap-2">
+                      <div className={`shrink-0 mt-0.5 ${msg.role === "user" ? "text-emerald-400" : "text-violet-400"}`}>
+                        {msg.role === "user" ? <User size={11} /> : <Bot size={11} />}
+                      </div>
+                      <p className="flex-1 text-[11px] leading-relaxed text-slate-400 whitespace-pre-wrap">
+                        {msg.content}
+                      </p>
+                    </div>
+                  ))}
+                  {isRefining && (
+                    <div className="flex gap-2">
+                      <Bot size={11} className="shrink-0 mt-0.5 text-violet-400 animate-pulse" />
+                      <Loader2 size={11} className="animate-spin text-emerald-400" />
+                    </div>
+                  )}
+                  <div ref={chatEndRef} />
+                </div>
+              </>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Prompt textarea (taller) */}
@@ -160,47 +197,6 @@ export function StepIdea({ onGenerated }: StepIdeaProps) {
           </div>
         )}
       </div>
-
-      {/* Chat history toggle + collapsible panel */}
-      {chatHistory.length > 0 && (
-        <div className="rounded-xl border border-slate-700/50 bg-slate-900/30 overflow-hidden">
-          <button
-            onClick={() => setShowHistory(!showHistory)}
-            className="flex w-full items-center gap-2 px-3 py-2 text-left transition hover:bg-slate-800/30"
-          >
-            <MessageSquare size={13} className="text-emerald-400" />
-            <span className="text-[11px] font-medium text-slate-400">
-              {t("wizard.chatHistory" as any) || "对话历史"} ({chatHistory.length})
-            </span>
-            <ChevronDown
-              size={12}
-              className={`ml-auto text-slate-600 transition-transform ${showHistory ? "rotate-180" : ""}`}
-            />
-          </button>
-
-          {showHistory && (
-            <div className="max-h-48 overflow-y-auto border-t border-slate-700/30 px-3 py-2 space-y-2">
-              {chatHistory.map((msg, i) => (
-                <div key={i} className="flex gap-2">
-                  <div className={`shrink-0 mt-0.5 ${msg.role === "user" ? "text-emerald-400" : "text-violet-400"}`}>
-                    {msg.role === "user" ? <User size={12} /> : <Bot size={12} />}
-                  </div>
-                  <p className="flex-1 text-[11px] leading-relaxed text-slate-400 whitespace-pre-wrap">
-                    {msg.content}
-                  </p>
-                </div>
-              ))}
-              {isRefining && (
-                <div className="flex gap-2">
-                  <Bot size={12} className="shrink-0 mt-0.5 text-violet-400 animate-pulse" />
-                  <Loader2 size={12} className="animate-spin text-emerald-400" />
-                </div>
-              )}
-              <div ref={chatEndRef} />
-            </div>
-          )}
-        </div>
-      )}
 
       {/* Chat input for follow-up conversation */}
       <div className="flex gap-2">
