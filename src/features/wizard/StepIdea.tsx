@@ -86,7 +86,8 @@ export function StepIdea({ onGenerated }: StepIdeaProps) {
 
       const assistantMsg: ChatTurn = { role: "assistant", content: result.content };
       setChatHistory((prev) => [...prev, assistantMsg]);
-      // Don't overwrite textarea — user decides what to apply
+      // Auto-apply: AI always outputs the complete idea
+      setPrompt(result.content);
     } catch {
       setChatHistory((prev) => [...prev, { role: "assistant", content: "请求失败，请重试。" }]);
     } finally {
@@ -117,7 +118,8 @@ export function StepIdea({ onGenerated }: StepIdeaProps) {
 
       const assistantMsg: ChatTurn = { role: "assistant", content: result.content };
       setChatHistory((prev) => [...prev, assistantMsg]);
-      // Don't overwrite textarea — user decides what to apply
+      // Auto-apply: AI always outputs the complete idea
+      setPrompt(result.content);
     } catch {
       setChatHistory((prev) => [...prev, { role: "assistant", content: "请求失败，请重试。" }]);
     } finally {
@@ -170,15 +172,6 @@ export function StepIdea({ onGenerated }: StepIdeaProps) {
                 <p className="text-[11px] leading-relaxed text-slate-400 whitespace-pre-wrap">
                   {msg.content}
                 </p>
-                {msg.role === "assistant" && (
-                  <button
-                    onClick={() => setPrompt(msg.content)}
-                    className="mt-1 flex items-center gap-1 text-[10px] text-emerald-400 hover:text-emerald-300 transition"
-                  >
-                    <Sparkles size={9} />
-                    {t("wizard.applyIdea") || "应用到想法"}
-                  </button>
-                )}
               </div>
             </div>
           ))}
