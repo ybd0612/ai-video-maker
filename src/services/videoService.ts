@@ -10,7 +10,7 @@
 import { MODELS } from "@/lib/models";
 
 const VIDEO_POLL_INTERVAL_MS = 5_000;
-const VIDEO_POLL_TIMEOUT_MS = 10 * 60 * 1000;
+const VIDEO_POLL_TIMEOUT_MS = 4 * 60 * 1000; // 4 minutes per attempt
 const VIDEO_POLL_MAX_NOT_EXIST_RETRIES = 6; // 最多等待 30 秒让任务注册
 
 interface CreateVideoOptions {

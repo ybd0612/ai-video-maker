@@ -346,6 +346,7 @@ function isRetriableError(err: Error): boolean {
   const msg = err.message.toLowerCase();
   if (msg.includes("failed to fetch") || msg.includes("networkerror")) return true;
   if (msg.includes("timeout") || msg.includes("aborted")) return true;
+  if (msg.includes("超时")) return true;
   if (/error 5\d{2}/.test(msg)) return true;
   if (msg.includes("ssl") || msg.includes("econnrefused") || msg.includes("enetunreach")) return true;
   return false;
