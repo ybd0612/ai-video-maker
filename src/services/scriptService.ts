@@ -3,7 +3,7 @@
 // Generates structured shots from a user prompt using the text model.
 // ────────────────────────────────────────────────────────────────────────────
 
-import type { Shot } from "@/stores/projectStore";
+import type { Shot, ProjectMode, Character } from "@/stores/projectStore";
 import { MODELS } from "@/lib/models";
 
 interface GenerateScriptOptions {
@@ -12,6 +12,8 @@ interface GenerateScriptOptions {
   prompt: string;
   language: "zh" | "en";
   aspectRatio: string;
+  mode?: ProjectMode;
+  characters?: Character[];
 }
 
 interface RawShot {
@@ -19,6 +21,8 @@ interface RawShot {
   visualPrompt: string;
   motionPrompt: string;
   duration: number;
+  dialogues?: Array<{ characterId: string | null; text: string; delivery?: string }>;
+  activeCharacterIds?: string[];
 }
 
 /**
@@ -54,16 +58,22 @@ function extractJsonFromResponse(content: string): string | null {
 
 const MAX_SCRIPT_RETRIES = 2;
 
-/**
- * Call the text model to generate a structured shot list from a user prompt.
- * Returns an array of shots (without id/index/status — those are added by the store).
- */
-export async function generateScript(
-  opts: GenerateScriptOptions,
-): Promise<Omit<Shot, "id" | "index" | "status">[]> {
-  const systemPrompt =
-    opts.language === "zh"
-      ? `你是一位专业的短视频分镜策划师。用户会给你一个主题或想法，你需要将其拆分为 4-6 个分镜镜头。
+/* ── System prompt builders ────────────────────────────────────────────── */
+
+function buildSystemPrompt(
+  language: "zh" | "en",
+  isDrama: boolean,
+  characters?: Character[],
+): string {
+  if (isDrama) {
+    return language === "zh"
+      ? buildDramaPromptZh(characters)
+      : buildDramaPromptEn(characters);
+  }
+  return language === "zh" ? SIMPLE_PROMPT_ZH : SIMPLE_PROMPT_EN;
+}
+
+const SIMPLE_PROMPT_ZH = `你是一位专业的短视频分镜策划师。用户会给你一个主题或想法，你需要将其拆分为 4-6 个分镜镜头。
 
 严格按以下 JSON 格式返回，不要包含任何其他文字：
 {
@@ -96,8 +106,9 @@ motionPrompt（图生视频）要求：
 - 每个镜头 duration 为 3、5 或 8 秒
 - scriptText 用用户相同的语言
 - 整体节奏要有起承转合
-- 总镜头数 4-6 个`
-      : `You are a professional short-video storyboard planner. The user will give you a topic or idea. Break it into 4-6 shot scenes.
+- 总镜头数 4-6 个`;
+
+const SIMPLE_PROMPT_EN = `You are a professional short-video storyboard planner. The user will give you a topic or idea. Break it into 4-6 shot scenes.
 
 Return strictly in this JSON format, no other text:
 {
@@ -131,6 +142,126 @@ Other requirements:
 - scriptText in the user's language
 - Overall pacing: setup, development, climax, resolution
 - 4-6 shots total`;
+
+function buildDramaPromptZh(characters?: Character[]): string {
+  let charSection = "";
+  if (characters && characters.length > 0) {
+    charSection =
+      "\n可用角色：\n" +
+      characters
+        .map((c) => `- ${c.name}（ID: ${c.id}）：${c.description || "无描述"}`)
+        .join("\n") +
+      "\n";
+  }
+
+  return `你是一位专业的短剧编剧。用户会给你一个主题或想法，你需要将其拆分为 4-8 个分镜，并为每个分镜编写对话和画面描述。
+${charSection}
+严格按以下 JSON 格式返回，不要包含任何其他文字：
+{
+  "shots": [
+    {
+      "activeCharacterIds": ["char_xxx"],
+      "dialogues": [
+        { "characterId": null, "text": "旁白文本", "delivery": "平静" },
+        { "characterId": "char_xxx", "text": "角色台词", "delivery": "温柔地" }
+      ],
+      "scriptText": "该镜头旁白摘要（简短有力）",
+      "visualPrompt": "文生图提示词（英文，必须包含出场角色的完整外貌描述，与角色设定一致）",
+      "motionPrompt": "图生视频提示词（英文，动态描述）",
+      "duration": 5
+    }
+  ]
+}
+
+visualPrompt 要求：
+- 必须用英文，短语用逗号分隔
+- 必须包含出场角色的完整外貌描述（与角色设定保持一致）
+- 包含：主体描述、场景/背景、光影/色调、艺术风格
+- 主体姿态要自然稳定
+- 示例：A young woman with long black hair wearing a white blouse, slim build, soft features, standing in a sunlit cafe, warm golden hour light, photorealistic, 8k
+
+motionPrompt 要求：
+- 必须用英文
+- 只描述动态元素：主体动作、镜头运镜、环境变化
+- 每个镜头只给 1-2 个核心动作
+- 使用专业镜头语言
+
+对话要求：
+- characterId 为 null 表示旁白，否则使用角色 ID
+- delivery 描述语气/情绪
+- 每镜头 1-3 句对话，简洁有力
+
+其他要求：
+- 每个镜头 duration 为 3、5 或 8 秒
+- scriptText 用用户相同的语言
+- 整体节奏要有起承转合
+- 总镜头数 4-8 个`;
+}
+
+function buildDramaPromptEn(characters?: Character[]): string {
+  let charSection = "";
+  if (characters && characters.length > 0) {
+    charSection =
+      "\nAvailable characters:\n" +
+      characters
+        .map((c) => `- ${c.name} (ID: ${c.id}): ${c.description || "No description"}`)
+        .join("\n") +
+      "\n";
+  }
+
+  return `You are a professional short drama screenwriter. The user will give you a topic or idea. Break it into 4-8 shot scenes with dialogue and visual descriptions.
+${charSection}
+Return strictly in this JSON format, no other text:
+{
+  "shots": [
+    {
+      "activeCharacterIds": ["char_xxx"],
+      "dialogues": [
+        { "characterId": null, "text": "Narrator text", "delivery": "calm" },
+        { "characterId": "char_xxx", "text": "Character dialogue", "delivery": "gently" }
+      ],
+      "scriptText": "Shot narration summary (short, punchy)",
+      "visualPrompt": "Text-to-image prompt (English, must include active characters' full appearance matching character definitions)",
+      "motionPrompt": "Image-to-video prompt (English, dynamic description)",
+      "duration": 5
+    }
+  ]
+}
+
+visualPrompt requirements:
+- Must be in English, comma-separated phrases
+- Must include full appearance descriptions of active characters (consistent with character definitions)
+- Include: subject, scene/background, lighting/color, art style
+- Keep poses natural and stable
+
+motionPrompt requirements:
+- Must be in English
+- Only describe dynamic elements: subject action, camera movement, environment changes
+- 1-2 core actions per shot
+- Use professional camera language
+
+Dialogue requirements:
+- characterId null = narrator, otherwise use character ID
+- delivery describes tone/emotion
+- 1-3 lines per shot, concise and impactful
+
+Other requirements:
+- Each shot duration: 3, 5, or 8 seconds
+- scriptText in the user's language
+- Overall pacing: setup, development, climax, resolution
+- 4-8 shots total`;
+}
+
+/**
+ * Call the text model to generate a structured shot list from a user prompt.
+ * Returns an array of shots (without id/index/status — those are added by the store).
+ */
+export async function generateScript(
+  opts: GenerateScriptOptions,
+): Promise<Omit<Shot, "id" | "index" | "status">[]> {
+  // Build system prompt based on mode
+  const isDrama = opts.mode === "drama";
+  const systemPrompt = buildSystemPrompt(opts.language, isDrama, opts.characters);
 
   const url = `${opts.baseUrl.replace(/\/+$/, "")}/chat/completions`;
 
@@ -189,6 +320,13 @@ Other requirements:
         scriptText: s.scriptText ?? "",
         visualPrompt: s.visualPrompt ?? "",
         motionPrompt: s.motionPrompt ?? "",
+        dialogues: (s.dialogues ?? []).map((d) => ({
+          id: `dlg_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+          characterId: d.characterId ?? null,
+          text: d.text ?? "",
+          delivery: d.delivery,
+        })),
+        activeCharacterIds: s.activeCharacterIds ?? [],
         duration: [3, 5, 8].includes(s.duration) ? s.duration : 5,
       }));
 

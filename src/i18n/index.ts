@@ -299,6 +299,44 @@ const zh = {
   "aiAssist.optimizeMainPrompt": "AI 优化主题",
   "aiAssist.emptyField": "当前字段为空",
 
+  // Characters
+  "characters.title": "角色",
+  "characters.add": "添加角色",
+  "characters.edit": "编辑角色",
+  "characters.name": "名称",
+  "characters.namePlaceholder": "角色名字...",
+  "characters.description": "角色描述",
+  "characters.descriptionPlaceholder": "描述角色性格、背景等...",
+  "characters.appearance": "外貌描述",
+  "characters.appearancePlaceholder": "English appearance description for image generation...",
+  "characters.avatar": "参考头像",
+  "characters.avatarPlaceholder": "头像图片 URL（可选）",
+  "characters.delete": "删除角色",
+  "characters.deleteConfirm": "确定删除角色「{name}」？相关对话将变为旁白。",
+  "characters.noCharacters": "暂无角色，添加角色以创建短剧",
+  "characters.aiGenerate": "AI 生成外貌描述",
+
+  // Dialogue
+  "dialogue.title": "对话",
+  "dialogue.add": "添加对话",
+  "dialogue.narrator": "旁白",
+  "dialogue.delivery": "语气",
+  "dialogue.deliveryPlaceholder": "如：温柔地、愤怒地...",
+  "dialogue.textPlaceholder": "输入台词...",
+  "dialogue.selectCharacter": "选择角色",
+
+  // Mode
+  "mode.simple": "简单模式",
+  "mode.drama": "短剧模式",
+  "mode.switchToDrama": "切换到短剧模式",
+  "mode.switchToSimple": "切换到简单模式",
+  "mode.dramaHint": "解锁角色、对话等高级功能",
+
+  // Shot extras
+  "shot.characters": "出场角色",
+  "shot.selectCharacters": "选择本镜头出场角色",
+  "shot.motionPrompt": "动态描述",
+
 } as const;
 
 const en = {
@@ -595,6 +633,44 @@ const en = {
   "aiAssist.optimizeMotionPrompt": "AI Optimize Motion Prompt",
   "aiAssist.optimizeMainPrompt": "AI Optimize Topic",
   "aiAssist.emptyField": "Current field is empty",
+
+  // Characters
+  "characters.title": "Characters",
+  "characters.add": "Add Character",
+  "characters.edit": "Edit Character",
+  "characters.name": "Name",
+  "characters.namePlaceholder": "Character name...",
+  "characters.description": "Description",
+  "characters.descriptionPlaceholder": "Describe personality, background...",
+  "characters.appearance": "Appearance",
+  "characters.appearancePlaceholder": "English appearance description for image generation...",
+  "characters.avatar": "Reference Avatar",
+  "characters.avatarPlaceholder": "Avatar image URL (optional)",
+  "characters.delete": "Delete Character",
+  "characters.deleteConfirm": "Delete character \"{name}\"? Related dialogues will become narration.",
+  "characters.noCharacters": "No characters yet. Add characters to create a drama.",
+  "characters.aiGenerate": "AI Generate Appearance",
+
+  // Dialogue
+  "dialogue.title": "Dialogue",
+  "dialogue.add": "Add Line",
+  "dialogue.narrator": "Narrator",
+  "dialogue.delivery": "Delivery",
+  "dialogue.deliveryPlaceholder": "e.g. gently, angrily...",
+  "dialogue.textPlaceholder": "Enter dialogue...",
+  "dialogue.selectCharacter": "Select character",
+
+  // Mode
+  "mode.simple": "Simple",
+  "mode.drama": "Drama",
+  "mode.switchToDrama": "Switch to Drama Mode",
+  "mode.switchToSimple": "Switch to Simple Mode",
+  "mode.dramaHint": "Unlock characters, dialogue and more",
+
+  // Shot extras
+  "shot.characters": "Characters",
+  "shot.selectCharacters": "Select characters in this shot",
+  "shot.motionPrompt": "Motion Prompt",
 } as const;
 
 export type TranslationKey = keyof typeof zh;

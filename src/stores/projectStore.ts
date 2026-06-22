@@ -30,7 +30,24 @@ export type ShotStatus =
 
 export type AspectRatio = "9:16" | "16:9" | "1:1";
 
+export type ProjectMode = "simple" | "drama";
+
 /* ── Data models ────────────────────────────────────────────────────────── */
+
+export interface Character {
+  id: string;
+  name: string;
+  description: string;
+  appearancePrompt: string;
+  avatarUrl?: string;
+}
+
+export interface DialogueLine {
+  id: string;
+  characterId: string | null; // null = narrator
+  text: string;
+  delivery?: string; // e.g. "温柔地", for Phase 2 TTS
+}
 
 export interface Shot {
   id: string;
@@ -38,6 +55,8 @@ export interface Shot {
   scriptText: string;
   visualPrompt: string;
   motionPrompt: string;
+  dialogues: DialogueLine[];
+  activeCharacterIds: string[];
   duration: number;
   status: ShotStatus;
   imageUrl?: string;
@@ -50,6 +69,8 @@ export interface Shot {
 export interface Project {
   id: string;
   title: string;
+  mode: ProjectMode;
+  characters: Character[];
   aspectRatio: AspectRatio;
   style: string;
   language: "zh" | "en";
@@ -112,6 +133,21 @@ interface ProjectState {
   reorderShots: (fromIndex: number, toIndex: number) => void;
   setShotStatus: (id: string, status: ShotStatus, error?: string) => void;
 
+  /* Character actions */
+  addCharacter: (character: Omit<Character, "id">) => Character;
+  updateCharacter: (id: string, updates: Partial<Omit<Character, "id">>) => void;
+  removeCharacter: (id: string) => void;
+
+  /* Project mode */
+  setProjectMode: (mode: ProjectMode) => void;
+
+  /* Dialogue actions */
+  addDialogueLine: (shotId: string, line: Omit<DialogueLine, "id">) => void;
+  updateDialogueLine: (shotId: string, lineId: string, updates: Partial<Omit<DialogueLine, "id">>) => void;
+  removeDialogueLine: (shotId: string, lineId: string) => void;
+  reorderDialogueLines: (shotId: string, fromIndex: number, toIndex: number) => void;
+  setActiveCharacters: (shotId: string, characterIds: string[]) => void;
+
   /* History actions */
   addHistory: (action: HistoryAction, description: string) => void;
   clearHistory: () => void;
@@ -144,6 +180,8 @@ export const useProjectStore = create<ProjectState>()(
         const project: Project = {
           id: newId("proj"),
           title,
+          mode: "simple",
+          characters: [],
           aspectRatio: "16:9",
           style: "",
           language: "zh",
@@ -319,6 +357,134 @@ export const useProjectStore = create<ProjectState>()(
           })),
         })),
 
+      /* ── Character actions ───────────────────────────────────────────── */
+
+      addCharacter: (character) => {
+        const newChar: Character = { ...character, id: newId("char") };
+        set((s) => ({
+          projects: updateActive(s.projects, s.activeProjectId, (p) => ({
+            ...p,
+            characters: [...p.characters, newChar],
+            updatedAt: Date.now(),
+          })),
+        }));
+        return newChar;
+      },
+
+      updateCharacter: (id, updates) =>
+        set((s) => ({
+          projects: updateActive(s.projects, s.activeProjectId, (p) => ({
+            ...p,
+            characters: p.characters.map((c) =>
+              c.id === id ? { ...c, ...updates } : c,
+            ),
+            updatedAt: Date.now(),
+          })),
+        })),
+
+      removeCharacter: (id) =>
+        set((s) => ({
+          projects: updateActive(s.projects, s.activeProjectId, (p) => ({
+            ...p,
+            characters: p.characters.filter((c) => c.id !== id),
+            // Nullify dialogues referencing this character, remove from activeCharacterIds
+            shots: p.shots.map((sh) => ({
+              ...sh,
+              activeCharacterIds: sh.activeCharacterIds.filter((cid) => cid !== id),
+              dialogues: sh.dialogues.map((d) =>
+                d.characterId === id ? { ...d, characterId: null } : d,
+              ),
+            })),
+            updatedAt: Date.now(),
+          })),
+        })),
+
+      /* ── Project mode ────────────────────────────────────────────────── */
+
+      setProjectMode: (mode) =>
+        set((s) => ({
+          projects: updateActive(s.projects, s.activeProjectId, (p) => ({
+            ...p,
+            mode,
+            updatedAt: Date.now(),
+          })),
+        })),
+
+      /* ── Dialogue actions ────────────────────────────────────────────── */
+
+      addDialogueLine: (shotId, line) => {
+        const newLine: DialogueLine = { ...line, id: newId("dlg") };
+        set((s) => ({
+          projects: updateActive(s.projects, s.activeProjectId, (p) => ({
+            ...p,
+            shots: p.shots.map((sh) =>
+              sh.id === shotId
+                ? { ...sh, dialogues: [...sh.dialogues, newLine] }
+                : sh,
+            ),
+            updatedAt: Date.now(),
+          })),
+        }));
+      },
+
+      updateDialogueLine: (shotId, lineId, updates) =>
+        set((s) => ({
+          projects: updateActive(s.projects, s.activeProjectId, (p) => ({
+            ...p,
+            shots: p.shots.map((sh) =>
+              sh.id === shotId
+                ? {
+                    ...sh,
+                    dialogues: sh.dialogues.map((d) =>
+                      d.id === lineId ? { ...d, ...updates } : d,
+                    ),
+                  }
+                : sh,
+            ),
+            updatedAt: Date.now(),
+          })),
+        })),
+
+      removeDialogueLine: (shotId, lineId) =>
+        set((s) => ({
+          projects: updateActive(s.projects, s.activeProjectId, (p) => ({
+            ...p,
+            shots: p.shots.map((sh) =>
+              sh.id === shotId
+                ? { ...sh, dialogues: sh.dialogues.filter((d) => d.id !== lineId) }
+                : sh,
+            ),
+            updatedAt: Date.now(),
+          })),
+        })),
+
+      reorderDialogueLines: (shotId, fromIndex, toIndex) =>
+        set((s) => ({
+          projects: updateActive(s.projects, s.activeProjectId, (p) => ({
+            ...p,
+            shots: p.shots.map((sh) => {
+              if (sh.id !== shotId) return sh;
+              const lines = [...sh.dialogues];
+              const [moved] = lines.splice(fromIndex, 1);
+              if (!moved) return sh;
+              lines.splice(toIndex, 0, moved);
+              return { ...sh, dialogues: lines };
+            }),
+            updatedAt: Date.now(),
+          })),
+        })),
+
+      setActiveCharacters: (shotId, characterIds) =>
+        set((s) => ({
+          projects: updateActive(s.projects, s.activeProjectId, (p) => ({
+            ...p,
+            shots: p.shots.map((sh) =>
+              sh.id === shotId ? { ...sh, activeCharacterIds: characterIds } : sh,
+            ),
+            updatedAt: Date.now(),
+          })),
+        })),
+
       /* ── History actions ────────────────────────────────────────────── */
 
       addHistory: (action, description) => {
@@ -339,20 +505,40 @@ export const useProjectStore = create<ProjectState>()(
     }),
     {
       name: "wxhb-project",
-      version: 2,
+      version: 3,
       migrate: (persisted: unknown, version: number) => {
         // Migrate from v1 (single project) to v2 (multi-project)
         if (version < 2) {
           const old = persisted as Record<string, unknown>;
           const project = old.project as Project | null;
           if (project) {
-            return {
-              projects: [project],
-              activeProjectId: project.id,
-              history: [],
-            } as Record<string, unknown>;
+            (persisted as Record<string, unknown>).projects = [project];
+            (persisted as Record<string, unknown>).activeProjectId = project.id;
+            (persisted as Record<string, unknown>).history = [];
           }
         }
+
+        // Migrate from v2 to v3: add character system + dialogue system
+        if (version < 3) {
+          const state = persisted as {
+            projects?: Array<Record<string, unknown>>;
+          };
+          if (state.projects) {
+            state.projects = state.projects.map((p) => ({
+              ...p,
+              mode: "simple",
+              characters: [],
+              shots: ((p.shots as Array<Record<string, unknown>>) ?? []).map(
+                (s) => ({
+                  ...s,
+                  dialogues: [],
+                  activeCharacterIds: [],
+                }),
+              ),
+            }));
+          }
+        }
+
         return persisted as Record<string, unknown>;
       },
     },

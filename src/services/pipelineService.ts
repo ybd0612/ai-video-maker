@@ -8,6 +8,7 @@ import { useSettingsStore } from "@/stores/settingsStore";
 import { generateScript } from "./scriptService";
 import { generateImage, aspectRatioToImageSize } from "./imageService";
 import { generateVideo, aspectRatioToVideoSize } from "./videoService";
+import { injectCharacterDescriptions } from "@/lib/characterUtils";
 
 type PipelinePhase = "script" | "image" | "video" | "render";
 
@@ -52,6 +53,8 @@ export async function runPipeline(prompt: string, opts: RunOptions = {}) {
         prompt,
         language: project.language,
         aspectRatio: project.aspectRatio,
+        mode: project.mode,
+        characters: project.characters,
       });
 
       const shots: Shot[] = rawShots.map((s, i) => ({
@@ -87,10 +90,15 @@ export async function runPipeline(prompt: string, opts: RunOptions = {}) {
       opts.onShotUpdate?.(shot.id, "imaging");
 
       try {
+        const enrichedPrompt = injectCharacterDescriptions(
+          shot.visualPrompt,
+          shot.activeCharacterIds ?? [],
+          selectActiveProject(useProjectStore.getState())?.characters ?? [],
+        );
         const imageUrl = await generateImage({
           apiKey,
           baseUrl,
-          prompt: shot.visualPrompt,
+          prompt: enrichedPrompt,
           size: imageSize,
         });
 
@@ -185,10 +193,15 @@ export async function runSingleShot(shotId: string, opts: RunOptions = {}) {
   let imageUrl: string;
   store.setShotStatus(shotId, "imaging");
   try {
+    const enrichedPrompt = injectCharacterDescriptions(
+      shot.visualPrompt,
+      shot.activeCharacterIds ?? [],
+      project.characters,
+    );
     imageUrl = await generateImage({
       apiKey,
       baseUrl,
-      prompt: shot.visualPrompt,
+      prompt: enrichedPrompt,
       size: imageSize,
     });
     store.updateShot(shotId, { imageUrl, status: "imaged" });

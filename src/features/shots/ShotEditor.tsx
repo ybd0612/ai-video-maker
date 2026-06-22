@@ -3,9 +3,10 @@
 // Right panel: edit the selected shot's script text and visual prompt.
 // ────────────────────────────────────────────────────────────────────────────
 
-import { useProjectStore, type Shot } from "@/stores/projectStore";
+import { useProjectStore, selectActiveProject, type Shot } from "@/stores/projectStore";
 import { useT } from "@/i18n";
-import { RefreshCw, X, RotateCcw, Sparkles } from "lucide-react";
+import { RefreshCw, X, RotateCcw, Sparkles, Users } from "lucide-react";
+import { DialogueEditor } from "./DialogueEditor";
 
 interface ShotEditorProps {
   shot: Shot | null;
@@ -25,7 +26,11 @@ export function ShotEditor({
   isProcessing,
 }: ShotEditorProps) {
   const updateShot = useProjectStore((s) => s.updateShot);
+  const setActiveCharacters = useProjectStore((s) => s.setActiveCharacters);
+  const project = useProjectStore(selectActiveProject);
   const t = useT();
+  const isDramaMode = project?.mode === "drama";
+  const characters = project?.characters ?? [];
 
   if (!shot) {
     return (
@@ -49,6 +54,43 @@ export function ShotEditor({
           <X size={14} />
         </button>
       </div>
+
+      {/* Drama mode: character selector + dialogue editor */}
+      {isDramaMode && characters.length > 0 && (
+        <div className="space-y-1.5">
+          <label className="flex items-center gap-1 text-[11px] font-medium text-slate-500">
+            <Users size={10} />
+            {t("shot.characters")}
+          </label>
+          <div className="flex flex-wrap gap-1">
+            {characters.map((char) => {
+              const isActive = shot.activeCharacterIds.includes(char.id);
+              return (
+                <button
+                  key={char.id}
+                  onClick={() => {
+                    const newIds = isActive
+                      ? shot.activeCharacterIds.filter((id) => id !== char.id)
+                      : [...shot.activeCharacterIds, char.id];
+                    setActiveCharacters(shot.id, newIds);
+                  }}
+                  className={`rounded-full px-2 py-0.5 text-[10px] font-medium transition ${
+                    isActive
+                      ? "bg-emerald-900/50 text-emerald-300 border border-emerald-700"
+                      : "bg-slate-800 text-slate-500 border border-slate-700 hover:border-slate-600"
+                  }`}
+                >
+                  {char.name}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {isDramaMode && (
+        <DialogueEditor shotId={shot.id} />
+      )}
 
       {/* Script text */}
       <div className="space-y-1">

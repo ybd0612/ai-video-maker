@@ -19,6 +19,8 @@ import { generateImage, aspectRatioToImageSize } from "@/services/imageService";
 import { generateVideo, aspectRatioToVideoSize } from "@/services/videoService";
 import { SYSTEM_PROMPT_SCRIPT_TEXT, SYSTEM_PROMPT_VISUAL_PROMPT, SYSTEM_PROMPT_MAIN_PROMPT, SYSTEM_PROMPT_MOTION_PROMPT } from "@/services/chatService";
 import { AiAssistDrawer } from "@/components/ui/AiAssistDrawer";
+import { ModeToggle } from "@/components/ui/ModeToggle";
+import { CharacterPanel } from "@/features/characters/CharacterPanel";
 import { ProjectSidebar } from "@/features/projects/ProjectSidebar";
 import { HistoryPanel } from "@/features/history/HistoryPanel";
 import {
@@ -29,7 +31,7 @@ import { ApiKeyBanner } from "@/components/ApiKeyBanner";
 import { confirmDialog } from "@/components/ui/ConfirmDialog";
 
 type AspectRatio = "9:16" | "16:9" | "1:1";
-type LeftTab = "projects" | "shots" | "history";
+type LeftTab = "projects" | "shots" | "characters" | "history";
 
 export function ProjectWorkspace() {
   const t = useT();
@@ -318,6 +320,9 @@ export function ProjectWorkspace() {
         </div>
 
         <div className="flex items-center gap-2">
+          {/* Mode toggle */}
+          {project && <ModeToggle />}
+
           {/* Aspect ratio selector */}
           {project && (
             <select
@@ -416,6 +421,17 @@ export function ProjectWorkspace() {
               {t("pipeline.shots")} ({shots.length})
             </button>
             <button
+              onClick={() => setLeftTab("characters")}
+              className={`flex flex-1 items-center justify-center gap-1 py-2 text-[10px] font-medium transition ${
+                leftTab === "characters"
+                  ? "border-b-2 border-emerald-500 text-emerald-400"
+                  : "text-slate-600 hover:text-slate-400"
+              }`}
+            >
+              🎭
+              {t("characters.title")}
+            </button>
+            <button
               onClick={() => setLeftTab("history")}
               className={`flex flex-1 items-center justify-center gap-1 py-2 text-[10px] font-medium transition ${
                 leftTab === "history"
@@ -437,6 +453,7 @@ export function ProjectWorkspace() {
             />
           )}
           {leftTab === "history" && <HistoryPanel />}
+          {leftTab === "characters" && <CharacterPanel />}
         </aside>
 
         {/* Center: preview or script input */}
