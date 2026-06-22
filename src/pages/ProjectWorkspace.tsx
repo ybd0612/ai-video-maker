@@ -11,8 +11,6 @@ import { useT } from "@/i18n";
 import { ScriptPanel } from "@/features/script/ScriptPanel";
 import { ShotList } from "@/features/shots/ShotList";
 import { ShotEditor } from "@/features/shots/ShotEditor";
-import { ShotPreview } from "@/features/preview/ShotPreview";
-import { FinalPreview } from "@/features/preview/FinalPreview";
 import { runPipeline, runSingleShot, retryFailedVideos } from "@/services/pipelineService";
 import { generateScript } from "@/services/scriptService";
 import { generateImage, aspectRatioToImageSize } from "@/services/imageService";
@@ -50,7 +48,6 @@ export function ProjectWorkspace() {
   const [selectedShotId, setSelectedShotId] = useState<string | null>(null);
   const [isScripting, setIsScripting] = useState(false);
   const [isRunning, setIsRunning] = useState(false);
-  const [previewTab, setPreviewTab] = useState<"shot" | "final">("shot");
   const [leftTab, setLeftTab] = useState<LeftTab>("shots");
   const abortRef = useRef<AbortController | null>(null);
 
@@ -466,50 +463,7 @@ export function ProjectWorkspace() {
               </div>
             </div>
           ) : (
-            <CreationWizard>
-              {shots.length === 0 ? (
-                <div className="flex h-full items-center justify-center">
-                  <div className="w-full max-w-lg">
-                    <ScriptPanel onGenerate={handleGenerateScript} isGenerating={isScripting} onOpenAiAssist={handleOpenMainPromptAiAssist} promptOverride={mainPromptOverride} />
-                  </div>
-                </div>
-              ) : (
-                <div className="flex h-full flex-col">
-                  {/* Pipeline progress bar */}
-                  <PipelineProgress shots={shots} isRunning={isRunning} />
-                  {/* Tab switcher */}
-                  <div className="flex border-b border-slate-800">
-                    <button
-                      onClick={() => setPreviewTab("shot")}
-                      className={`px-4 py-1.5 text-xs font-medium transition ${
-                        previewTab === "shot"
-                          ? "border-b-2 border-emerald-500 text-emerald-400"
-                          : "text-slate-500 hover:text-slate-300"
-                      }`}
-                    >
-                      {t("pipeline.tabShot")}
-                    </button>
-                    <button
-                      onClick={() => setPreviewTab("final")}
-                      className={`px-4 py-1.5 text-xs font-medium transition ${
-                        previewTab === "final"
-                          ? "border-b-2 border-emerald-500 text-emerald-400"
-                          : "text-slate-500 hover:text-slate-300"
-                      }`}
-                    >
-                      {t("pipeline.tabFinal")}
-                    </button>
-                  </div>
-                  <div className="flex-1 overflow-y-auto">
-                    {previewTab === "shot" ? (
-                      <ShotPreview shotId={selectedShotId} />
-                    ) : (
-                      <FinalPreview />
-                    )}
-                  </div>
-                </div>
-              )}
-            </CreationWizard>
+            <CreationWizard />
           )}
         </main>
 
@@ -541,57 +495,3 @@ export function ProjectWorkspace() {
   );
 }
 
-/* ── Pipeline progress bar ──────────────────────────────────────────────── */
-
-function PipelineProgress({
-  shots,
-  isRunning,
-}: {
-  shots: Shot[];
-  isRunning: boolean;
-}) {
-  const t = useT();
-  const total = shots.length;
-  const scripted = shots.filter((s) =>
-    ["scripted", "imaging", "imaged", "videoing", "videoed"].includes(s.status),
-  ).length;
-  const imaged = shots.filter((s) =>
-    ["imaged", "videoing", "videoed"].includes(s.status),
-  ).length;
-  const videoed = shots.filter((s) => s.status === "videoed").length;
-  const failed = shots.filter((s) => s.status === "failed").length;
-
-  const phases = [
-    { label: t("pipeline.phaseScript"), count: scripted, total, color: "bg-sky-500" },
-    { label: t("pipeline.phaseImage"), count: imaged, total, color: "bg-violet-500" },
-    { label: t("pipeline.phaseVideo"), count: videoed, total, color: "bg-amber-500" },
-  ];
-
-  return (
-    <div className="flex items-center gap-4 border-b border-slate-800 px-4 py-2">
-      {phases.map((phase) => (
-        <div key={phase.label} className="flex items-center gap-2">
-          <div className="h-1.5 w-20 overflow-hidden rounded-full bg-slate-800">
-            <div
-              className={`h-full rounded-full transition-all ${phase.color}`}
-              style={{ width: `${total > 0 ? (phase.count / total) * 100 : 0}%` }}
-            />
-          </div>
-          <span className="text-[10px] text-slate-500">
-            {phase.label} {phase.count}/{total}
-          </span>
-        </div>
-      ))}
-      {failed > 0 && (
-        <span className="text-[10px] text-red-400">
-          {failed} {t("pipeline.failed")}
-        </span>
-      )}
-      {isRunning && (
-        <span className="text-[10px] text-emerald-400 animate-pulse">
-          {t("pipeline.running")}
-        </span>
-      )}
-    </div>
-  );
-}
