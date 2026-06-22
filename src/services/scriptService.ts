@@ -23,6 +23,19 @@ interface RawShot {
   duration: number;
   dialogues?: Array<{ characterId: string | null; text: string; delivery?: string }>;
   activeCharacterIds?: string[];
+  // Structured sub-elements for text-to-image
+  subjectDesc?: string;
+  sceneDesc?: string;
+  detailDesc?: string;
+  lightingDesc?: string;
+  styleDesc?: string;
+  negativePrompt?: string;
+  // Structured sub-elements for image-to-video
+  actionDesc?: string;
+  cameraDesc?: string;
+  envChangeDesc?: string;
+  motionSpeedDesc?: string;
+  negativeMotionPrompt?: string;
 }
 
 /**
@@ -80,27 +93,38 @@ const SIMPLE_PROMPT_ZH = `你是一位专业的短视频分镜策划师。用户
   "shots": [
     {
       "scriptText": "该镜头的旁白/文案（中文，简短有力）",
-      "visualPrompt": "文生图提示词（英文，静态画面描述：主体+场景背景+光影色调+艺术风格，详细具体）",
-      "motionPrompt": "图生视频提示词（英文，动态描述：主体动作+镜头运镜+环境变化，1-2个核心动作即可）",
+      "subjectDesc": "主体描述（英文，如 A young woman with long dark hair）",
+      "sceneDesc": "场景/背景描述（英文，如 sitting in a sunlit cafe by the window）",
+      "detailDesc": "细节/服饰描述（英文，如 wearing a white blouse, delicate jewelry）",
+      "lightingDesc": "光影/色调（英文，如 warm golden hour light, cinematic rim light）",
+      "styleDesc": "艺术风格（英文，如 photorealistic, 8k, ultra-detailed）",
+      "negativePrompt": "负向提示词（英文，如 bad anatomy, extra limbs, blurry）",
+      "actionDesc": "主体动作（英文，如 slowly turns her head and smiles gently）",
+      "cameraDesc": "镜头运镜（英文，如 camera slowly dollies in, close-up tracking shot）",
+      "envChangeDesc": "环境变化（英文，如 steam rising from the coffee cup, leaves swaying）",
+      "motionSpeedDesc": "运动速率（英文，如 cinematic slow-motion, 24fps）",
+      "negativeMotionPrompt": "负向动态提示（英文，如 morphing, flickering, shaky camera）",
       "duration": 5
     }
   ]
 }
 
-visualPrompt（文生图）要求：
-- 必须用英文，短语用逗号分隔
-- 包含：主体描述、场景/背景、光影/色调、艺术风格
-- 主体姿态要自然稳定，避免动作幅度过大的姿势
-- 尽量用中景或特写构图
-- 示例：A young woman with long dark hair, standing in a sunlit cafe, warm golden hour light, soft bokeh background, photorealistic, cinematic composition, 8k
+文生图子字段要求（subjectDesc/sceneDesc/detailDesc/lightingDesc/styleDesc）：
+- 必须用英文，逗号分隔短语
+- subjectDesc：主体外貌描述，姿态自然稳定，中景或特写
+- sceneDesc：场景/背景，有空间层次（前景/中景/远景）
+- detailDesc：服饰、道具、细节
+- lightingDesc：光线类型、色调氛围
+- styleDesc：艺术风格、渲染质量
+- negativePrompt：不希望出现的元素
 
-motionPrompt（图生视频）要求：
+图生视频子字段要求（actionDesc/cameraDesc/envChangeDesc/motionSpeedDesc）：
 - 必须用英文
-- 只描述动态元素：主体动作、镜头运镜、环境变化
-- 每个镜头只给 1-2 个核心动作，不要贪多
-- 使用专业镜头语言：slow dolly in, pan left, tilt up, close-up tracking shot 等
-- 不要重复描述静态元素（衣服颜色、发型等，图片已经锚定了）
-- 示例：The woman slowly turns her head and smiles gently, camera slowly dollies in, steam rising from the coffee cup, soft natural lighting shifts
+- actionDesc：主体动作，只给 1-2 个核心动作
+- cameraDesc：使用专业镜头语言（dolly, pan, tilt, tracking shot）
+- envChangeDesc：环境动态变化（烟雾、光影变化、物体运动）
+- motionSpeedDesc：运动速率和帧率
+- negativeMotionPrompt：不希望出现的动态效果（变形、闪烁、抖动）
 
 其他要求：
 - 每个镜头 duration 为 3、5 或 8 秒
@@ -115,27 +139,38 @@ Return strictly in this JSON format, no other text:
   "shots": [
     {
       "scriptText": "Narration/copy for this shot (short, punchy)",
-      "visualPrompt": "Text-to-image prompt (English, static scene: subject + background + lighting + art style, detailed)",
-      "motionPrompt": "Image-to-video prompt (English, dynamic: subject action + camera movement + environment change, 1-2 core actions)",
+      "subjectDesc": "Subject description (English, e.g. A young woman with long dark hair)",
+      "sceneDesc": "Scene/background (English, e.g. sitting in a sunlit cafe by the window)",
+      "detailDesc": "Details/clothing (English, e.g. wearing a white blouse, delicate jewelry)",
+      "lightingDesc": "Lighting/color (English, e.g. warm golden hour light, cinematic rim light)",
+      "styleDesc": "Art style (English, e.g. photorealistic, 8k, ultra-detailed)",
+      "negativePrompt": "Negative prompt (English, e.g. bad anatomy, extra limbs, blurry)",
+      "actionDesc": "Subject action (English, e.g. slowly turns her head and smiles gently)",
+      "cameraDesc": "Camera movement (English, e.g. camera slowly dollies in, close-up tracking shot)",
+      "envChangeDesc": "Environment changes (English, e.g. steam rising from the coffee cup)",
+      "motionSpeedDesc": "Motion speed (English, e.g. cinematic slow-motion, 24fps)",
+      "negativeMotionPrompt": "Negative motion (English, e.g. morphing, flickering, shaky camera)",
       "duration": 5
     }
   ]
 }
 
-visualPrompt (Text-to-Image) requirements:
+Text-to-image sub-fields (subjectDesc/sceneDesc/detailDesc/lightingDesc/styleDesc):
 - Must be in English, comma-separated phrases
-- Include: subject description, scene/background, lighting/color palette, art style
-- Keep subject pose natural and stable, avoid extreme action poses
-- Prefer medium shot or close-up composition
-- Example: A young woman with long dark hair, standing in a sunlit cafe, warm golden hour light, soft bokeh background, photorealistic, cinematic composition, 8k
+- subjectDesc: subject appearance, natural stable pose, medium shot or close-up
+- sceneDesc: scene/background with spatial layers (foreground/midground/background)
+- detailDesc: clothing, props, details
+- lightingDesc: lighting type, color mood
+- styleDesc: art style, render quality
+- negativePrompt: unwanted elements
 
-motionPrompt (Image-to-Video) requirements:
+Image-to-video sub-fields (actionDesc/cameraDesc/envChangeDesc/motionSpeedDesc):
 - Must be in English
-- Only describe dynamic elements: subject action, camera movement, environment changes
-- Give only 1-2 core actions per shot, don't overload
-- Use professional camera language: slow dolly in, pan left, tilt up, close-up tracking shot, etc.
-- Don't repeat static elements (clothing color, hairstyle — the image already anchors those)
-- Example: The woman slowly turns her head and smiles gently, camera slowly dollies in, steam rising from the coffee cup, soft natural lighting shifts
+- actionDesc: 1-2 core actions only
+- cameraDesc: professional camera language (dolly, pan, tilt, tracking shot)
+- envChangeDesc: environmental dynamics (smoke, light shifts, object motion)
+- motionSpeedDesc: motion speed and frame rate
+- negativeMotionPrompt: unwanted motion effects (morphing, flickering, shaking)
 
 Other requirements:
 - Each shot duration: 3, 5, or 8 seconds
@@ -327,6 +362,18 @@ export async function generateScript(
           delivery: d.delivery,
         })),
         activeCharacterIds: s.activeCharacterIds ?? [],
+        // Map structured sub-elements
+        subjectDesc: s.subjectDesc ?? "",
+        sceneDesc: s.sceneDesc ?? "",
+        detailDesc: s.detailDesc ?? "",
+        lightingDesc: s.lightingDesc ?? "",
+        styleDesc: s.styleDesc ?? "",
+        negativePrompt: s.negativePrompt ?? "",
+        actionDesc: s.actionDesc ?? "",
+        cameraDesc: s.cameraDesc ?? "",
+        envChangeDesc: s.envChangeDesc ?? "",
+        motionSpeedDesc: s.motionSpeedDesc ?? "",
+        negativeMotionPrompt: s.negativeMotionPrompt ?? "",
         duration: [3, 5, 8].includes(s.duration) ? s.duration : 5,
       }));
 
