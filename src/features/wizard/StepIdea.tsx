@@ -69,8 +69,17 @@ export function StepIdea({ onGenerated }: StepIdeaProps) {
     const input = chatInput.trim();
     if (!input || isRefining || !providerConfig.apiKey) return;
 
-    const userMsg: ChatTurn = { role: "user", content: input };
-    const newHistory = [...chatHistory, userMsg];
+    // Include current textarea content so AI knows what to refine
+    const contextContent = prompt.trim()
+      ? `当前想法：\n${prompt.trim()}\n\n调整要求：${input}`
+      : input;
+
+    // Display only the user's adjustment input in chat history
+    const displayMsg: ChatTurn = { role: "user", content: input };
+    // But send full context to AI
+    const apiMsg: ChatTurn = { role: "user", content: contextContent };
+
+    const newHistory = [...chatHistory, displayMsg];
     setChatHistory(newHistory);
     setChatInput("");
     setIsRefining(true);
@@ -78,7 +87,8 @@ export function StepIdea({ onGenerated }: StepIdeaProps) {
     try {
       const messages = [
         { role: "system" as const, content: systemPrompt },
-        ...newHistory.map((m) => ({ role: m.role as "user" | "assistant", content: m.content })),
+        ...chatHistory.map((m) => ({ role: m.role as "user" | "assistant", content: m.content })),
+        { role: "user" as const, content: apiMsg.content },
       ];
 
       const result = await chatCompletion({
