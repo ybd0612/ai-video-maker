@@ -1,14 +1,16 @@
 // ────────────────────────────────────────────────────────────────────────────
 // src/features/wizard/StepIdea.tsx
 // Step 1: Multi-turn AI brainstorm + aspect ratio + generate storyboard.
-// The user can go back and forth with AI to gradually refine the idea.
 // ────────────────────────────────────────────────────────────────────────────
 
 import { useState, useRef, useEffect } from "react";
 import { useProjectStore, selectActiveProject } from "@/stores/projectStore";
 import { useSettingsStore } from "@/stores/settingsStore";
 import { useT } from "@/i18n";
-import { Sparkles, Loader2, Monitor, Smartphone, Square, Send, Bot, User } from "lucide-react";
+import {
+  Sparkles, Loader2, Monitor, Smartphone, Square, Send, Bot, User,
+  MessageSquare, Lightbulb, ChevronDown,
+} from "lucide-react";
 import { useWizardActions } from "./useWizardActions";
 import { chatCompletion } from "@/services/chatService";
 
@@ -50,6 +52,7 @@ export function StepIdea({ onGenerated }: StepIdeaProps) {
   // Multi-turn conversation
   const [chatHistory, setChatHistory] = useState<ChatTurn[]>([]);
   const [chatInput, setChatInput] = useState("");
+  const [showHistory, setShowHistory] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
 
   const aspectRatio = project?.aspectRatio ?? "16:9";
@@ -118,49 +121,27 @@ export function StepIdea({ onGenerated }: StepIdeaProps) {
 
   return (
     <div className="mx-auto flex max-w-2xl flex-col gap-5 py-8">
-      {/* Title */}
-      <div className="text-center">
+      {/* Title with tooltip hint */}
+      <div className="flex items-center justify-center gap-2">
         <h2 className="text-lg font-bold text-slate-100">
           {t("wizard.enterIdea")}
         </h2>
-        <p className="mt-1 text-sm text-slate-500">
-          {t("wizard.ideaPlaceholder")}
-        </p>
+        <div className="group relative">
+          <Lightbulb size={14} className="text-slate-500 cursor-help" />
+          <div className="pointer-events-none absolute left-1/2 top-full z-50 mt-2 w-64 -translate-x-1/2 rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-[11px] leading-relaxed text-slate-400 opacity-0 shadow-xl transition-opacity group-hover:opacity-100">
+            {t("wizard.ideaPlaceholder")}
+          </div>
+        </div>
       </div>
 
-      {/* Conversation history */}
-      {chatHistory.length > 0 && (
-        <div className="max-h-48 overflow-y-auto rounded-xl border border-slate-700/50 bg-slate-900/30 px-3 py-2 space-y-2">
-          {chatHistory.map((msg, i) => (
-            <div key={i} className="flex gap-2">
-              <div className={`shrink-0 mt-0.5 ${msg.role === "user" ? "text-emerald-400" : "text-violet-400"}`}>
-                {msg.role === "user" ? <User size={12} /> : <Bot size={12} />}
-              </div>
-              <div className="flex-1">
-                <p className="text-[11px] leading-relaxed text-slate-400 whitespace-pre-wrap">
-                  {msg.content}
-                </p>
-              </div>
-            </div>
-          ))}
-          {isRefining && (
-            <div className="flex gap-2">
-              <Bot size={12} className="shrink-0 mt-0.5 text-violet-400 animate-pulse" />
-              <Loader2 size={12} className="animate-spin text-emerald-400" />
-            </div>
-          )}
-          <div ref={chatEndRef} />
-        </div>
-      )}
-
-      {/* Prompt input with AI refine */}
+      {/* Prompt textarea (taller) */}
       <div className="relative">
         <textarea
           value={prompt}
           onChange={(e) => setPrompt(e.target.value)}
           onKeyDown={handleKeyDown}
           placeholder={t("wizard.ideaPlaceholder")}
-          rows={4}
+          rows={7}
           disabled={isGenerating || isRefining}
           className="w-full resize-none rounded-xl border border-slate-700 bg-slate-800 p-4 text-sm text-slate-100 placeholder:text-slate-600 focus:border-emerald-500 focus:outline-none disabled:opacity-50"
         />
@@ -175,6 +156,47 @@ export function StepIdea({ onGenerated }: StepIdeaProps) {
           </div>
         )}
       </div>
+
+      {/* Chat history toggle + collapsible panel */}
+      {chatHistory.length > 0 && (
+        <div className="rounded-xl border border-slate-700/50 bg-slate-900/30 overflow-hidden">
+          <button
+            onClick={() => setShowHistory(!showHistory)}
+            className="flex w-full items-center gap-2 px-3 py-2 text-left transition hover:bg-slate-800/30"
+          >
+            <MessageSquare size={13} className="text-emerald-400" />
+            <span className="text-[11px] font-medium text-slate-400">
+              {t("wizard.chatHistory" as any) || "对话历史"} ({chatHistory.length})
+            </span>
+            <ChevronDown
+              size={12}
+              className={`ml-auto text-slate-600 transition-transform ${showHistory ? "rotate-180" : ""}`}
+            />
+          </button>
+
+          {showHistory && (
+            <div className="max-h-48 overflow-y-auto border-t border-slate-700/30 px-3 py-2 space-y-2">
+              {chatHistory.map((msg, i) => (
+                <div key={i} className="flex gap-2">
+                  <div className={`shrink-0 mt-0.5 ${msg.role === "user" ? "text-emerald-400" : "text-violet-400"}`}>
+                    {msg.role === "user" ? <User size={12} /> : <Bot size={12} />}
+                  </div>
+                  <p className="flex-1 text-[11px] leading-relaxed text-slate-400 whitespace-pre-wrap">
+                    {msg.content}
+                  </p>
+                </div>
+              ))}
+              {isRefining && (
+                <div className="flex gap-2">
+                  <Bot size={12} className="shrink-0 mt-0.5 text-violet-400 animate-pulse" />
+                  <Loader2 size={12} className="animate-spin text-emerald-400" />
+                </div>
+              )}
+              <div ref={chatEndRef} />
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Chat input for follow-up conversation */}
       <div className="flex gap-2">
