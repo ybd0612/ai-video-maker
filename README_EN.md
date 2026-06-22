@@ -24,13 +24,14 @@ A pipeline-based one-click video generation tool integrating Agnes AI's text, im
 | Feature | Description |
 |---------|-------------|
 | 🎬 **One-Click Pipeline** | Enter a topic → auto-generate storyboard → reference images → video clips → final MP4 |
-| 🤖 **Script Generation** | `agnes-2.0-flash` — splits topic into 4-6 structured shots (copy + visual prompt + duration) |
-| 🎨 **Image Generation** | `agnes-image-2.1-flash` — generates reference images per shot (concurrency: 3) |
-| 🎥 **Video Generation** | `agnes-video-v2.0` — async task creation + polling, image-to-video support (concurrency: 2, 10min timeout) |
+| 🤖 **Smart Storyboard** | `agnes-2.0-flash` — generates 4-6 shots with dual prompts (text-to-image + image-to-video) |
+| 🎨 **Image Generation** | `agnes-image-2.1-flash` — generates reference images from visual prompts (concurrency: 3) |
+| 🎥 **Video Generation** | `agnes-video-v2.0` — generates videos from motion prompts (concurrency: 2, auto-retry 3x) |
 | ✂️ **Video Concatenation** | FFmpeg.wasm client-side concat demuxer for final MP4 output |
+| ✨ **AI Prompt Assist** | Multi-turn AI chat to optimize any prompt field |
 | 📋 **Multi-Project** | Create / switch / delete / duplicate projects, localStorage persistence |
 | 📊 **History Log** | Last 200 operation records, grouped by date |
-| 🔄 **Single Shot Retry** | Retry individual failed shots without re-running the entire pipeline |
+| 🔄 **Auto Retry** | Failed videos auto-retry, auto-recover on page load |
 | 📐 **Aspect Ratios** | 16:9 (landscape), 9:16 (portrait), 1:1 (square) |
 | 🌐 **i18n** | Built-in lightweight i18n — switch between Chinese and English instantly |
 | 🔧 **Swappable Models** | Centralized model identifiers — swap models by editing the `MODELS` constant |
@@ -89,7 +90,8 @@ npm run preview
 │            │                        │                  │
 │ · Projects │  · Single shot preview │  · Shot copy     │
 │ · Shots    │  · Image/Video toggle  │  · Visual prompt │
-│ · History  │  · Final video + DL    │  · Duration      │
+│ · History  │  · Final video + DL    │  · Motion prompt │
+│            │                        │  · Duration      │
 │            │                        │  · Retry button  │
 └────────────┴────────────────────────┴──────────────────┘
 ```
@@ -98,9 +100,9 @@ npm run preview
 
 | Phase | Description | Concurrency |
 |-------|-------------|-------------|
-| 📝 Script | Call text model to generate 4-6 structured shots | 1 |
-| 🖼️ Image | Generate reference image per shot | 3 |
-| 🎥 Video | Generate video per shot (async create + 5s polling) | 2 |
+| 📝 Script | Generate shots + text-to-image prompts + image-to-video prompts | 1 |
+| 🖼️ Image | Generate reference images from visual prompts | 3 |
+| 🎥 Video | Generate videos from motion prompts (auto-retry 3x) | 2 |
 | ✂️ Render | FFmpeg.wasm concat demuxer → final MP4 | 1 |
 
 ## 🏗️ Project Structure
@@ -129,6 +131,7 @@ src/
 │   ├── scriptService.ts           # Text model call, structured storyboard generation
 │   ├── imageService.ts            # Image generation (single)
 │   ├── videoService.ts            # Video generation (async create + polling)
+│   ├── chatService.ts             # Multi-turn chat API (AI prompt optimization)
 │   └── renderService.ts           # FFmpeg.wasm video concatenation
 ├── stores/                        # Zustand stores
 │   ├── projectStore.ts            # Multi-project management (localStorage, v1→v2 migration)
@@ -150,7 +153,8 @@ src/
 │       ├── HelpTooltip.tsx        # Help tooltip
 │       ├── Lightbox.tsx           # Image lightbox
 │       ├── NumberInput.tsx        # Number input
-│       └── IMEAwareTextarea.tsx   # IME-aware textarea
+│       ├── IMEAwareTextarea.tsx   # IME-aware textarea
+│       └── AiAssistDrawer.tsx     # AI prompt optimization chat drawer
 ├── styles/
 │   └── globals.css                # Global styles
 ├── App.tsx                        # Root component

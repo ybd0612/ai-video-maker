@@ -23,7 +23,7 @@ src/
 │   │   └── ScriptPanel.tsx        # 用户输入区域 + 生成分镜按钮
 │   ├── shots/
 │   │   ├── ShotList.tsx           # 左侧分镜列表（状态徽标 + 缩略图）
-│   │   └── ShotEditor.tsx         # 右侧分镜编辑器（文案 / 画面描述 / 时长）
+│   │   └── ShotEditor.tsx         # 右侧分镜编辑器（文案 / 画面描述 / 动态描述 / 时长）
 │   ├── preview/
 │   │   ├── ShotPreview.tsx        # 单镜头预览（图片 + 视频）
 │   │   └── FinalPreview.tsx       # 成片预览（FFmpeg 拼接 + 下载）
@@ -32,10 +32,11 @@ src/
 │   └── history/
 │       └── HistoryPanel.tsx       # 操作历史面板
 ├── services/                      # Pipeline 服务层
-│   ├── pipelineService.ts         # 编排引擎（脚本 → 图片 → 视频，含并发控制）
-│   ├── scriptService.ts           # 文本模型调用，生成结构化分镜
-│   ├── imageService.ts            # 图片生成（单张）
-│   ├── videoService.ts            # 视频生成（异步创建 + 轮询）
+│   ├── pipelineService.ts         # 编排引擎（脚本 → 图片 → 视频，含并发控制 + 视频重试）
+│   ├── scriptService.ts           # 文本模型调用，生成结构化分镜（含 visualPrompt + motionPrompt）
+│   ├── imageService.ts            # 图片生成（单张，使用 visualPrompt）
+│   ├── videoService.ts            # 视频生成（异步创建 + 轮询，使用 motionPrompt）
+│   ├── chatService.ts             # 多轮对话 API（AI 辅助提示词优化）
 │   └── renderService.ts           # FFmpeg.wasm 视频拼接
 ├── stores/                        # Zustand stores
 │   ├── projectStore.ts            # 多项目管理（projects[] + activeProjectId + history[]，localStorage 持久化，v1→v2 迁移）
@@ -57,7 +58,8 @@ src/
 │       ├── HelpTooltip.tsx        # 帮助提示
 │       ├── Lightbox.tsx           # 图片灯箱
 │       ├── NumberInput.tsx        # 数字输入框
-│       └── IMEAwareTextarea.tsx   # 输入法兼容文本框
+│       ├── IMEAwareTextarea.tsx   # 输入法兼容文本框
+│       └── AiAssistDrawer.tsx     # AI 辅助提示词优化对话抽屉
 ├── styles/
 │   └── globals.css                # 全局样式
 ├── App.tsx                        # 根组件
@@ -90,14 +92,34 @@ src/
 
 四阶段流水线，编排在 `src/services/pipelineService.ts`：
 
-1. **脚本阶段** — 调用文本模型生成 4-6 个结构化分镜（scriptText + visualPrompt + duration）
-2. **图片阶段** — 为每个分镜生成参考图（并发度 3）
-3. **视频阶段** — 为每个分镜生成视频（并发度 2，异步创建 + 5 秒轮询，10 分钟超时）
+1. **脚本阶段** — 调用文本模型生成 4-6 个结构化分镜（scriptText + visualPrompt + motionPrompt + duration）
+2. **图片阶段** — 为每个分镜生成参考图（使用 visualPrompt，并发度 3）
+3. **视频阶段** — 为每个分镜生成视频（使用 motionPrompt，并发度 2，异步创建 + 5 秒轮询，4 分钟超时，最多 3 次自动重试）
 4. **拼接阶段** — FFmpeg.wasm concat demuxer 拼接所有视频为最终 MP4
 
 - 并发控制使用 `Promise.allSettled`，确保所有 worker 完成后再检查状态
 - 支持 AbortController 取消
 - 支持单镜头重试（`runSingleShot`，跳过脚本阶段）
+- 视频生成自动重试（最多 3 次，针对网络超时/5xx 等临时性故障）
+- 进入项目页面时自动重试之前失败的视频任务
+
+## 双提示词系统
+
+文生图和图生视频的提示词逻辑不同，拆分为两个字段：
+
+- **visualPrompt**（文生图）：静态场景描述，包含主体+场景背景+光影色调+艺术风格
+- **motionPrompt**（图生视频）：动态描述，包含主体动作+镜头运镜+环境变化
+
+脚本生成阶段同时产出两套提示词，分别用于图片和视频生成。
+
+## AI 辅助提示词优化
+
+可选增强功能，不影响一键成片主流程：
+
+- 每个输入框旁有 ✨ 按钮，点击滑出 AI 对话抽屉
+- 多轮对话优化提示词，满意后点击“应用”替换
+- 不同字段使用不同的 AI 专家角色（文案/画面/动态/主题）
+- 实现在 `chatService.ts` + `AiAssistDrawer.tsx`
 
 ## 模型配置
 
@@ -109,7 +131,7 @@ src/
 ## 数据模型
 
 - **Project**：项目（title / aspectRatio / style / language / shots / status / error / createdAt / updatedAt）
-- **Shot**：分镜（scriptText / visualPrompt / duration / imageUrl / videoUrl / status）
+- **Shot**：分镜（scriptText / visualPrompt / motionPrompt / duration / imageUrl / videoUrl / status / videoRetryCount）
 - **HistoryEntry**：操作记录（projectId / action / description / timestamp）
 - 项目状态流转：`idle → scripting → imaging → videoing → rendering → done`（可卡在 `failed`）
 - 分镜状态流转：`idle → scripting → scripted → imaging → imaged → videoing → videoed`（可卡在 `failed`）
