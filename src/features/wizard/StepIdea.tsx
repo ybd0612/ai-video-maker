@@ -95,38 +95,6 @@ export function StepIdea({ onGenerated }: StepIdeaProps) {
     }
   };
 
-  /** Quick refine: send current textarea to AI */
-  const handleQuickRefine = async () => {
-    if (!prompt.trim() || isRefining || !providerConfig.apiKey) return;
-
-    const userMsg: ChatTurn = { role: "user", content: `请帮我完善这个想法：${prompt}` };
-    const newHistory = [...chatHistory, userMsg];
-    setChatHistory(newHistory);
-    setIsRefining(true);
-
-    try {
-      const messages = [
-        { role: "system" as const, content: systemPrompt },
-        ...newHistory.map((m) => ({ role: m.role as "user" | "assistant", content: m.content })),
-      ];
-
-      const result = await chatCompletion({
-        apiKey: providerConfig.apiKey,
-        baseUrl: providerConfig.baseUrl,
-        messages,
-      });
-
-      const assistantMsg: ChatTurn = { role: "assistant", content: result.content };
-      setChatHistory((prev) => [...prev, assistantMsg]);
-      // Auto-apply: AI always outputs the complete idea
-      setPrompt(result.content);
-    } catch {
-      setChatHistory((prev) => [...prev, { role: "assistant", content: "请求失败，请重试。" }]);
-    } finally {
-      setIsRefining(false);
-    }
-  };
-
   const handleGenerate = async () => {
     if (!prompt.trim()) return;
     setIsGenerating(true);
@@ -194,23 +162,8 @@ export function StepIdea({ onGenerated }: StepIdeaProps) {
           placeholder={t("wizard.ideaPlaceholder")}
           rows={4}
           disabled={isGenerating || isRefining}
-          className="w-full resize-none rounded-xl border border-slate-700 bg-slate-800 p-4 pr-24 text-sm text-slate-100 placeholder:text-slate-600 focus:border-emerald-500 focus:outline-none disabled:opacity-50"
+          className="w-full resize-none rounded-xl border border-slate-700 bg-slate-800 p-4 text-sm text-slate-100 placeholder:text-slate-600 focus:border-emerald-500 focus:outline-none disabled:opacity-50"
         />
-
-        {/* AI quick refine button — inside textarea, top-right */}
-        <button
-          onClick={handleQuickRefine}
-          disabled={!prompt.trim() || isRefining || isGenerating || !providerConfig.apiKey}
-          className="absolute right-3 top-3 flex items-center gap-1 rounded-lg bg-slate-700/80 px-2 py-1 text-[11px] text-emerald-400 transition hover:bg-emerald-900/50 hover:text-emerald-300 disabled:opacity-30 disabled:cursor-not-allowed backdrop-blur-sm"
-          title={t("wizard.chatWithAi") || "AI 完善"}
-        >
-          {isRefining ? (
-            <Loader2 size={12} className="animate-spin" />
-          ) : (
-            <Sparkles size={12} />
-          )}
-          {isRefining ? (t("wizard.aiThinking") || "完善中...") : (t("wizard.chatWithAi") || "AI 完善")}
-        </button>
 
         {/* Generating overlay */}
         {isGenerating && (
