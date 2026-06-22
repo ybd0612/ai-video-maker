@@ -6,6 +6,8 @@
 import { useProjectStore, selectActiveProject } from "@/stores/projectStore";
 import { useT } from "@/i18n";
 import { StepIndicator } from "./StepIndicator";
+import { StepIdea } from "./StepIdea";
+import { StepStoryboard } from "./StepStoryboard";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 
 interface CreationWizardProps {
@@ -51,8 +53,10 @@ export function CreationWizard({ children }: CreationWizardProps) {
       <StepIndicator />
 
       {/* Step content */}
-      <div className="flex-1 overflow-y-auto p-6">
-        {children}
+      <div className="flex-1 overflow-y-auto">
+        {currentStep === 1 && <StepIdea />}
+        {currentStep === 2 && <StepStoryboard />}
+        {currentStep >= 3 && children}
       </div>
 
       {/* Navigation buttons */}
