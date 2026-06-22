@@ -12,6 +12,17 @@ import { Sparkles, Loader2, Monitor, Smartphone, Square, Send, Bot, User } from 
 import { useWizardActions } from "./useWizardActions";
 import { chatCompletion } from "@/services/chatService";
 
+const IDEA_SYSTEM_PROMPT = `你是一位专业的短视频创意策划师。用户正在构思一个短视频的主题和想法，你需要帮助用户完善和细化。
+
+要求：
+- 帮助用户明确视频主题、情感基调、视觉风格
+- 提供具体的场景建议和叙事方向
+- 建议要具体、有画面感、可操作
+- 每次回复简洁有力，不超过 150 字
+- 如果用户的想法已经足够好，告诉他们可以直接点击"生成分镜"
+- 如果用户提供了初步想法，帮助他们补充细节和情感
+- 如果用户提出修改意见，按用户要求调整`;
+
 interface StepIdeaProps {
   onGenerated?: () => void;
 }
@@ -44,16 +55,7 @@ export function StepIdea({ onGenerated }: StepIdeaProps) {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [chatHistory]);
 
-  const systemPrompt = `你是一位专业的短视频创意策划师。用户正在构思一个短视频的主题和想法，你需要帮助用户完善和细化。
-
-要求：
-- 帮助用户明确视频主题、情感基调、视觉风格
-- 提供具体的场景建议和叙事方向
-- 建议要具体、有画面感、可操作
-- 每次回复简洁有力，不超过 150 字
-- 如果用户的想法已经足够好，告诉他们可以直接点击"生成分镜"
-- 如果用户提供了初步想法，帮助他们补充细节和情感
-- 如果用户提出修改意见，按用户要求调整`;
+  const systemPrompt = IDEA_SYSTEM_PROMPT;
 
   /** Send a message in the conversation */
   const handleChatSend = async () => {

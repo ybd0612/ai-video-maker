@@ -100,7 +100,7 @@ const SIMPLE_PROMPT_ZH = `你是一位专业的短视频分镜策划师。用户
       "detailDesc": "细节/服饰描述（中文，如 穿着白色衬衫，精致首饰）",
       "lightingDesc": "光影/色调（中文，如 温暖的金色夕阳光，电影感轮廓光）",
       "styleDesc": "艺术风格（中文，如 写实风格，8K，超精细）",
-      "negativePrompt": "负向提示词（中文，如 解刨异常，多余肢体，模糊）",
+      "negativePrompt": "负向提示词（中文，如 解剖异常，多余肢体，模糊）",
       "actionDesc": "主体动作（中文，如 缓缓转头，温柔微笑）",
       "cameraDesc": "镜头运镜（中文，如 镜头缓缓推进，特写跟踪镜头）",
       "envChangeDesc": "环境变化（中文，如 咖啡杯蒸汽上升，窗外树叶摇曳）",
@@ -149,6 +149,8 @@ Return strictly in this JSON format, no other text:
   "shots": [
     {
       "scriptText": "Narration/copy for this shot (short, punchy)",
+      "visualPrompt": "Text-to-image English prompt (complete English description for AI image API)",
+      "motionPrompt": "Image-to-video English prompt (complete English motion description for AI video API)",
       "subjectDesc": "Subject description (English, e.g. A young woman with long dark hair)",
       "sceneDesc": "Scene/background (English, e.g. sitting in a sunlit cafe by the window)",
       "detailDesc": "Details/clothing (English, e.g. wearing a white blouse, delicate jewelry)",
@@ -218,7 +220,7 @@ ${charSection}
       "detailDesc": "细节/服饰描述（中文，如 穿着白色衬衫，精致首饰）",
       "lightingDesc": "光影/色调（中文，如 温暖的金色夕阳光，电影感轮廓光）",
       "styleDesc": "艺术风格（中文，如 写实风格，8K，超精细）",
-      "negativePrompt": "负向提示词（中文，如 解刨异常，多余肢体，模糊）",
+      "negativePrompt": "负向提示词（中文，如 解剖异常，多余肢体，模糊）",
       "actionDesc": "主体动作（中文，如 缓缓转头，温柔微笑）",
       "cameraDesc": "镜头运镜（中文，如 镜头缓缓推进，特写跟踪镜头）",
       "envChangeDesc": "环境变化（中文，如 咖啡杯蒸汽上升，窗外树叶摇曳）",
@@ -270,6 +272,8 @@ Return strictly in this JSON format, no other text:
         { "characterId": "char_xxx", "text": "Character dialogue", "delivery": "gently" }
       ],
       "scriptText": "Shot narration summary (short, punchy)",
+      "visualPrompt": "Text-to-image English prompt (complete English description, must include active characters' full appearance)",
+      "motionPrompt": "Image-to-video English prompt (complete English motion description)",
       "subjectDesc": "Subject description (English, e.g. A young woman with long dark hair)",
       "sceneDesc": "Scene/background (English, e.g. sitting in a sunlit cafe by the window)",
       "detailDesc": "Details/clothing (English, e.g. wearing a white blouse, delicate jewelry)",

@@ -252,7 +252,7 @@ export function useWizardActions() {
             // Wait before retrying
             store.updateShot(shot.id, {
               videoProgress: 0,
-              videoRetryCount: (shot.videoRetryCount ?? 0) + 1,
+              videoRetryCount: attempt + 1,
             });
             await new Promise<void>((r) => setTimeout(r, RETRY_DELAY_MS * (attempt + 1)));
           }
@@ -297,7 +297,12 @@ export function useWizardActions() {
 
       store.updateShot(shotId, { videoUrl: result.videoUrl, status: "videoed" });
     } catch (err) {
-      store.setShotStatus(shotId, "failed", err instanceof Error ? err.message : String(err));
+      if (err instanceof VideoTaskCreatedError) {
+        store.setShotStatus(shotId, "failed",
+          "视频任务已创建但获取结果失败，请稍后重试。");
+      } else {
+        store.setShotStatus(shotId, "failed", err instanceof Error ? err.message : String(err));
+      }
     }
   }, []);
 

@@ -139,7 +139,7 @@ export function PromptSubFields({
             label={t("wizard.negativePrompt")}
             value={shot.negativePrompt ?? ""}
             onChange={(v) => handleChange("negativePrompt", v)}
-            placeholder="解刨异常，多余肢体，模糊，变形"
+            placeholder="解剖异常，多余肢体，模糊，变形"
             color="red"
             rows={1}
           />

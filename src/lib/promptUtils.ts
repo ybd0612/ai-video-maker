@@ -28,7 +28,7 @@ export function composeVisualPrompt(shot: Shot): string {
     .filter(Boolean);
 
   if (parts.length > 0) return parts.join(", ");
-  return "";
+  return shot.visualPrompt ?? "";
 }
 
 /**
@@ -52,5 +52,5 @@ export function composeMotionPrompt(shot: Shot): string {
     .filter(Boolean);
 
   if (parts.length > 0) return parts.join(", ");
-  return "";
+  return shot.motionPrompt ?? "";
 }
