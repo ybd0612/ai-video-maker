@@ -7,8 +7,10 @@ import { useState, useCallback } from "react";
 import { useProjectStore, type Character } from "@/stores/projectStore";
 import { useSettingsStore } from "@/stores/settingsStore";
 import { useT } from "@/i18n";
-import { ArrowLeft, Sparkles, Loader2 } from "lucide-react";
+import { ArrowLeft, Sparkles, Loader2, RefreshCw, ImageIcon } from "lucide-react";
 import { chatCompletion, SYSTEM_PROMPT_CHARACTER } from "@/services/chatService";
+import { generateImage } from "@/services/imageService";
+import { generateAssetNamespace, generateFullPrompt } from "@/lib/assetNamespace";
 
 interface CharacterEditorProps {
   character: Character | null; // null = creating new
@@ -26,24 +28,59 @@ export function CharacterEditor({ character, onClose }: CharacterEditorProps) {
   const [appearancePrompt, setAppearancePrompt] = useState(character?.appearancePrompt ?? "");
   const [avatarUrl, setAvatarUrl] = useState(character?.avatarUrl ?? "");
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isGeneratingPortrait, setIsGeneratingPortrait] = useState(false);
+
+  /** Generate a portrait image from the appearance prompt */
+  const handleGeneratePortrait = useCallback(async () => {
+    if (!appearancePrompt.trim() || !providerConfig.apiKey || !providerConfig.baseUrl) return;
+    setIsGeneratingPortrait(true);
+    try {
+      const portraitUrl = await generateImage({
+        apiKey: providerConfig.apiKey,
+        baseUrl: providerConfig.baseUrl,
+        prompt: `Portrait photo of ${appearancePrompt.trim()}, facing camera, clean background, high quality, detailed facial features, photorealistic, professional, all-ages appropriate`,
+        size: "1024x1024",
+      });
+      // Save portrait to character
+      if (character) {
+        updateCharacter(character.id, { generatedPortraitUrl: portraitUrl });
+      }
+      // Store for new character creation
+      setGeneratedPortraitUrl(portraitUrl);
+    } catch {
+      // Silent fail — user can retry
+    } finally {
+      setIsGeneratingPortrait(false);
+    }
+  }, [appearancePrompt, providerConfig, character, updateCharacter]);
+
+  const [generatedPortraitUrl, setGeneratedPortraitUrl] = useState(
+    character?.generatedPortraitUrl ?? "",
+  );
 
   const handleSave = () => {
     if (!name.trim()) return;
 
+    const trimmedName = name.trim();
+    const trimmedAppearance = appearancePrompt.trim();
+    const namespace = generateAssetNamespace(trimmedName);
+    const charForPrompt = { name: trimmedName, appearancePrompt: trimmedAppearance } as Character;
+    const fullPrompt = generateFullPrompt(charForPrompt);
+
+    const updates = {
+      name: trimmedName,
+      description: description.trim(),
+      appearancePrompt: trimmedAppearance,
+      avatarUrl: avatarUrl.trim() || undefined,
+      generatedPortraitUrl: generatedPortraitUrl || undefined,
+      assetNamespace: namespace,
+      fullPrompt,
+    };
+
     if (character) {
-      updateCharacter(character.id, {
-        name: name.trim(),
-        description: description.trim(),
-        appearancePrompt: appearancePrompt.trim(),
-        avatarUrl: avatarUrl.trim() || undefined,
-      });
+      updateCharacter(character.id, updates);
     } else {
-      addCharacter({
-        name: name.trim(),
-        description: description.trim(),
-        appearancePrompt: appearancePrompt.trim(),
-        avatarUrl: avatarUrl.trim() || undefined,
-      });
+      addCharacter(updates);
     }
     onClose();
   };
@@ -144,7 +181,51 @@ export function CharacterEditor({ character, onClose }: CharacterEditorProps) {
         />
       </div>
 
-      {/* Avatar URL */}
+      {/* Portrait Preview + Generate */}
+      <div className="space-y-1">
+        <div className="flex items-center justify-between">
+          <label className="text-[11px] font-medium text-slate-500">
+            {t("characters.portrait" as any) || "定妆照"}
+          </label>
+          <button
+            onClick={handleGeneratePortrait}
+            disabled={isGeneratingPortrait || !appearancePrompt.trim() || !providerConfig.apiKey}
+            className="flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] text-violet-400 hover:bg-violet-950/30 transition disabled:opacity-50"
+            title={t("characters.generatePortrait" as any) || "生成定妆照"}
+          >
+            {isGeneratingPortrait ? (
+              <Loader2 size={10} className="animate-spin" />
+            ) : generatedPortraitUrl ? (
+              <RefreshCw size={10} />
+            ) : (
+              <ImageIcon size={10} />
+            )}
+            {generatedPortraitUrl
+              ? (t("characters.regeneratePortrait" as any) || "重新生成")
+              : (t("characters.generatePortrait" as any) || "生成定妆照")}
+          </button>
+        </div>
+        {generatedPortraitUrl ? (
+          <div className="relative w-20 h-20 rounded-lg overflow-hidden border border-slate-700">
+            <img
+              src={generatedPortraitUrl}
+              alt="定妆照"
+              className="h-full w-full object-cover"
+            />
+          </div>
+        ) : (
+          <div className="flex h-20 w-20 items-center justify-center rounded-lg border border-dashed border-slate-700 text-slate-600">
+            <ImageIcon size={20} />
+          </div>
+        )}
+        {isGeneratingPortrait && (
+          <p className="text-[10px] text-emerald-400 animate-pulse">
+            {t("wizard.generating") || "生成中..."}
+          </p>
+        )}
+      </div>
+
+      {/* Avatar URL (manual override) */}
       <div className="space-y-1">
         <label className="text-[11px] font-medium text-slate-500">
           {t("characters.avatar")}
