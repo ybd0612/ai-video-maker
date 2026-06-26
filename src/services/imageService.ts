@@ -3,59 +3,54 @@
 // Generates images for shots using the Agnes Image API.
 // ────────────────────────────────────────────────────────────────────────────
 
-import { MODELS } from "@/lib/models";
+import { createAIService } from "@/services/ai/factory";
+import { useSettingsStore } from "@/stores/settingsStore";
 
 interface GenerateImageOptions {
   apiKey: string;
   baseUrl: string;
   prompt: string;
   size: string;
+  /** If provided, uses image-to-image mode with this reference image */
+  inputImageUrl?: string;
 }
 
 /**
  * Generate a single image from a visual prompt.
  * Returns the image URL.
+ *
+ * 内部委托给统一 AI 服务层，保留原有调用签名以兼容现有调用方。
  */
 export async function generateImage(opts: GenerateImageOptions): Promise<string> {
-  const url = `${opts.baseUrl.replace(/\/+$/, "")}/images/generations`;
-  const body: Record<string, unknown> = {
-    model: MODELS.image,
+  const service = createAIService({
+    provider: "openai",
+    apiKey: opts.apiKey,
+    baseUrl: opts.baseUrl,
+  });
+  const result = await service.generateImage({
     prompt: opts.prompt,
     size: opts.size,
-    extra_body: { response_format: "url" },
-  };
-
-  const resp = await fetch(url, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${opts.apiKey}`,
-    },
-    body: JSON.stringify(body),
+    inputImageUrl: opts.inputImageUrl,
   });
+  return result.url;
+}
 
-  if (!resp.ok) {
-    const text = await resp.text().catch(() => "");
-    throw new Error(`Image API error ${resp.status}: ${text}`);
-  }
-
-  const contentType = resp.headers.get("content-type") ?? "";
-  if (!contentType.includes("application/json")) {
-    const text = await resp.text().catch(() => "");
-    throw new Error(
-      `Image API 返回了非 JSON 响应 (Content-Type: ${contentType})。请检查 Base URL 是否正确。响应前 200 字符：${text.slice(0, 200)}`,
-    );
-  }
-
-  const json = await resp.json();
-  let imageUrl: string = json.data?.[0]?.url ?? "";
-  if (imageUrl && !imageUrl.startsWith("http://") && !imageUrl.startsWith("https://")) {
-    imageUrl = "https://" + imageUrl;
-  }
-  if (!imageUrl) {
-    throw new Error("Image API returned no URL.");
-  }
-  return imageUrl;
+/**
+ * 简化版图片生成接口 — 从 settingsStore 读取 provider 配置。
+ */
+export async function generateImageFromSettings(params: {
+  prompt: string;
+  size: string;
+  inputImageUrl?: string;
+}): Promise<string> {
+  const { providerConfig } = useSettingsStore.getState();
+  const service = createAIService({
+    provider: "openai",
+    apiKey: providerConfig.apiKey,
+    baseUrl: providerConfig.baseUrl,
+  });
+  const result = await service.generateImage(params);
+  return result.url;
 }
 
 /**

@@ -3,8 +3,8 @@
 // Multi-turn chat API for AI-assisted prompt optimization.
 // ────────────────────────────────────────────────────────────────────────────
 
-import { MODELS } from "@/lib/models";
-import { resolveBaseUrl } from "@/lib/resolveBaseUrl";
+import { createAIService } from "@/services/ai/factory";
+import { useSettingsStore } from "@/stores/settingsStore";
 
 /* ── Types ──────────────────────────────────────────────────────────────── */
 
@@ -80,6 +80,11 @@ Requirements:
 - Keep appearance concise but detailed enough for consistent image generation
 - Example: "Young woman in her mid-20s, long straight black hair, slim build, soft facial features, fair skin, wearing casual modern clothing"
 
+Content safety (MUST follow, or the image API will reject the prompt):
+- Use "young man/young woman/teenager" instead of "boy/girl/child/kid/little boy/little girl"
+- Keep clothing descriptions modest and appropriate
+- Avoid descriptions that could trigger content moderation filters
+
 Return the optimized appearance description directly, no explanations.`;
 
 export const SYSTEM_PROMPT_DIALOGUE = `你是一位专业的短剧对白优化专家。用户会给你一段角色对话，请帮助优化和改进。
@@ -102,50 +107,38 @@ const MAX_HISTORY_MESSAGES = 10;
 /**
  * Send a multi-turn chat request to the text model.
  * Returns the assistant's response content.
+ *
+ * 内部委托给统一 AI 服务层，保留原有调用签名以兼容现有调用方。
  */
 export async function chatCompletion(opts: ChatOptions): Promise<ChatResult> {
-  const url = `${resolveBaseUrl(opts.baseUrl)}/chat/completions`;
-
   // Trim history to last N messages (keep system message + recent turns)
   const systemMsg = opts.messages[0];
   const history = opts.messages.slice(1);
-  const trimmed = history.length > MAX_HISTORY_MESSAGES
-    ? [systemMsg, ...history.slice(-MAX_HISTORY_MESSAGES)]
-    : opts.messages;
+  const trimmed =
+    history.length > MAX_HISTORY_MESSAGES
+      ? [systemMsg, ...history.slice(-MAX_HISTORY_MESSAGES)]
+      : opts.messages;
 
-  const resp = await fetch(url, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${opts.apiKey}`,
-    },
-    body: JSON.stringify({
-      model: MODELS.text,
-      messages: trimmed,
-      temperature: 0.7,
-      max_tokens: 1024,
-    }),
+  const service = createAIService({
+    provider: "openai",
+    apiKey: opts.apiKey,
+    baseUrl: opts.baseUrl,
   });
+  return service.chatCompletion({ messages: trimmed });
+}
 
-  if (!resp.ok) {
-    const body = await resp.text().catch(() => "");
-    throw new Error(`Chat API error ${resp.status}: ${body}`);
-  }
-
-  const contentType = resp.headers.get("content-type") ?? "";
-  if (!contentType.includes("application/json")) {
-    const body = await resp.text().catch(() => "");
-    throw new Error(
-      `Chat API 返回了非 JSON 响应 (Content-Type: ${contentType})。响应前 200 字符：${body.slice(0, 200)}`,
-    );
-  }
-
-  const json = await resp.json();
-  const content: string = json.choices?.[0]?.message?.content ?? "";
-
-  if (!content) {
-    throw new Error("Chat API 返回了空内容。");
-  }
-
-  return { content: content.trim() };
+/**
+ * 简化版聊天接口 — 从 settingsStore 读取 provider 配置。
+ * 适用于不需要显式传 apiKey/baseUrl 的场景。
+ */
+export async function chatCompletionFromSettings(params: {
+  messages: ChatMessage[];
+}): Promise<ChatResult> {
+  const { providerConfig } = useSettingsStore.getState();
+  const service = createAIService({
+    provider: "openai",
+    apiKey: providerConfig.apiKey,
+    baseUrl: providerConfig.baseUrl,
+  });
+  return service.chatCompletion({ messages: params.messages });
 }
