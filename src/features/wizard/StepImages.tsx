@@ -10,11 +10,13 @@ import { ShotCard } from "./ShotCard";
 import { PromptSubFields } from "./PromptSubFields";
 import { Lightbox } from "@/components/ui/Lightbox";
 import { useWizardActions } from "./useWizardActions";
+import { ReviewCheckpoint } from "./ReviewCheckpoint";
 import { RefreshCw } from "lucide-react";
 
 export function StepImages() {
   const t = useT();
   const project = useProjectStore(selectActiveProject);
+  const setWizardStep = useProjectStore((s) => s.setWizardStep);
   const { generateImagesForStep, rerollImage } = useWizardActions();
 
   const shots = project?.shots ?? [];
@@ -83,9 +85,11 @@ export function StepImages() {
       </div>
 
       {allImaged && (
-        <div className="text-center text-emerald-400 text-xs">
-          ✓ {t("wizard.allReady")}
-        </div>
+        <ReviewCheckpoint
+          mode={project?.automationMode ?? "semi-auto"}
+          onConfirm={() => setWizardStep(5)}
+          onSkip={() => setWizardStep(5)}
+        />
       )}
     </div>
   );
