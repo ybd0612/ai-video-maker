@@ -21,8 +21,9 @@ export function generateAssetNamespace(name: string): string {
 
 /**
  * 生成角色的完整提示词，用于替换命名空间占位符
+ * 接受窄类型而非完整 Character，避免调用方做 unsafe cast
  */
-export function generateFullPrompt(character: Character): string {
+export function generateFullPrompt(character: { name: string; appearancePrompt: string }): string {
   return `a character named ${character.name}, ${character.appearancePrompt}`;
 }
 

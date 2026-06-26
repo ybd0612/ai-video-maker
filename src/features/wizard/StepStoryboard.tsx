@@ -64,6 +64,7 @@ export function StepStoryboard() {
       dialogues: [],
       activeCharacterIds: [],
       duration: 5,
+      useDualFrame: false,
     });
   };
 
@@ -76,23 +77,23 @@ export function StepStoryboard() {
             {t("wizard.step2")}
           </h2>
           <p className="mt-2 text-xs text-slate-500">
-            基于你的想法和资产，AI 将生成分镜脚本
+            {t("wizard.storyboardHint")}
           </p>
         </div>
 
         {/* Idea preview */}
         {ideaPrompt && (
           <div className="w-full rounded-xl border border-slate-700 bg-slate-800/50 p-4">
-            <p className="text-[11px] font-medium text-slate-500 mb-1">想法</p>
+            <p className="text-[11px] font-medium text-slate-500 mb-1">{t("wizard.step1")}</p>
             <p className="text-sm text-slate-300 line-clamp-4">{ideaPrompt}</p>
           </div>
         )}
 
         {/* Asset summary */}
         <div className="flex gap-4 text-xs text-slate-500">
-          <span>角色: {project?.characters?.length ?? 0}</span>
-          <span>场景: {project?.sceneReferences?.length ?? 0}</span>
-          {project?.styleReferenceUrl && <span>风格图: ✓</span>}
+          <span>{t("wizard.assetCharacters")}: {project?.characters?.length ?? 0}</span>
+          <span>{t("wizard.assetScenes")}: {project?.sceneReferences?.length ?? 0}</span>
+          {project?.styleReferenceUrl && <span>{t("wizard.assetStyle")}: ✓</span>}
         </div>
 
         <button
@@ -120,7 +121,7 @@ export function StepStoryboard() {
           className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-300 transition"
         >
           <Plus size={12} />
-          手动添加镜头
+          {t("wizard.addShotManual")}
         </button>
       </div>
     );
@@ -147,7 +148,7 @@ export function StepStoryboard() {
             className="flex items-center gap-1 rounded px-2 py-1 text-[11px] text-emerald-400 hover:bg-emerald-950/30 transition"
           >
             <Plus size={12} />
-            {t("dialogue.add" as any)}
+            {t("wizard.addShot")}
           </button>
         </div>
       </div>

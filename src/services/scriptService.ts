@@ -37,6 +37,7 @@ interface RawShot {
   envChangeDesc?: string;
   motionSpeedDesc?: string;
   negativeMotionPrompt?: string;
+  useDualFrame?: boolean;
 }
 
 interface RawCharacter {
@@ -396,6 +397,7 @@ export async function generateScript(
         motionSpeedDesc: s.motionSpeedDesc ?? "",
         negativeMotionPrompt: s.negativeMotionPrompt ?? "",
         duration: [3, 5, 8].includes(s.duration) ? s.duration : 5,
+        useDualFrame: s.useDualFrame ?? false,
       }));
 
       // Fallback for empty prompts

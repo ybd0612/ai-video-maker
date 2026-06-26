@@ -29,7 +29,6 @@ export function ShotEditor({
   const setActiveCharacters = useProjectStore((s) => s.setActiveCharacters);
   const project = useProjectStore(selectActiveProject);
   const t = useT();
-  const isDramaMode = project?.mode === "drama";
   const characters = project?.characters ?? [];
 
   if (!shot) {
@@ -88,7 +87,7 @@ export function ShotEditor({
         </div>
       )}
 
-      {isDramaMode && (
+      {characters.length > 0 && (
         <DialogueEditor shotId={shot.id} />
       )}
 

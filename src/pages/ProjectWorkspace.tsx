@@ -17,7 +17,6 @@ import { generateImage, aspectRatioToImageSize } from "@/services/imageService";
 import { generateVideo, aspectRatioToVideoSize } from "@/services/videoService";
 import { SYSTEM_PROMPT_SCRIPT_TEXT, SYSTEM_PROMPT_VISUAL_PROMPT, SYSTEM_PROMPT_MAIN_PROMPT, SYSTEM_PROMPT_MOTION_PROMPT } from "@/services/chatService";
 import { AiAssistDrawer } from "@/components/ui/AiAssistDrawer";
-import { ModeToggle } from "@/components/ui/ModeToggle";
 import { CharacterPanel } from "@/features/characters/CharacterPanel";
 import { ProjectSidebar } from "@/features/projects/ProjectSidebar";
 import { HistoryPanel } from "@/features/history/HistoryPanel";
@@ -152,7 +151,7 @@ export function ProjectWorkspace() {
           aspectRatio: proj.aspectRatio,
         });
 
-        const shots: Shot[] = rawShots.map((s, i) => ({
+        const shots: Shot[] = rawShots.shots.map((s, i) => ({
           id: `shot_${Date.now()}_${i}`,
           index: i,
           status: "scripted" as const,
@@ -318,9 +317,6 @@ export function ProjectWorkspace() {
         </div>
 
         <div className="flex items-center gap-2">
-          {/* Mode toggle */}
-          {project && <ModeToggle />}
-
           {/* Aspect ratio selector */}
           {project && (
             <select

@@ -64,8 +64,7 @@ export function CharacterEditor({ character, onClose }: CharacterEditorProps) {
     const trimmedName = name.trim();
     const trimmedAppearance = appearancePrompt.trim();
     const namespace = generateAssetNamespace(trimmedName);
-    const charForPrompt = { name: trimmedName, appearancePrompt: trimmedAppearance } as Character;
-    const fullPrompt = generateFullPrompt(charForPrompt);
+    const fullPrompt = generateFullPrompt({ name: trimmedName, appearancePrompt: trimmedAppearance });
 
     const updates = {
       name: trimmedName,
@@ -185,13 +184,13 @@ export function CharacterEditor({ character, onClose }: CharacterEditorProps) {
       <div className="space-y-1">
         <div className="flex items-center justify-between">
           <label className="text-[11px] font-medium text-slate-500">
-            {t("characters.portrait" as any) || "定妆照"}
+            {t("characters.portrait")}
           </label>
           <button
             onClick={handleGeneratePortrait}
             disabled={isGeneratingPortrait || !appearancePrompt.trim() || !providerConfig.apiKey}
             className="flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] text-violet-400 hover:bg-violet-950/30 transition disabled:opacity-50"
-            title={t("characters.generatePortrait" as any) || "生成定妆照"}
+            title={t("characters.generatePortrait")}
           >
             {isGeneratingPortrait ? (
               <Loader2 size={10} className="animate-spin" />
@@ -201,8 +200,8 @@ export function CharacterEditor({ character, onClose }: CharacterEditorProps) {
               <ImageIcon size={10} />
             )}
             {generatedPortraitUrl
-              ? (t("characters.regeneratePortrait" as any) || "重新生成")
-              : (t("characters.generatePortrait" as any) || "生成定妆照")}
+              ? t("characters.regeneratePortrait")
+              : t("characters.generatePortrait")}
           </button>
         </div>
         {generatedPortraitUrl ? (

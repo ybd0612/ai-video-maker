@@ -48,7 +48,7 @@ export function StepVideos() {
             </span>
           )}
           <button
-            onClick={() => shots.forEach((s) => s.imageUrl && !s.videoUrl && rerollVideo(s.id))}
+            onClick={() => shots.forEach((s) => s.videoUrl && rerollVideo(s.id))}
             disabled={generatingCount > 0}
             className="flex items-center gap-1 rounded px-2 py-1 text-[11px] text-emerald-400 hover:bg-emerald-950/30 transition disabled:opacity-50"
           >

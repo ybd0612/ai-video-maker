@@ -14,6 +14,7 @@ import type {
   ImageResult,
   VideoTaskStatus,
 } from "../types";
+import { fetchWithRetry } from "@/lib/fetchWithRetry";
 
 export class AgnesAdapter implements ModelProvider {
   readonly name = "Agnes AI";
@@ -22,7 +23,7 @@ export class AgnesAdapter implements ModelProvider {
 
   async discover(apiKey: string, baseUrl: string): Promise<AIModel[]> {
     try {
-      const resp = await fetch(`${baseUrl}/models`, {
+      const resp = await fetchWithRetry(`${baseUrl}/models`, {
         headers: { Authorization: `Bearer ${apiKey}` },
       });
       if (!resp.ok) return [];
@@ -75,7 +76,7 @@ export class AgnesAdapter implements ModelProvider {
     baseUrl: string,
     params: TextParams,
   ): Promise<TextResult> {
-    const resp = await fetch(`${baseUrl}/chat/completions`, {
+    const resp = await fetchWithRetry(`${baseUrl}/chat/completions`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -140,7 +141,7 @@ export class AgnesAdapter implements ModelProvider {
       ...(params.extraBody ?? {}),
     };
 
-    const resp = await fetch(`${baseUrl}/images/generations`, {
+    const resp = await fetchWithRetry(`${baseUrl}/images/generations`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -199,7 +200,7 @@ export class AgnesAdapter implements ModelProvider {
       body.image = params.imageUrl;
     }
 
-    const resp = await fetch(`${baseUrl}/videos`, {
+    const resp = await fetchWithRetry(`${baseUrl}/videos`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -226,7 +227,7 @@ export class AgnesAdapter implements ModelProvider {
     baseUrl: string,
     videoId: string,
   ): Promise<VideoTaskStatus> {
-    const resp = await fetch(`${baseUrl}/videos/${videoId}`, {
+    const resp = await fetchWithRetry(`${baseUrl}/videos/${videoId}`, {
       headers: { Authorization: `Bearer ${apiKey}` },
     });
 

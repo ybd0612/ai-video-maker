@@ -72,9 +72,9 @@ export function CharacterPanel() {
             >
               {/* Avatar */}
               <div className="h-8 w-8 shrink-0 overflow-hidden rounded-full border border-slate-700 bg-slate-800">
-                {char.avatarUrl ? (
+                {(char.generatedPortraitUrl || char.avatarUrl) ? (
                   <img
-                    src={char.avatarUrl}
+                    src={char.generatedPortraitUrl || char.avatarUrl}
                     alt={char.name}
                     className="h-full w-full object-cover"
                   />

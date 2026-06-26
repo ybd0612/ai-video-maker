@@ -1,10 +1,11 @@
 // ────────────────────────────────────────────────────────────────────────────
 // src/features/wizard/StepIdea.tsx
-// Step 1: Multi-turn AI brainstorm + aspect ratio + generate storyboard.
+// Step 1: Multi-turn AI brainstorm + aspect ratio + extract characters.
 // ────────────────────────────────────────────────────────────────────────────
 
 import { useState, useRef, useEffect } from "react";
 import { useProjectStore, selectActiveProject } from "@/stores/projectStore";
+import type { ChatTurn } from "@/stores/projectStore";
 import { useSettingsStore } from "@/stores/settingsStore";
 import { useT } from "@/i18n";
 import {
@@ -26,16 +27,11 @@ const IDEA_SYSTEM_PROMPT = `你是一位专业的短视频创意策划师。用�
 - 提供具体的场景建议和叙事方向
 - 建议要具体、有画面感、可操作
 - 每次回复不超过 200 字
-- 如果用户的想法已经足够好，告诉他们可以直接点击"生成分镜"
+- 如果用户的想法已经足够好，告诉他们可以点击"下一步"进入资产准备
 - 如果用户提出修改意见，在完整版本中体现修改`;
 
 interface StepIdeaProps {
   onGenerated?: () => void;
-}
-
-interface ChatTurn {
-  role: "user" | "assistant";
-  content: string;
 }
 
 export function StepIdea({ onGenerated }: StepIdeaProps) {
@@ -43,19 +39,66 @@ export function StepIdea({ onGenerated }: StepIdeaProps) {
   const project = useProjectStore(selectActiveProject);
   const updateProject = useProjectStore((s) => s.updateProject);
   const providerConfig = useSettingsStore((s) => s.providerConfig);
-  const { generateAndAdvance } = useWizardActions();
-  const [prompt, setPrompt] = useState("");
+  const { extractCharactersFromIdea } = useWizardActions();
   const [isGenerating, setIsGenerating] = useState(false);
   const [isRefining, setIsRefining] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Multi-turn conversation
-  const [chatHistory, setChatHistory] = useState<ChatTurn[]>([]);
+  // Initialize from project store, fallback to empty
+  const [prompt, setPrompt] = useState(project?.ideaPrompt ?? "");
+  const [chatHistory, setChatHistory] = useState<ChatTurn[]>(project?.ideaChatHistory ?? []);
   const [chatInput, setChatInput] = useState("");
   const [showHistory, setShowHistory] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
+  const chatInputRef = useRef<HTMLInputElement>(null);
 
   const aspectRatio = project?.aspectRatio ?? "16:9";
+
+  // Reset local state when active project changes (e.g., creating/switching projects)
+  const prevProjectIdRef = useRef(project?.id);
+  useEffect(() => {
+    if (project?.id !== prevProjectIdRef.current) {
+      prevProjectIdRef.current = project?.id;
+      setPrompt(project?.ideaPrompt ?? "");
+      setChatHistory(project?.ideaChatHistory ?? []);
+      setChatInput("");
+      setShowHistory(false);
+    }
+  }, [project?.id, project?.ideaPrompt, project?.ideaChatHistory]);
+
+  // Persist prompt to store (debounced via useEffect)
+  const promptRef = useRef(prompt);
+  promptRef.current = prompt;
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (promptRef.current !== (project?.ideaPrompt ?? "")) {
+        updateProject({ ideaPrompt: promptRef.current });
+      }
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [prompt, project?.ideaPrompt, updateProject]);
+
+  // Sync prompt when project changes (e.g., switching projects)
+  useEffect(() => {
+    if (project?.ideaPrompt !== undefined && project.ideaPrompt !== promptRef.current) {
+      setPrompt(project.ideaPrompt);
+    }
+  }, [project?.ideaPrompt]);
+
+  // Persist chatHistory to store immediately on change
+  const chatHistoryRef = useRef(chatHistory);
+  chatHistoryRef.current = chatHistory;
+  useEffect(() => {
+    updateProject({ ideaChatHistory: chatHistory.length > 0 ? chatHistory : undefined });
+  }, [chatHistory, updateProject]);
+
+  // Sync chatHistory when project changes (e.g., switching projects)
+  useEffect(() => {
+    const projectHistory = project?.ideaChatHistory ?? [];
+    if (JSON.stringify(chatHistoryRef.current) !== JSON.stringify(projectHistory)) {
+      setChatHistory(projectHistory);
+    }
+  }, [project?.ideaChatHistory]);
 
   // Auto-scroll chat
   useEffect(() => {
@@ -105,6 +148,8 @@ export function StepIdea({ onGenerated }: StepIdeaProps) {
       setChatHistory((prev) => [...prev, { role: "assistant", content: "请求失败，请重试。" }]);
     } finally {
       setIsRefining(false);
+      // Auto-focus chat input so user can continue typing
+      requestAnimationFrame(() => chatInputRef.current?.focus());
     }
   };
 
@@ -113,7 +158,7 @@ export function StepIdea({ onGenerated }: StepIdeaProps) {
     setIsGenerating(true);
     setError(null);
     try {
-      await generateAndAdvance(prompt.trim());
+      await extractCharactersFromIdea(prompt.trim());
       onGenerated?.();
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -200,20 +245,31 @@ export function StepIdea({ onGenerated }: StepIdeaProps) {
 
       {/* Chat input for follow-up conversation */}
       <div className="flex gap-2">
-        <input
-          type="text"
-          value={chatInput}
-          onChange={(e) => setChatInput(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && !e.shiftKey) {
-              e.preventDefault();
-              handleChatSend();
-            }
-          }}
-          placeholder={t("wizard.chatPlaceholder") || "和 AI 继续讨论..."}
-          disabled={isRefining || !providerConfig.apiKey}
-          className="flex-1 rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-xs text-slate-100 placeholder:text-slate-600 focus:border-emerald-500 focus:outline-none disabled:opacity-50"
-        />
+        <div className="relative flex-1">
+          <input
+            ref={chatInputRef}
+            type="text"
+            value={chatInput}
+            onChange={(e) => setChatInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                handleChatSend();
+              }
+            }}
+            placeholder={isRefining ? "" : (t("wizard.chatPlaceholder") || "和 AI 继续讨论...")}
+            disabled={isRefining || !providerConfig.apiKey}
+            className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-xs text-slate-100 placeholder:text-slate-600 focus:border-emerald-500 focus:outline-none disabled:opacity-50"
+          />
+          {isRefining && (
+            <div className="absolute inset-0 flex items-center gap-2 px-3 pointer-events-none">
+              <Loader2 size={13} className="animate-spin text-emerald-400" />
+              <span className="text-xs text-emerald-400/80 animate-pulse">
+                {t("wizard.generating") || "AI 思考中..."}
+              </span>
+            </div>
+          )}
+        </div>
         <button
           onClick={handleChatSend}
           disabled={!chatInput.trim() || isRefining || !providerConfig.apiKey}
@@ -256,7 +312,7 @@ export function StepIdea({ onGenerated }: StepIdeaProps) {
         ) : (
           <Sparkles size={16} />
         )}
-        {t("wizard.generate")}
+        {t("wizard.next")}
       </button>
 
       {/* Error */}

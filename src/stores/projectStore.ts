@@ -652,7 +652,7 @@ export const useProjectStore = create<ProjectState>()(
           }
         }
 
-        // Migrate from v4 to v5: unified flow, remove mode, 4-step wizard
+        // Migrate from v4 to v5: unified flow, remove mode, 6-step wizard
         if (version < 5) {
           const state = persisted as {
             projects?: Array<Record<string, unknown>>;
@@ -670,7 +670,7 @@ export const useProjectStore = create<ProjectState>()(
                 // simple: 1(idea)→1, 2(storyboard)→2, 3(images)→3, 4(videos)→3, 5(assembly)→4
                 newStep = oldStep <= 2 ? oldStep : oldStep <= 4 ? 3 : 4;
               }
-              return { ...rest, wizardStep: newStep };
+              return { ...rest, wizardStep: newStep, automationMode: 'semi-auto' as const };
             });
           }
         }
