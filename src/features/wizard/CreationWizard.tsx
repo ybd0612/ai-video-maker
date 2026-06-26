@@ -13,6 +13,7 @@ import { StepAssets } from "./StepAssets";
 import { StepImages } from "./StepImages";
 import { StepVideos } from "./StepVideos";
 import { StepAssembly } from "./StepAssembly";
+import { AutomationModeSwitch } from "./AutomationModeSwitch";
 import { ChevronLeft, ChevronRight, SkipForward } from "lucide-react";
 
 const TOTAL_STEPS = 6;
@@ -21,6 +22,7 @@ export function CreationWizard() {
   const t = useT();
   const project = useProjectStore(selectActiveProject);
   const setWizardStep = useProjectStore((s) => s.setWizardStep);
+  const setAutomationMode = useProjectStore((s) => s.setAutomationMode);
   const currentStep = project?.wizardStep ?? 1;
   const shots = project?.shots ?? [];
   const characters = project?.characters ?? [];
@@ -57,7 +59,13 @@ export function CreationWizard() {
 
   return (
     <div className="flex h-full flex-col overflow-hidden">
-      <StepIndicator />
+      <div className="flex items-center justify-between border-b border-slate-800 px-6 py-3">
+        <StepIndicator />
+        <AutomationModeSwitch
+          mode={project?.automationMode ?? 'semi-auto'}
+          onChange={setAutomationMode}
+        />
+      </div>
 
       <div className="flex-1 overflow-y-auto">
         {currentStep === 1 && <StepIdea />}
