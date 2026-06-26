@@ -1,6 +1,6 @@
 // ────────────────────────────────────────────────────────────────────────────
 // src/features/wizard/StepVideos.tsx
-// Step 4: Generate videos for all shots, with "draw card" re-roll.
+// Step 5: Generate videos for all shots, with dual-frame control.
 // ────────────────────────────────────────────────────────────────────────────
 
 import { useEffect, useRef } from "react";
@@ -16,7 +16,6 @@ import { RefreshCw } from "lucide-react";
 export function StepVideos() {
   const t = useT();
   const project = useProjectStore(selectActiveProject);
-  const setWizardStep = useProjectStore((s) => s.setWizardStep);
   const { generateVideosForStep, rerollVideo } = useWizardActions();
 
   const shots = project?.shots ?? [];
@@ -24,7 +23,7 @@ export function StepVideos() {
   const generatingCount = shots.filter((s) => s.status === "videoing").length;
   const hasStarted = useRef(false);
 
-  // Auto-generate videos when entering this step
+  // 自动开始生成视频（仅首次进入时触发，需要已有图片）
   useEffect(() => {
     if (!hasStarted.current && shots.length > 0) {
       const needsVideos = shots.some((s) => !s.videoUrl && s.imageUrl);
@@ -35,20 +34,11 @@ export function StepVideos() {
     }
   }, [shots.length, generateVideosForStep]);
 
-  const handleRerollAll = () => {
-    shots.forEach((shot) => {
-      if (shot.videoUrl) {
-        rerollVideo(shot.id);
-      }
-    });
-  };
-
   return (
     <div className="mx-auto flex max-w-4xl flex-col gap-4 py-4">
-      {/* Header */}
       <div className="flex items-center justify-between">
         <h2 className="text-sm font-bold text-slate-200">
-          {t("wizard.step4")} ({shots.filter((s) => !!s.videoUrl).length}/{shots.length})
+          {t("wizard.step5")} ({shots.filter((s) => !!s.videoUrl).length}/{shots.length})
         </h2>
         <div className="flex items-center gap-2">
           {generatingCount > 0 && (
@@ -58,25 +48,16 @@ export function StepVideos() {
             </span>
           )}
           <button
-            onClick={handleRerollAll}
+            onClick={() => shots.forEach((s) => s.imageUrl && !s.videoUrl && rerollVideo(s.id))}
             disabled={generatingCount > 0}
             className="flex items-center gap-1 rounded px-2 py-1 text-[11px] text-emerald-400 hover:bg-emerald-950/30 transition disabled:opacity-50"
           >
             <RefreshCw size={11} />
             {t("wizard.rerollAll")}
           </button>
-          {allVideoed && (
-            <button
-              onClick={() => setWizardStep(4)}
-              className="flex items-center gap-1 rounded bg-emerald-600 px-3 py-1 text-[11px] font-medium text-white hover:bg-emerald-500 transition"
-            >
-              {t("wizard.next")} →
-            </button>
-          )}
         </div>
       </div>
 
-      {/* Shot cards with videos */}
       <div className="flex flex-col gap-2">
         {shots.map((shot) => (
           <ShotCard
@@ -86,7 +67,6 @@ export function StepVideos() {
             onReroll={() => rerollVideo(shot.id)}
             isGenerating={shot.status === "videoing"}
           >
-            {/* Show reference image + generated video side by side */}
             <div className="flex gap-2">
               {shot.imageUrl && (
                 <Lightbox src={shot.imageUrl} alt={`Ref ${shot.index + 1}`}>
@@ -134,17 +114,19 @@ export function StepVideos() {
               )}
             </div>
 
-            {/* Edit motion sub-elements */}
-            <PromptSubFields
-              shotId={shot.id}
-              sections={["motion", "negative"]}
-            />
+            <PromptSubFields shotId={shot.id} sections={["motion", "negative"]} />
 
             {/* 首尾帧控制 */}
             <DualFrameToggle shot={shot} />
           </ShotCard>
         ))}
       </div>
+
+      {allVideoed && (
+        <div className="text-center text-emerald-400 text-xs">
+          ✓ {t("wizard.allReady")}
+        </div>
+      )}
     </div>
   );
 }

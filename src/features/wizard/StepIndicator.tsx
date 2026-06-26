@@ -1,6 +1,6 @@
 // ────────────────────────────────────────────────────────────────────────────
 // src/features/wizard/StepIndicator.tsx
-// Horizontal step indicator bar for the creation wizard.
+// Horizontal step indicator bar — unified 6-step flow.
 // ────────────────────────────────────────────────────────────────────────────
 
 import { useProjectStore, selectActiveProject, type WizardStep } from "@/stores/projectStore";
@@ -13,6 +13,7 @@ const STEPS: { step: WizardStep; labelKey: string }[] = [
   { step: 3, labelKey: "wizard.step3" },
   { step: 4, labelKey: "wizard.step4" },
   { step: 5, labelKey: "wizard.step5" },
+  { step: 6, labelKey: "wizard.step6" },
 ];
 
 export function StepIndicator() {
@@ -22,7 +23,6 @@ export function StepIndicator() {
   const currentStep = project?.wizardStep ?? 1;
 
   const handleClick = (step: WizardStep) => {
-    // Allow jumping back to completed steps, or forward by 1
     if (step <= currentStep) {
       setWizardStep(step);
     }

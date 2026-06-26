@@ -1,6 +1,6 @@
 // ────────────────────────────────────────────────────────────────────────────
 // src/features/wizard/StepAssembly.tsx
-// Step 5: Preview all videos in sequence, concatenate, download.
+// Step 6: Preview all videos in sequence, concatenate, download.
 // ────────────────────────────────────────────────────────────────────────────
 
 import { useState, useCallback } from "react";
@@ -36,6 +36,7 @@ export function StepAssembly() {
       setRenderedUrl(url);
       setProjectStatus("done");
     } catch (err) {
+      console.error("Assembly failed:", err);
       setProjectStatus("failed", err instanceof Error ? err.message : String(err));
     } finally {
       setIsRendering(false);
@@ -52,23 +53,19 @@ export function StepAssembly() {
 
   return (
     <div className="mx-auto flex max-w-3xl flex-col gap-6 py-6">
-      {/* Header */}
       <div className="text-center">
         <h2 className="text-lg font-bold text-slate-100">
-          {t("wizard.step5")}
+          {t("wizard.step6")}
         </h2>
         <p className="mt-1 text-sm text-slate-500">
-          {videoShots.length} {t("wizard.step4")} ready
+          {videoShots.length}/{shots.length} {t("wizard.step5")} ready
         </p>
       </div>
 
-      {/* Video sequence preview */}
+      {/* 视频序列预览 */}
       <div className="flex flex-wrap gap-2">
         {videoShots.map((shot) => (
-          <div
-            key={shot.id}
-            className="flex flex-col items-center gap-1"
-          >
+          <div key={shot.id} className="flex flex-col items-center gap-1">
             <div className="h-16 w-24 overflow-hidden rounded border border-slate-700 bg-black">
               <video
                 src={shot.videoUrl!}
@@ -83,7 +80,7 @@ export function StepAssembly() {
         ))}
       </div>
 
-      {/* Render button */}
+      {/* 拼接按钮 */}
       {!renderedUrl && (
         <button
           onClick={handleRender}
@@ -104,7 +101,7 @@ export function StepAssembly() {
         </button>
       )}
 
-      {/* Render progress bar */}
+      {/* 拼接进度条 */}
       {isRendering && (
         <div className="mx-auto w-full max-w-md">
           <div className="h-2 overflow-hidden rounded-full bg-slate-800">
@@ -116,7 +113,7 @@ export function StepAssembly() {
         </div>
       )}
 
-      {/* Rendered video */}
+      {/* 成片预览与下载 */}
       {renderedUrl && (
         <div className="flex flex-col items-center gap-4">
           <div className="w-full max-w-lg overflow-hidden rounded-xl border border-slate-700 bg-black">
