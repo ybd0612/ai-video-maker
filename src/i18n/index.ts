@@ -339,10 +339,27 @@ const zh = {
 
   // Wizard
   "wizard.step1": "想法",
-  "wizard.step2": "分镜",
-  "wizard.step3": "图片",
-  "wizard.step4": "视频",
-  "wizard.step5": "成片",
+  "wizard.step2": "资产",
+  "wizard.step3": "分镜",
+  "wizard.step4": "图片",
+  "wizard.step5": "视频",
+  "wizard.step6": "后期",
+  "wizard.stepAssets": "资产",
+  "wizard.stepGenerate": "生成",
+  "wizard.skip": "跳过",
+  "wizard.assetsHint": "先生成角色和场景的参考图，后续分镜将基于这些图片保持一致性",
+  "wizard.assetsExtracted": "AI 已提取以下角色，可编辑后继续",
+  "wizard.noAssets": "未检测到角色",
+  "wizard.noAssetsHint": "如果内容涉及人物，可手动添加角色以提升一致性",
+  "wizard.sceneReferences": "场景参考图",
+  "wizard.sceneReferencesHint": "AI 从想法中提取的关键场景，生成参考图后用于后续镜头的一致性",
+  "wizard.addScene": "添加场景",
+  "wizard.styleReference": "风格参考图",
+  "wizard.styleReferenceHint": "生成一张整体风格锚点图，锁定画风",
+  "wizard.generateAllPortraits": "批量生成肖像",
+  "wizard.generateAllScenes": "批量生成场景图",
+  "wizard.generateStyleRef": "生成风格图",
+  "wizard.assetsReady": "资产就绪，进入分镜",
   "wizard.prev": "上一步",
   "wizard.next": "下一步",
   "wizard.reroll": "重新生成",
@@ -371,6 +388,19 @@ const zh = {
   "wizard.chatPlaceholder": "描述你想调整的内容...",
   "wizard.applyIdea": "应用到想法",
   "wizard.aiThinking": "AI 思考中...",
+
+  // 自动化模式
+  "automation.semi-auto": "半自动",
+  "automation.auto": "全自动",
+  "automation.manual": "手动",
+  "automation.semi-autoHint": "关键节点需要确认",
+  "automation.autoHint": "全程自动，无需确认",
+  "automation.manualHint": "每步都需要确认",
+
+  // 审核卡点
+  "review.confirmImages": "确认图片，进入视频生成",
+  "review.skipReview": "跳过审核",
+  "review.qualityCheck": "质量检查",
 
 } as const;
 
@@ -709,10 +739,27 @@ const en = {
 
   // Wizard
   "wizard.step1": "Idea",
-  "wizard.step2": "Storyboard",
-  "wizard.step3": "Images",
-  "wizard.step4": "Videos",
-  "wizard.step5": "Final",
+  "wizard.step2": "Assets",
+  "wizard.step3": "Storyboard",
+  "wizard.step4": "Images",
+  "wizard.step5": "Videos",
+  "wizard.step6": "Post-production",
+  "wizard.stepAssets": "Assets",
+  "wizard.stepGenerate": "Generate",
+  "wizard.skip": "Skip",
+  "wizard.assetsHint": "Generate reference images for characters and scenes first. Storyboard will use these for consistency",
+  "wizard.assetsExtracted": "AI extracted these characters. Edit before continuing",
+  "wizard.noAssets": "No characters detected",
+  "wizard.noAssetsHint": "If your content involves people, add characters for better consistency",
+  "wizard.sceneReferences": "Scene References",
+  "wizard.sceneReferencesHint": "Key scenes extracted by AI. Generate reference images for storyboard consistency",
+  "wizard.addScene": "Add Scene",
+  "wizard.styleReference": "Style Reference",
+  "wizard.styleReferenceHint": "Generate a style anchor image to lock the visual style",
+  "wizard.generateAllPortraits": "Generate All Portraits",
+  "wizard.generateAllScenes": "Generate All Scene Images",
+  "wizard.generateStyleRef": "Generate Style Image",
+  "wizard.assetsReady": "Assets Ready, Continue to Storyboard",
   "wizard.prev": "Previous",
   "wizard.next": "Next",
   "wizard.reroll": "Re-roll",
@@ -741,6 +788,19 @@ const en = {
   "wizard.chatPlaceholder": "Describe what you want to adjust...",
   "wizard.applyIdea": "Apply to idea",
   "wizard.aiThinking": "AI thinking...",
+
+  // Automation mode
+  "automation.semi-auto": "Semi-auto",
+  "automation.auto": "Full auto",
+  "automation.manual": "Manual",
+  "automation.semi-autoHint": "Confirmation at key checkpoints",
+  "automation.autoHint": "Fully automatic, no confirmation needed",
+  "automation.manualHint": "Confirmation at every step",
+
+  // Review checkpoints
+  "review.confirmImages": "Confirm images, proceed to video generation",
+  "review.skipReview": "Skip review",
+  "review.qualityCheck": "Quality check",
 } as const;
 
 export type TranslationKey = keyof typeof zh;

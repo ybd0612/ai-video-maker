@@ -30,8 +30,9 @@ export type ShotStatus =
 
 export type AspectRatio = "9:16" | "16:9" | "1:1";
 
-export type ProjectMode = "simple" | "drama";
-export type WizardStep = 1 | 2 | 3 | 4 | 5;
+export type WizardStep = 1 | 2 | 3 | 4 | 5 | 6;
+
+export type AutomationMode = 'auto' | 'semi-auto' | 'manual';
 
 /* ── Data models ────────────────────────────────────────────────────────── */
 
@@ -41,6 +42,14 @@ export interface Character {
   description: string;
   appearancePrompt: string;
   avatarUrl?: string;
+  /** AI-generated portrait from appearancePrompt (text-to-image) */
+  generatedPortraitUrl?: string;
+  /** 资产一致性优化 - 用于标识角色在提示词中的命名空间 */
+  assetNamespace: string;  // 如 "[Hero_A]"
+  /** 自动生成的完整提示词 */
+  fullPrompt: string;
+  /** 多视角矩阵图 */
+  multiViewUrl?: string;
 }
 
 export interface DialogueLine {
@@ -78,13 +87,30 @@ export interface Shot {
   envChangeDesc?: string;    // Environment changes: "steam rising from cup"
   motionSpeedDesc?: string;  // Motion speed: "cinematic slow-motion, 24fps"
   negativeMotionPrompt?: string; // Negative motion: "morphing, flickering"
+  // 首尾帧控制
+  firstFrameUrl?: string;
+  lastFrameUrl?: string;
+  useDualFrame: boolean;
+}
+
+export interface ChatTurn {
+  role: "user" | "assistant";
+  content: string;
+}
+
+export interface SceneReference {
+  id: string;
+  name: string;         // 场景名称，如"城市街道"
+  imageUrl?: string;    // 生成的场景参考图
+  prompt: string;       // 英文生成提示词
+  description: string;  // 中文描述
 }
 
 export interface Project {
   id: string;
   title: string;
-  mode: ProjectMode;
   wizardStep: WizardStep;
+  automationMode: AutomationMode;
   characters: Character[];
   aspectRatio: AspectRatio;
   style: string;
@@ -94,6 +120,14 @@ export interface Project {
   error?: string;
   createdAt: number;
   updatedAt: number;
+  /** Step 1: saved idea prompt text */
+  ideaPrompt?: string;
+  /** Step 1: saved AI chat history */
+  ideaChatHistory?: ChatTurn[];
+  /** Step 2: scene reference images for img2img consistency */
+  sceneReferences?: SceneReference[];
+  /** Step 2: overall style reference image URL */
+  styleReferenceUrl?: string;
 }
 
 export type HistoryAction =
@@ -134,7 +168,7 @@ interface ProjectState {
   /* Project actions */
   createProject: (title: string) => Project;
   switchProject: (id: string) => void;
-  updateProject: (updates: Partial<Pick<Project, "title" | "aspectRatio" | "style" | "language">>) => void;
+  updateProject: (updates: Partial<Pick<Project, "title" | "aspectRatio" | "style" | "language" | "ideaPrompt" | "ideaChatHistory" | "sceneReferences" | "styleReferenceUrl">>) => void;
   deleteProject: (id: string) => void;
   duplicateProject: (id: string) => Project | null;
   setProjectStatus: (status: ProjectStatus, error?: string) => void;
@@ -153,11 +187,16 @@ interface ProjectState {
   updateCharacter: (id: string, updates: Partial<Omit<Character, "id">>) => void;
   removeCharacter: (id: string) => void;
 
-  /* Project mode */
-  setProjectMode: (mode: ProjectMode) => void;
-
   /* Wizard step */
   setWizardStep: (step: WizardStep) => void;
+
+  /* Automation mode */
+  setAutomationMode: (mode: AutomationMode) => void;
+
+  /* Scene reference actions */
+  addSceneReference: (ref: Omit<SceneReference, "id">) => SceneReference;
+  updateSceneReference: (id: string, updates: Partial<Omit<SceneReference, "id">>) => void;
+  removeSceneReference: (id: string) => void;
 
   /* Dialogue actions */
   addDialogueLine: (shotId: string, line: Omit<DialogueLine, "id">) => void;
@@ -198,8 +237,8 @@ export const useProjectStore = create<ProjectState>()(
         const project: Project = {
           id: newId("proj"),
           title,
-          mode: "simple",
           wizardStep: 1 as WizardStep,
+          automationMode: 'semi-auto',
           characters: [],
           aspectRatio: "16:9",
           style: "",
@@ -419,22 +458,54 @@ export const useProjectStore = create<ProjectState>()(
           })),
         })),
 
-      /* ── Project mode ────────────────────────────────────────────────── */
-
-      setProjectMode: (mode) =>
-        set((s) => ({
-          projects: updateActive(s.projects, s.activeProjectId, (p) => ({
-            ...p,
-            mode,
-            updatedAt: Date.now(),
-          })),
-        })),
-
       setWizardStep: (step) =>
         set((s) => ({
           projects: updateActive(s.projects, s.activeProjectId, (p) => ({
             ...p,
             wizardStep: step,
+            updatedAt: Date.now(),
+          })),
+        })),
+
+      setAutomationMode: (mode) =>
+        set((s) => ({
+          projects: updateActive(s.projects, s.activeProjectId, (p) => ({
+            ...p,
+            automationMode: mode,
+            updatedAt: Date.now(),
+          })),
+        })),
+
+      /* ── Scene reference actions ─────────────────────────────────────── */
+
+      addSceneReference: (ref) => {
+        const newRef: SceneReference = { ...ref, id: newId("scene") };
+        set((s) => ({
+          projects: updateActive(s.projects, s.activeProjectId, (p) => ({
+            ...p,
+            sceneReferences: [...(p.sceneReferences ?? []), newRef],
+            updatedAt: Date.now(),
+          })),
+        }));
+        return newRef;
+      },
+
+      updateSceneReference: (id, updates) =>
+        set((s) => ({
+          projects: updateActive(s.projects, s.activeProjectId, (p) => ({
+            ...p,
+            sceneReferences: (p.sceneReferences ?? []).map((r) =>
+              r.id === id ? { ...r, ...updates } : r,
+            ),
+            updatedAt: Date.now(),
+          })),
+        })),
+
+      removeSceneReference: (id) =>
+        set((s) => ({
+          projects: updateActive(s.projects, s.activeProjectId, (p) => ({
+            ...p,
+            sceneReferences: (p.sceneReferences ?? []).filter((r) => r.id !== id),
             updatedAt: Date.now(),
           })),
         })),
@@ -534,7 +605,7 @@ export const useProjectStore = create<ProjectState>()(
     }),
     {
       name: "wxhb-project",
-      version: 4,
+      version: 6,
       migrate: (persisted: unknown, version: number) => {
         // Migrate from v1 (single project) to v2 (multi-project)
         if (version < 2) {
@@ -577,6 +648,43 @@ export const useProjectStore = create<ProjectState>()(
             state.projects = state.projects.map((p) => ({
               ...p,
               wizardStep: 1,
+            }));
+          }
+        }
+
+        // Migrate from v4 to v5: unified flow, remove mode, 4-step wizard
+        if (version < 5) {
+          const state = persisted as {
+            projects?: Array<Record<string, unknown>>;
+          };
+          if (state.projects) {
+            state.projects = state.projects.map((p) => {
+              const { mode, ...rest } = p;
+              // Map old wizard steps to new 4-step flow
+              const oldStep = (p.wizardStep as number) ?? 1;
+              let newStep: number;
+              if (mode === "drama") {
+                // drama: 1(chars)→skip, 2(idea)→1, 3(storyboard)→2, 4(images)→3, 5(videos)→3, 6(assembly)→4
+                newStep = oldStep <= 1 ? 1 : oldStep === 2 ? 1 : oldStep === 3 ? 2 : 4;
+              } else {
+                // simple: 1(idea)→1, 2(storyboard)→2, 3(images)→3, 4(videos)→3, 5(assembly)→4
+                newStep = oldStep <= 2 ? oldStep : oldStep <= 4 ? 3 : 4;
+              }
+              return { ...rest, wizardStep: newStep };
+            });
+          }
+        }
+
+        // Migrate from v5 to v6: add sceneReferences and styleReferenceUrl
+        if (version < 6) {
+          const state = persisted as {
+            projects?: Array<Record<string, unknown>>;
+          };
+          if (state.projects) {
+            state.projects = state.projects.map((p) => ({
+              ...p,
+              sceneReferences: (p.sceneReferences as unknown[]) ?? [],
+              styleReferenceUrl: (p.styleReferenceUrl as string) ?? undefined,
             }));
           }
         }
