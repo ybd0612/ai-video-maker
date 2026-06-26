@@ -392,6 +392,8 @@ export function useWizardActions() {
               baseUrl: providerConfig.baseUrl,
               prompt: motionPrompt,
               imageUrl: shot.imageUrl!,
+              // 双图流：同时传入首帧和尾帧
+              ...(shot.useDualFrame && shot.lastFrameUrl ? { lastFrameUrl: shot.lastFrameUrl } : {}),
               size: videoSize,
               duration: shot.duration,
             },
@@ -452,6 +454,8 @@ export function useWizardActions() {
           baseUrl: providerConfig.baseUrl,
           prompt: motionPrompt,
           imageUrl: shot.imageUrl,
+          // 双图流：同时传入首帧和尾帧
+          ...(shot.useDualFrame && shot.lastFrameUrl ? { lastFrameUrl: shot.lastFrameUrl } : {}),
           size: aspectRatioToVideoSize(project.aspectRatio),
           duration: shot.duration,
         },

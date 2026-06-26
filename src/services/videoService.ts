@@ -8,6 +8,7 @@
 // ────────────────────────────────────────────────────────────────────────────
 
 import { MODELS } from "@/lib/models";
+import { fetchWithRetry } from "@/lib/fetchWithRetry";
 
 const VIDEO_POLL_INTERVAL_MS = 5_000;
 const VIDEO_POLL_TIMEOUT_MS = 10 * 60 * 1000; // 10 minutes per attempt
@@ -36,6 +37,8 @@ interface CreateVideoOptions {
   baseUrl: string;
   prompt: string;
   imageUrl?: string;
+  /** 尾帧图片 URL（双图流模式下使用） */
+  lastFrameUrl?: string;
   size: string;
   duration: number;
   fps?: number;
@@ -115,31 +118,28 @@ export async function generateVideo(
     body.image = opts.imageUrl;
   }
 
+  // 双图流：传入尾帧让模型同时感知首尾帧
+  if (opts.lastFrameUrl) {
+    body.last_image = opts.lastFrameUrl;
+  }
+
   let createJson: Record<string, unknown> = {};
   let videoId: string | undefined;
 
-  for (let attempt = 0; attempt <= VIDEO_CREATE_MAX_RETRIES; attempt++) {
+  {
     if (signal?.aborted) throw new Error("视频生成已取消。");
 
-    const createResp = await fetch(`${baseUrl}/videos`, {
+    const createResp = await fetchWithRetry(`${baseUrl}/videos`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         Authorization: `Bearer ${opts.apiKey}`,
       },
       body: JSON.stringify(body),
+      signal,
+      maxRetries: VIDEO_CREATE_MAX_RETRIES,
+      baseDelayMs: VIDEO_CREATE_BASE_DELAY_MS,
     });
-
-    // 429 Too Many Requests — wait and retry with exponential backoff
-    if (createResp.status === 429) {
-      const delay = VIDEO_CREATE_BASE_DELAY_MS * Math.pow(2, attempt);
-      console.warn(`Video create 429, retry ${attempt + 1}/${VIDEO_CREATE_MAX_RETRIES} after ${delay / 1000}s`);
-      if (attempt >= VIDEO_CREATE_MAX_RETRIES) {
-        throw new Error(`视频创建失败：API 限流 (429)，已重试 ${VIDEO_CREATE_MAX_RETRIES} 次`);
-      }
-      await new Promise<void>((r) => setTimeout(r, delay));
-      continue;
-    }
 
     if (!createResp.ok) {
       const text = await createResp.text().catch(() => "");
@@ -163,7 +163,6 @@ export async function generateVideo(
         `Video API 未返回 video_id。响应: ${JSON.stringify(createJson).slice(0, 300)}`,
       );
     }
-    break; // Success
   }
 
   if (!videoId) {
@@ -186,7 +185,7 @@ export async function generateVideo(
     await new Promise<void>((r) => setTimeout(r, VIDEO_POLL_INTERVAL_MS));
     if (signal?.aborted) throw new Error("视频轮询已取消。");
 
-    const pollResp = await fetch(pollUrl, {
+    const pollResp = await fetchWithRetry(pollUrl, {
       headers: { Authorization: `Bearer ${opts.apiKey}` },
     });
 

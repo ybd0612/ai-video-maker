@@ -53,11 +53,10 @@ export async function runPipeline(prompt: string, opts: RunOptions = {}) {
         prompt,
         language: project.language,
         aspectRatio: project.aspectRatio,
-        mode: project.mode,
         characters: project.characters,
       });
 
-      const shots: Shot[] = rawShots.map((s, i) => ({
+      const shots: Shot[] = rawShots.shots.map((s, i) => ({
         id: `shot_${Date.now()}_${i}`,
         index: i,
         status: "scripted" as const,
@@ -95,11 +94,21 @@ export async function runPipeline(prompt: string, opts: RunOptions = {}) {
           shot.activeCharacterIds ?? [],
           selectActiveProject(useProjectStore.getState())?.characters ?? [],
         );
+
+        // Collect portrait URLs from active characters for img2img
+        const currentChars = selectActiveProject(useProjectStore.getState())?.characters ?? [];
+        const portraitUrls = (shot.activeCharacterIds ?? [])
+          .map((id) => currentChars.find((c) => c.id === id))
+          .filter((c): c is NonNullable<typeof c> => c != null)
+          .map((c) => c.generatedPortraitUrl ?? c.avatarUrl)
+          .filter((url): url is string => !!url);
+
         const imageUrl = await generateImage({
           apiKey,
           baseUrl,
           prompt: enrichedPrompt,
           size: imageSize,
+          inputImageUrl: portraitUrls[0],
         });
 
         store.updateShot(shot.id, { imageUrl, status: "imaged" });
@@ -150,6 +159,8 @@ export async function runPipeline(prompt: string, opts: RunOptions = {}) {
             baseUrl,
             prompt: shot.motionPrompt || shot.visualPrompt,
             imageUrl: shot.imageUrl,
+            // 双图流：同时传入首帧和尾帧
+            ...(shot.useDualFrame && shot.lastFrameUrl ? { lastFrameUrl: shot.lastFrameUrl } : {}),
             size: videoSize,
             duration: shot.duration,
           },
@@ -198,11 +209,20 @@ export async function runSingleShot(shotId: string, opts: RunOptions = {}) {
       shot.activeCharacterIds ?? [],
       project.characters,
     );
+
+    // Collect portrait URLs from active characters for img2img
+    const portraitUrls = (shot.activeCharacterIds ?? [])
+      .map((id) => project.characters.find((c) => c.id === id))
+      .filter((c): c is NonNullable<typeof c> => c != null)
+      .map((c) => c.generatedPortraitUrl ?? c.avatarUrl)
+      .filter((url): url is string => !!url);
+
     imageUrl = await generateImage({
       apiKey,
       baseUrl,
       prompt: enrichedPrompt,
       size: imageSize,
+      inputImageUrl: portraitUrls[0],
     });
     store.updateShot(shotId, { imageUrl, status: "imaged" });
   } catch (err) {
@@ -221,6 +241,8 @@ export async function runSingleShot(shotId: string, opts: RunOptions = {}) {
         baseUrl,
         prompt: shot.motionPrompt || shot.visualPrompt,
         imageUrl,
+        // 双图流：同时传入首帧和尾帧
+        ...(shot.useDualFrame && shot.lastFrameUrl ? { lastFrameUrl: shot.lastFrameUrl } : {}),
         size: videoSize,
         duration: shot.duration,
       },
@@ -267,6 +289,8 @@ export async function retryFailedVideos(opts: RunOptions = {}) {
           baseUrl,
           prompt: shot.motionPrompt || shot.visualPrompt,
           imageUrl: shot.imageUrl!,
+          // 双图流：同时传入首帧和尾帧
+          ...(shot.useDualFrame && shot.lastFrameUrl ? { lastFrameUrl: shot.lastFrameUrl } : {}),
           size: videoSize,
           duration: shot.duration,
         },
@@ -298,6 +322,8 @@ async function generateVideoWithRetry(
     baseUrl: string;
     prompt: string;
     imageUrl: string;
+    /** 尾帧图片 URL（双图流模式下使用） */
+    lastFrameUrl?: string;
     size: string;
     duration: number;
   },

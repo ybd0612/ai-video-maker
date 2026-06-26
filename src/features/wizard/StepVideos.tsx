@@ -8,6 +8,7 @@ import { useProjectStore, selectActiveProject } from "@/stores/projectStore";
 import { useT } from "@/i18n";
 import { ShotCard } from "./ShotCard";
 import { PromptSubFields } from "./PromptSubFields";
+import { DualFrameToggle } from "./DualFrameToggle";
 import { Lightbox } from "@/components/ui/Lightbox";
 import { useWizardActions } from "./useWizardActions";
 import { RefreshCw } from "lucide-react";
@@ -66,7 +67,7 @@ export function StepVideos() {
           </button>
           {allVideoed && (
             <button
-              onClick={() => setWizardStep(5)}
+              onClick={() => setWizardStep(4)}
               className="flex items-center gap-1 rounded bg-emerald-600 px-3 py-1 text-[11px] font-medium text-white hover:bg-emerald-500 transition"
             >
               {t("wizard.next")} →
@@ -138,6 +139,9 @@ export function StepVideos() {
               shotId={shot.id}
               sections={["motion", "negative"]}
             />
+
+            {/* 首尾帧控制 */}
+            <DualFrameToggle shot={shot} />
           </ShotCard>
         ))}
       </div>

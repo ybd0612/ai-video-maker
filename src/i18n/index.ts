@@ -315,6 +315,9 @@ const zh = {
   "characters.deleteConfirm": "确定删除角色「{name}」？相关对话将变为旁白。",
   "characters.noCharacters": "暂无角色，添加角色以创建短剧",
   "characters.aiGenerate": "AI 生成外貌描述",
+  "characters.portrait": "定妆照",
+  "characters.generatePortrait": "生成定妆照",
+  "characters.regeneratePortrait": "重新生成",
 
   // Dialogue
   "dialogue.title": "对话",
@@ -381,6 +384,9 @@ const zh = {
   "wizard.promptMotionSpeed": "运动速率",
   "wizard.negativePrompt": "负向提示词",
   "wizard.negativeMotionPrompt": "负向动态提示",
+  "wizard.useDualFrame": "使用双图流（首尾帧控制）",
+  "wizard.lastFrameUrl": "尾帧图片 URL",
+  "wizard.lastFrameUrlPlaceholder": "输入尾帧图片 URL 或从分镜图中选择",
   "wizard.sectionImage": "文生图",
   "wizard.sectionVideo": "图生视频",
   "wizard.chatWithAi": "和 AI 聊天完善想法",
@@ -388,6 +394,12 @@ const zh = {
   "wizard.chatPlaceholder": "描述你想调整的内容...",
   "wizard.applyIdea": "应用到想法",
   "wizard.aiThinking": "AI 思考中...",
+  "wizard.storyboardHint": "基于你的想法和资产，AI 将生成分镜脚本",
+  "wizard.assetCharacters": "角色",
+  "wizard.assetScenes": "场景",
+  "wizard.assetStyle": "风格图",
+  "wizard.addShot": "添加镜头",
+  "wizard.addShotManual": "手动添加镜头",
 
   // 自动化模式
   "automation.semi-auto": "半自动",
@@ -715,6 +727,9 @@ const en = {
   "characters.deleteConfirm": "Delete character \"{name}\"? Related dialogues will become narration.",
   "characters.noCharacters": "No characters yet. Add characters to create a drama.",
   "characters.aiGenerate": "AI Generate Appearance",
+  "characters.portrait": "Portrait",
+  "characters.generatePortrait": "Generate Portrait",
+  "characters.regeneratePortrait": "Regenerate",
 
   // Dialogue
   "dialogue.title": "Dialogue",
@@ -781,6 +796,9 @@ const en = {
   "wizard.promptMotionSpeed": "Motion Speed",
   "wizard.negativePrompt": "Negative Prompt",
   "wizard.negativeMotionPrompt": "Negative Motion Prompt",
+  "wizard.useDualFrame": "Use dual-frame (first & last frame control)",
+  "wizard.lastFrameUrl": "Last frame image URL",
+  "wizard.lastFrameUrlPlaceholder": "Enter last frame image URL or select from storyboard",
   "wizard.sectionImage": "Text-to-Image",
   "wizard.sectionVideo": "Image-to-Video",
   "wizard.chatWithAi": "Chat with AI to refine idea",
@@ -788,6 +806,12 @@ const en = {
   "wizard.chatPlaceholder": "Describe what you want to adjust...",
   "wizard.applyIdea": "Apply to idea",
   "wizard.aiThinking": "AI thinking...",
+  "wizard.storyboardHint": "Based on your idea and assets, AI will generate the storyboard",
+  "wizard.assetCharacters": "Characters",
+  "wizard.assetScenes": "Scenes",
+  "wizard.assetStyle": "Style",
+  "wizard.addShot": "Add Shot",
+  "wizard.addShotManual": "Add shot manually",
 
   // Automation mode
   "automation.semi-auto": "Semi-auto",
