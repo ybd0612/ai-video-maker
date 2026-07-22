@@ -336,7 +336,9 @@ export async function generateScript(
           { role: "user", content: opts.prompt },
         ],
         temperature: 0.7,
-        max_tokens: 3000,
+        // 推理模型会先消耗 token 用于思考，剩余才输出 JSON。
+        // 分镜 JSON 本身较大（4-8 个镜头），需预留充足预算避免思考耗尽导致 content 为空。
+        max_tokens: 8192,
       }),
     });
 

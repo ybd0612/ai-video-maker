@@ -46,7 +46,9 @@ export class OpenAIService implements AIService {
         model: MODELS.text,
         messages: params.messages,
         temperature: params.temperature ?? 0.7,
-        max_tokens: params.maxTokens ?? 1024,
+        // 推理模型（如 agnes-2.0-flash）会先消耗 token 用于思考（reasoning_content），
+        // 剩余才输出到 content。预算太小会导致思考耗尽、content 为空，故默认给 4096。
+        max_tokens: params.maxTokens ?? 4096,
       }),
     });
 
@@ -64,10 +66,27 @@ export class OpenAIService implements AIService {
     }
 
     const json = await resp.json();
-    const content: string = json.choices?.[0]?.message?.content ?? "";
+    const choice = json.choices?.[0];
 
-    if (!content) {
-      throw new Error("Chat API 返回了空内容。");
+    // 规范化 content：部分提供商返回数组形式（[{type, text}]）或 null
+    let rawContent: unknown = choice?.message?.content ?? "";
+    if (Array.isArray(rawContent)) {
+      rawContent = rawContent
+        .map((part) => (typeof part === "string" ? part : (part?.text ?? "")))
+        .join("");
+    }
+    const content: string = typeof rawContent === "string" ? rawContent : "";
+
+    if (!content.trim()) {
+      // 诊断：推理模型思考耗尽 token 预算（finish_reason=length 且有 reasoning_content）
+      const finishReason: string = choice?.finish_reason ?? "";
+      const hasReasoning = !!choice?.message?.reasoning_content;
+      if (finishReason === "length" && hasReasoning) {
+        throw new Error(
+          "推理模型的思考过程耗尽了 token 预算，没有剩余空间输出回答。请重试；若持续出现，需调大 max_tokens。",
+        );
+      }
+      throw new Error(`Chat API 返回了空内容（finish_reason: ${finishReason || "未知"}）。`);
     }
 
     return {
