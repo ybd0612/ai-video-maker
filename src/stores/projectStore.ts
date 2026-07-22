@@ -128,6 +128,10 @@ export interface Project {
   sceneReferences?: SceneReference[];
   /** Step 2: overall style reference image URL */
   styleReferenceUrl?: string;
+  /** 步骤级生成标记：防止导航切换后重复触发 */
+  assetGenerationStarted?: boolean;
+  imageGenerationStarted?: boolean;
+  videoGenerationStarted?: boolean;
 }
 
 export type HistoryAction =
@@ -168,7 +172,7 @@ interface ProjectState {
   /* Project actions */
   createProject: (title: string) => Project;
   switchProject: (id: string) => void;
-  updateProject: (updates: Partial<Pick<Project, "title" | "aspectRatio" | "style" | "language" | "ideaPrompt" | "ideaChatHistory" | "sceneReferences" | "styleReferenceUrl">>) => void;
+  updateProject: (updates: Partial<Pick<Project, "title" | "aspectRatio" | "style" | "language" | "ideaPrompt" | "ideaChatHistory" | "sceneReferences" | "styleReferenceUrl" | "assetGenerationStarted" | "imageGenerationStarted" | "videoGenerationStarted">>) => void;
   deleteProject: (id: string) => void;
   duplicateProject: (id: string) => Project | null;
   setProjectStatus: (status: ProjectStatus, error?: string) => void;
@@ -204,6 +208,11 @@ interface ProjectState {
   removeDialogueLine: (shotId: string, lineId: string) => void;
   reorderDialogueLines: (shotId: string, fromIndex: number, toIndex: number) => void;
   setActiveCharacters: (shotId: string, characterIds: string[]) => void;
+
+  /* Generation started flags */
+  setAssetGenerationStarted: (v: boolean) => void;
+  setImageGenerationStarted: (v: boolean) => void;
+  setVideoGenerationStarted: (v: boolean) => void;
 
   /* History actions */
   addHistory: (action: HistoryAction, description: string) => void;
@@ -245,6 +254,9 @@ export const useProjectStore = create<ProjectState>()(
           language: "zh",
           shots: [],
           status: "idle",
+          assetGenerationStarted: false,
+          imageGenerationStarted: false,
+          videoGenerationStarted: false,
           createdAt: now,
           updatedAt: now,
         };
@@ -585,6 +597,35 @@ export const useProjectStore = create<ProjectState>()(
           })),
         })),
 
+      /* ── Generation started flags ──────────────────────────────────── */
+
+      setAssetGenerationStarted: (v) =>
+        set((s) => ({
+          projects: updateActive(s.projects, s.activeProjectId, (p) => ({
+            ...p,
+            assetGenerationStarted: v,
+            updatedAt: Date.now(),
+          })),
+        })),
+
+      setImageGenerationStarted: (v) =>
+        set((s) => ({
+          projects: updateActive(s.projects, s.activeProjectId, (p) => ({
+            ...p,
+            imageGenerationStarted: v,
+            updatedAt: Date.now(),
+          })),
+        })),
+
+      setVideoGenerationStarted: (v) =>
+        set((s) => ({
+          projects: updateActive(s.projects, s.activeProjectId, (p) => ({
+            ...p,
+            videoGenerationStarted: v,
+            updatedAt: Date.now(),
+          })),
+        })),
+
       /* ── History actions ────────────────────────────────────────────── */
 
       addHistory: (action, description) => {
@@ -605,7 +646,7 @@ export const useProjectStore = create<ProjectState>()(
     }),
     {
       name: "wxhb-project",
-      version: 6,
+      version: 7,
       migrate: (persisted: unknown, version: number) => {
         // Migrate from v1 (single project) to v2 (multi-project)
         if (version < 2) {
@@ -685,6 +726,21 @@ export const useProjectStore = create<ProjectState>()(
               ...p,
               sceneReferences: (p.sceneReferences as unknown[]) ?? [],
               styleReferenceUrl: (p.styleReferenceUrl as string) ?? undefined,
+            }));
+          }
+        }
+
+        // Migrate from v6 to v7: add generation started flags
+        if (version < 7) {
+          const state = persisted as {
+            projects?: Array<Record<string, unknown>>;
+          };
+          if (state.projects) {
+            state.projects = state.projects.map((p) => ({
+              ...p,
+              assetGenerationStarted: false,
+              imageGenerationStarted: false,
+              videoGenerationStarted: false,
             }));
           }
         }

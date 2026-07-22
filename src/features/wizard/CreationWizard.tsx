@@ -59,13 +59,16 @@ export function CreationWizard() {
 
   return (
     <div className="flex h-full flex-col overflow-hidden">
-      <div className="flex items-center justify-between border-b border-slate-800 px-6 py-3">
-        <StepIndicator />
-        <AutomationModeSwitch
-          mode={project?.automationMode ?? 'semi-auto'}
-          onChange={setAutomationMode}
-        />
-      </div>
+      {/* Show header only when project exists */}
+      {project && (
+        <div className="flex items-center justify-between border-b border-slate-800 px-6 py-3">
+          <StepIndicator />
+          <AutomationModeSwitch
+            mode={project?.automationMode ?? 'semi-auto'}
+            onChange={setAutomationMode}
+          />
+        </div>
+      )}
 
       <div className="flex-1 overflow-y-auto">
         {currentStep === 1 && <StepIdea />}

@@ -4,7 +4,7 @@
 // Generates reference images that will be used as img2img anchors for storyboard.
 // ────────────────────────────────────────────────────────────────────────────
 
-import { useState, useCallback } from "react";
+import { useState } from "react";
 import {
   useProjectStore, selectActiveProject,
   type Character, type SceneReference,
@@ -32,9 +32,9 @@ export function StepAssets() {
 
   const [editingChar, setEditingChar] = useState<Character | null>(null);
   const [showEditor, setShowEditor] = useState(false);
-  const [isGenerating, setIsGenerating] = useState(false);
   const [generatingScenes, setGeneratingScenes] = useState<Set<string>>(new Set());
   const [generatingStyle, setGeneratingStyle] = useState(false);
+  const isGenerating = project?.assetGenerationStarted ?? false;
 
   const characters = project?.characters ?? [];
   const sceneReferences = project?.sceneReferences ?? [];
@@ -65,38 +65,23 @@ export function StepAssets() {
 
   // ── Batch generate portraits ──────────────────────────────────────────
 
-  const handleBatchPortraits = useCallback(async () => {
-    setIsGenerating(true);
-    try {
-      await generateAssetImages({ generatePortraits: true, generateScenes: false, generateStyle: false });
-    } finally {
-      setIsGenerating(false);
-    }
-  }, [generateAssetImages]);
+  const handleBatchPortraits = async () => {
+    await generateAssetImages({ generatePortraits: true, generateScenes: false, generateStyle: false });
+  };
 
   // ── Batch generate scene images ───────────────────────────────────────
 
-  const handleBatchScenes = useCallback(async () => {
-    setIsGenerating(true);
-    try {
-      await generateAssetImages({ generatePortraits: false, generateScenes: true, generateStyle: false });
-    } finally {
-      setIsGenerating(false);
-    }
-  }, [generateAssetImages]);
+  const handleBatchScenes = async () => {
+    await generateAssetImages({ generatePortraits: false, generateScenes: true, generateStyle: false });
+  };
 
   // ── Generate all assets ───────────────────────────────────────────────
 
-  const handleGenerateAll = useCallback(async () => {
-    setIsGenerating(true);
-    try {
-      await generateAssetImages({ generatePortraits: true, generateScenes: true, generateStyle: true });
-      // 资产生成完成后，自动进入分镜步骤
-      setWizardStep(3);
-    } finally {
-      setIsGenerating(false);
-    }
-  }, [generateAssetImages, setWizardStep]);
+  const handleGenerateAll = async () => {
+    await generateAssetImages({ generatePortraits: true, generateScenes: true, generateStyle: true });
+    // 资产生成完成后，自动进入分镜步骤
+    setWizardStep(3);
+  };
 
   // ── Scene reference handlers ──────────────────────────────────────────
 

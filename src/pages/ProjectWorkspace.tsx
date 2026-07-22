@@ -5,17 +5,15 @@
 // ────────────────────────────────────────────────────────────────────────────
 
 import { useState, useCallback, useRef, useEffect } from "react";
-import { useProjectStore, selectActiveProject, type Shot } from "@/stores/projectStore";
+import { useProjectStore, selectActiveProject } from "@/stores/projectStore";
 import { useSettingsStore } from "@/stores/settingsStore";
 import { useT } from "@/i18n";
-import { ScriptPanel } from "@/features/script/ScriptPanel";
 import { ShotList } from "@/features/shots/ShotList";
 import { ShotEditor } from "@/features/shots/ShotEditor";
 import { runPipeline, runSingleShot, retryFailedVideos } from "@/services/pipelineService";
-import { generateScript } from "@/services/scriptService";
 import { generateImage, aspectRatioToImageSize } from "@/services/imageService";
 import { generateVideo, aspectRatioToVideoSize } from "@/services/videoService";
-import { SYSTEM_PROMPT_SCRIPT_TEXT, SYSTEM_PROMPT_VISUAL_PROMPT, SYSTEM_PROMPT_MAIN_PROMPT, SYSTEM_PROMPT_MOTION_PROMPT } from "@/services/chatService";
+import { SYSTEM_PROMPT_SCRIPT_TEXT, SYSTEM_PROMPT_VISUAL_PROMPT, SYSTEM_PROMPT_MOTION_PROMPT } from "@/services/chatService";
 import { AiAssistDrawer } from "@/components/ui/AiAssistDrawer";
 import { CharacterPanel } from "@/features/characters/CharacterPanel";
 import { ProjectSidebar } from "@/features/projects/ProjectSidebar";
@@ -35,17 +33,14 @@ export function ProjectWorkspace() {
   const t = useT();
   const project = useProjectStore(selectActiveProject);
   const projects = useProjectStore((s) => s.projects);
-  const createProject = useProjectStore((s) => s.createProject);
   const updateProject = useProjectStore((s) => s.updateProject);
   const clearProject = useProjectStore((s) => s.clearProject);
-  const setShots = useProjectStore((s) => s.setShots);
   const setShotStatus = useProjectStore((s) => s.setShotStatus);
   const updateShot = useProjectStore((s) => s.updateShot);
   const addHistory = useProjectStore((s) => s.addHistory);
   const openSettings = useSettingsStore((s) => s.setSettingsDialogOpen);
 
   const [selectedShotId, setSelectedShotId] = useState<string | null>(null);
-  const [isScripting, setIsScripting] = useState(false);
   const [isRunning, setIsRunning] = useState(false);
   const [leftTab, setLeftTab] = useState<LeftTab>("shots");
   const abortRef = useRef<AbortController | null>(null);
@@ -58,7 +53,6 @@ export function ProjectWorkspace() {
     fieldName: string;
     systemPrompt: string;
   } | null>(null);
-  const [mainPromptOverride, setMainPromptOverride] = useState<string | undefined>(undefined);
 
   // Auto-retry failed videos on page load
   useEffect(() => {
@@ -103,70 +97,14 @@ export function ProjectWorkspace() {
     [selectedShotId, t],
   );
 
-  const handleOpenMainPromptAiAssist = useCallback(
-    (currentValue: string) => {
-      setAiAssistTarget({
-        field: "mainPrompt",
-        currentValue,
-        fieldName: t("pipeline.scriptPanelTitle"),
-        systemPrompt: SYSTEM_PROMPT_MAIN_PROMPT,
-      });
-    },
-    [t],
-  );
-
   const handleAiAssistApply = useCallback(
     (value: string) => {
       if (!aiAssistTarget) return;
-      if (aiAssistTarget.field === "mainPrompt") {
-        setMainPromptOverride(value);
-      } else if (aiAssistTarget.shotId) {
+      if (aiAssistTarget.shotId) {
         updateShot(aiAssistTarget.shotId, { [aiAssistTarget.field]: value });
       }
     },
     [aiAssistTarget, updateShot],
-  );
-
-  // Create project if needed, then generate script
-  const handleGenerateScript = useCallback(
-    async (prompt: string) => {
-      const { providerConfig } = useSettingsStore.getState();
-      if (!providerConfig.apiKey || !providerConfig.baseUrl) {
-        openSettings(true);
-        return;
-      }
-
-      let proj = selectActiveProject(useProjectStore.getState());
-      if (!proj) {
-        proj = createProject(prompt.slice(0, 30) || t("pipeline.newProject"));
-      }
-
-      setIsScripting(true);
-      try {
-        const rawShots = await generateScript({
-          apiKey: providerConfig.apiKey,
-          baseUrl: providerConfig.baseUrl,
-          prompt,
-          language: proj.language,
-          aspectRatio: proj.aspectRatio,
-        });
-
-        const shots: Shot[] = rawShots.shots.map((s, i) => ({
-          id: `shot_${Date.now()}_${i}`,
-          index: i,
-          status: "scripted" as const,
-          ...s,
-        }));
-
-        setShots(shots);
-        addHistory("script_generated", `生成 ${shots.length} 个分镜`);
-      } catch (err) {
-        alert(err instanceof Error ? err.message : String(err));
-      } finally {
-        setIsScripting(false);
-      }
-    },
-    [createProject, setShots, openSettings, t, addHistory],
   );
 
   // Run full pipeline
@@ -450,17 +388,9 @@ export function ProjectWorkspace() {
           {leftTab === "characters" && <CharacterPanel />}
         </aside>
 
-        {/* Center: wizard or script input */}
+        {/* Center: always show wizard */}
         <main className="flex-1 overflow-hidden">
-          {!project ? (
-            <div className="flex h-full items-center justify-center">
-              <div className="w-full max-w-lg">
-                <ScriptPanel onGenerate={handleGenerateScript} isGenerating={isScripting} onOpenAiAssist={handleOpenMainPromptAiAssist} promptOverride={mainPromptOverride} />
-              </div>
-            </div>
-          ) : (
-            <CreationWizard />
-          )}
+          <CreationWizard />
         </main>
 
         {/* Right panel: shot editor */}
