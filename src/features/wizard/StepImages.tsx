@@ -20,7 +20,11 @@ export function StepImages() {
   const { generateImagesForStep, rerollImage } = useWizardActions();
 
   const shots = project?.shots ?? [];
+  const imagedCount = shots.filter((s) => !!s.imageUrl).length;
   const allImaged = shots.length > 0 && shots.every((s) => !!s.imageUrl);
+  const failedCount = shots.filter((s) => s.status === "failed").length;
+  // 所有 shot 均已落定（成功或失败）时才显示审核卡点，避免失败时用户卡住
+  const allSettled = shots.length > 0 && shots.every((s) => !!s.imageUrl || s.status === "failed");
   const generatingCount = shots.filter((s) => s.status === "imaging").length;
   const imageGenerationStarted = project?.imageGenerationStarted ?? false;
 
@@ -46,7 +50,7 @@ export function StepImages() {
     <div className="mx-auto flex max-w-4xl flex-col gap-4 py-4">
       <div className="flex items-center justify-between">
         <h2 className="text-sm font-bold text-slate-200">
-          {t("wizard.step4")} ({shots.filter((s) => !!s.imageUrl).length}/{shots.length})
+          {t("wizard.step4")} ({imagedCount}/{shots.length})
         </h2>
         <div className="flex items-center gap-2">
           {generatingCount > 0 && (
@@ -54,6 +58,16 @@ export function StepImages() {
               <RefreshCw size={11} className="animate-spin" />
               {generatingCount} {t("wizard.generating")}
             </span>
+          )}
+          {failedCount > 0 && (
+            <button
+              onClick={() => shots.filter((s) => s.status === "failed").forEach((s) => rerollImage(s.id))}
+              disabled={generatingCount > 0}
+              className="flex items-center gap-1 rounded px-2 py-1 text-[11px] text-red-400 hover:bg-red-950/30 transition disabled:opacity-50"
+            >
+              <RefreshCw size={11} />
+              {t("wizard.retryFailed")} ({failedCount})
+            </button>
           )}
           <button
             onClick={() => shots.forEach((s) => s.imageUrl && rerollImage(s.id))}
@@ -65,6 +79,16 @@ export function StepImages() {
           </button>
         </div>
       </div>
+
+      {/* 步骤级进度条 */}
+      {shots.length > 0 && (
+        <div className="h-1 w-full overflow-hidden rounded-full bg-slate-800">
+          <div
+            className="h-full rounded-full bg-violet-500 transition-all duration-300"
+            style={{ width: `${(imagedCount / shots.length) * 100}%` }}
+          />
+        </div>
+      )}
 
       <div className="flex flex-col gap-2">
         {shots.map((shot) => (
@@ -91,11 +115,12 @@ export function StepImages() {
         ))}
       </div>
 
-      {allImaged && (
+      {allSettled && (
         <ReviewCheckpoint
           mode={project?.automationMode ?? "semi-auto"}
           onConfirm={() => setWizardStep(5)}
           onSkip={() => setWizardStep(5)}
+          failedCount={failedCount}
         />
       )}
     </div>

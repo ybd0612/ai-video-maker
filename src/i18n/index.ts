@@ -365,6 +365,10 @@ const zh = {
   "wizard.assetsReady": "资产就绪，进入分镜",
   "wizard.prev": "上一步",
   "wizard.next": "下一步",
+  "wizard.extractAndContinue": "AI 提取角色并继续",
+  "wizard.retryFailed": "重试失败",
+  "wizard.pickLastFrame": "或从分镜图中选择尾帧",
+  "wizard.videosDone": "所有视频已生成",
   "wizard.reroll": "重新生成",
   "wizard.rerollAll": "全部重新生成",
   "wizard.generating": "生成中...",
@@ -414,6 +418,7 @@ const zh = {
   "review.skipReview": "跳过审核",
   "review.qualityCheck": "质量检查",
   "review.hint": "请确认所有图片质量符合预期，然后进入视频生成阶段。",
+  "review.someFailed": "{count} 张图片生成失败，将在视频阶段被跳过。",
   "wizard.waiting": "等待中...",
 
 } as const;
@@ -779,6 +784,10 @@ const en = {
   "wizard.assetsReady": "Assets Ready, Continue to Storyboard",
   "wizard.prev": "Previous",
   "wizard.next": "Next",
+  "wizard.extractAndContinue": "AI Extract & Continue",
+  "wizard.retryFailed": "Retry Failed",
+  "wizard.pickLastFrame": "Or pick a last frame from shots",
+  "wizard.videosDone": "All videos generated",
   "wizard.reroll": "Re-roll",
   "wizard.rerollAll": "Re-roll All",
   "wizard.generating": "Generating...",
@@ -828,6 +837,7 @@ const en = {
   "review.skipReview": "Skip review",
   "review.qualityCheck": "Quality check",
   "review.hint": "Please confirm all images meet quality expectations before proceeding to video generation.",
+  "review.someFailed": "{count} image(s) failed to generate and will be skipped in the video stage.",
   "wizard.waiting": "Waiting...",
 } as const;
 

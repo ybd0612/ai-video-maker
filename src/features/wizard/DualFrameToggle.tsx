@@ -3,7 +3,7 @@
 // 首尾帧控制开关：切换双图流模式并输入尾帧 URL。
 // ────────────────────────────────────────────────────────────────────────────
 
-import { useProjectStore, type Shot } from "@/stores/projectStore";
+import { useProjectStore, selectActiveProject, type Shot } from "@/stores/projectStore";
 import { useT } from "@/i18n";
 import { Film } from "lucide-react";
 
@@ -14,6 +14,12 @@ interface DualFrameToggleProps {
 export function DualFrameToggle({ shot }: DualFrameToggleProps) {
   const t = useT();
   const updateShot = useProjectStore((s) => s.updateShot);
+  const project = useProjectStore(selectActiveProject);
+
+  // 其他已生成图片的分镜，供用户点选作为尾帧
+  const candidateFrames = (project?.shots ?? []).filter(
+    (s) => s.id !== shot.id && !!s.imageUrl,
+  );
 
   return (
     <div className="space-y-2">
@@ -40,6 +46,35 @@ export function DualFrameToggle({ shot }: DualFrameToggleProps) {
       {/* 尾帧 URL 输入框（仅在双图流开启时显示） */}
       {shot.useDualFrame && (
         <div className="space-y-1">
+          {/* 从其他分镜图中点选尾帧 */}
+          {candidateFrames.length > 0 && (
+            <div className="space-y-1">
+              <label className="text-[11px] font-medium text-slate-500">
+                {t("wizard.pickLastFrame")}
+              </label>
+              <div className="flex gap-1.5 overflow-x-auto pb-1">
+                {candidateFrames.map((s) => (
+                  <button
+                    key={s.id}
+                    onClick={() => updateShot(shot.id, { lastFrameUrl: s.imageUrl })}
+                    className={`shrink-0 overflow-hidden rounded border transition ${
+                      shot.lastFrameUrl === s.imageUrl
+                        ? "border-amber-500 ring-1 ring-amber-500"
+                        : "border-slate-700 hover:border-slate-500"
+                    }`}
+                    title={`Shot ${s.index + 1}`}
+                  >
+                    <img
+                      src={s.imageUrl}
+                      alt={`Shot ${s.index + 1}`}
+                      className="h-12 w-20 object-cover"
+                    />
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
           <label className="text-[11px] font-medium text-slate-500">
             {t("wizard.lastFrameUrl")}
           </label>

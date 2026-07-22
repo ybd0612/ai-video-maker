@@ -3,7 +3,7 @@
 // Step 5: Generate videos for all shots, with dual-frame control.
 // ────────────────────────────────────────────────────────────────────────────
 
-import { useEffect } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useProjectStore, selectActiveProject } from "@/stores/projectStore";
 import { useT } from "@/i18n";
 import { ShotCard } from "./ShotCard";
@@ -20,9 +20,24 @@ export function StepVideos() {
   const { generateVideosForStep, rerollVideo } = useWizardActions();
 
   const shots = project?.shots ?? [];
+  const videoedCount = shots.filter((s) => !!s.videoUrl).length;
   const allVideoed = shots.length > 0 && shots.every((s) => !!s.videoUrl);
+  const failedCount = shots.filter((s) => s.status === "failed").length;
   const generatingCount = shots.filter((s) => s.status === "videoing").length;
   const videoGenerationStarted = project?.videoGenerationStarted ?? false;
+
+  // 生成完成 toast：allVideoed 从 false→true 时短暂提示
+  const [showDoneToast, setShowDoneToast] = useState(false);
+  const prevAllVideoedRef = useRef(allVideoed);
+  useEffect(() => {
+    if (allVideoed && !prevAllVideoedRef.current) {
+      setShowDoneToast(true);
+      const timer = setTimeout(() => setShowDoneToast(false), 4000);
+      prevAllVideoedRef.current = allVideoed;
+      return () => clearTimeout(timer);
+    }
+    prevAllVideoedRef.current = allVideoed;
+  }, [allVideoed]);
 
   // 自动开始/恢复视频生成：首次进入触发，切回时继续未完成的 shot
   useEffect(() => {
@@ -46,7 +61,7 @@ export function StepVideos() {
     <div className="mx-auto flex max-w-4xl flex-col gap-4 py-4">
       <div className="flex items-center justify-between">
         <h2 className="text-sm font-bold text-slate-200">
-          {t("wizard.step5")} ({shots.filter((s) => !!s.videoUrl).length}/{shots.length})
+          {t("wizard.step5")} ({videoedCount}/{shots.length})
         </h2>
         <div className="flex items-center gap-2">
           {generatingCount > 0 && (
@@ -54,6 +69,16 @@ export function StepVideos() {
               <RefreshCw size={11} className="animate-spin" />
               {generatingCount} {t("wizard.generating")}
             </span>
+          )}
+          {failedCount > 0 && (
+            <button
+              onClick={() => shots.filter((s) => s.status === "failed" && s.imageUrl).forEach((s) => rerollVideo(s.id))}
+              disabled={generatingCount > 0}
+              className="flex items-center gap-1 rounded px-2 py-1 text-[11px] text-red-400 hover:bg-red-950/30 transition disabled:opacity-50"
+            >
+              <RefreshCw size={11} />
+              {t("wizard.retryFailed")} ({failedCount})
+            </button>
           )}
           <button
             onClick={() => shots.forEach((s) => s.videoUrl && rerollVideo(s.id))}
@@ -65,6 +90,23 @@ export function StepVideos() {
           </button>
         </div>
       </div>
+
+      {/* 步骤级进度条 */}
+      {shots.length > 0 && (
+        <div className="h-1 w-full overflow-hidden rounded-full bg-slate-800">
+          <div
+            className="h-full rounded-full bg-amber-500 transition-all duration-300"
+            style={{ width: `${(videoedCount / shots.length) * 100}%` }}
+          />
+        </div>
+      )}
+
+      {/* 生成完成 toast */}
+      {showDoneToast && (
+        <div className="rounded-lg border border-emerald-700 bg-emerald-950/40 px-4 py-2.5 text-center text-xs text-emerald-300">
+          ✓ {t("wizard.videosDone")}
+        </div>
+      )}
 
       <div className="flex flex-col gap-2">
         {shots.map((shot) => (

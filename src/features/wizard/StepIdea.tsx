@@ -37,6 +37,7 @@ interface StepIdeaProps {
 export function StepIdea({ onGenerated }: StepIdeaProps) {
   const t = useT();
   const project = useProjectStore(selectActiveProject);
+  const createProject = useProjectStore((s) => s.createProject);
   const updateProject = useProjectStore((s) => s.updateProject);
   const providerConfig = useSettingsStore((s) => s.providerConfig);
   const { extractCharactersFromIdea } = useWizardActions();
@@ -158,6 +159,14 @@ export function StepIdea({ onGenerated }: StepIdeaProps) {
     setIsGenerating(true);
     setError(null);
     try {
+      // Create project if one doesn't exist
+      let currentProject = project;
+      if (!currentProject) {
+        const title = prompt.trim().slice(0, 30) || t("pipeline.newProject");
+        currentProject = createProject(title);
+        // Update the project with the idea prompt
+        updateProject({ ideaPrompt: prompt.trim() });
+      }
       await extractCharactersFromIdea(prompt.trim());
       onGenerated?.();
     } catch (err) {
@@ -312,7 +321,7 @@ export function StepIdea({ onGenerated }: StepIdeaProps) {
         ) : (
           <Sparkles size={16} />
         )}
-        {t("wizard.next")}
+        {t("wizard.extractAndContinue")}
       </button>
 
       {/* Error */}
