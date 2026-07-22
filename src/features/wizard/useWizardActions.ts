@@ -16,6 +16,14 @@ import { composeVisualPrompt, composeMotionPrompt } from "@/lib/promptUtils";
 export function useWizardActions() {
   const abortRef = useRef<AbortController | null>(null);
 
+  /** Ensure a fresh AbortController exists and return its signal */
+  const ensureAbortController = useCallback(() => {
+    // Abort any previous in-flight operation
+    abortRef.current?.abort();
+    abortRef.current = new AbortController();
+    return abortRef.current.signal;
+  }, []);
+
   /** Step 1→2: Extract characters from idea, advance to assets step */
   const extractCharactersFromIdea = useCallback(async (prompt: string) => {
     const { providerConfig } = useSettingsStore.getState();
@@ -176,7 +184,7 @@ export function useWizardActions() {
     if (!project) return;
 
     const imageSize = aspectRatioToImageSize(project.aspectRatio);
-    const signal = abortRef.current?.signal;
+    const signal = ensureAbortController();
     const generatePortraits = opts?.generatePortraits !== false;
     const generateScenes = opts?.generateScenes !== false;
     const generateStyle = opts?.generateStyle !== false;
@@ -248,7 +256,18 @@ export function useWizardActions() {
     }
 
     if (tasks.length === 0) return;
+
+    store.setAssetGenerationStarted(true);
     await runWithConcurrency(tasks, 3, signal);
+
+    // 所有资产生成完成后清除标记
+    const updatedProject = selectActiveProject(useProjectStore.getState());
+    const allPortraitsDone = updatedProject?.characters.every((c) => !!c.generatedPortraitUrl);
+    const allScenesDone = (updatedProject?.sceneReferences ?? []).every((s) => !!s.imageUrl);
+    const styleDone = !!updatedProject?.styleReferenceUrl;
+    if (allPortraitsDone && allScenesDone && styleDone) {
+      store.setAssetGenerationStarted(false);
+    }
   }, []);
 
   /** Step 4: Generate images for all shots (with img2img from scene/style references) */
@@ -260,14 +279,16 @@ export function useWizardActions() {
     const project = selectActiveProject(store);
     if (!project) return;
 
+    // 跳过已在生成中的 shot（status="imaging"），防止导航切换后重复提交
     const shotsNeedingImages = project.shots.filter(
-      (s) => !s.imageUrl && s.visualPrompt.trim(),
+      (s) => !s.imageUrl && s.status !== "imaging" && s.visualPrompt.trim(),
     );
     if (shotsNeedingImages.length === 0) return;
 
+    store.setImageGenerationStarted(true);
     store.setProjectStatus("imaging");
     const imageSize = aspectRatioToImageSize(project.aspectRatio);
-    const signal = abortRef.current?.signal;
+    const signal = ensureAbortController();
 
     // Generate images with concurrency 3
     const tasks = shotsNeedingImages.map((shot) => async () => {
@@ -310,6 +331,7 @@ export function useWizardActions() {
     const updatedProject = selectActiveProject(useProjectStore.getState());
     const allImaged = updatedProject?.shots.every((s) => !!s.imageUrl);
     if (allImaged) {
+      store.setImageGenerationStarted(false);
       store.setProjectStatus("done");
     }
   }, []);
@@ -364,14 +386,16 @@ export function useWizardActions() {
     const project = selectActiveProject(store);
     if (!project) return;
 
+    // 跳过已在生成中的 shot（status="videoing"），防止导航切换后重复提交
     const shotsNeedingVideos = project.shots.filter(
-      (s) => !s.videoUrl && s.imageUrl && (s.motionPrompt.trim() || s.actionDesc?.trim()),
+      (s) => !s.videoUrl && s.imageUrl && s.status !== "videoing" && (s.motionPrompt.trim() || s.actionDesc?.trim()),
     );
     if (shotsNeedingVideos.length === 0) return;
 
+    store.setVideoGenerationStarted(true);
     store.setProjectStatus("videoing");
     const videoSize = aspectRatioToVideoSize(project.aspectRatio);
-    const signal = abortRef.current?.signal;
+    const signal = ensureAbortController();
 
     const tasks = shotsNeedingVideos.map((shot) => async () => {
       if (signal?.aborted) return;
@@ -429,6 +453,13 @@ export function useWizardActions() {
     });
 
     await runWithConcurrency(tasks, 2, signal);
+
+    // 所有视频生成完成后清除标记
+    const updatedProject = selectActiveProject(useProjectStore.getState());
+    const allVideoed = updatedProject?.shots.every((s) => !!s.videoUrl);
+    if (allVideoed) {
+      store.setVideoGenerationStarted(false);
+    }
   }, []);
 
   /** Re-roll a single shot's video */

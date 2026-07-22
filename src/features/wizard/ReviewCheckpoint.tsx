@@ -26,7 +26,7 @@ export function ReviewCheckpoint({ mode, onConfirm, onSkip }: ReviewCheckpointPr
         {t("review.qualityCheck")}
       </h3>
       <p className="mt-2 text-sm text-slate-400">
-        请确认所有图片质量符合预期，然后进入视频生成阶段。
+        {t("review.hint")}
       </p>
 
       <div className="mt-4 flex gap-3">

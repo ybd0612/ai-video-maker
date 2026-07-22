@@ -3,7 +3,7 @@
 // Step 4: Generate images for all shots, with re-roll support.
 // ────────────────────────────────────────────────────────────────────────────
 
-import { useEffect, useRef } from "react";
+import { useEffect } from "react";
 import { useProjectStore, selectActiveProject } from "@/stores/projectStore";
 import { useT } from "@/i18n";
 import { ShotCard } from "./ShotCard";
@@ -22,18 +22,25 @@ export function StepImages() {
   const shots = project?.shots ?? [];
   const allImaged = shots.length > 0 && shots.every((s) => !!s.imageUrl);
   const generatingCount = shots.filter((s) => s.status === "imaging").length;
-  const hasStarted = useRef(false);
+  const imageGenerationStarted = project?.imageGenerationStarted ?? false;
 
-  // 自动开始生成图片（仅首次进入时触发）
+  // 自动开始/恢复图片生成：首次进入触发，切回时继续未完成的 shot
   useEffect(() => {
-    if (!hasStarted.current && shots.length > 0) {
+    if (shots.length > 0) {
       const needsImages = shots.some((s) => !s.imageUrl);
       if (needsImages) {
-        hasStarted.current = true;
         generateImagesForStep();
       }
     }
-  }, [shots.length, generateImagesForStep]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [imageGenerationStarted, shots.length]);
+
+  // auto 模式：所有图片完成后自动推进到 Step 5（跳过审核卡点）
+  useEffect(() => {
+    if (allImaged && project?.automationMode === "auto") {
+      setWizardStep(5);
+    }
+  }, [allImaged, project?.automationMode, setWizardStep]);
 
   return (
     <div className="mx-auto flex max-w-4xl flex-col gap-4 py-4">

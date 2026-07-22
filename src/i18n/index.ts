@@ -413,6 +413,8 @@ const zh = {
   "review.confirmImages": "确认图片，进入视频生成",
   "review.skipReview": "跳过审核",
   "review.qualityCheck": "质量检查",
+  "review.hint": "请确认所有图片质量符合预期，然后进入视频生成阶段。",
+  "wizard.waiting": "等待中...",
 
 } as const;
 
@@ -825,6 +827,8 @@ const en = {
   "review.confirmImages": "Confirm images, proceed to video generation",
   "review.skipReview": "Skip review",
   "review.qualityCheck": "Quality check",
+  "review.hint": "Please confirm all images meet quality expectations before proceeding to video generation.",
+  "wizard.waiting": "Waiting...",
 } as const;
 
 export type TranslationKey = keyof typeof zh;

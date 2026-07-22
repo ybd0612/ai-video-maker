@@ -4,10 +4,10 @@
 // ────────────────────────────────────────────────────────────────────────────
 
 import { useProjectStore, selectActiveProject, type WizardStep } from "@/stores/projectStore";
-import { useT } from "@/i18n";
+import { useT, type TranslationKey } from "@/i18n";
 import { Check } from "lucide-react";
 
-const STEPS: { step: WizardStep; labelKey: string }[] = [
+const STEPS: { step: WizardStep; labelKey: TranslationKey }[] = [
   { step: 1, labelKey: "wizard.step1" },
   { step: 2, labelKey: "wizard.step2" },
   { step: 3, labelKey: "wizard.step3" },
@@ -29,7 +29,7 @@ export function StepIndicator() {
   };
 
   return (
-    <div className="flex items-center justify-center gap-1 border-b border-slate-800 bg-slate-950 px-4 py-3">
+    <div className="flex items-center justify-center gap-1">
       {STEPS.map(({ step, labelKey }, i) => {
         const isCompleted = step < currentStep;
         const isCurrent = step === currentStep;
@@ -61,7 +61,7 @@ export function StepIndicator() {
                   {step}
                 </span>
               )}
-              {t(labelKey as any)}
+              {t(labelKey)}
             </button>
           </div>
         );

@@ -3,7 +3,7 @@
 // Step 5: Generate videos for all shots, with dual-frame control.
 // ────────────────────────────────────────────────────────────────────────────
 
-import { useEffect, useRef } from "react";
+import { useEffect } from "react";
 import { useProjectStore, selectActiveProject } from "@/stores/projectStore";
 import { useT } from "@/i18n";
 import { ShotCard } from "./ShotCard";
@@ -16,23 +16,31 @@ import { RefreshCw } from "lucide-react";
 export function StepVideos() {
   const t = useT();
   const project = useProjectStore(selectActiveProject);
+  const setWizardStep = useProjectStore((s) => s.setWizardStep);
   const { generateVideosForStep, rerollVideo } = useWizardActions();
 
   const shots = project?.shots ?? [];
   const allVideoed = shots.length > 0 && shots.every((s) => !!s.videoUrl);
   const generatingCount = shots.filter((s) => s.status === "videoing").length;
-  const hasStarted = useRef(false);
+  const videoGenerationStarted = project?.videoGenerationStarted ?? false;
 
-  // 自动开始生成视频（仅首次进入时触发，需要已有图片）
+  // 自动开始/恢复视频生成：首次进入触发，切回时继续未完成的 shot
   useEffect(() => {
-    if (!hasStarted.current && shots.length > 0) {
+    if (shots.length > 0) {
       const needsVideos = shots.some((s) => !s.videoUrl && s.imageUrl);
       if (needsVideos) {
-        hasStarted.current = true;
         generateVideosForStep();
       }
     }
-  }, [shots.length, generateVideosForStep]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [videoGenerationStarted, shots.length]);
+
+  // auto 模式：所有视频完成后自动推进到 Step 6
+  useEffect(() => {
+    if (allVideoed && project?.automationMode === "auto") {
+      setWizardStep(6);
+    }
+  }, [allVideoed, project?.automationMode, setWizardStep]);
 
   return (
     <div className="mx-auto flex max-w-4xl flex-col gap-4 py-4">
@@ -109,7 +117,7 @@ export function StepVideos() {
                 </div>
               ) : (
                 <div className="flex flex-1 items-center justify-center rounded-md border border-dashed border-slate-700 bg-slate-800/30 h-24">
-                  <span className="text-[10px] text-slate-600">Waiting...</span>
+                  <span className="text-[10px] text-slate-600">{t("wizard.waiting")}</span>
                 </div>
               )}
             </div>

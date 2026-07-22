@@ -3,7 +3,7 @@
 // Step 6: Preview all videos in sequence, concatenate, download.
 // ────────────────────────────────────────────────────────────────────────────
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { useProjectStore, selectActiveProject } from "@/stores/projectStore";
 import { useT } from "@/i18n";
 import { concatenateVideos } from "@/services/renderService";
@@ -20,6 +20,15 @@ export function StepAssembly() {
   const [isRendering, setIsRendering] = useState(false);
   const [renderProgress, setRenderProgress] = useState(0);
   const [renderedUrl, setRenderedUrl] = useState<string | null>(null);
+
+  // 组件卸载时释放 Blob URL，避免内存泄漏
+  useEffect(() => {
+    return () => {
+      if (renderedUrl) {
+        URL.revokeObjectURL(renderedUrl);
+      }
+    };
+  }, [renderedUrl]);
 
   const handleRender = useCallback(async () => {
     if (videoShots.length === 0) return;

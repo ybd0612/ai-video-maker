@@ -162,6 +162,8 @@ export class OpenAIService implements AIService {
         baseUrl: this.config.baseUrl,
         prompt: params.prompt,
         imageUrl: params.imageUrl,
+        // 双图流：传递尾帧 URL
+        ...(params.lastFrameUrl ? { lastFrameUrl: params.lastFrameUrl } : {}),
         // 默认 16:9 尺寸，后续可从 Project 配置获取
         size: "1280x720",
         duration: params.duration,

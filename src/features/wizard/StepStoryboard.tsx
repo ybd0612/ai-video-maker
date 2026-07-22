@@ -36,18 +36,26 @@ export function StepStoryboard() {
     try {
       await generateStoryboard(ideaPrompt.trim());
 
-      // 为每个分镜翻译运动提示词（visualPrompt + motionPrompt）
+      // 为每个分镜翻译运动提示词（visualPrompt + motionPrompt）—— 并发度 3
       const currentProject = selectActiveProject(useProjectStore.getState());
       const shots = currentProject?.shots ?? [];
       const characters = currentProject?.characters ?? [];
       const scene = currentProject?.sceneReferences?.[0];
-      for (const shot of shots) {
-        if (!shot.scriptText.trim()) continue;
-        const motionResult = await translateToMotion(shot.scriptText, characters, scene);
-        updateShot(shot.id, {
-          visualPrompt: motionResult.visualPrompt,
-          motionPrompt: motionResult.motionPrompt,
-        });
+      const validShots = shots.filter((s) => s.scriptText.trim());
+
+      // 并发控制：每次最多 3 个翻译请求
+      const CONCURRENCY = 3;
+      for (let i = 0; i < validShots.length; i += CONCURRENCY) {
+        const batch = validShots.slice(i, i + CONCURRENCY);
+        await Promise.all(
+          batch.map(async (shot) => {
+            const motionResult = await translateToMotion(shot.scriptText, characters, scene);
+            updateShot(shot.id, {
+              visualPrompt: motionResult.visualPrompt,
+              motionPrompt: motionResult.motionPrompt,
+            });
+          }),
+        );
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
