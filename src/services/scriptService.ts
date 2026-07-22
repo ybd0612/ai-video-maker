@@ -354,12 +354,31 @@ export async function generateScript(
     }
 
     const json = await resp.json();
-    const content: string = json.choices?.[0]?.message?.content ?? "";
+    const choice = json.choices?.[0];
+    const finishReason: string = choice?.finish_reason ?? choice?.finishReason ?? "";
+
+    // 规范化 content：部分提供商返回数组形式（[{type, text}]）或 null
+    let rawContent: unknown = choice?.message?.content ?? "";
+    if (Array.isArray(rawContent)) {
+      rawContent = rawContent
+        .map((part) => (typeof part === "string" ? part : (part?.text ?? "")))
+        .join("");
+    }
+    const content: string = typeof rawContent === "string" ? rawContent : "";
 
     const jsonStr = extractJsonFromResponse(content);
     if (!jsonStr) {
+      // 诊断信息：区分“内容为空”（常见于内容过滤/拒绝）与“有内容但非 JSON”
+      const isEmpty = content.trim().length === 0;
+      const filterHint =
+        finishReason === "content_filter" || finishReason === "sensitive"
+          ? "（finish_reason 提示内容被安全过滤）"
+          : "";
+      const detail = isEmpty
+        ? `模型返回了空内容${filterHint || "，可能触发了内容安全过滤或模型拒绝"}。finish_reason: ${finishReason || "未知"}`
+        : `模型返回的内容不是有效 JSON。finish_reason: ${finishReason || "未知"}。响应内容：${content.slice(0, 200)}`;
       lastError = new Error(
-        `无法从模型响应中提取 JSON（第 ${attempt + 1} 次尝试）。响应内容：${content.slice(0, 200)}`,
+        `无法从模型响应中提取 JSON（第 ${attempt + 1} 次尝试）。${detail}`,
       );
       if (attempt < MAX_SCRIPT_RETRIES) continue;
       throw lastError;
