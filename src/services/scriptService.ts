@@ -339,6 +339,8 @@ export async function generateScript(
         // 推理模型会先消耗 token 用于思考，剩余才输出 JSON。
         // 分镜 JSON 本身较大（4-8 个镜头），需预留充足预算避免思考耗尽导致 content 为空。
         max_tokens: 8192,
+        // 关闭 Thinking 模式：分镜生成无需深度推理，所有预算用于输出 JSON，避免思考耗尽导致 content 为空。
+        chat_template_kwargs: { enable_thinking: false },
       }),
     });
 

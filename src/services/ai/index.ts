@@ -7,6 +7,9 @@ export interface ChatParams {
   messages: Array<{ role: "system" | "user" | "assistant"; content: string }>;
   temperature?: number;
   maxTokens?: number;
+  /** 是否启用推理模型的 Thinking 模式（默认 false：思考会占用 token 预算，
+   * 关闭后所有预算用于实际输出，避免思考耗尽导致 content 为空） */
+  enableThinking?: boolean;
 }
 
 export interface ChatResult {

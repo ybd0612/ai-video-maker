@@ -49,6 +49,9 @@ export class OpenAIService implements AIService {
         // 推理模型（如 agnes-2.0-flash）会先消耗 token 用于思考（reasoning_content），
         // 剩余才输出到 content。预算太小会导致思考耗尽、content 为空，故默认给 4096。
         max_tokens: params.maxTokens ?? 4096,
+        // 默认关闭 Thinking 模式：聊天/脚本生成等任务无需深度推理，
+        // 关闭后所有 token 预算用于实际输出，从根本上避免思考耗尽导致 content 为空，且响应更快。
+        chat_template_kwargs: { enable_thinking: params.enableThinking ?? false },
       }),
     });
 
