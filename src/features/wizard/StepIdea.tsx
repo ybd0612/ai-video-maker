@@ -56,6 +56,7 @@ export function StepIdea({ onGenerated }: StepIdeaProps) {
   const aspectRatio = project?.aspectRatio ?? "16:9";
 
   // Reset local state when active project changes (e.g., creating/switching projects)
+  // 重置加载/错误状态，避免上个项目的生成中状态卡住新项目的输入框
   const prevProjectIdRef = useRef(project?.id);
   useEffect(() => {
     if (project?.id !== prevProjectIdRef.current) {
@@ -64,6 +65,9 @@ export function StepIdea({ onGenerated }: StepIdeaProps) {
       setChatHistory(project?.ideaChatHistory ?? []);
       setChatInput("");
       setShowHistory(false);
+      setIsGenerating(false);
+      setIsRefining(false);
+      setError(null);
     }
   }, [project?.id, project?.ideaPrompt, project?.ideaChatHistory]);
 
@@ -158,6 +162,7 @@ export function StepIdea({ onGenerated }: StepIdeaProps) {
     if (!prompt.trim()) return;
     setIsGenerating(true);
     setError(null);
+    let targetId: string | undefined;
     try {
       // Create project if one doesn't exist
       let currentProject = project;
@@ -167,12 +172,19 @@ export function StepIdea({ onGenerated }: StepIdeaProps) {
         // Update the project with the idea prompt
         updateProject({ ideaPrompt: prompt.trim() });
       }
+      targetId = currentProject.id;
       await extractCharactersFromIdea(prompt.trim());
       onGenerated?.();
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      // 仅当仍停留在发起项目时才展示错误，避免旧项目的错误污染已切换到的新项目
+      if (useProjectStore.getState().activeProjectId === targetId) {
+        setError(err instanceof Error ? err.message : String(err));
+      }
     } finally {
-      setIsGenerating(false);
+      // 同理：只有仍在发起项目上才复位加载态，避免覆盖新项目自己的生成状态
+      if (useProjectStore.getState().activeProjectId === targetId) {
+        setIsGenerating(false);
+      }
     }
   };
 

@@ -4,7 +4,7 @@
 // ────────────────────────────────────────────────────────────────────────────
 
 import { useCallback, useRef } from "react";
-import { useProjectStore, selectActiveProject, type Shot, type SceneReference } from "@/stores/projectStore";
+import { useProjectStore, selectActiveProject, newId, type Shot, type SceneReference, type Character } from "@/stores/projectStore";
 import { useSettingsStore } from "@/stores/settingsStore";
 import { generateScript } from "@/services/scriptService";
 import { generateImage, aspectRatioToImageSize } from "@/services/imageService";
@@ -35,35 +35,50 @@ export function useWizardActions() {
     const project = selectActiveProject(store);
     if (!project) throw new Error("No active project.");
 
+    // 捕获发起项目的 ID：异步完成后结果必须写回该项目，
+    // 即使用户在生成期间切换/创建了新项目，也不会污染其他项目。
+    const targetProjectId = project.id;
+
     store.setProjectStatus("scripting");
 
-    // Use generateScript to extract characters (shots are discarded)
-    const result = await generateScript({
-      apiKey: providerConfig.apiKey,
-      baseUrl: providerConfig.baseUrl,
-      prompt,
-      language: project.language,
-      aspectRatio: project.aspectRatio,
-      characters: project.characters,
-    });
+    try {
+      // Use generateScript to extract characters (shots are discarded)
+      const result = await generateScript({
+        apiKey: providerConfig.apiKey,
+        baseUrl: providerConfig.baseUrl,
+        prompt,
+        language: project.language,
+        aspectRatio: project.aspectRatio,
+        characters: project.characters,
+      });
 
-    // Auto-add extracted characters to project
-    if (result.characters.length > 0) {
-      for (const char of result.characters) {
-        const namespace = generateAssetNamespace(char.name);
-        const fullPrompt = `a character named ${char.name}, ${char.appearancePrompt}`;
-        store.addCharacter({
-          name: char.name,
-          description: char.description,
-          appearancePrompt: char.appearancePrompt,
-          assetNamespace: namespace,
-          fullPrompt,
-        });
-      }
+      // 构造提取到的角色（带唯一 ID）
+      const newCharacters: Character[] = result.characters.map((char) => ({
+        id: newId("char"),
+        name: char.name,
+        description: char.description,
+        appearancePrompt: char.appearancePrompt,
+        assetNamespace: generateAssetNamespace(char.name),
+        fullPrompt: `a character named ${char.name}, ${char.appearancePrompt}`,
+      }));
+
+      // 原子地写回发起项目：追加角色 + 复位状态 + 推进到资产步骤
+      useProjectStore.getState().updateProjectById(targetProjectId, (p) => ({
+        ...p,
+        characters: [...p.characters, ...newCharacters],
+        status: "idle",
+        error: undefined,
+        wizardStep: 2,
+      }));
+    } catch (err) {
+      // 失败时将发起项目复位为 failed，避免其状态永远停留在 scripting
+      useProjectStore.getState().updateProjectById(targetProjectId, (p) => ({
+        ...p,
+        status: "failed",
+        error: err instanceof Error ? err.message : String(err),
+      }));
+      throw err;
     }
-
-    store.setProjectStatus("idle");
-    store.setWizardStep(2);
   }, []);
 
   /** Step 3: Generate storyboard shots using asset context */

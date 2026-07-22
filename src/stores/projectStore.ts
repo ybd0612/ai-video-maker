@@ -161,6 +161,9 @@ function newId(prefix: string): string {
   return `${prefix}_${Date.now()}_${counter}`;
 }
 
+/** 生成唯一 ID（导出供服务层构造实体时使用，保证与 store 内部 ID 格式一致） */
+export { newId };
+
 /* ── Store shape ────────────────────────────────────────────────────────── */
 
 interface ProjectState {
@@ -173,6 +176,8 @@ interface ProjectState {
   createProject: (title: string) => Project;
   switchProject: (id: string) => void;
   updateProject: (updates: Partial<Pick<Project, "title" | "aspectRatio" | "style" | "language" | "ideaPrompt" | "ideaChatHistory" | "sceneReferences" | "styleReferenceUrl" | "assetGenerationStarted" | "imageGenerationStarted" | "videoGenerationStarted">>) => void;
+  /** 按 ID 更新指定项目（用于异步操作完成后写回发起项目，而非当前活跃项目，避免跨项目污染） */
+  updateProjectById: (projectId: string, updater: (p: Project) => Project) => void;
   deleteProject: (id: string) => void;
   duplicateProject: (id: string) => Project | null;
   setProjectStatus: (status: ProjectStatus, error?: string) => void;
@@ -282,6 +287,13 @@ export const useProjectStore = create<ProjectState>()(
             ...updates,
             updatedAt: Date.now(),
           })),
+        })),
+
+      updateProjectById: (projectId, updater) =>
+        set((s) => ({
+          projects: s.projects.map((p) =>
+            p.id === projectId ? { ...updater(p), updatedAt: Date.now() } : p,
+          ),
         })),
 
       deleteProject: (id) => {
