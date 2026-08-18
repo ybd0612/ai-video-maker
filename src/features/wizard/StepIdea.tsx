@@ -5,7 +5,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import { useProjectStore, selectActiveProject } from "@/stores/projectStore";
-import type { ChatTurn } from "@/stores/projectStore";
+import type { AspectRatio, ChatTurn } from "@/stores/projectStore";
 import { useSettingsStore } from "@/stores/settingsStore";
 import { useT } from "@/i18n";
 import {
@@ -50,10 +50,11 @@ export function StepIdea({ onGenerated }: StepIdeaProps) {
   const [chatHistory, setChatHistory] = useState<ChatTurn[]>(project?.ideaChatHistory ?? []);
   const [chatInput, setChatInput] = useState("");
   const [showHistory, setShowHistory] = useState(false);
+  const [selectedAspectRatio, setSelectedAspectRatio] = useState<AspectRatio>(project?.aspectRatio ?? "16:9");
   const chatEndRef = useRef<HTMLDivElement>(null);
   const chatInputRef = useRef<HTMLInputElement>(null);
 
-  const aspectRatio = project?.aspectRatio ?? "16:9";
+  const aspectRatio = project?.aspectRatio ?? selectedAspectRatio;
 
   // Reset local state when active project changes (e.g., creating/switching projects)
   // 重置加载/错误状态，避免上个项目的生成中状态卡住新项目的输入框
@@ -65,6 +66,7 @@ export function StepIdea({ onGenerated }: StepIdeaProps) {
       setChatHistory(project?.ideaChatHistory ?? []);
       setChatInput("");
       setShowHistory(false);
+      setSelectedAspectRatio(project?.aspectRatio ?? "16:9");
       setIsGenerating(false);
       setIsRefining(false);
       setError(null);
@@ -172,7 +174,7 @@ export function StepIdea({ onGenerated }: StepIdeaProps) {
         currentProject = createProject(title);
         updateProject({
           ideaPrompt: prompt.trim(),
-          aspectRatio,
+          aspectRatio: selectedAspectRatio,
         });
       }
       targetId = currentProject.id;
@@ -312,7 +314,10 @@ export function StepIdea({ onGenerated }: StepIdeaProps) {
         ] as const).map(({ value, icon: Icon, label }) => (
           <button
             key={value}
-            onClick={() => updateProject({ aspectRatio: value })}
+            onClick={() => {
+              setSelectedAspectRatio(value);
+              if (project) updateProject({ aspectRatio: value });
+            }}
             className={`flex items-center gap-2 rounded-lg border px-4 py-2 text-sm transition ${
               aspectRatio === value
                 ? "border-emerald-500 bg-emerald-950/30 text-emerald-400"
