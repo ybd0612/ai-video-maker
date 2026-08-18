@@ -8,9 +8,11 @@ import { useProjectStore } from "@/stores/projectStore";
 import { useT } from "@/i18n";
 import {
   Plus, Copy, Trash2, CheckCircle2,
-  Film, Loader2,
+  Film, Loader2, Search, SortAsc, SortDesc,
 } from "lucide-react";
 import { confirmDialog } from "@/components/ui/ConfirmDialog";
+
+type SortMode = 'newest' | 'oldest';
 
 export function ProjectSidebar() {
   const t = useT();
@@ -23,6 +25,8 @@ export function ProjectSidebar() {
 
   const [newTitle, setNewTitle] = useState("");
   const [isCreating, setIsCreating] = useState(false);
+  const [search, setSearch] = useState("");
+  const [sort, setSort] = useState<SortMode>('newest');
 
   const handleCreate = () => {
     const title = newTitle.trim() || `${t("pipeline.newProject")} ${projects.length + 1}`;
@@ -44,6 +48,13 @@ export function ProjectSidebar() {
   const handleDuplicate = (id: string) => {
     duplicateProject(id);
   };
+
+  // Filter + sort
+  const filtered = projects
+    .filter(p => p.title.toLowerCase().includes(search.toLowerCase()))
+    .sort((a, b) => sort === 'newest'
+      ? (b.createdAt ?? 0) - (a.createdAt ?? 0)
+      : (a.createdAt ?? 0) - (b.createdAt ?? 0));
 
   const statusIcon = (status: string) => {
     switch (status) {
@@ -96,15 +107,37 @@ export function ProjectSidebar() {
         )}
       </div>
 
+      {/* Search + Sort */}
+      <div className="flex items-center gap-1 border-b border-slate-800 px-2 py-1.5">
+        <div className="relative flex-1">
+          <Search size={10} className="absolute left-1.5 top-1/2 -translate-y-1/2 text-slate-600" />
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder={t("pipeline.searchPlaceholder")}
+            className="w-full rounded border border-slate-700 bg-slate-800 pl-5 pr-2 py-1 text-[10px] text-slate-200 placeholder:text-slate-600 focus:border-emerald-500 focus:outline-none"
+          />
+        </div>
+        <button
+          onClick={() => setSort(s => s === 'newest' ? 'oldest' : 'newest')}
+          title={t(sort === 'newest' ? "pipeline.sortOldest" : "pipeline.sortNewest")}
+          className="rounded p-1 text-slate-600 hover:text-emerald-400"
+        >
+          {sort === 'newest' ? <SortDesc size={10} /> : <SortAsc size={10} />}
+        </button>
+      </div>
+
       {/* Project list */}
       <div className="flex-1 overflow-y-auto">
-        {projects.length === 0 ? (
+        {filtered.length === 0 ? (
           <div className="flex h-full items-center justify-center">
-            <span className="text-xs text-slate-600">{t("pipeline.noProjects")}</span>
+            <span className="text-xs text-slate-600">
+              {search ? "未找到匹配项目" : t("pipeline.noProjects")}
+            </span>
           </div>
         ) : (
           <div className="flex flex-col">
-            {projects.map((proj) => {
+            {filtered.map((proj) => {
               const isActive = proj.id === activeProjectId;
               const shotCount = proj.shots.length;
               const doneCount = proj.shots.filter((s) => s.status === "videoed").length;

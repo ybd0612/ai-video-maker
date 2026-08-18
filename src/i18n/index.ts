@@ -286,6 +286,9 @@ const zh = {
   "pipeline.needAllVideos": "还有 {done}/{total} 个镜头未生成视频",
   "pipeline.tabShot": "单镜头",
   "pipeline.tabFinal": "成片",
+  "pipeline.searchPlaceholder": "搜索项目...",
+  "pipeline.sortNewest": "最新优先",
+  "pipeline.sortOldest": "最早优先",
 
   // AI Assist
   "aiAssist.title": "AI 优化",
@@ -710,6 +713,9 @@ const en = {
   "pipeline.needAllVideos": "{done}/{total} shots have videos",
   "pipeline.tabShot": "Shot",
   "pipeline.tabFinal": "Final",
+  "pipeline.searchPlaceholder": "Search projects...",
+  "pipeline.sortNewest": "Newest first",
+  "pipeline.sortOldest": "Oldest first",
 
   // AI Assist
   "aiAssist.title": "AI Optimize",

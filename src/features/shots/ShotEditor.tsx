@@ -159,9 +159,14 @@ export function ShotEditor({
 
       {/* Duration */}
       <div className="space-y-1">
-        <label className="text-[11px] font-medium text-slate-500">
-          {t("pipeline.duration")}
-        </label>
+        <div className="flex items-center justify-between">
+          <label className="text-[11px] font-medium text-slate-500">
+            {t("pipeline.duration")}
+          </label>
+          <span className="text-[10px] text-emerald-600">
+            ≈{(shot.duration ?? 5) * 15}s
+          </span>
+        </div>
         <select
           value={shot.duration}
           onChange={(e) => updateShot(shot.id, { duration: parseInt(e.target.value) })}

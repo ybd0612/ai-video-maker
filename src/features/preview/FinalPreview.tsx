@@ -7,7 +7,8 @@ import { useState, useCallback } from "react";
 import { useProjectStore, selectActiveProject } from "@/stores/projectStore";
 import { useT } from "@/i18n";
 import { concatenateVideos } from "@/services/renderService";
-import { Download, Loader2, Scissors } from "lucide-react";
+import { Download, Loader2, Scissors, AlertCircle } from "lucide-react";
+import { RateLimitError } from "@/services/rateLimit";
 
 export function FinalPreview() {
   const project = useProjectStore(selectActiveProject);
@@ -15,6 +16,7 @@ export function FinalPreview() {
   const [isRendering, setIsRendering] = useState(false);
   const [renderProgress, setRenderProgress] = useState(0);
   const [renderedUrl, setRenderedUrl] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   const shots = project?.shots ?? [];
   const videoedShots = shots.filter((s) => s.videoUrl);
@@ -24,6 +26,7 @@ export function FinalPreview() {
     if (!canRender) return;
     setIsRendering(true);
     setRenderProgress(0);
+    setError(null);
     try {
       const urls = shots.map((s) => s.videoUrl!);
       const url = await concatenateVideos({
@@ -32,7 +35,11 @@ export function FinalPreview() {
       });
       setRenderedUrl(url);
     } catch (err) {
-      alert(err instanceof Error ? err.message : String(err));
+      if (err instanceof RateLimitError) {
+        setError(err.message);
+      } else {
+        setError(err instanceof Error ? err.message : String(err));
+      }
     } finally {
       setIsRendering(false);
     }
@@ -59,23 +66,37 @@ export function FinalPreview() {
 
       {/* Render button */}
       {!renderedUrl && (
-        <button
-          onClick={handleRender}
-          disabled={!canRender || isRendering}
-          className="flex items-center justify-center gap-2 rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          {isRendering ? (
-            <>
-              <Loader2 size={14} className="animate-spin" />
-              {t("pipeline.rendering")} {renderProgress}%
-            </>
-          ) : (
-            <>
-              <Scissors size={14} />
-              {t("pipeline.concatVideos")}
-            </>
+        <>
+          <button
+            onClick={handleRender}
+            disabled={!canRender || isRendering}
+            className="flex items-center justify-center gap-2 rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {isRendering ? (
+              <>
+                <Loader2 size={14} className="animate-spin" />
+                {t("pipeline.rendering")} {renderProgress}%
+              </>
+            ) : (
+              <>
+                <Scissors size={14} />
+                {t("pipeline.concatVideos")}
+              </>
+            )}
+          </button>
+          {error && (
+            <div className="flex items-start gap-2 rounded-md border border-red-800 bg-red-950/30 p-3 text-xs text-red-300">
+              <AlertCircle size={14} className="shrink-0 mt-0.5" />
+              <div className="flex-1 space-y-1">
+                <p>{error.split('，')[0]}</p>
+                {error.includes('预计') && (
+                  <span className="text-red-400">{error.split('预计')[1]?.split('后')[0]}后</span>
+                )}
+              </div>
+              <button onClick={() => setError(null)} className="text-red-500 hover:text-red-400">×</button>
+            </div>
           )}
-        </button>
+        </>
       )}
 
       {/* Render progress */}
