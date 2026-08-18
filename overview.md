@@ -25,6 +25,7 @@
   - 移除 ProjectWorkspace 的 retryFailedVideos 自动重试入口（与向导双入口冲突，会重复创建服务端任务）；
   - StepVideos 增加免费档排队提示（约 1 分钟/条）。
 - 决定性修复：用户提供真实成功响应，确认 Agnes 中国站实际把成片地址放在**顶层 `url` 字段**（与文档示例 metadata.url 不一致）。解析链已改为 url → metadata.url → video_url → output.url 等，并识别 internal_status="completed"。
+- 提示词覆盖修复：用户实测视频请求体 prompt 仅为兜底文案 "Camera slowly pans, gentle movement"。根因是 StepStoryboard 在生成分镜后又调 translateToMotion 覆盖提示词，其 JSON 解析失败时用兜底值覆盖 AI 完整输出。已移除该覆盖步骤及孤儿代码（translateToMotion / MotionTranslationResult），视频提示词现在使用分镜阶段 AI 生成的完整英文 motionPrompt，且每个分镜省一次文本调用。
 
 ## 验证结果
 - TypeScript 类型检查通过。

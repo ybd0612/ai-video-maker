@@ -7,7 +7,6 @@
 import type { Shot, Character, SceneReference } from "@/stores/projectStore";
 import { MODELS } from "@/lib/models";
 import { fetchWithRetry } from "@/lib/fetchWithRetry";
-import { chatCompletionFromSettings } from "./chatService";
 
 interface GenerateScriptOptions {
   apiKey: string;
@@ -53,64 +52,12 @@ export interface GenerateScriptResult {
 
 /* ── Motion translation ─────────────────────────────────────────────────── */
 
-export interface MotionTranslationResult {
-  visualPrompt: string;   // 画面层（文生图用）
-  motionPrompt: string;   // 运动层（图生视频用）
-}
-
 /**
- * 将分镜文案翻译为画面层 + 运动层提示词。
- * 内部读取 settingsStore 的 API 配置，调用方无需传 key。
+ * 注：曾存在 translateToMotion（用单镜头 scriptText 重新翻译 visualPrompt/motionPrompt 并覆盖）。
+ * 该步骤已移除：generateScript 输出的分镜已含 AI 生成的完整英文双提示词，
+ * 二次翻译在 JSON 解析失败时用 "Camera slowly pans, gentle movement" 等兜底文案
+ * 覆盖完整提示词，导致视频请求体 prompt 内容缺失（实测问题）。
  */
-export async function translateToMotion(
-  scriptText: string,
-  characters: Character[],
-  scene?: SceneReference,
-): Promise<MotionTranslationResult> {
-  const characterDesc = characters.map((c) => `${c.name}: ${c.fullPrompt}`).join("\n");
-  const sceneDesc = scene ? `场景: ${scene.prompt}` : "";
-
-  const systemPrompt = `你是一位专业的视频分镜提示词专家。
-
-将用户的故事描述转换为两部分：
-
-1. **画面层（visualPrompt）**：用于文生图，描述静态画面
-   - 包含：主体描述、场景、光影、风格
-   - 格式：英文，逗号分隔
-
-2. **运动层（motionPrompt）**：用于图生视频，描述物理运动
-   - 包含：镜头运动、角色动作、环境动态
-   - 格式：英文，具体物理运动指令
-   - 不要写情绪，只写具体动作
-
-角色信息：
-${characterDesc}
-
-${sceneDesc}
-
-请以 JSON 格式输出：
-{
-  "visualPrompt": "画面层提示词",
-  "motionPrompt": "运动层提示词"
-}`;
-
-  const result = await chatCompletionFromSettings({
-    messages: [
-      { role: "system", content: systemPrompt },
-      { role: "user", content: scriptText },
-    ],
-  });
-
-  try {
-    return JSON.parse(result.content);
-  } catch {
-    // AI 返回内容无法解析时的兜底值
-    return {
-      visualPrompt: scriptText,
-      motionPrompt: "Camera slowly pans, gentle movement",
-    };
-  }
-}
 
 /**
  * Extract JSON object from a model response that may contain markdown fences,

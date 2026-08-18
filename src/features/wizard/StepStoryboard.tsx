@@ -6,7 +6,6 @@
 
 import { useState } from "react";
 import { useProjectStore, selectActiveProject } from "@/stores/projectStore";
-import { translateToMotion } from "@/services/scriptService";
 import { useT } from "@/i18n";
 import { ShotCard } from "./ShotCard";
 import { PromptSubFields } from "./PromptSubFields";
@@ -31,33 +30,14 @@ export function StepStoryboard() {
 
   const handleGenerateStoryboard = async () => {
     if (!ideaPrompt.trim() || !project) return;
-    const targetProjectId = project.id;
     setIsGenerating(true);
     setError(null);
     try {
+      // generateStoryboard 已由 AI 直接输出完整的 visualPrompt + motionPrompt（英文），
+      // 无需再调用 translateToMotion 翻译覆盖 —— 该步骤 JSON 解析失败时
+      // 会用 "Camera slowly pans, gentle movement" 等兜底文案覆盖完整提示词，
+      // 导致视频生成请求体 prompt 内容缺失（用户实测发现的提示词丢失问题）。
       await generateStoryboard(ideaPrompt.trim());
-
-      // 为每个分镜翻译运动提示词（visualPrompt + motionPrompt）—— 并发度 3
-      const currentProject = useProjectStore.getState().projects.find((p) => p.id === targetProjectId);
-      const shots = currentProject?.shots ?? [];
-      const characters = currentProject?.characters ?? [];
-      const scene = currentProject?.sceneReferences?.[0];
-      const validShots = shots.filter((s) => s.scriptText.trim());
-
-      // 并发控制：每次最多 3 个翻译请求
-      const CONCURRENCY = 3;
-      for (let i = 0; i < validShots.length; i += CONCURRENCY) {
-        const batch = validShots.slice(i, i + CONCURRENCY);
-        await Promise.all(
-          batch.map(async (shot) => {
-            const motionResult = await translateToMotion(shot.scriptText, characters, scene);
-            useProjectStore.getState().updateShotByProjectId(targetProjectId, shot.id, {
-              visualPrompt: motionResult.visualPrompt,
-              motionPrompt: motionResult.motionPrompt,
-            });
-          }),
-        );
-      }
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {

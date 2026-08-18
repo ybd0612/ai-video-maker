@@ -106,7 +106,22 @@
 - 已修复：解析链改为 `url`（顶层）→ `metadata.url` → `video_url` → `output.url` → `output.video_url` → `remixed_from_video_id`；成功状态同时识别 `internal_status: "completed"`；`seconds` 转数字。
 - 这是“官方已成功但前端无回显”的最终根因，现已彻底解决。
 
-## 八、后续建议（未实施）
+## 八、提示词被兜底文案覆盖（用户实测请求体）
+
+用户实测视频请求体：
+
+```json
+{ "prompt": "Camera slowly pans, gentle movement", "width": 720, "height": 1280, "num_frames": 113, "frame_rate": 24 }
+```
+
+**根因**：`StepStoryboard.handleGenerateStoryboard` 在 `generateStoryboard` 之后又对每个分镜调用 `translateToMotion`（用单镜头 scriptText 重新翻译并覆盖 visualPrompt/motionPrompt）。该函数使用裸 `JSON.parse`，AI 返回稍带格式差异即失败 → 落入兜底文案 `"Camera slowly pans, gentle movement"`，把 AI 生成的完整英文提示词覆盖。
+
+**修复**：
+- 移除 StepStoryboard 中的 translateToMotion 覆盖步骤——`generateScript` 输出的分镜已含 AI 生成的完整英文双提示词（system prompt 明确要求完整动态描述）。
+- 清理孤儿代码：`translateToMotion` 函数与 `MotionTranslationResult` 接口从 scriptService 移除。
+- 附带收益：每个分镜少一次文本模型调用（省 token）。
+
+## 九、后续建议（未实施）
 
 1. 若仍出现单个镜头失败，可增加“查看服务端任务 ID + 手动重查”入口，便于与 Agnes 后台核对。
 2. ProjectWorkspace 的“一键成片 / 重试失败”仍是 pipelineService 旧路径，未与向导批量生成统一，如需完全收敛可后续处理。
