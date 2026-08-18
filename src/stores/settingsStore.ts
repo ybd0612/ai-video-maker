@@ -49,6 +49,29 @@ export const useSettingsStore = create<SettingsState>()(
       setProviderConfig: (config) =>
         set((s) => ({ providerConfig: { ...s.providerConfig, ...config } })),
     }),
-    { name: "wxhb-settings" },
+    {
+      name: "wxhb-settings",
+      version: 1,
+      migrate: (persisted) => {
+        // v0 → v1：把历史遗留的国际站地址（apihub.agnes-ai.com）自动迁移到中国站，
+        // 中国站实测端点/响应与官方文档一致（见 docs/video-generation-investigation-2026-08-18.md）。
+        // 仅迁移已知旧域名，用户自定义地址不受影响。
+        const state = persisted as Partial<SettingsState>;
+        const baseUrl = state.providerConfig?.baseUrl ?? "";
+        if (
+          baseUrl.startsWith("https://apihub.agnes-ai.com") ||
+          baseUrl.startsWith("http://apihub.agnes-ai.com")
+        ) {
+          return {
+            ...state,
+            providerConfig: {
+              ...state.providerConfig!,
+              baseUrl: "https://api.agnes-ai.cn/v1",
+            },
+          };
+        }
+        return state;
+      },
+    },
   ),
 );
