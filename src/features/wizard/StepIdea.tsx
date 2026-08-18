@@ -164,13 +164,16 @@ export function StepIdea({ onGenerated }: StepIdeaProps) {
     setError(null);
     let targetId: string | undefined;
     try {
-      // Create project if one doesn't exist
+      // Create project if one doesn't exist. Preserve the aspect ratio selected
+      // before creation; updateProject() cannot write without an active project.
       let currentProject = project;
       if (!currentProject) {
         const title = prompt.trim().slice(0, 30) || t("pipeline.newProject");
         currentProject = createProject(title);
-        // Update the project with the idea prompt
-        updateProject({ ideaPrompt: prompt.trim() });
+        updateProject({
+          ideaPrompt: prompt.trim(),
+          aspectRatio,
+        });
       }
       targetId = currentProject.id;
       await extractCharactersFromIdea(prompt.trim());
