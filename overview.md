@@ -12,6 +12,12 @@
 - 服务端任务已创建但轮询超时不再标记为 failed，也不创建重复任务，保留 videoing 状态。
 - 修复 Agnes 完成响应解析：官方成片地址位于 `metadata.url`，同时兼容旧版 `video_url` / `output.url` 字段。
 - 只有任务明确 `failed` / `cancelled` 才显示失败；已创建但仍可能运行的任务继续保持生成状态。
+- 全面调研视频生成失败根因（报告：docs/video-generation-investigation-2026-08-18.md），修复：
+  - StepVideos 自动触发 effect 重入导致任务被误杀/重复创建（去掉 videoGenerationStarted 依赖）；
+  - 批量生成加幂等守卫 + 独立 AbortController（模块级 activeVideoTasks 注册表）；
+  - 刷新后残留 videoing 自动重置为 imaged 重新接管（解决永久加载中）；
+  - rerollVideo 独立 controller，服务端任务仍运行时不误报失败；
+  - “重试失败”改走并发受控的批量生成。
 
 ## 验证结果
 - TypeScript 类型检查通过。

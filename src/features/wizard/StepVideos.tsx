@@ -24,7 +24,6 @@ export function StepVideos() {
   const allVideoed = shots.length > 0 && shots.every((s) => !!s.videoUrl);
   const failedCount = shots.filter((s) => s.status === "failed").length;
   const generatingCount = shots.filter((s) => s.status === "videoing").length;
-  const videoGenerationStarted = project?.videoGenerationStarted ?? false;
 
   // 生成完成 toast：allVideoed 从 false→true 时短暂提示
   const [showDoneToast, setShowDoneToast] = useState(false);
@@ -39,7 +38,9 @@ export function StepVideos() {
     prevAllVideoedRef.current = allVideoed;
   }, [allVideoed]);
 
-  // 自动开始/恢复视频生成：首次进入触发，切回时继续未完成的 shot
+  // 自动开始/恢复视频生成：挂载时触发一次（shots.length 变化时重算）。
+  // 注意：不依赖 videoGenerationStarted —— 批量生成内部会把它置 true，
+  // 若加入依赖会导致 effect 重入，generateVideosForStep 的幂等守卫会跳过，但更稳妥的做法是只触发一次。
   useEffect(() => {
     if (shots.length > 0) {
       const needsVideos = shots.some((s) => !s.videoUrl && s.imageUrl);
@@ -48,7 +49,7 @@ export function StepVideos() {
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [videoGenerationStarted, shots.length]);
+  }, [shots.length]);
 
   // auto 模式：所有视频完成后自动推进到 Step 6
   useEffect(() => {
@@ -72,7 +73,7 @@ export function StepVideos() {
           )}
           {failedCount > 0 && (
             <button
-              onClick={() => shots.filter((s) => s.status === "failed" && s.imageUrl).forEach((s) => rerollVideo(s.id))}
+              onClick={() => generateVideosForStep()}
               disabled={generatingCount > 0}
               className="flex items-center gap-1 rounded px-2 py-1 text-[11px] text-red-400 hover:bg-red-950/30 transition disabled:opacity-50"
             >

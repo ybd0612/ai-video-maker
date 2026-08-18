@@ -14,6 +14,14 @@ import { generateVideo, aspectRatioToVideoSize, VideoTaskCreatedError } from "@/
 import { injectCharacterDescriptions } from "@/lib/characterUtils";
 import { composeVisualPrompt, composeMotionPrompt } from "@/lib/promptUtils";
 
+/**
+ * 正在运行的视频生成任务：projectId -> AbortController。
+ * 模块级注册表（跨组件实例共享），用于：
+ * 1. 幂等守卫：同一项目已有任务在跑时不重复启动，避免重复创建服务端视频任务；
+ * 2. 刷新/新会话恢复：页面刷新后注册表清空，可将残留的 videoing 状态重置为可重试。
+ */
+const activeVideoTasks = new Map<string, AbortController>();
+
 export function useWizardActions() {
   const abortRef = useRef<AbortController | null>(null);
 
@@ -421,20 +429,43 @@ export function useWizardActions() {
     const project = selectActiveProject(store);
     if (!project) return;
     const targetProjectId = project.id;
+
+    // 幂等守卫：同一项目已有视频任务在跑时不重复启动，
+    // 避免 effect 重入 / 导航切换导致重复创建服务端视频任务。
+    if (activeVideoTasks.has(targetProjectId)) return;
+
     const plan = resolvePlan(providerConfig.plan as PlanId | undefined);
     // 免费档视频 RPM=1，限流器会串行排队；这里同步使用相同并发度，避免界面同时显示多个“生成中”。
     const videoConcurrency = plan.rpm.video <= 1 ? 1 : 2;
 
+    // 刷新/新会话恢复：videoing 状态没有对应的存活任务（注册表为空）→ 重置为 imaged，
+    // 让下面重新接管这些 shot，避免“永久加载中”卡死。
+    const latestProject = useProjectStore.getState().projects.find((p) => p.id === targetProjectId);
+    const stuckVideoing = (latestProject?.shots ?? []).filter((s) => s.status === "videoing");
+    if (stuckVideoing.length > 0) {
+      for (const s of stuckVideoing) {
+        useProjectStore.getState().updateShotByProjectId(targetProjectId, s.id, {
+          status: "imaged",
+          videoProgress: 0,
+          error: undefined,
+        });
+      }
+    }
+
     // 跳过已在生成中的 shot（status="videoing"），防止导航切换后重复提交
-    const shotsNeedingVideos = project.shots.filter(
+    const shotsNeedingVideos = (latestProject?.shots ?? []).filter(
       (s) => !s.videoUrl && s.imageUrl && s.status !== "videoing" && (s.motionPrompt.trim() || s.actionDesc?.trim()),
     );
     if (shotsNeedingVideos.length === 0) return;
 
+    // 独立 AbortController：只取消本轮任务，不误杀其他仍在运行的任务。
+    const controller = new AbortController();
+    const signal = controller.signal;
+    activeVideoTasks.set(targetProjectId, controller);
+
     store.setVideoGenerationStartedByProjectId(targetProjectId, true);
     store.setProjectStatusById(targetProjectId, "videoing");
-    const videoSize = aspectRatioToVideoSize(project.aspectRatio);
-    const signal = ensureAbortController();
+    const videoSize = aspectRatioToVideoSize(latestProject?.aspectRatio ?? project.aspectRatio);
 
     const tasks = shotsNeedingVideos.map((shot) => async () => {
       if (signal?.aborted) return;
@@ -500,7 +531,11 @@ export function useWizardActions() {
       }
     });
 
-    await runWithConcurrency(tasks, videoConcurrency, signal);
+    try {
+      await runWithConcurrency(tasks, videoConcurrency, signal);
+    } finally {
+      activeVideoTasks.delete(targetProjectId);
+    }
 
     // 只有全部成功或明确失败后才清除标记；仍在服务端运行的任务继续保留“生成中”。
     const updatedProject = useProjectStore.getState().projects.find((p) => p.id === targetProjectId);
@@ -526,6 +561,10 @@ export function useWizardActions() {
     store.setShotStatusByProjectId(targetProjectId, shotId, "videoing");
     store.updateShotByProjectId(targetProjectId, shotId, { videoProgress: 0 });
 
+    // 单镜头重试用独立 controller，不干扰批量生成任务。
+    const controller = new AbortController();
+    const signal = controller.signal;
+
     try {
       const motionPrompt = composeMotionPrompt(shot);
       const result = await generateVideo(
@@ -542,14 +581,21 @@ export function useWizardActions() {
         (progress) => {
           useProjectStore.getState().updateShotByProjectId(targetProjectId, shotId, { videoProgress: progress });
         },
-        abortRef.current?.signal,
+        signal,
       );
 
       useProjectStore.getState().updateShotByProjectId(targetProjectId, shotId, { videoUrl: result.videoUrl, status: "videoed" });
     } catch (err) {
       if (err instanceof VideoTaskCreatedError) {
-        useProjectStore.getState().setShotStatusByProjectId(targetProjectId, shotId, "failed",
-          "视频任务已创建但获取结果失败，请稍后重试。");
+        if (!err.stillRunning) {
+          useProjectStore.getState().setShotStatusByProjectId(targetProjectId, shotId, "failed", err.message);
+        } else {
+          // 服务端任务仍在运行：保持 videoing，不重复创建，也不误报失败。
+          useProjectStore.getState().updateShotByProjectId(targetProjectId, shotId, {
+            videoProgress: 0,
+            error: `${err.message} 已保留服务端任务，不重复创建。`,
+          });
+        }
       } else {
         useProjectStore.getState().setShotStatusByProjectId(targetProjectId, shotId, "failed", err instanceof Error ? err.message : String(err));
       }
