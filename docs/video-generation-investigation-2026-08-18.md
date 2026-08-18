@@ -84,7 +84,29 @@
 | ProjectWorkspace 进入页面自动重试（retryFailedVideos）与向导批量生成双入口并行，可能重复创建服务端视频任务 | 移除该自动重试入口，统一由向导视频步骤接管；清理不再使用的 abortRef/ensureAbortController |
 | 免费档视频排队无提示 | StepVideos 显示“N 个排队中，免费档约 1 分钟/条” |
 
-## 七、后续建议（未实施）
+## 七、决定性证据补充：实际响应成片地址在顶层 `url` 字段
+
+用户提供真实成功响应（已脱敏），关键结构：
+
+```json
+{
+  "id": "video_xxx",
+  "status": "completed",
+  "internal_status": "completed",
+  "progress": 100,
+  "url": "https://cos-platform-outputs.agnes-ai.cn/videos/agnes-video-v2.0/video_xxx.mp4",
+  "seconds": "4.7",
+  "size": "704x1280"
+}
+```
+
+**结论**：
+- 中国站实际实现与官方文档示例（`metadata.url`）**不一致**——成片地址在**顶层 `url` 字段**。
+- 此前解析链（`metadata.url` / `video_url` / `output.video_url`）均无法命中 → 轮询成功但提取不到 URL → 状态无法更新。
+- 已修复：解析链改为 `url`（顶层）→ `metadata.url` → `video_url` → `output.url` → `output.video_url` → `remixed_from_video_id`；成功状态同时识别 `internal_status: "completed"`；`seconds` 转数字。
+- 这是“官方已成功但前端无回显”的最终根因，现已彻底解决。
+
+## 八、后续建议（未实施）
 
 1. 若仍出现单个镜头失败，可增加“查看服务端任务 ID + 手动重查”入口，便于与 Agnes 后台核对。
 2. ProjectWorkspace 的“一键成片 / 重试失败”仍是 pipelineService 旧路径，未与向导批量生成统一，如需完全收敛可后续处理。

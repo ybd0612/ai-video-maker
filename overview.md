@@ -24,6 +24,7 @@
   - “全部重新生成/重试失败”全部改走批量生成（消除 forEach 并发）；
   - 移除 ProjectWorkspace 的 retryFailedVideos 自动重试入口（与向导双入口冲突，会重复创建服务端任务）；
   - StepVideos 增加免费档排队提示（约 1 分钟/条）。
+- 决定性修复：用户提供真实成功响应，确认 Agnes 中国站实际把成片地址放在**顶层 `url` 字段**（与文档示例 metadata.url 不一致）。解析链已改为 url → metadata.url → video_url → output.url 等，并识别 internal_status="completed"。
 
 ## 验证结果
 - TypeScript 类型检查通过。

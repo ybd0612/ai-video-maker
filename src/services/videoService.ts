@@ -234,19 +234,24 @@ export async function generateVideo(
 
     onProgress?.(progress);
 
-    if (rawStatus === "completed" || rawStatus === "succeeded") {
-      // Agnes 官方完成响应将成片 URL 放在 metadata.url；兼容旧版字段。
-      videoUrl = pollJson.metadata?.url
+    if (rawStatus === "completed" || rawStatus === "succeeded" || pollJson.internal_status === "completed") {
+      // Agnes 实际返回：成片 URL 位于顶层 `url` 字段（用户实测响应，如
+      // https://cos-platform-outputs.agnes-ai.cn/videos/...mp4）。
+      // 官方文档示例格式为 metadata.url；另兼容旧版 video_url / output.url 等字段。
+      videoUrl = pollJson.url
+        ?? pollJson.metadata?.url
         ?? pollJson.video_url
-        ?? pollJson.remixed_from_video_id
-        ?? pollJson.output?.video_url
         ?? pollJson.output?.url
+        ?? pollJson.output?.video_url
+        ?? pollJson.remixed_from_video_id
         ?? "";
       coverImageUrl = pollJson.cover_image_url ?? pollJson.metadata?.cover_url;
-      duration = pollJson.seconds ?? pollJson.output?.duration ?? pollJson.duration;
+      duration = pollJson.seconds !== undefined && pollJson.seconds !== null
+        ? Number(pollJson.seconds)
+        : (pollJson.output?.duration ?? pollJson.duration);
       if (!videoUrl) {
         throw new VideoTaskCreatedError(
-          `视频任务 ${videoId} 已完成，但响应中没有 metadata.url。响应: ${JSON.stringify(pollJson).slice(0, 500)}`,
+          `视频任务 ${videoId} 已完成，但响应中没有视频 URL（url/metadata.url 均缺失）。响应: ${JSON.stringify(pollJson).slice(0, 500)}`,
           videoId,
           false,
         );
