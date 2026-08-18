@@ -12,10 +12,12 @@ import { Download, Loader2, Film } from "lucide-react";
 export function StepAssembly() {
   const t = useT();
   const project = useProjectStore(selectActiveProject);
-  const setProjectStatus = useProjectStore((s) => s.setProjectStatus);
+  const setProjectStatusById = useProjectStore((s) => s.setProjectStatusById);
 
   const shots = project?.shots ?? [];
   const videoShots = shots.filter((s) => s.videoUrl);
+  const missingShots = shots.filter((s) => !s.videoUrl);
+  const canRender = shots.length > 0 && missingShots.length === 0;
 
   const [isRendering, setIsRendering] = useState(false);
   const [renderProgress, setRenderProgress] = useState(0);
@@ -31,10 +33,10 @@ export function StepAssembly() {
   }, [renderedUrl]);
 
   const handleRender = useCallback(async () => {
-    if (videoShots.length === 0) return;
+    if (!canRender || !project) return;
     setIsRendering(true);
     setRenderProgress(0);
-    setProjectStatus("rendering");
+    setProjectStatusById(project.id, "rendering");
 
     try {
       const urls = videoShots.map((s) => s.videoUrl!);
@@ -43,14 +45,14 @@ export function StepAssembly() {
         onProgress: setRenderProgress,
       });
       setRenderedUrl(url);
-      setProjectStatus("done");
+      setProjectStatusById(project.id, "done");
     } catch (err) {
       console.error("Assembly failed:", err);
-      setProjectStatus("failed", err instanceof Error ? err.message : String(err));
+      setProjectStatusById(project.id, "failed", err instanceof Error ? err.message : String(err));
     } finally {
       setIsRendering(false);
     }
-  }, [videoShots, setProjectStatus]);
+  }, [canRender, project, videoShots, setProjectStatusById]);
 
   const handleDownload = () => {
     if (!renderedUrl || !project) return;
@@ -89,11 +91,20 @@ export function StepAssembly() {
         ))}
       </div>
 
+      {missingShots.length > 0 && (
+        <div className="rounded-lg border border-amber-800 bg-amber-950/30 p-3 text-center text-xs text-amber-300">
+          {t("pipeline.needAllVideos", { done: videoShots.length, total: shots.length })}
+          <div className="mt-1 text-amber-400/80">
+            缺少镜头：{missingShots.map((shot) => `#${shot.index + 1}`).join("、")}
+          </div>
+        </div>
+      )}
+
       {/* 拼接按钮 */}
       {!renderedUrl && (
         <button
           onClick={handleRender}
-          disabled={isRendering || videoShots.length === 0}
+          disabled={isRendering || !canRender}
           className="mx-auto flex items-center gap-2 rounded-xl bg-emerald-600 px-8 py-3 text-sm font-semibold text-white transition hover:bg-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {isRendering ? (

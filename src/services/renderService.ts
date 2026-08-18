@@ -36,7 +36,7 @@ function toProxyUrl(url: string): string {
   try {
     const parsed = new URL(url);
     // In dev mode, route through Vite proxy to avoid CORS
-    if (typeof window !== "undefined" && window.location.hostname === "127.0.0.1") {
+    if (typeof window !== "undefined" && window.location.hostname === "127.0.0.1" || window.location.hostname === "localhost") {
       return `/cdn-proxy${parsed.pathname}`;
     }
   } catch {

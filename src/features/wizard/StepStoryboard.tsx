@@ -30,14 +30,15 @@ export function StepStoryboard() {
   const ideaPrompt = project?.ideaPrompt ?? "";
 
   const handleGenerateStoryboard = async () => {
-    if (!ideaPrompt.trim()) return;
+    if (!ideaPrompt.trim() || !project) return;
+    const targetProjectId = project.id;
     setIsGenerating(true);
     setError(null);
     try {
       await generateStoryboard(ideaPrompt.trim());
 
       // 为每个分镜翻译运动提示词（visualPrompt + motionPrompt）—— 并发度 3
-      const currentProject = selectActiveProject(useProjectStore.getState());
+      const currentProject = useProjectStore.getState().projects.find((p) => p.id === targetProjectId);
       const shots = currentProject?.shots ?? [];
       const characters = currentProject?.characters ?? [];
       const scene = currentProject?.sceneReferences?.[0];
@@ -50,7 +51,7 @@ export function StepStoryboard() {
         await Promise.all(
           batch.map(async (shot) => {
             const motionResult = await translateToMotion(shot.scriptText, characters, scene);
-            updateShot(shot.id, {
+            useProjectStore.getState().updateShotByProjectId(targetProjectId, shot.id, {
               visualPrompt: motionResult.visualPrompt,
               motionPrompt: motionResult.motionPrompt,
             });

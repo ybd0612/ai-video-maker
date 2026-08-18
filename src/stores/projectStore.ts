@@ -181,19 +181,24 @@ interface ProjectState {
   deleteProject: (id: string) => void;
   duplicateProject: (id: string) => Project | null;
   setProjectStatus: (status: ProjectStatus, error?: string) => void;
+  setProjectStatusById: (projectId: string, status: ProjectStatus, error?: string) => void;
   clearProject: () => void;
 
   /* Shot actions */
   setShots: (shots: Shot[]) => void;
+  setShotsByProjectId: (projectId: string, shots: Shot[]) => void;
   addShot: (shot: Omit<Shot, "id" | "index" | "status">) => Shot;
   updateShot: (id: string, updates: Partial<Omit<Shot, "id" | "index">>) => void;
+  updateShotByProjectId: (projectId: string, id: string, updates: Partial<Omit<Shot, "id" | "index">>) => void;
   removeShot: (id: string) => void;
   reorderShots: (fromIndex: number, toIndex: number) => void;
   setShotStatus: (id: string, status: ShotStatus, error?: string) => void;
+  setShotStatusByProjectId: (projectId: string, id: string, status: ShotStatus, error?: string) => void;
 
   /* Character actions */
   addCharacter: (character: Omit<Character, "id">) => Character;
   updateCharacter: (id: string, updates: Partial<Omit<Character, "id">>) => void;
+  updateCharacterByProjectId: (projectId: string, id: string, updates: Partial<Omit<Character, "id">>) => void;
   removeCharacter: (id: string) => void;
 
   /* Wizard step */
@@ -205,6 +210,7 @@ interface ProjectState {
   /* Scene reference actions */
   addSceneReference: (ref: Omit<SceneReference, "id">) => SceneReference;
   updateSceneReference: (id: string, updates: Partial<Omit<SceneReference, "id">>) => void;
+  updateSceneReferenceByProjectId: (projectId: string, id: string, updates: Partial<Omit<SceneReference, "id">>) => void;
   removeSceneReference: (id: string) => void;
 
   /* Dialogue actions */
@@ -216,8 +222,11 @@ interface ProjectState {
 
   /* Generation started flags */
   setAssetGenerationStarted: (v: boolean) => void;
+  setAssetGenerationStartedByProjectId: (projectId: string, v: boolean) => void;
   setImageGenerationStarted: (v: boolean) => void;
+  setImageGenerationStartedByProjectId: (projectId: string, v: boolean) => void;
   setVideoGenerationStarted: (v: boolean) => void;
+  setVideoGenerationStartedByProjectId: (projectId: string, v: boolean) => void;
 
   /* History actions */
   addHistory: (action: HistoryAction, description: string) => void;
@@ -351,6 +360,13 @@ export const useProjectStore = create<ProjectState>()(
           })),
         })),
 
+      setProjectStatusById: (projectId, status, error) =>
+        set((s) => ({
+          projects: s.projects.map((p) =>
+            p.id === projectId ? { ...p, status, error, updatedAt: Date.now() } : p,
+          ),
+        })),
+
       clearProject: () => {
         const { activeProjectId } = get();
         if (!activeProjectId) return;
@@ -373,6 +389,15 @@ export const useProjectStore = create<ProjectState>()(
             shots: shots.map((sh, i) => ({ ...sh, index: i })),
             updatedAt: Date.now(),
           })),
+        })),
+
+      setShotsByProjectId: (projectId, shots) =>
+        set((s) => ({
+          projects: s.projects.map((p) =>
+            p.id === projectId
+              ? { ...p, shots: shots.map((sh, i) => ({ ...sh, index: i })), updatedAt: Date.now() }
+              : p,
+          ),
         })),
 
       addShot: (shot) => {
@@ -401,6 +426,19 @@ export const useProjectStore = create<ProjectState>()(
             ),
             updatedAt: Date.now(),
           })),
+        })),
+
+      updateShotByProjectId: (projectId, id, updates) =>
+        set((s) => ({
+          projects: s.projects.map((p) =>
+            p.id === projectId
+              ? {
+                  ...p,
+                  shots: p.shots.map((sh) => sh.id === id ? { ...sh, ...updates } : sh),
+                  updatedAt: Date.now(),
+                }
+              : p,
+          ),
         })),
 
       removeShot: (id) =>
@@ -440,6 +478,19 @@ export const useProjectStore = create<ProjectState>()(
           })),
         })),
 
+      setShotStatusByProjectId: (projectId, id, status, error) =>
+        set((s) => ({
+          projects: s.projects.map((p) =>
+            p.id === projectId
+              ? {
+                  ...p,
+                  shots: p.shots.map((sh) => sh.id === id ? { ...sh, status, error } : sh),
+                  updatedAt: Date.now(),
+                }
+              : p,
+          ),
+        })),
+
       /* ── Character actions ───────────────────────────────────────────── */
 
       addCharacter: (character) => {
@@ -463,6 +514,15 @@ export const useProjectStore = create<ProjectState>()(
             ),
             updatedAt: Date.now(),
           })),
+        })),
+
+      updateCharacterByProjectId: (projectId, id, updates) =>
+        set((s) => ({
+          projects: s.projects.map((p) =>
+            p.id === projectId
+              ? { ...p, characters: p.characters.map((c) => c.id === id ? { ...c, ...updates } : c), updatedAt: Date.now() }
+              : p,
+          ),
         })),
 
       removeCharacter: (id) =>
@@ -523,6 +583,15 @@ export const useProjectStore = create<ProjectState>()(
             ),
             updatedAt: Date.now(),
           })),
+        })),
+
+      updateSceneReferenceByProjectId: (projectId, id, updates) =>
+        set((s) => ({
+          projects: s.projects.map((p) =>
+            p.id === projectId
+              ? { ...p, sceneReferences: (p.sceneReferences ?? []).map((r) => r.id === id ? { ...r, ...updates } : r), updatedAt: Date.now() }
+              : p,
+          ),
         })),
 
       removeSceneReference: (id) =>
@@ -629,6 +698,12 @@ export const useProjectStore = create<ProjectState>()(
           })),
         })),
 
+      setAssetGenerationStartedByProjectId: (projectId, v) =>
+        set((s) => ({ projects: s.projects.map((p) => p.id === projectId ? { ...p, assetGenerationStarted: v, updatedAt: Date.now() } : p) })),
+
+      setImageGenerationStartedByProjectId: (projectId, v) =>
+        set((s) => ({ projects: s.projects.map((p) => p.id === projectId ? { ...p, imageGenerationStarted: v, updatedAt: Date.now() } : p) })),
+
       setVideoGenerationStarted: (v) =>
         set((s) => ({
           projects: updateActive(s.projects, s.activeProjectId, (p) => ({
@@ -637,6 +712,9 @@ export const useProjectStore = create<ProjectState>()(
             updatedAt: Date.now(),
           })),
         })),
+
+      setVideoGenerationStartedByProjectId: (projectId, v) =>
+        set((s) => ({ projects: s.projects.map((p) => p.id === projectId ? { ...p, videoGenerationStarted: v, updatedAt: Date.now() } : p) })),
 
       /* ── History actions ────────────────────────────────────────────── */
 

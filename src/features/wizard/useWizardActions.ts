@@ -91,8 +91,9 @@ export function useWizardActions() {
     const store = useProjectStore.getState();
     const project = selectActiveProject(store);
     if (!project) throw new Error("No active project.");
+    const targetProjectId = project.id;
 
-    store.setProjectStatus("scripting");
+    store.setProjectStatusById(targetProjectId, "scripting");
 
     const result = await generateScript({
       apiKey: providerConfig.apiKey,
@@ -111,7 +112,7 @@ export function useWizardActions() {
       ...s,
     }));
 
-    store.setShots(shots);
+    store.setShotsByProjectId(targetProjectId, shots);
 
     // Auto-add any newly extracted characters
     if (result.characters.length > 0) {
@@ -120,18 +121,23 @@ export function useWizardActions() {
         if (!existingNames.has(char.name)) {
           const namespace = generateAssetNamespace(char.name);
           const fullPrompt = `a character named ${char.name}, ${char.appearancePrompt}`;
-          store.addCharacter({
+          const newCharacter: Character = {
+            id: newId("char"),
             name: char.name,
             description: char.description,
             appearancePrompt: char.appearancePrompt,
             assetNamespace: namespace,
             fullPrompt,
-          });
+          };
+          useProjectStore.getState().updateProjectById(targetProjectId, (p) => ({
+            ...p,
+            characters: [...p.characters, newCharacter],
+          }));
         }
       }
     }
 
-    store.setProjectStatus("idle");
+    useProjectStore.getState().setProjectStatusById(targetProjectId, "idle");
   }, []);
 
   /** Re-roll a single shot's script */
@@ -197,6 +203,7 @@ export function useWizardActions() {
     const store = useProjectStore.getState();
     const project = selectActiveProject(store);
     if (!project) return;
+    const targetProjectId = project.id;
 
     const imageSize = aspectRatioToImageSize(project.aspectRatio);
     const signal = ensureAbortController();
@@ -220,7 +227,7 @@ export function useWizardActions() {
               prompt: portraitPrompt,
               size: imageSize,
             });
-            store.updateCharacter(char.id, { generatedPortraitUrl: url });
+            useProjectStore.getState().updateCharacterByProjectId(targetProjectId, char.id, { generatedPortraitUrl: url });
           } catch (err) {
             console.error(`Failed to generate portrait for ${char.name}:`, err);
           }
@@ -241,7 +248,7 @@ export function useWizardActions() {
               prompt: scene.prompt,
               size: imageSize,
             });
-            store.updateSceneReference(scene.id, { imageUrl: url });
+            useProjectStore.getState().updateSceneReferenceByProjectId(targetProjectId, scene.id, { imageUrl: url });
           } catch (err) {
             console.error(`Failed to generate scene image for ${scene.name}:`, err);
           }
@@ -263,7 +270,7 @@ export function useWizardActions() {
             prompt: stylePrompt,
             size: imageSize,
           });
-          store.updateProject({ styleReferenceUrl: url });
+          useProjectStore.getState().updateProjectById(targetProjectId, (p) => ({ ...p, styleReferenceUrl: url }));
         } catch (err) {
           console.error("Failed to generate style reference:", err);
         }
@@ -272,16 +279,16 @@ export function useWizardActions() {
 
     if (tasks.length === 0) return;
 
-    store.setAssetGenerationStarted(true);
+    store.setAssetGenerationStartedByProjectId(targetProjectId, true);
     await runWithConcurrency(tasks, 3, signal);
 
     // 所有资产生成完成后清除标记
-    const updatedProject = selectActiveProject(useProjectStore.getState());
+    const updatedProject = useProjectStore.getState().projects.find((p) => p.id === targetProjectId);
     const allPortraitsDone = updatedProject?.characters.every((c) => !!c.generatedPortraitUrl);
     const allScenesDone = (updatedProject?.sceneReferences ?? []).every((s) => !!s.imageUrl);
     const styleDone = !!updatedProject?.styleReferenceUrl;
     if (allPortraitsDone && allScenesDone && styleDone) {
-      store.setAssetGenerationStarted(false);
+      useProjectStore.getState().setAssetGenerationStartedByProjectId(targetProjectId, false);
     }
   }, []);
 
@@ -293,6 +300,7 @@ export function useWizardActions() {
     const store = useProjectStore.getState();
     const project = selectActiveProject(store);
     if (!project) return;
+    const targetProjectId = project.id;
 
     // 跳过已在生成中的 shot（status="imaging"），防止导航切换后重复提交
     const shotsNeedingImages = project.shots.filter(
@@ -300,15 +308,15 @@ export function useWizardActions() {
     );
     if (shotsNeedingImages.length === 0) return;
 
-    store.setImageGenerationStarted(true);
-    store.setProjectStatus("imaging");
+    store.setImageGenerationStartedByProjectId(targetProjectId, true);
+    store.setProjectStatusById(targetProjectId, "imaging");
     const imageSize = aspectRatioToImageSize(project.aspectRatio);
     const signal = ensureAbortController();
 
     // Generate images with concurrency 3
     const tasks = shotsNeedingImages.map((shot) => async () => {
       if (signal?.aborted) return;
-      store.setShotStatus(shot.id, "imaging");
+      useProjectStore.getState().setShotStatusByProjectId(targetProjectId, shot.id, "imaging");
 
       try {
         let enrichedPrompt = injectCharacterDescriptions(
@@ -333,9 +341,9 @@ export function useWizardActions() {
           inputImageUrl: referenceImageUrl,
         });
 
-        store.updateShot(shot.id, { imageUrl, status: "imaged" });
+        useProjectStore.getState().updateShotByProjectId(targetProjectId, shot.id, { imageUrl, status: "imaged" });
       } catch (err) {
-        store.setShotStatus(shot.id, "failed", err instanceof Error ? err.message : String(err));
+        useProjectStore.getState().setShotStatusByProjectId(targetProjectId, shot.id, "failed", err instanceof Error ? err.message : String(err));
       }
     });
 
@@ -343,11 +351,11 @@ export function useWizardActions() {
     await runWithConcurrency(tasks, 3, signal);
 
     // Check if all images are ready
-    const updatedProject = selectActiveProject(useProjectStore.getState());
+    const updatedProject = useProjectStore.getState().projects.find((p) => p.id === targetProjectId);
     const allImaged = updatedProject?.shots.every((s) => !!s.imageUrl);
     if (allImaged) {
-      store.setImageGenerationStarted(false);
-      store.setProjectStatus("done");
+      useProjectStore.getState().setImageGenerationStartedByProjectId(targetProjectId, false);
+      useProjectStore.getState().setProjectStatusById(targetProjectId, "done");
     }
   }, []);
 
@@ -400,6 +408,7 @@ export function useWizardActions() {
     const store = useProjectStore.getState();
     const project = selectActiveProject(store);
     if (!project) return;
+    const targetProjectId = project.id;
 
     // 跳过已在生成中的 shot（status="videoing"），防止导航切换后重复提交
     const shotsNeedingVideos = project.shots.filter(
@@ -407,15 +416,15 @@ export function useWizardActions() {
     );
     if (shotsNeedingVideos.length === 0) return;
 
-    store.setVideoGenerationStarted(true);
-    store.setProjectStatus("videoing");
+    store.setVideoGenerationStartedByProjectId(targetProjectId, true);
+    store.setProjectStatusById(targetProjectId, "videoing");
     const videoSize = aspectRatioToVideoSize(project.aspectRatio);
     const signal = ensureAbortController();
 
     const tasks = shotsNeedingVideos.map((shot) => async () => {
       if (signal?.aborted) return;
-      store.setShotStatus(shot.id, "videoing");
-      store.updateShot(shot.id, { videoProgress: 0 });
+      useProjectStore.getState().setShotStatusByProjectId(targetProjectId, shot.id, "videoing");
+      useProjectStore.getState().updateShotByProjectId(targetProjectId, shot.id, { videoProgress: 0 });
 
       const MAX_TASK_RETRIES = 2;
       const RETRY_DELAY_MS = 8_000;
@@ -437,27 +446,27 @@ export function useWizardActions() {
               duration: shot.duration,
             },
             (progress) => {
-              useProjectStore.getState().updateShot(shot.id, { videoProgress: progress });
+              useProjectStore.getState().updateShotByProjectId(targetProjectId, shot.id, { videoProgress: progress });
             },
             signal,
           );
 
-          store.updateShot(shot.id, { videoUrl: result.videoUrl, status: "videoed" });
+          useProjectStore.getState().updateShotByProjectId(targetProjectId, shot.id, { videoUrl: result.videoUrl, status: "videoed" });
           return; // Success — exit retry loop
         } catch (err) {
           // If the task was already created on the server, do NOT retry
           // (the server task may still be running — retrying would create duplicate tasks)
           if (err instanceof VideoTaskCreatedError) {
-            store.setShotStatus(shot.id, "failed", err.message);
+            useProjectStore.getState().setShotStatusByProjectId(targetProjectId, shot.id, "failed", err.message);
             return;
           }
 
           const isLastAttempt = attempt >= MAX_TASK_RETRIES;
           if (isLastAttempt) {
-            store.setShotStatus(shot.id, "failed", err instanceof Error ? err.message : String(err));
+            useProjectStore.getState().setShotStatusByProjectId(targetProjectId, shot.id, "failed", err instanceof Error ? err.message : String(err));
           } else {
             // Wait before retrying
-            store.updateShot(shot.id, {
+            useProjectStore.getState().updateShotByProjectId(targetProjectId, shot.id, {
               videoProgress: 0,
               videoRetryCount: attempt + 1,
             });
@@ -470,10 +479,10 @@ export function useWizardActions() {
     await runWithConcurrency(tasks, 2, signal);
 
     // 所有视频生成完成后清除标记
-    const updatedProject = selectActiveProject(useProjectStore.getState());
+    const updatedProject = useProjectStore.getState().projects.find((p) => p.id === targetProjectId);
     const allVideoed = updatedProject?.shots.every((s) => !!s.videoUrl);
     if (allVideoed) {
-      store.setVideoGenerationStarted(false);
+      useProjectStore.getState().setVideoGenerationStartedByProjectId(targetProjectId, false);
     }
   }, []);
 
@@ -485,12 +494,13 @@ export function useWizardActions() {
     const store = useProjectStore.getState();
     const project = selectActiveProject(store);
     if (!project) return;
+    const targetProjectId = project.id;
 
     const shot = project.shots.find((s) => s.id === shotId);
     if (!shot || !shot.imageUrl) return;
 
-    store.setShotStatus(shotId, "videoing");
-    store.updateShot(shotId, { videoProgress: 0 });
+    store.setShotStatusByProjectId(targetProjectId, shotId, "videoing");
+    store.updateShotByProjectId(targetProjectId, shotId, { videoProgress: 0 });
 
     try {
       const motionPrompt = composeMotionPrompt(shot);
@@ -506,18 +516,18 @@ export function useWizardActions() {
           duration: shot.duration,
         },
         (progress) => {
-          useProjectStore.getState().updateShot(shotId, { videoProgress: progress });
+          useProjectStore.getState().updateShotByProjectId(targetProjectId, shotId, { videoProgress: progress });
         },
         abortRef.current?.signal,
       );
 
-      store.updateShot(shotId, { videoUrl: result.videoUrl, status: "videoed" });
+      useProjectStore.getState().updateShotByProjectId(targetProjectId, shotId, { videoUrl: result.videoUrl, status: "videoed" });
     } catch (err) {
       if (err instanceof VideoTaskCreatedError) {
-        store.setShotStatus(shotId, "failed",
+        useProjectStore.getState().setShotStatusByProjectId(targetProjectId, shotId, "failed",
           "视频任务已创建但获取结果失败，请稍后重试。");
       } else {
-        store.setShotStatus(shotId, "failed", err instanceof Error ? err.message : String(err));
+        useProjectStore.getState().setShotStatusByProjectId(targetProjectId, shotId, "failed", err instanceof Error ? err.message : String(err));
       }
     }
   }, []);

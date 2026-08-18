@@ -219,8 +219,8 @@ export function ProjectWorkspace() {
   // Clear project
   const handleClear = useCallback(async () => {
     const ok = await confirmDialog({
-      title: t("pipeline.clearProject"),
-      message: t("pipeline.clearConfirm"),
+      title: t("pipeline.deleteProject"),
+      message: t("pipeline.deleteProjectConfirm").replace("{title}", project?.title ?? ""),
       confirmLabel: t("dialog.confirm"),
       variant: "danger",
     });
@@ -314,7 +314,7 @@ export function ProjectWorkspace() {
             <button
               onClick={handleClear}
               className="rounded-md p-1.5 text-slate-500 hover:bg-red-950 hover:text-red-400"
-              title={t("pipeline.clearProject")}
+              title={t("pipeline.deleteProject")}
             >
               <Trash2 size={14} />
             </button>
