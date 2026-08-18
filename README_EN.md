@@ -24,7 +24,7 @@ A pipeline-based one-click video generation tool integrating Agnes AI's text, im
 | Feature | Description |
 |---------|-------------|
 | 🎬 **One-Click Pipeline** | Enter a topic → auto-generate storyboard → reference images → video clips → final MP4 |
-| 🤖 **Smart Storyboard** | `agnes-2.0-flash` — generates 4-6 shots with dual prompts (text-to-image + image-to-video) |
+| 🤖 **Smart Storyboard** | `agnes-2.5-flash` — generates 4-6 shots with dual prompts (text-to-image + image-to-video) |
 | 🎨 **Image Generation** | `agnes-image-2.1-flash` — generates reference images from visual prompts (concurrency: 3) |
 | 🎥 **Video Generation** | `agnes-video-v2.0` — generates videos from motion prompts (concurrency: 2, auto-retry 3x) |
 | ✂️ **Video Concatenation** | FFmpeg.wasm client-side concat demuxer for final MP4 output |
@@ -167,7 +167,7 @@ Model identifiers are centralized in `src/lib/models.ts`:
 
 ```typescript
 export const MODELS = {
-  text: "agnes-2.0-flash",
+  text: "agnes-2.5-flash",
   image: "agnes-image-2.1-flash",
   video: "agnes-video-v2.0",
 } as const;

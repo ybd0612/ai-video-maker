@@ -4,7 +4,7 @@
 // ────────────────────────────────────────────────────────────────────────────
 
 export const MODELS = {
-  text: "agnes-2.0-flash",
+  text: "agnes-2.5-flash",
   image: "agnes-image-2.1-flash",
   video: "agnes-video-v2.0",
 } as const;

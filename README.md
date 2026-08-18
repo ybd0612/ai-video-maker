@@ -24,7 +24,7 @@
 | 特性 | 说明 |
 |------|------|
 | 🎬 **一键成片** | 输入主题 → 自动生成分镜脚本 → 参考图 → 视频片段 → 拼接成片 |
-| 🤖 **智能分镜** | `agnes-2.0-flash` — 自动生成 4-6 个分镜，同时产出文生图 + 图生视频两套提示词 |
+| 🤖 **智能分镜** | `agnes-2.5-flash` — 自动生成 4-6 个分镜，同时产出文生图 + 图生视频两套提示词 |
 | 🎨 **图像生成** | `agnes-image-2.1-flash` — 根据画面描述生成参考图（并发度 3） |
 | 🎥 **视频生成** | `agnes-video-v2.0` — 根据动态描述生成视频（并发度 2，自动重试 3 次） |
 | ✂️ **视频拼接** | FFmpeg.wasm 客户端 concat demuxer 拼接为最终 MP4 |
@@ -167,7 +167,7 @@ src/
 
 ```typescript
 export const MODELS = {
-  text: "agnes-2.0-flash",
+  text: "agnes-2.5-flash",
   image: "agnes-image-2.1-flash",
   video: "agnes-video-v2.0",
 } as const;

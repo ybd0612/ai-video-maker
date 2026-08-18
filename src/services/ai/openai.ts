@@ -46,7 +46,7 @@ export class OpenAIService implements AIService {
         model: MODELS.text,
         messages: params.messages,
         temperature: params.temperature ?? 0.7,
-        // 推理模型（如 agnes-2.0-flash）会先消耗 token 用于思考（reasoning_content），
+        // 推理模型（如 agnes-2.5-flash）会先消耗 token 用于思考（reasoning_content），
         // 剩余才输出到 content。预算太小会导致思考耗尽、content 为空，故默认给 4096。
         max_tokens: params.maxTokens ?? 4096,
         // 默认关闭 Thinking 模式：聊天/脚本生成等任务无需深度推理，
