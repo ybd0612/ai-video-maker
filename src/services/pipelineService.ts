@@ -7,7 +7,7 @@ import { useProjectStore, selectActiveProject, type Shot } from "@/stores/projec
 import { useSettingsStore } from "@/stores/settingsStore";
 import { generateScript } from "./scriptService";
 import { generateImage, aspectRatioToImageSize } from "./imageService";
-import { generateVideo, aspectRatioToVideoSize } from "./videoService";
+import { generateVideo, aspectRatioToVideoSize, VideoTaskCreatedError } from "./videoService";
 import { injectCharacterDescriptions } from "@/lib/characterUtils";
 
 type PipelinePhase = "script" | "image" | "video" | "render";
@@ -361,6 +361,18 @@ async function generateVideoWithRetry(
       return;
     } catch (err) {
       lastError = err instanceof Error ? err : new Error(String(err));
+
+      if (lastError instanceof VideoTaskCreatedError) {
+        if (lastError.stillRunning) {
+          store.updateShot(shotId, {
+            videoRetryCount: attempt + 1,
+            error: `${lastError.message} 已保留服务端任务，不重复创建。`,
+          });
+        } else {
+          store.setShotStatus(shotId, "failed", lastError.message);
+        }
+        throw lastError;
+      }
 
       if (!isRetriableError(lastError) || attempt === VIDEO_MAX_RETRIES) {
         store.setShotStatus(

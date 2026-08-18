@@ -473,11 +473,15 @@ export function useWizardActions() {
           // 任务已在服务端创建：继续等待同一个任务，不创建重复任务。
           // generateVideo 的轮询已延长到 30 分钟；若仍超时则保留 videoing 状态，允许用户稍后继续等待/刷新恢复。
           if (err instanceof VideoTaskCreatedError) {
-            useProjectStore.getState().updateShotByProjectId(targetProjectId, shot.id, {
-              videoProgress: 0,
-              videoRetryCount: attempt + 1,
-              error: `${err.message} 已保留服务端任务，不重复创建。`,
-            });
+            if (!err.stillRunning) {
+              useProjectStore.getState().setShotStatusByProjectId(targetProjectId, shot.id, "failed", err.message);
+            } else {
+              useProjectStore.getState().updateShotByProjectId(targetProjectId, shot.id, {
+                videoProgress: 0,
+                videoRetryCount: attempt + 1,
+                error: `${err.message} 已保留服务端任务，不重复创建。`,
+              });
+            }
             return;
           }
 
@@ -498,10 +502,10 @@ export function useWizardActions() {
 
     await runWithConcurrency(tasks, videoConcurrency, signal);
 
-    // 所有视频生成完成后清除标记
+    // 只有全部成功或明确失败后才清除标记；仍在服务端运行的任务继续保留“生成中”。
     const updatedProject = useProjectStore.getState().projects.find((p) => p.id === targetProjectId);
-    const allVideoed = updatedProject?.shots.every((s) => !!s.videoUrl);
-    if (allVideoed) {
+    const allSettled = updatedProject?.shots.every((s) => !!s.videoUrl || s.status === "failed");
+    if (allSettled) {
       useProjectStore.getState().setVideoGenerationStartedByProjectId(targetProjectId, false);
     }
   }, []);

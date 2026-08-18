@@ -25,11 +25,14 @@ const VIDEO_CREATE_BASE_DELAY_MS = 10_000; // 10s base delay for 429 retry
 export class VideoTaskCreatedError extends Error {
   readonly taskCreated = true;
   readonly videoId: string;
+  /** 服务端任务仍可能运行；真正 failed/cancelled 时为 false。 */
+  readonly stillRunning: boolean;
 
-  constructor(message: string, videoId: string) {
+  constructor(message: string, videoId: string, stillRunning = true) {
     super(message);
     this.name = "VideoTaskCreatedError";
     this.videoId = videoId;
+    this.stillRunning = stillRunning;
   }
 }
 
@@ -232,9 +235,22 @@ export async function generateVideo(
     onProgress?.(progress);
 
     if (rawStatus === "completed" || rawStatus === "succeeded") {
-      videoUrl = pollJson.video_url ?? pollJson.remixed_from_video_id ?? pollJson.output?.video_url ?? "";
-      coverImageUrl = pollJson.cover_image_url;
+      // Agnes 官方完成响应将成片 URL 放在 metadata.url；兼容旧版字段。
+      videoUrl = pollJson.metadata?.url
+        ?? pollJson.video_url
+        ?? pollJson.remixed_from_video_id
+        ?? pollJson.output?.video_url
+        ?? pollJson.output?.url
+        ?? "";
+      coverImageUrl = pollJson.cover_image_url ?? pollJson.metadata?.cover_url;
       duration = pollJson.seconds ?? pollJson.output?.duration ?? pollJson.duration;
+      if (!videoUrl) {
+        throw new VideoTaskCreatedError(
+          `视频任务 ${videoId} 已完成，但响应中没有 metadata.url。响应: ${JSON.stringify(pollJson).slice(0, 500)}`,
+          videoId,
+          false,
+        );
+      }
       break;
     }
 
@@ -244,11 +260,11 @@ export async function generateVideo(
         : pollJson.error
           ? JSON.stringify(pollJson.error)
           : "unknown error";
-      throw new VideoTaskCreatedError(`视频生成失败: ${errDetail}`, videoId);
+      throw new VideoTaskCreatedError(`视频生成失败: ${errDetail}`, videoId, false);
     }
   }
 
-  if (!videoUrl) throw new VideoTaskCreatedError("视频生成超时，任务可能仍在服务器运行。", videoId);
+  if (!videoUrl) throw new VideoTaskCreatedError("视频生成超时，任务可能仍在服务器运行。", videoId, true);
 
   if (!videoUrl.startsWith("http://") && !videoUrl.startsWith("https://")) {
     videoUrl = "https://" + videoUrl;
