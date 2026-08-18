@@ -12,8 +12,8 @@ import { fetchWithRetry } from "@/lib/fetchWithRetry";
 import { rateLimiter } from "@/services/rateLimit";
 
 const VIDEO_POLL_INTERVAL_MS = 5_000;
-const VIDEO_POLL_TIMEOUT_MS = 10 * 60 * 1000; // 10 minutes per attempt
-const VIDEO_POLL_MAX_NOT_EXIST_RETRIES = 6; // 最多等待 30 秒让任务注册
+const VIDEO_POLL_TIMEOUT_MS = 30 * 60 * 1000; // 视频模型较慢，单个任务最多等待 30 分钟
+const VIDEO_POLL_MAX_NOT_EXIST_RETRIES = 24; // 最多等待 2 分钟让任务注册
 const VIDEO_CREATE_MAX_RETRIES = 3; // 429 rate-limit retry
 const VIDEO_CREATE_BASE_DELAY_MS = 10_000; // 10s base delay for 429 retry
 

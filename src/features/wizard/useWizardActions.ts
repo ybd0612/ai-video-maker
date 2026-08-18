@@ -6,6 +6,7 @@
 import { useCallback, useRef } from "react";
 import { useProjectStore, selectActiveProject, newId, type Shot, type SceneReference, type Character } from "@/stores/projectStore";
 import { useSettingsStore } from "@/stores/settingsStore";
+import { resolvePlan, type PlanId } from "@/lib/plans";
 import { generateScript } from "@/services/scriptService";
 import { generateImage, aspectRatioToImageSize } from "@/services/imageService";
 import { generateAssetNamespace } from "@/lib/assetNamespace";
@@ -53,16 +54,27 @@ export function useWizardActions() {
       });
 
       // 构造提取到的角色（带唯一 ID）
-      const newCharacters: Character[] = result.characters.map((char) => ({
-        id: newId("char"),
-        name: char.name,
-        description: char.description,
-        appearancePrompt: char.appearancePrompt,
-        assetNamespace: generateAssetNamespace(char.name),
-        fullPrompt: `a character named ${char.name}, ${char.appearancePrompt}`,
-      }));
+      // AI 可能在重复点击“生成”时再次返回相同角色；按名称去重，避免资产列表重复。
+      const existingNames = new Set(
+        project.characters.map((character) => character.name.trim().toLocaleLowerCase()),
+      );
+      const newCharacters: Character[] = result.characters
+        .filter((char) => {
+          const normalizedName = char.name.trim().toLocaleLowerCase();
+          if (!normalizedName || existingNames.has(normalizedName)) return false;
+          existingNames.add(normalizedName);
+          return true;
+        })
+        .map((char) => ({
+          id: newId("char"),
+          name: char.name,
+          description: char.description,
+          appearancePrompt: char.appearancePrompt,
+          assetNamespace: generateAssetNamespace(char.name),
+          fullPrompt: `a character named ${char.name}, ${char.appearancePrompt}`,
+        }));
 
-      // 原子地写回发起项目：追加角色 + 复位状态 + 推进到资产步骤
+      // 原子地写回发起项目：追加新角色 + 复位状态 + 推进到资产步骤
       useProjectStore.getState().updateProjectById(targetProjectId, (p) => ({
         ...p,
         characters: [...p.characters, ...newCharacters],
@@ -409,6 +421,9 @@ export function useWizardActions() {
     const project = selectActiveProject(store);
     if (!project) return;
     const targetProjectId = project.id;
+    const plan = resolvePlan(providerConfig.plan as PlanId | undefined);
+    // 免费档视频 RPM=1，限流器会串行排队；这里同步使用相同并发度，避免界面同时显示多个“生成中”。
+    const videoConcurrency = plan.rpm.video <= 1 ? 1 : 2;
 
     // 跳过已在生成中的 shot（status="videoing"），防止导航切换后重复提交
     const shotsNeedingVideos = project.shots.filter(
@@ -426,6 +441,7 @@ export function useWizardActions() {
       useProjectStore.getState().setShotStatusByProjectId(targetProjectId, shot.id, "videoing");
       useProjectStore.getState().updateShotByProjectId(targetProjectId, shot.id, { videoProgress: 0 });
 
+      // 任务已创建但轮询超时/异常时，不再创建重复任务；继续等待同一个任务。
       const MAX_TASK_RETRIES = 2;
       const RETRY_DELAY_MS = 8_000;
 
@@ -454,10 +470,14 @@ export function useWizardActions() {
           useProjectStore.getState().updateShotByProjectId(targetProjectId, shot.id, { videoUrl: result.videoUrl, status: "videoed" });
           return; // Success — exit retry loop
         } catch (err) {
-          // If the task was already created on the server, do NOT retry
-          // (the server task may still be running — retrying would create duplicate tasks)
+          // 任务已在服务端创建：继续等待同一个任务，不创建重复任务。
+          // generateVideo 的轮询已延长到 30 分钟；若仍超时则保留 videoing 状态，允许用户稍后继续等待/刷新恢复。
           if (err instanceof VideoTaskCreatedError) {
-            useProjectStore.getState().setShotStatusByProjectId(targetProjectId, shot.id, "failed", err.message);
+            useProjectStore.getState().updateShotByProjectId(targetProjectId, shot.id, {
+              videoProgress: 0,
+              videoRetryCount: attempt + 1,
+              error: `${err.message} 已保留服务端任务，不重复创建。`,
+            });
             return;
           }
 
@@ -476,7 +496,7 @@ export function useWizardActions() {
       }
     });
 
-    await runWithConcurrency(tasks, 2, signal);
+    await runWithConcurrency(tasks, videoConcurrency, signal);
 
     // 所有视频生成完成后清除标记
     const updatedProject = useProjectStore.getState().projects.find((p) => p.id === targetProjectId);
