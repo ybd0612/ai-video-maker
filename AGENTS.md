@@ -132,7 +132,7 @@ src/
 
 ## 用量限制与套餐（Rate Limit / Plan）
 
-服务面向免费用户（默认 `default` 套餐），官方对各访问类型有 RPM 与订阅配额限制。这些限制已写入程序，在真实 API 调用前统一拦截，避免触发 429 / 配额超限。数据来源：`https://agnes-ai.com/zh-Hans/docs/tokenplan`。
+服务面向免费用户（默认 `default` 套餐），官方对各访问类型有 RPM 与订阅配额限制。这些限制已写入程序，在真实 API 调用前统一拦截，避免触发 429 / 配额超限。数据来源：`https://agnes-ai.cn/zh-Hans/docs/tokenplan`。
 
 - **套餐（plan）**：用户在设置对话框选择，存入 `providerConfig.plan`，默认 `default`。共 5 档：`default`（免费）、`enterprise`（企业认证）、`starter` / `plus` / `pro`（Token Plan 订阅）。
 - **配置单一事实源**：`src/lib/plans.ts` 的 `PLANS` 常量，集中定义各档 RPM 与订阅配额（文本/图片/视频）。替换或调整限制只改此处。

@@ -90,7 +90,7 @@ function sanitizePrompt(prompt: string): string {
  *
  * 注意：轮询端点与创建端点使用不同的路径。
  * 创建用 {baseUrl}/videos，轮询用 {origin}/agnesapi。
- * 参考官方文档 agnes-ai.com/doc/agnes-video-v20
+ * 参考官方文档 https://agnes-ai.cn/zh-Hans/docs/agnes-video-v20
  */
 export async function generateVideo(
   opts: CreateVideoOptions,

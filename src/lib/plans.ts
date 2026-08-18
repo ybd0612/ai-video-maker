@@ -2,7 +2,7 @@
 // src/lib/plans.ts
 // Agnes AI 访问计划与用量限制配置（单一事实源）。
 //
-// 数据来源：https://agnes-ai.com/zh-Hans/docs/tokenplan （生效 2026-06-22）
+// 数据来源：https://agnes-ai.cn/zh-Hans/docs/tokenplan （生效 2026-06-22）
 // 代码中以文档给出的「实际 RPM」作为安全执行上限（更保守，避免触发 429）。
 //
 // 访问类型（accessType）：
