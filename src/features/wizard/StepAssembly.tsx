@@ -3,7 +3,7 @@
 // Step 6: Preview all videos in sequence, concatenate, download.
 // ────────────────────────────────────────────────────────────────────────────
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { useProjectStore, selectActiveProject } from "@/stores/projectStore";
 import { useT } from "@/i18n";
 import { concatenateVideos } from "@/services/renderService";
@@ -22,21 +22,39 @@ export function StepAssembly() {
   const [isRendering, setIsRendering] = useState(false);
   const [renderProgress, setRenderProgress] = useState(0);
   const [renderedUrl, setRenderedUrl] = useState<string | null>(null);
+  const renderedUrlRef = useRef<string | null>(null);
+  const renderedProjectIdRef = useRef<string | null>(project?.id ?? null);
 
-  // 组件卸载时释放 Blob URL，避免内存泄漏
+  // 活动项目切换后，旧项目的成片不能继续显示；同时释放旧 Blob URL。
+  useEffect(() => {
+    const nextProjectId = project?.id ?? null;
+    if (renderedProjectIdRef.current !== nextProjectId) {
+      if (renderedUrlRef.current) {
+        URL.revokeObjectURL(renderedUrlRef.current);
+        renderedUrlRef.current = null;
+      }
+      setRenderedUrl(null);
+      setRenderProgress(0);
+      setIsRendering(false);
+      renderedProjectIdRef.current = nextProjectId;
+    }
+  }, [project?.id]);
+
+  // 组件卸载时释放当前成片 Blob URL，避免内存泄漏。
   useEffect(() => {
     return () => {
-      if (renderedUrl) {
-        URL.revokeObjectURL(renderedUrl);
+      if (renderedUrlRef.current) {
+        URL.revokeObjectURL(renderedUrlRef.current);
       }
     };
-  }, [renderedUrl]);
+  }, []);
 
   const handleRender = useCallback(async () => {
     if (!canRender || !project) return;
+    const targetProjectId = project.id;
     setIsRendering(true);
     setRenderProgress(0);
-    setProjectStatusById(project.id, "rendering");
+    setProjectStatusById(targetProjectId, "rendering");
 
     try {
       const urls = videoShots.map((s) => s.videoUrl!);
@@ -44,11 +62,21 @@ export function StepAssembly() {
         videoUrls: urls,
         onProgress: setRenderProgress,
       });
+      const activeProjectId = useProjectStore.getState().activeProjectId;
+      if (activeProjectId !== targetProjectId) {
+        URL.revokeObjectURL(url);
+        return;
+      }
+      if (renderedUrlRef.current) {
+        URL.revokeObjectURL(renderedUrlRef.current);
+      }
+      renderedUrlRef.current = url;
+      renderedProjectIdRef.current = targetProjectId;
       setRenderedUrl(url);
-      setProjectStatusById(project.id, "done");
+      setProjectStatusById(targetProjectId, "done");
     } catch (err) {
       console.error("Assembly failed:", err);
-      setProjectStatusById(project.id, "failed", err instanceof Error ? err.message : String(err));
+      setProjectStatusById(targetProjectId, "failed", err instanceof Error ? err.message : String(err));
     } finally {
       setIsRendering(false);
     }
