@@ -1,6 +1,6 @@
 # AI Video Maker — AI 一键成片
 
-面向 AI 创作的短视频制作工具。采用 Pipeline 架构（脚本 → 图片 → 视频 → 拼接），集成 Agnes AI 的文本、图像、视频三大模型，支持中英文切换。
+面向 AI 创作的短视频制作工具。主流程为 6 步向导（想法 → 角色资产 → 分镜 → 图片 → 视频 → 成片），底层为 Pipeline 架构（脚本 → 图片 → 视频 → 拼接），集成 Agnes AI 的文本、图像、视频三大模型，支持中英文切换。
 
 ## 技术栈
 
@@ -17,42 +17,50 @@ src/
 ├── i18n/                          # 轻量 i18n 系统（无第三方依赖）
 │   └── index.ts                   # zh/en 翻译字典 + useT hook
 ├── pages/
-│   └── ProjectWorkspace.tsx       # 主页面（三栏布局：分镜列表 | 预览 | 编辑器）
+│   └── ProjectWorkspace.tsx       # 主页面外壳（三栏：侧边栏 | 向导 | 编辑器）
 ├── features/
-│   ├── script/
-│   │   └── ScriptPanel.tsx        # 用户输入区域 + 生成分镜按钮
-│   ├── shots/
-│   │   ├── ShotList.tsx           # 左侧分镜列表（状态徽标 + 缩略图）
-│   │   └── ShotEditor.tsx         # 右侧分镜编辑器（文案 / 画面描述 / 动态描述 / 时长）
-│   ├── preview/
-│   │   ├── ShotPreview.tsx        # 单镜头预览（图片 + 视频）
-│   │   └── FinalPreview.tsx       # 成片预览（FFmpeg 拼接 + 下载）
-│   ├── projects/
-│   │   └── ProjectSidebar.tsx     # 项目管理面板
-│   └── history/
-│       └── HistoryPanel.tsx       # 操作历史面板
-├── services/                      # Pipeline 服务层
-│   ├── pipelineService.ts         # 编排引擎（脚本 → 图片 → 视频，含并发控制 + 视频重试）
+│   ├── wizard/                    # 6 步向导（主流程）
+│   │   ├── CreationWizard.tsx     # 向导容器（步骤路由 + 状态机）
+│   │   ├── StepIdea.tsx           # 步骤1：想法 + 画幅比例 + AI 对话
+│   │   ├── StepAssets.tsx         # 步骤2：角色/场景/风格资产
+│   │   ├── StepStoryboard.tsx     # 步骤3：分镜脚本
+│   │   ├── StepImages.tsx         # 步骤4：镜头图片
+│   │   ├── StepVideos.tsx         # 步骤5：视频生成
+│   │   ├── StepAssembly.tsx       # 步骤6：成片拼接
+│   │   ├── useWizardActions.ts    # 向导操作编排（含模块级幂等守卫注册表）
+│   │   ├── ShotCard.tsx           # 分镜卡片（状态徽标 + 展开详情）
+│   │   ├── PromptSubFields.tsx    # 提示词子字段编辑
+│   │   ├── DualFrameToggle.tsx    # 首尾帧开关
+│   │   └── ReviewCheckpoint.tsx   # 审核卡点
+│   ├── characters/                # 角色编辑器（CharacterEditor）/ 面板（CharacterPanel）
+│   ├── projects/                  # 项目管理面板（ProjectSidebar）
+│   └── history/                   # 操作历史面板（HistoryPanel）
+├── services/                      # 服务层
+│   ├── rateLimit.ts               # 集中式用量限制器（RPM 节流 + Token Plan 配额追踪，单例）
 │   ├── scriptService.ts           # 文本模型调用，生成结构化分镜（含 visualPrompt + motionPrompt）
 │   ├── imageService.ts            # 图片生成（单张，使用 visualPrompt）
-│   ├── videoService.ts            # 视频生成（异步创建 + 轮询，使用 motionPrompt）
+│   ├── videoService.ts            # 视频生成（异步创建 + 轮询 + 完成响应解析，使用 motionPrompt）
 │   ├── chatService.ts             # 多轮对话 API（AI 辅助提示词优化）
-│   ├── rateLimit.ts               # 集中式用量限制器（RPM 节流 + Token Plan 配额追踪）
-│   └── renderService.ts           # FFmpeg.wasm 视频拼接
+│   ├── renderService.ts           # FFmpeg.wasm 视频拼接
+│   ├── pipelineService.ts         # 旧版一键流水线（兼容保留，非主流程）
+│   └── ai/                        # AI 服务统一入口（OpenAI 兼容）
+│       ├── factory.ts             # 服务工厂
+│       ├── openai.ts              # chatCompletion / generateImage 实现
+│       └── index.ts
 ├── stores/                        # Zustand stores
 │   ├── projectStore.ts            # 多项目管理（projects[] + activeProjectId + history[]，localStorage 持久化，v1→v2 迁移）
-│   └── settingsStore.ts           # 全局设置（apiKey/baseUrl/language/plan，localStorage）
-├── providers/                     # AI 模型抽象层
-│   ├── types.ts                   # ModelProvider 接口定义
-│   └── agnes/
-│       └── AgnesAdapter.ts        # Agnes AI 适配器（文本/图像/视频）
+│   └── settingsStore.ts           # 全局设置（apiKey/baseUrl/plan/language，localStorage）
 ├── lib/
 │   ├── models.ts                  # AI 模型标识符常量（集中管理）
 │   ├── plans.ts                   # 访问套餐与用量限制配置（RPM/配额单一事实源）
+│   ├── fetchWithRetry.ts          # fetch 统一封装（超时 + 指数退避重试）
+│   ├── promptUtils.ts             # 画面/运动提示词组合
+│   ├── characterUtils.ts          # 角色描述注入
+│   ├── assetNamespace.ts          # 角色命名空间与完整提示词
 │   ├── resolveBaseUrl.ts          # API 地址解析工具
 │   └── validation.ts              # 校验工具（帧数计算、prompt 清理等）
 ├── components/
-│   ├── SettingsDialog.tsx         # 设置对话框（API Key / 语言）
+│   ├── SettingsDialog.tsx         # 设置对话框（API Key / Base URL / 套餐 / 语言）
 │   ├── ApiKeyBanner.tsx           # API Key 缺失提示横幅
 │   └── ui/                        # 通用 UI 组件
 │       ├── ConfirmDialog.tsx      # 确认对话框
@@ -92,18 +100,31 @@ src/
 
 ## Pipeline 架构
 
+> 主流程已改为 6 步向导（`features/wizard/`），`pipelineService.ts` 为旧版一键流水线（兼容保留）。本节描述底层编排逻辑。
+
 四阶段流水线，编排在 `src/services/pipelineService.ts`：
 
 1. **脚本阶段** — 调用文本模型生成 4-6 个结构化分镜（scriptText + visualPrompt + motionPrompt + duration）
 2. **图片阶段** — 为每个分镜生成参考图（使用 visualPrompt，并发度 3）
-3. **视频阶段** — 为每个分镜生成视频（使用 motionPrompt，并发度 2，异步创建 + 5 秒轮询，4 分钟超时，最多 3 次自动重试）
+3. **视频阶段** — 为每个分镜生成视频（使用 motionPrompt，按套餐并发：免费档 1，企业 2，Token Plan 5；异步创建 + 5 秒轮询，单任务 30 分钟超时，任务注册等待 2 分钟）
 4. **拼接阶段** — FFmpeg.wasm concat demuxer 拼接所有视频为最终 MP4
 
 - 并发控制使用 `Promise.allSettled`，确保所有 worker 完成后再检查状态
 - 支持 AbortController 取消
 - 支持单镜头重试（`runSingleShot`，跳过脚本阶段）
 - 视频生成自动重试（最多 3 次，针对网络超时/5xx 等临时性故障）
-- 进入项目页面时自动重试之前失败的视频任务
+- 失败视频的自动重试统一由向导视频步骤（`useWizardActions.generateVideosForStep`）接管
+
+## 向导可靠性铁律（踩坑沉淀，改动时必须遵守）
+
+- 批量生成（视频/图片/资产）必须用**模块级注册表**（`activeVideoTasks` / `activeImageTasks` / `activeAssetTasks`）做幂等守卫：同项目任务在跑时不重复启动，避免服务端任务重复创建（token 双倍消耗）。
+- 每个批量任务用**独立 AbortController**，禁止共享 abortRef 互杀。
+- 向导步骤的自动触发 effect 只依赖 `[shots.length]`，**禁止依赖 `*GenerationStarted` 标志**（批量生成内部会把它置 true，导致 effect 重入误杀进行中任务）。
+- 刷新恢复：注册表为空时，残留 `videoing`→`imaged`、`imaging`→`scripted`；挂载时重置卡 true 的 `*GenerationStarted`，避免永久转圈。
+- 异步结果一律按项目 ID 写回（`updateXxxByProjectId`），禁止用 active-project 版本，防串写。
+- “重试失败 / 全部重新生成”按钮必须走批量生成函数（幂等 + 并发受控），禁止 forEach 并发 reroll。
+- 视频完成响应解析链：`url`（顶层）→ `metadata.url` → `video_url` → `output.url` → `output.video_url` → `remixed_from_video_id`。
+- 分镜阶段 `generateScript` 已产出完整英文双提示词，**禁止二次翻译覆盖**（translateToMotion 已移除）。
 
 ## 双提示词系统
 
@@ -140,7 +161,7 @@ src/
   - 文本 — `src/services/ai/openai.ts` 的 `chatCompletion`
   - 图片 — `openai.ts` 的 `generateImage`（按 `imageSizeToTier(size)` 区分 1K/2K/3K/4K 档位）
   - 视频 — `src/services/videoService.ts` 的 `generateVideo`（cost = 请求时长秒数）
-- **RPM 节流**：按模型种类（图片再按尺寸档位）做 60s 滑动窗口；达到上限即等待到最早一条滑出窗口。以官方「实际 RPM」作安全上限（更保守）。默认档视频 RPM=1，会把 pipeline 的并发度 2 串行化到约 1 次/分钟。
+- **RPM 节流**：按模型种类（图片再按尺寸档位）做 60s 滑动窗口；达到上限即等待到最早一条滑出窗口。以官方「实际 RPM」作安全上限（更保守）。默认档视频 RPM=1，向导已按套餐同步并发（免费档 1、企业 2、Token Plan 2），不会同时显示多个“生成中”。
 - **订阅配额（仅 Token Plan）**：文本（每 5h / 每周）、图片（每日张数）、视频（每日秒数）计数并持久化到 localStorage（key `wxhb-usage`），刷新不丢失。用尽抛出 `RateLimitError`（reason=`quota`），由 `pipelineService.isRetriableError` 识别为终态错误（消息不含瞬时关键字），不会进入视频自动重试。
 - **取消**：`acquire` 支持 `AbortSignal`，取消时抛 `RateLimitError`（reason=`aborted`）。
 - **套餐升级即生效**：用户切换套餐后，限流器实时读取 `providerConfig.plan`，无需刷新页面。
@@ -157,7 +178,7 @@ src/
 
 ## 多项目管理
 
-- 左侧面板三个标签：**项目**（ProjectSidebar）、**分镜**（ShotList）、**历史**（HistoryPanel）
+- 左侧面板四个标签：**项目**（ProjectSidebar）、**分镜**（ShotList）、**角色**（CharacterPanel）、**历史**（HistoryPanel）
 - 项目操作：创建 / 切换 / 删除 / 复制
 - 复制项目时保留分镜结构，重置状态为 idle
 - v1 → v2 存储迁移：旧单项目自动转换为新多项目格式
@@ -166,13 +187,14 @@ src/
 
 每次完成代码编写任务后，执行以下流程：
 
-1. **文档同步检查** — 审查相关文档（README.md、AGENTS.md 等），确保与代码变动一致。如有新增/删除/重命名的文件、接口变更、功能变更等，必须同步更新文档。
-2. **提交代码** — 使用 `git add` + `git commit` 提交所有变更，commit message 遵循约定式提交格式（`feat:` / `fix:` / `docs:` / `refactor:` 等）。
-3. **推送代码** — 执行 `git push` 推送到远程仓库。
+1. **文档同步检查** — 审查相关文档（README.md、README_EN.md、AGENTS.md 等），确保与代码变动一致。如有新增/删除/重命名的文件、接口变更、功能变更等，必须同步更新文档（中英双语口径一致）。
+2. **提交代码** — 使用 `git add` + `git commit` 提交所有变更，commit message 遵循约定式提交格式（`feat:` / `fix:` / `docs:` / `refactor:` 等）。只精确暂存业务文件，**禁止 `git add -A`**（`.workbuddy/` 等工具数据不入库）。
+3. **推送代码** — 默认不推送；仅在用户明确要求 push 时执行 `git push`。
 
 ## 注意事项
 
-- 本项目无测试套件，无需运行测试
+- 本项目无测试套件，无需运行测试；验证用 `npx tsc --noEmit` + `git diff --check` + `npm run build`（dist 被占用时先 `rm -rf dist`）
 - `server.cjs` / `server2.cjs` 是独立的 Node.js 静态文件服务器脚本，用于在非开发环境提供 dist 目录
 - `.env.example` 中的 `VITE_*` 环境变量仅作参考，实际配置通过应用内设置对话框完成
 - `providers/` 目录保留了 ModelProvider 抽象接口，但当前服务层直接调用 API（未经过 adapter）
+- 视频/图片等外部 API 响应字段以**用户实测为准**，不要仅凭官方文档推断（实测：Agnes 视频成片地址在响应顶层 `url` 字段，非文档示例的 `metadata.url`）
