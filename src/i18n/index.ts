@@ -71,6 +71,11 @@ const zh = {
   "settings.storageNote": "密钥存储在浏览器本地，仅在向配置的地址发起 API 请求时才会发送。",
   "settings.github.desc": "开源项目，欢迎 Star ⭐ 和 PR",
   "settings.language": "语言",
+  "settings.plan": "套餐 / 访问类型",
+  "settings.planHint": "程序据此限制请求频率（RPM）与用量配额。默认免费档限制较严，升级套餐后在此切换以解除限制。",
+  "settings.planRpm": "每分钟请求上限 (RPM)",
+  "settings.planQuota": "订阅配额",
+  "settings.planNone": "无（仅受 RPM 限制）",
 
   // Panel
   "panel.noSelection": "未选中节点",
@@ -487,6 +492,11 @@ const en = {
   "settings.storageNote": "Keys are stored in your browser. They never leave your device except when making API calls to the configured base URL.",
   "settings.github.desc": "Open source project — Star ⭐ and PRs welcome",
   "settings.language": "Language",
+  "settings.plan": "Plan / Access Tier",
+  "settings.planHint": "Request frequency (RPM) and usage quotas are enforced per this plan. The free tier is strict; upgrade here to raise limits.",
+  "settings.planRpm": "Requests per minute (RPM)",
+  "settings.planQuota": "Subscription quota",
+  "settings.planNone": "None (RPM only)",
 
   // Panel
   "panel.noSelection": "No node selected",

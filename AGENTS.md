@@ -37,16 +37,18 @@ src/
 │   ├── imageService.ts            # 图片生成（单张，使用 visualPrompt）
 │   ├── videoService.ts            # 视频生成（异步创建 + 轮询，使用 motionPrompt）
 │   ├── chatService.ts             # 多轮对话 API（AI 辅助提示词优化）
+│   ├── rateLimit.ts               # 集中式用量限制器（RPM 节流 + Token Plan 配额追踪）
 │   └── renderService.ts           # FFmpeg.wasm 视频拼接
 ├── stores/                        # Zustand stores
 │   ├── projectStore.ts            # 多项目管理（projects[] + activeProjectId + history[]，localStorage 持久化，v1→v2 迁移）
-│   └── settingsStore.ts           # 全局设置（apiKey/baseUrl/language，localStorage）
+│   └── settingsStore.ts           # 全局设置（apiKey/baseUrl/language/plan，localStorage）
 ├── providers/                     # AI 模型抽象层
 │   ├── types.ts                   # ModelProvider 接口定义
 │   └── agnes/
 │       └── AgnesAdapter.ts        # Agnes AI 适配器（文本/图像/视频）
 ├── lib/
 │   ├── models.ts                  # AI 模型标识符常量（集中管理）
+│   ├── plans.ts                   # 访问套餐与用量限制配置（RPM/配额单一事实源）
 │   ├── resolveBaseUrl.ts          # API 地址解析工具
 │   └── validation.ts              # 校验工具（帧数计算、prompt 清理等）
 ├── components/
@@ -127,6 +129,21 @@ src/
 - 服务层（scriptService / imageService / videoService）通过 `MODELS` 引用模型名
 - 替换模型只需修改 `MODELS` 常量
 - API Key 和 Base URL 由用户在设置对话框中配置，存储在浏览器本地
+
+## 用量限制与套餐（Rate Limit / Plan）
+
+服务面向免费用户（默认 `default` 套餐），官方对各访问类型有 RPM 与订阅配额限制。这些限制已写入程序，在真实 API 调用前统一拦截，避免触发 429 / 配额超限。数据来源：`https://agnes-ai.com/zh-Hans/docs/tokenplan`。
+
+- **套餐（plan）**：用户在设置对话框选择，存入 `providerConfig.plan`，默认 `default`。共 5 档：`default`（免费）、`enterprise`（企业认证）、`starter` / `plus` / `pro`（Token Plan 订阅）。
+- **配置单一事实源**：`src/lib/plans.ts` 的 `PLANS` 常量，集中定义各档 RPM 与订阅配额（文本/图片/视频）。替换或调整限制只改此处。
+- **集中式限流器**：`src/services/rateLimit.ts` 的单例 `rateLimiter`。三类真实入口统一在调用前 `await rateLimiter.acquire(kind, opts)`：
+  - 文本 — `src/services/ai/openai.ts` 的 `chatCompletion`
+  - 图片 — `openai.ts` 的 `generateImage`（按 `imageSizeToTier(size)` 区分 1K/2K/3K/4K 档位）
+  - 视频 — `src/services/videoService.ts` 的 `generateVideo`（cost = 请求时长秒数）
+- **RPM 节流**：按模型种类（图片再按尺寸档位）做 60s 滑动窗口；达到上限即等待到最早一条滑出窗口。以官方「实际 RPM」作安全上限（更保守）。默认档视频 RPM=1，会把 pipeline 的并发度 2 串行化到约 1 次/分钟。
+- **订阅配额（仅 Token Plan）**：文本（每 5h / 每周）、图片（每日张数）、视频（每日秒数）计数并持久化到 localStorage（key `wxhb-usage`），刷新不丢失。用尽抛出 `RateLimitError`（reason=`quota`），由 `pipelineService.isRetriableError` 识别为终态错误（消息不含瞬时关键字），不会进入视频自动重试。
+- **取消**：`acquire` 支持 `AbortSignal`，取消时抛 `RateLimitError`（reason=`aborted`）。
+- **套餐升级即生效**：用户切换套餐后，限流器实时读取 `providerConfig.plan`，无需刷新页面。
 
 ## 数据模型
 

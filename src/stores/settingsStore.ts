@@ -5,12 +5,18 @@
 
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+import type { PlanId } from "@/lib/plans";
 
 export type Language = 'zh' | 'en';
 
 export interface ProviderConfig {
   apiKey: string;
   baseUrl: string;
+  /**
+   * Agnes 访问套餐/计划。默认 "default"（免费）。
+   * 决定 RPM 与订阅配额上限；用户升级后在此切换以解除限制。
+   */
+  plan: PlanId;
 }
 
 interface SettingsState {
@@ -34,6 +40,7 @@ export const useSettingsStore = create<SettingsState>()(
       providerConfig: {
         apiKey: "",
         baseUrl: "https://apihub.agnes-ai.com/v1",
+        plan: "default",
       },
 
       toggleDarkMode: () => set((s) => ({ darkMode: !s.darkMode })),

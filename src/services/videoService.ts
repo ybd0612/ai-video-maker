@@ -9,6 +9,7 @@
 
 import { MODELS } from "@/lib/models";
 import { fetchWithRetry } from "@/lib/fetchWithRetry";
+import { rateLimiter } from "@/services/rateLimit";
 
 const VIDEO_POLL_INTERVAL_MS = 5_000;
 const VIDEO_POLL_TIMEOUT_MS = 10 * 60 * 1000; // 10 minutes per attempt
@@ -101,6 +102,10 @@ export async function generateVideo(
   const numFrames = calcNumFrames(opts.duration, fps);
 
   // ── Create task (with 429 retry) ──────────────────────────────────────
+  // 用量控制：视频 RPM（默认档仅 1 RPM，会把并发串行化到约 1 次/分钟）
+  // + Token Plan 每日秒数配额（cost = 请求时长秒数）
+  await rateLimiter.acquire("video", { cost: opts.duration || 1, signal });
+
   const body: Record<string, unknown> = {
     model: MODELS.video,
     prompt: sanitizePrompt(opts.prompt),

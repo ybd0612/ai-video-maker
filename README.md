@@ -31,6 +31,7 @@
 | ✨ **AI 辅助优化** | 每个输入框旁可调用 AI 多轮对话优化提示词 |
 | 📋 **多项目管理** | 创建 / 切换 / 删除 / 复制项目，localStorage 持久化 |
 | 📊 **操作历史** | 最近 200 条操作记录，按日期分组展示 |
+| 🚦 **用量限制** | 按所选套餐（默认免费 / 企业 / Token Plan）自动限流：RPM 节流 + Token Plan 订阅配额（文本/图片/视频），配额用尽给出重置提示 |
 | 🔄 **自动重试** | 视频生成失败自动重试，进入页面自动恢复失败任务 |
 | 📐 **多比例支持** | 16:9（横屏）、9:16（竖屏）、1:1（方形） |
 | 🌐 **中英文切换** | 内置轻量 i18n 系统，一键切换中文 / English |
@@ -135,7 +136,7 @@ src/
 │   └── renderService.ts           # FFmpeg.wasm 视频拼接
 ├── stores/                        # Zustand stores
 │   ├── projectStore.ts            # 多项目管理（localStorage 持久化，v1→v2 迁移）
-│   └── settingsStore.ts           # 全局设置（apiKey/baseUrl/language，localStorage）
+│   └── settingsStore.ts           # 全局设置（apiKey/baseUrl/language/plan，localStorage）
 ├── providers/                     # AI 模型抽象层
 │   ├── types.ts                   # ModelProvider 接口定义
 │   └── agnes/
@@ -145,7 +146,7 @@ src/
 │   ├── resolveBaseUrl.ts          # API 地址解析工具
 │   └── validation.ts              # 校验工具（帧数计算、prompt 清理等）
 ├── components/
-│   ├── SettingsDialog.tsx         # 设置对话框（API Key / 语言）
+│   ├── SettingsDialog.tsx         # 设置对话框（API Key / 语言 / 套餐）
 │   ├── ApiKeyBanner.tsx           # API Key 缺失提示横幅
 │   └── ui/                        # 通用 UI 组件
 │       ├── ConfirmDialog.tsx      # 确认对话框

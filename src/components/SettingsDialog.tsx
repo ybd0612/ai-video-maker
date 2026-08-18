@@ -7,6 +7,42 @@ import { useT } from '@/i18n';
 import type { Language } from '@/stores/settingsStore';
 import { isValidUrl } from "@/lib/validation";
 import { MODELS } from "@/lib/models";
+import { PLANS, resolvePlan, type PlanId } from "@/lib/plans";
+
+/* 展示所选套餐的 RPM 与订阅配额，帮助用户理解当前限制 */
+function PlanLimitSummary({
+  planId,
+  t,
+}: {
+  planId: PlanId;
+  t: (key: import("@/i18n").TranslationKey, vars?: Record<string, string | number>) => string;
+}) {
+  const plan = resolvePlan(planId);
+  const q = plan.quota;
+  const hasQuota = plan.accessType === "tokenplan";
+
+  return (
+    <div className="mt-2 space-y-1 rounded-lg border border-slate-700/60 bg-slate-800/40 px-3 py-2 text-[10px] leading-relaxed text-slate-400">
+      <p>{t("settings.planHint")}</p>
+      <p>
+        <span className="text-slate-500">{t("settings.planRpm")}：</span>{" "}
+        文本 {plan.rpm.text} · 图片(1K) {plan.rpm.image["1K"]} · 视频 {plan.rpm.video}
+      </p>
+      <p>
+        <span className="text-slate-500">{t("settings.planQuota")}：</span>{" "}
+        {hasQuota ? (
+          <>
+            文本 每5h {q.textPer5h?.toLocaleString()} / 每周 {q.textPerWeek?.toLocaleString()}；
+            图片 每日 {q.imagePerDay?.toLocaleString()} 张；
+            视频 每日 {q.videoSecondsPerDay?.toLocaleString()} 秒
+          </>
+        ) : (
+          t("settings.planNone")
+        )}
+      </p>
+    </div>
+  );
+}
 
 export function SettingsDialog() {
   const open = useSettingsStore((s) => s.settingsDialogOpen);
@@ -19,6 +55,7 @@ export function SettingsDialog() {
 
   const [apiKey, setApiKey] = useState("");
   const [baseUrl, setBaseUrl] = useState("https://apihub.agnes-ai.com/v1");
+  const [plan, setPlan] = useState<PlanId>("default");
   const [showKey, setShowKey] = useState(false);
   const [toast, setToast] = useState<{ show: boolean; type: "success" | "error"; message: string }>({ show: false, type: "success", message: "" });
   const [testing, setTesting] = useState(false);
@@ -28,6 +65,7 @@ export function SettingsDialog() {
   useEffect(() => {
     setApiKey(providerConfig.apiKey);
     setBaseUrl(providerConfig.baseUrl);
+    setPlan(providerConfig.plan ?? "default");
   }, [providerConfig]);
 
   // Also sync when dialog opens
@@ -35,6 +73,7 @@ export function SettingsDialog() {
     if (open) {
       setApiKey(providerConfig.apiKey);
       setBaseUrl(providerConfig.baseUrl);
+      setPlan(providerConfig.plan ?? "default");
       setTestResult({ status: "idle", message: "" });
       setToast({ show: false, type: "success", message: "" });
     }
@@ -51,7 +90,7 @@ export function SettingsDialog() {
       showToast("error", t("settings.keyEmpty"));
       return;
     }
-    setProviderConfig({ apiKey, baseUrl });
+    setProviderConfig({ apiKey, baseUrl, plan });
     showToast("success", t("settings.saved"));
     setOpen(false);
   };
@@ -172,6 +211,25 @@ export function SettingsDialog() {
                     placeholder="https://apihub.agnes-ai.com/v1"
                     className="w-full cursor-not-allowed rounded-lg border border-slate-700/50 bg-slate-800/50 px-3 py-2 text-xs text-slate-500 focus:outline-none"
                   />
+                </div>
+
+                {/* Plan / access tier */}
+                <div>
+                  <label className="mb-1 block text-[11px] font-medium text-slate-400">
+                    {t("settings.plan")}
+                  </label>
+                  <select
+                    value={plan}
+                    onChange={(e) => setPlan(e.target.value as PlanId)}
+                    className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-xs text-slate-100 focus:border-emerald-500 focus:outline-none"
+                  >
+                    {(Object.keys(PLANS) as PlanId[]).map((id) => (
+                      <option key={id} value={id}>
+                        {language === "zh" ? PLANS[id].label : PLANS[id].labelEn}
+                      </option>
+                    ))}
+                  </select>
+                  <PlanLimitSummary planId={plan} t={t} />
                 </div>
 
                 <div className="grid grid-cols-2 gap-2">

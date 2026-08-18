@@ -7,6 +7,7 @@
 import { MODELS } from "@/lib/models";
 import { resolveBaseUrl } from "@/lib/resolveBaseUrl";
 import { fetchWithRetry } from "@/lib/fetchWithRetry";
+import { rateLimiter, imageSizeToTier } from "@/services/rateLimit";
 import { generateVideo as rawGenerateVideo } from "@/services/videoService";
 import type {
   AIService,
@@ -34,6 +35,9 @@ export class OpenAIService implements AIService {
   /* ── Chat ──────────────────────────────────────────────────────────────── */
 
   async chatCompletion(params: ChatParams): Promise<ChatResult> {
+    // 用量控制：文本 RPM（按当前套餐节流，超限自动等待）
+    await rateLimiter.acquire("text");
+
     const url = `${resolveBaseUrl(this.config.baseUrl)}/chat/completions`;
 
     const resp = await fetchWithRetry(url, {
@@ -106,6 +110,9 @@ export class OpenAIService implements AIService {
   /* ── Image ─────────────────────────────────────────────────────────────── */
 
   async generateImage(params: ImageParams): Promise<ImageResult> {
+    // 用量控制：图片 RPM（按尺寸档位 1K/2K/3K/4K 区分限制）
+    await rateLimiter.acquire("image", { sizeTier: imageSizeToTier(params.size) });
+
     const url = `${this.config.baseUrl.replace(/\/+$/, "")}/images/generations`;
     const body: Record<string, unknown> = {
       model: MODELS.image,
