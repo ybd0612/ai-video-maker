@@ -24,6 +24,8 @@ export function StepVideos() {
   const allVideoed = shots.length > 0 && shots.every((s) => !!s.videoUrl);
   const failedCount = shots.filter((s) => s.status === "failed").length;
   const generatingCount = shots.filter((s) => s.status === "videoing").length;
+  // 排队中的镜头：已准备好（有图片）但尚未开始生成
+  const queueCount = shots.filter((s) => !s.videoUrl && s.status === "imaged" && s.imageUrl).length;
 
   // 生成完成 toast：allVideoed 从 false→true 时短暂提示
   const [showDoneToast, setShowDoneToast] = useState(false);
@@ -71,6 +73,11 @@ export function StepVideos() {
               {generatingCount} {t("wizard.generating")}
             </span>
           )}
+          {queueCount > 0 && (
+            <span className="text-[11px] text-slate-500">
+              {queueCount} 个排队中，免费档约 1 分钟/条
+            </span>
+          )}
           {failedCount > 0 && (
             <button
               onClick={() => generateVideosForStep()}
@@ -82,7 +89,21 @@ export function StepVideos() {
             </button>
           )}
           <button
-            onClick={() => shots.forEach((s) => s.videoUrl && rerollVideo(s.id))}
+            onClick={() => {
+              // 全部重新生成：先清空已有视频，再走批量生成（幂等 + 并发受控）
+              const pid = project?.id;
+              if (!pid) return;
+              for (const s of shots) {
+                if (s.videoUrl) {
+                  useProjectStore.getState().updateShotByProjectId(pid, s.id, {
+                    videoUrl: undefined,
+                    status: "imaged",
+                    videoProgress: 0,
+                  });
+                }
+              }
+              generateVideosForStep();
+            }}
             disabled={generatingCount > 0}
             className="flex items-center gap-1 rounded px-2 py-1 text-[11px] text-emerald-400 hover:bg-emerald-950/30 transition disabled:opacity-50"
           >

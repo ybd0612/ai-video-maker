@@ -3,7 +3,7 @@
 // Wizard operation hooks: generate, re-roll, advance steps.
 // ────────────────────────────────────────────────────────────────────────────
 
-import { useCallback, useRef } from "react";
+import { useCallback } from "react";
 import { useProjectStore, selectActiveProject, newId, type Shot, type SceneReference, type Character } from "@/stores/projectStore";
 import { useSettingsStore } from "@/stores/settingsStore";
 import { resolvePlan, type PlanId } from "@/lib/plans";
@@ -22,16 +22,13 @@ import { composeVisualPrompt, composeMotionPrompt } from "@/lib/promptUtils";
  */
 const activeVideoTasks = new Map<string, AbortController>();
 
-export function useWizardActions() {
-  const abortRef = useRef<AbortController | null>(null);
+/** 正在运行的图片生成任务（同 video：幂等守卫 + 刷新恢复） */
+const activeImageTasks = new Map<string, AbortController>();
 
-  /** Ensure a fresh AbortController exists and return its signal */
-  const ensureAbortController = useCallback(() => {
-    // Abort any previous in-flight operation
-    abortRef.current?.abort();
-    abortRef.current = new AbortController();
-    return abortRef.current.signal;
-  }, []);
+/** 正在运行的资产生成任务（同 video：幂等守卫 + 刷新恢复） */
+const activeAssetTasks = new Map<string, AbortController>();
+
+export function useWizardActions() {
 
   /** Step 1→2: Extract characters from idea, advance to assets step */
   const extractCharactersFromIdea = useCallback(async (prompt: string) => {
@@ -225,8 +222,10 @@ export function useWizardActions() {
     if (!project) return;
     const targetProjectId = project.id;
 
+    // 幂等守卫：同一项目已有资产生成任务在跑时不重复启动
+    if (activeAssetTasks.has(targetProjectId)) return;
+
     const imageSize = aspectRatioToImageSize(project.aspectRatio);
-    const signal = ensureAbortController();
     const generatePortraits = opts?.generatePortraits !== false;
     const generateScenes = opts?.generateScenes !== false;
     const generateStyle = opts?.generateStyle !== false;
@@ -297,10 +296,23 @@ export function useWizardActions() {
       });
     }
 
-    if (tasks.length === 0) return;
+    if (tasks.length === 0) {
+      // 没有可生成的任务：清除可能卡住的生成标记
+      useProjectStore.getState().setAssetGenerationStartedByProjectId(targetProjectId, false);
+      return;
+    }
+
+    // 独立 AbortController：不误杀其他正在运行的任务
+    const controller = new AbortController();
+    const signal = controller.signal;
+    activeAssetTasks.set(targetProjectId, controller);
 
     store.setAssetGenerationStartedByProjectId(targetProjectId, true);
-    await runWithConcurrency(tasks, 3, signal);
+    try {
+      await runWithConcurrency(tasks, 3, signal);
+    } finally {
+      activeAssetTasks.delete(targetProjectId);
+    }
 
     // 所有资产生成完成后清除标记
     const updatedProject = useProjectStore.getState().projects.find((p) => p.id === targetProjectId);
@@ -322,16 +334,35 @@ export function useWizardActions() {
     if (!project) return;
     const targetProjectId = project.id;
 
+    // 幂等守卫：同一项目已有图片任务在跑时不重复启动
+    if (activeImageTasks.has(targetProjectId)) return;
+
+    // 刷新/新会话恢复：残留 imaging 状态没有存活任务 → 重置为 scripted 重新生成
+    const latestProject = useProjectStore.getState().projects.find((p) => p.id === targetProjectId);
+    const stuckImaging = (latestProject?.shots ?? []).filter((s) => s.status === "imaging");
+    if (stuckImaging.length > 0) {
+      for (const s of stuckImaging) {
+        useProjectStore.getState().updateShotByProjectId(targetProjectId, s.id, {
+          status: "scripted",
+          error: undefined,
+        });
+      }
+    }
+
     // 跳过已在生成中的 shot（status="imaging"），防止导航切换后重复提交
-    const shotsNeedingImages = project.shots.filter(
+    const shotsNeedingImages = (latestProject?.shots ?? []).filter(
       (s) => !s.imageUrl && s.status !== "imaging" && s.visualPrompt.trim(),
     );
     if (shotsNeedingImages.length === 0) return;
 
+    // 独立 AbortController：不误杀其他正在运行的任务
+    const controller = new AbortController();
+    const signal = controller.signal;
+    activeImageTasks.set(targetProjectId, controller);
+
     store.setImageGenerationStartedByProjectId(targetProjectId, true);
     store.setProjectStatusById(targetProjectId, "imaging");
-    const imageSize = aspectRatioToImageSize(project.aspectRatio);
-    const signal = ensureAbortController();
+    const imageSize = aspectRatioToImageSize(latestProject?.aspectRatio ?? project.aspectRatio);
 
     // Generate images with concurrency 3
     const tasks = shotsNeedingImages.map((shot) => async () => {
@@ -368,7 +399,11 @@ export function useWizardActions() {
     });
 
     // Simple concurrency control
-    await runWithConcurrency(tasks, 3, signal);
+    try {
+      await runWithConcurrency(tasks, 3, signal);
+    } finally {
+      activeImageTasks.delete(targetProjectId);
+    }
 
     // Check if all images are ready
     const updatedProject = useProjectStore.getState().projects.find((p) => p.id === targetProjectId);
@@ -603,7 +638,6 @@ export function useWizardActions() {
   }, []);
 
   return {
-    abortRef,
     extractCharactersFromIdea,
     generateStoryboard,
     generateAssetImages,

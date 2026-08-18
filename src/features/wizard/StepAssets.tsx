@@ -4,7 +4,7 @@
 // Generates reference images that will be used as img2img anchors for storyboard.
 // ────────────────────────────────────────────────────────────────────────────
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   useProjectStore, selectActiveProject,
   type Character, type SceneReference,
@@ -39,6 +39,15 @@ export function StepAssets() {
   const characters = project?.characters ?? [];
   const sceneReferences = project?.sceneReferences ?? [];
   const styleReferenceUrl = project?.styleReferenceUrl;
+
+  // 刷新/中断后恢复：assetGenerationStarted 卡 true 且没有存活任务时重置，
+  // 避免“生成全部”按钮永久禁用转圈（用户反馈过“资产第一个自动在加载”）。
+  useEffect(() => {
+    if (project?.assetGenerationStarted) {
+      useProjectStore.getState().setAssetGenerationStartedByProjectId(project.id, false);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [project?.id]);
 
   // ── Character handlers ────────────────────────────────────────────────
 

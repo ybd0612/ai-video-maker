@@ -4,13 +4,13 @@
 // Layout: left sidebar (projects/shots) | center preview | right editor.
 // ────────────────────────────────────────────────────────────────────────────
 
-import { useState, useCallback, useRef, useEffect } from "react";
+import { useState, useCallback, useRef } from "react";
 import { useProjectStore, selectActiveProject } from "@/stores/projectStore";
 import { useSettingsStore } from "@/stores/settingsStore";
 import { useT } from "@/i18n";
 import { ShotList } from "@/features/shots/ShotList";
 import { ShotEditor } from "@/features/shots/ShotEditor";
-import { runPipeline, runSingleShot, retryFailedVideos } from "@/services/pipelineService";
+import { runPipeline, runSingleShot } from "@/services/pipelineService";
 import { generateImage, aspectRatioToImageSize } from "@/services/imageService";
 import { generateVideo, aspectRatioToVideoSize } from "@/services/videoService";
 import { SYSTEM_PROMPT_SCRIPT_TEXT, SYSTEM_PROMPT_VISUAL_PROMPT, SYSTEM_PROMPT_MOTION_PROMPT } from "@/services/chatService";
@@ -54,27 +54,8 @@ export function ProjectWorkspace() {
     systemPrompt: string;
   } | null>(null);
 
-  // Auto-retry failed videos on page load
-  useEffect(() => {
-    if (!project) return;
-    const failedVideoShots = project.shots.filter(
-      (s) => s.status === "failed" && s.imageUrl && !s.videoUrl && (s.videoRetryCount ?? 0) < 3,
-    );
-    if (failedVideoShots.length === 0) return;
-
-    const { providerConfig } = useSettingsStore.getState();
-    if (!providerConfig.apiKey || !providerConfig.baseUrl) return;
-
-    setIsRunning(true);
-    abortRef.current = new AbortController();
-    retryFailedVideos({ signal: abortRef.current.signal })
-      .catch(() => { /* ignore — already handled in store */ })
-      .finally(() => {
-        setIsRunning(false);
-        abortRef.current = null;
-      });
-  }, [project?.id]); // eslint-disable-line react-hooks/exhaustive-deps
-
+  // 注：失败视频的自动重试已统一由向导视频步骤（StepVideos → generateVideosForStep）接管。
+  // 此前此处存在 retryFailedVideos 入口，会与向导批量生成并行，重复创建服务端视频任务（token 双倍消耗）。
   // AI Assist handlers
   const handleOpenShotAiAssist = useCallback(
     (field: "scriptText" | "visualPrompt" | "motionPrompt", currentValue: string) => {

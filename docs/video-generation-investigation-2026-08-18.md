@@ -73,8 +73,18 @@
 - `git diff --check` ✅
 - Vite 生产构建 ✅（仅原有 chunk 体积提示）
 
-## 六、后续建议（未实施）
+## 六、遗留问题全面修复（本轮 fa3cc00 之后追加）
+
+| 遗留问题 | 修复 |
+|---|---|
+| StepImages 存在与视频相同的 effect 重入缺陷（依赖 imageGenerationStarted），图片请求被误杀并重复生成 | 依赖去掉 imageGenerationStarted；批量图片生成加幂等守卫 + 独立 controller；刷新后残留 imaging 重置为 scripted |
+| StepAssets 的 assetGenerationStarted 刷新后卡 true，按钮永久禁用转圈（用户此前反馈“资产第一个自动在加载”） | 挂载时重置卡住的 flag；资产生成加幂等守卫 + 独立 controller |
+| StepVideos “全部重新生成”用 forEach 并发，全部立即显示生成中 | 改为清空 videoUrl 后走批量生成（幂等 + 并发受控） |
+| StepImages “重试失败/全部重新生成”用 forEach 并发 | 改为走批量生成 |
+| ProjectWorkspace 进入页面自动重试（retryFailedVideos）与向导批量生成双入口并行，可能重复创建服务端视频任务 | 移除该自动重试入口，统一由向导视频步骤接管；清理不再使用的 abortRef/ensureAbortController |
+| 免费档视频排队无提示 | StepVideos 显示“N 个排队中，免费档约 1 分钟/条” |
+
+## 七、后续建议（未实施）
 
 1. 若仍出现单个镜头失败，可增加“查看服务端任务 ID + 手动重查”入口，便于与 Agnes 后台核对。
-2. 进入项目页自动重试失败视频（`pipelineService.retryFailedVideos`）仍是旧入口，建议后续统一走 wizard 视频步骤。
-3. 免费档视频生成约 1 次/分钟（RPM=1），4-8 个镜头需排队 4-8 分钟以上，属正常现象，可在 UI 提示预计等待时间。
+2. ProjectWorkspace 的“一键成片 / 重试失败”仍是 pipelineService 旧路径，未与向导批量生成统一，如需完全收敛可后续处理。

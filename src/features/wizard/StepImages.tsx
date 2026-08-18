@@ -26,9 +26,10 @@ export function StepImages() {
   // 所有 shot 均已落定（成功或失败）时才显示审核卡点，避免失败时用户卡住
   const allSettled = shots.length > 0 && shots.every((s) => !!s.imageUrl || s.status === "failed");
   const generatingCount = shots.filter((s) => s.status === "imaging").length;
-  const imageGenerationStarted = project?.imageGenerationStarted ?? false;
 
-  // 自动开始/恢复图片生成：首次进入触发，切回时继续未完成的 shot
+  // 自动开始/恢复图片生成：挂载时触发一次（shots.length 变化时重算）。
+  // 注意：不依赖 imageGenerationStarted —— 批量生成内部会把它置 true，
+  // 若加入依赖会导致 effect 重入，误杀进行中的图片请求。
   useEffect(() => {
     if (shots.length > 0) {
       const needsImages = shots.some((s) => !s.imageUrl);
@@ -37,7 +38,7 @@ export function StepImages() {
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [imageGenerationStarted, shots.length]);
+  }, [shots.length]);
 
   // auto 模式：所有图片完成后自动推进到 Step 5（跳过审核卡点）
   useEffect(() => {
@@ -61,7 +62,7 @@ export function StepImages() {
           )}
           {failedCount > 0 && (
             <button
-              onClick={() => shots.filter((s) => s.status === "failed").forEach((s) => rerollImage(s.id))}
+              onClick={() => generateImagesForStep()}
               disabled={generatingCount > 0}
               className="flex items-center gap-1 rounded px-2 py-1 text-[11px] text-red-400 hover:bg-red-950/30 transition disabled:opacity-50"
             >
@@ -70,7 +71,20 @@ export function StepImages() {
             </button>
           )}
           <button
-            onClick={() => shots.forEach((s) => s.imageUrl && rerollImage(s.id))}
+            onClick={() => {
+              // 全部重新生成：先清空已有图片，再走批量生成（幂等 + 并发受控）
+              const pid = project?.id;
+              if (!pid) return;
+              for (const s of shots) {
+                if (s.imageUrl) {
+                  useProjectStore.getState().updateShotByProjectId(pid, s.id, {
+                    imageUrl: undefined,
+                    status: "scripted",
+                  });
+                }
+              }
+              generateImagesForStep();
+            }}
             disabled={generatingCount > 0}
             className="flex items-center gap-1 rounded px-2 py-1 text-[11px] text-emerald-400 hover:bg-emerald-950/30 transition disabled:opacity-50"
           >

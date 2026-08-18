@@ -18,6 +18,12 @@
   - 刷新后残留 videoing 自动重置为 imaged 重新接管（解决永久加载中）；
   - rerollVideo 独立 controller，服务端任务仍运行时不误报失败；
   - “重试失败”改走并发受控的批量生成。
+- 全面修复同类问题：
+  - StepImages 同样存在 effect 重入缺陷（图片请求被误杀/重复生成）→ 依赖修复 + 幂等守卫 + 独立 controller + 刷新恢复 imaging；
+  - StepAssets 的 assetGenerationStarted 刷新后卡 true 导致按钮永久转圈 → 挂载重置 + 幂等守卫；
+  - “全部重新生成/重试失败”全部改走批量生成（消除 forEach 并发）；
+  - 移除 ProjectWorkspace 的 retryFailedVideos 自动重试入口（与向导双入口冲突，会重复创建服务端任务）；
+  - StepVideos 增加免费档排队提示（约 1 分钟/条）。
 
 ## 验证结果
 - TypeScript 类型检查通过。
