@@ -68,7 +68,7 @@ npm run preview
 
 1. 启动应用后，点击 **设置** 按钮
 2. 填入 **API Key**（Agnes AI 或兼容的 OpenAI 格式密钥）
-3. 确认 **API Base URL**（默认：`https://apihub.agnes-ai.com/v1`）
+3. 确认 **API Base URL**（默认：`https://api.agnes-ai.cn/v1`）
 4. 保存设置
 
 > 💡 API Key 存储在浏览器本地（localStorage），仅在发起 API 请求时发送到配置的服务端地址。

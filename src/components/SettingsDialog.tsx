@@ -54,7 +54,7 @@ export function SettingsDialog() {
   const setProviderConfig = useSettingsStore((s) => s.setProviderConfig);
 
   const [apiKey, setApiKey] = useState("");
-  const [baseUrl, setBaseUrl] = useState("https://apihub.agnes-ai.com/v1");
+  const [baseUrl, setBaseUrl] = useState("https://api.agnes-ai.cn/v1");
   const [plan, setPlan] = useState<PlanId>("default");
   const [showKey, setShowKey] = useState(false);
   const [toast, setToast] = useState<{ show: boolean; type: "success" | "error"; message: string }>({ show: false, type: "success", message: "" });
@@ -173,7 +173,7 @@ export function SettingsDialog() {
                   <label className="mb-1 block text-[11px] font-medium text-slate-400">
 {t("settings.apiKey")}
                                       <a
-                      href="https://platform.agnes-ai.com/login"
+                      href="https://platform.agnes-ai.cn/settings/apiKeys"
                       target="_blank"
                       rel="noopener noreferrer"
                       className="ml-1 text-emerald-400 hover:text-emerald-300 underline"
@@ -208,7 +208,7 @@ export function SettingsDialog() {
                     value={baseUrl}
                     readOnly
 
-                    placeholder="https://apihub.agnes-ai.com/v1"
+                    placeholder="https://api.agnes-ai.cn/v1"
                     className="w-full cursor-not-allowed rounded-lg border border-slate-700/50 bg-slate-800/50 px-3 py-2 text-xs text-slate-500 focus:outline-none"
                   />
                 </div>

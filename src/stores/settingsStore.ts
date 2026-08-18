@@ -39,7 +39,7 @@ export const useSettingsStore = create<SettingsState>()(
       settingsDialogOpen: false,
       providerConfig: {
         apiKey: "",
-        baseUrl: "https://apihub.agnes-ai.com/v1",
+        baseUrl: "https://api.agnes-ai.cn/v1",
         plan: "default",
       },
 

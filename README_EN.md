@@ -67,7 +67,7 @@ npm run preview
 
 1. Launch the app and click **Settings**
 2. Enter your **API Key** (Agnes AI or any OpenAI-compatible key)
-3. Verify the **API Base URL** (default: `https://apihub.agnes-ai.com/v1`)
+3. Verify the **API Base URL** (default: `https://api.agnes-ai.cn/v1`)
 4. Save settings
 
 > 💡 API keys are stored in browser localStorage and only sent to the configured endpoint when making API calls.
