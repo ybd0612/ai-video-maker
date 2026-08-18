@@ -21,6 +21,7 @@ export function StepAssembly() {
 
   const [isRendering, setIsRendering] = useState(false);
   const [renderProgress, setRenderProgress] = useState(0);
+  const [renderError, setRenderError] = useState<string | null>(null);
   const [renderedUrl, setRenderedUrl] = useState<string | null>(null);
   const renderedUrlRef = useRef<string | null>(null);
   const renderedProjectIdRef = useRef<string | null>(project?.id ?? null);
@@ -35,6 +36,7 @@ export function StepAssembly() {
       }
       setRenderedUrl(null);
       setRenderProgress(0);
+      setRenderError(null);
       setIsRendering(false);
       renderedProjectIdRef.current = nextProjectId;
     }
@@ -54,6 +56,7 @@ export function StepAssembly() {
     const targetProjectId = project.id;
     setIsRendering(true);
     setRenderProgress(0);
+    setRenderError(null);
     setProjectStatusById(targetProjectId, "rendering");
 
     try {
@@ -76,6 +79,7 @@ export function StepAssembly() {
       setProjectStatusById(targetProjectId, "done");
     } catch (err) {
       console.error("Assembly failed:", err);
+      setRenderError(err instanceof Error ? err.message : String(err));
       setProjectStatusById(targetProjectId, "failed", err instanceof Error ? err.message : String(err));
     } finally {
       setIsRendering(false);
@@ -158,6 +162,14 @@ export function StepAssembly() {
               style={{ width: `${renderProgress}%` }}
             />
           </div>
+        </div>
+      )}
+
+      {/* 拼接失败原因（含 FFmpeg 日志尾部，便于反馈定位） */}
+      {renderError && (
+        <div className="mx-auto w-full max-w-md rounded-lg border border-red-800 bg-red-950/30 p-3 text-left text-xs text-red-300">
+          <div className="font-semibold text-red-400">拼接失败：</div>
+          <pre className="mt-1 max-h-40 overflow-auto whitespace-pre-wrap break-all">{renderError}</pre>
         </div>
       )}
 
