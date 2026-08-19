@@ -10,21 +10,20 @@ import { useSettingsStore } from "@/stores/settingsStore";
 import { useT } from "@/i18n";
 import { ShotList } from "@/features/shots/ShotList";
 import { ShotEditor } from "@/features/shots/ShotEditor";
-import { runPipeline, runSingleShot } from "@/services/pipelineService";
-import { generateImage, aspectRatioToImageSize } from "@/services/imageService";
-import { generateVideo, aspectRatioToVideoSize } from "@/services/videoService";
+import { runPipeline } from "@/services/pipelineService";
 import { SYSTEM_PROMPT_SCRIPT_TEXT, SYSTEM_PROMPT_VISUAL_PROMPT, SYSTEM_PROMPT_MOTION_PROMPT } from "@/services/chatService";
 import { AiAssistDrawer } from "@/components/ui/AiAssistDrawer";
 import { CharacterPanel } from "@/features/characters/CharacterPanel";
 import { ProjectSidebar } from "@/features/projects/ProjectSidebar";
 import { HistoryPanel } from "@/features/history/HistoryPanel";
 import {
-  Settings, Trash2, Play, Square, RotateCcw,
+  Settings, Trash2, Play, Square,
   FolderOpen, Clock, Layers,
 } from "lucide-react";
 import { ApiKeyBanner } from "@/components/ApiKeyBanner";
 import { confirmDialog } from "@/components/ui/ConfirmDialog";
 import { CreationWizard } from "@/features/wizard/CreationWizard";
+import { useWizardActions } from "@/features/wizard/useWizardActions";
 
 type AspectRatio = "9:16" | "16:9" | "1:1";
 type LeftTab = "projects" | "shots" | "characters" | "history";
@@ -35,10 +34,10 @@ export function ProjectWorkspace() {
   const projects = useProjectStore((s) => s.projects);
   const updateProject = useProjectStore((s) => s.updateProject);
   const clearProject = useProjectStore((s) => s.clearProject);
-  const setShotStatus = useProjectStore((s) => s.setShotStatus);
   const updateShot = useProjectStore((s) => s.updateShot);
   const addHistory = useProjectStore((s) => s.addHistory);
   const openSettings = useSettingsStore((s) => s.setSettingsDialogOpen);
+  const { rerollImage, rerollVideo } = useWizardActions();
 
   const [selectedShotId, setSelectedShotId] = useState<string | null>(null);
   const [isRunning, setIsRunning] = useState(false);
@@ -118,85 +117,6 @@ export function ProjectWorkspace() {
     abortRef.current?.abort();
   }, []);
 
-  // Retry all failed shots (skip script phase, only re-run image+video)
-  const handleRetryFailed = useCallback(async () => {
-    const proj = selectActiveProject(useProjectStore.getState());
-    if (!proj) return;
-    const failedShotIds = proj.shots.filter((s) => s.status === "failed").map((s) => s.id);
-    if (failedShotIds.length === 0) return;
-    for (const id of failedShotIds) {
-      useProjectStore.getState().setShotStatus(id, "idle");
-    }
-    setIsRunning(true);
-    abortRef.current = new AbortController();
-    try {
-      await Promise.allSettled(
-        failedShotIds.map((id) => runSingleShot(id, { signal: abortRef.current!.signal })),
-      );
-    } catch (err) {
-      if (err instanceof Error && err.message !== "Pipeline cancelled.") alert(err.message);
-    } finally {
-      setIsRunning(false);
-      abortRef.current = null;
-    }
-  }, []);
-
-  // Regenerate image for a single shot
-  const handleRegenerateImage = useCallback(async (shotId: string) => {
-    const { providerConfig } = useSettingsStore.getState();
-    if (!providerConfig.apiKey || !providerConfig.baseUrl) return;
-
-    const proj = selectActiveProject(useProjectStore.getState());
-    if (!proj) return;
-
-    const shot = proj.shots.find((s) => s.id === shotId);
-    if (!shot) return;
-
-    setShotStatus(shotId, "imaging");
-    try {
-      const size = aspectRatioToImageSize(proj.aspectRatio);
-      const imageUrl = await generateImage({
-        apiKey: providerConfig.apiKey,
-        baseUrl: providerConfig.baseUrl,
-        prompt: shot.visualPrompt,
-        size,
-      });
-      updateShot(shotId, { imageUrl, status: "imaged" });
-      addHistory("shot_regenerated", `重新生成镜头 ${shot.index + 1} 的图片`);
-    } catch (err) {
-      setShotStatus(shotId, "failed", err instanceof Error ? err.message : String(err));
-    }
-  }, [setShotStatus, updateShot, addHistory]);
-
-  // Regenerate video for a single shot
-  const handleRegenerateVideo = useCallback(async (shotId: string) => {
-    const { providerConfig } = useSettingsStore.getState();
-    if (!providerConfig.apiKey || !providerConfig.baseUrl) return;
-
-    const proj = selectActiveProject(useProjectStore.getState());
-    if (!proj) return;
-
-    const shot = proj.shots.find((s) => s.id === shotId);
-    if (!shot || !shot.imageUrl) return;
-
-    setShotStatus(shotId, "videoing");
-    try {
-      const size = aspectRatioToVideoSize(proj.aspectRatio);
-      const result = await generateVideo({
-        apiKey: providerConfig.apiKey,
-        baseUrl: providerConfig.baseUrl,
-        prompt: shot.visualPrompt,
-        imageUrl: shot.imageUrl,
-        size,
-        duration: shot.duration,
-      });
-      updateShot(shotId, { videoUrl: result.videoUrl, status: "videoed" });
-      addHistory("shot_regenerated", `重新生成镜头 ${shot.index + 1} 的视频`);
-    } catch (err) {
-      setShotStatus(shotId, "failed", err instanceof Error ? err.message : String(err));
-    }
-  }, [setShotStatus, updateShot, addHistory]);
-
   // Clear project
   const handleClear = useCallback(async () => {
     const ok = await confirmDialog({
@@ -268,15 +188,6 @@ export function ProjectWorkspace() {
                   <Play size={12} />
                   {t("pipeline.runAll")}
                 </button>
-                {shots.some((s) => s.status === "failed") && (
-                  <button
-                    onClick={handleRetryFailed}
-                    className="flex items-center gap-1.5 rounded-md bg-amber-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-amber-500"
-                  >
-                    <RotateCcw size={12} />
-                    {t("pipeline.retryFailed")}
-                  </button>
-                )}
               </div>
             )
           )}
@@ -380,8 +291,8 @@ export function ProjectWorkspace() {
             <ShotEditor
               shot={selectedShot}
               onClose={() => setSelectedShotId(null)}
-              onRegenerateImage={handleRegenerateImage}
-              onRegenerateVideo={handleRegenerateVideo}
+              onRegenerateImage={rerollImage}
+              onRegenerateVideo={rerollVideo}
               onOpenAiAssist={handleOpenShotAiAssist}
               isProcessing={isRunning}
             />
