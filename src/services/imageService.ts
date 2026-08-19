@@ -4,7 +4,6 @@
 // ────────────────────────────────────────────────────────────────────────────
 
 import { createAIService } from "@/services/ai/factory";
-import { useSettingsStore } from "@/stores/settingsStore";
 
 interface GenerateImageOptions {
   apiKey: string;
@@ -32,24 +31,6 @@ export async function generateImage(opts: GenerateImageOptions): Promise<string>
     size: opts.size,
     inputImageUrl: opts.inputImageUrl,
   });
-  return result.url;
-}
-
-/**
- * 简化版图片生成接口 — 从 settingsStore 读取 provider 配置。
- */
-export async function generateImageFromSettings(params: {
-  prompt: string;
-  size: string;
-  inputImageUrl?: string;
-}): Promise<string> {
-  const { providerConfig } = useSettingsStore.getState();
-  const service = createAIService({
-    provider: "openai",
-    apiKey: providerConfig.apiKey,
-    baseUrl: providerConfig.baseUrl,
-  });
-  const result = await service.generateImage(params);
   return result.url;
 }
 

@@ -4,7 +4,6 @@
 // ────────────────────────────────────────────────────────────────────────────
 
 import { createAIService } from "@/services/ai/factory";
-import { useSettingsStore } from "@/stores/settingsStore";
 
 /* ── Types ──────────────────────────────────────────────────────────────── */
 
@@ -125,20 +124,4 @@ export async function chatCompletion(opts: ChatOptions): Promise<ChatResult> {
     baseUrl: opts.baseUrl,
   });
   return service.chatCompletion({ messages: trimmed });
-}
-
-/**
- * 简化版聊天接口 — 从 settingsStore 读取 provider 配置。
- * 适用于不需要显式传 apiKey/baseUrl 的场景。
- */
-export async function chatCompletionFromSettings(params: {
-  messages: ChatMessage[];
-}): Promise<ChatResult> {
-  const { providerConfig } = useSettingsStore.getState();
-  const service = createAIService({
-    provider: "openai",
-    apiKey: providerConfig.apiKey,
-    baseUrl: providerConfig.baseUrl,
-  });
-  return service.chatCompletion({ messages: params.messages });
 }

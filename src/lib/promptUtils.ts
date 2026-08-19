@@ -6,7 +6,7 @@
 
 import type { Shot } from "@/stores/projectStore";
 
-export { resolveAssetNamespaces, generateAssetNamespace, generateFullPrompt } from "./assetNamespace";
+export { generateAssetNamespace, generateFullPrompt } from "./assetNamespace";
 
 /**
  * Return the visual prompt for API calls.
