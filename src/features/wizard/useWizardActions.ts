@@ -28,6 +28,49 @@ const activeImageTasks = new Map<string, AbortController>();
 /** 正在运行的资产生成任务（同 video：幂等守卫 + 刷新恢复） */
 const activeAssetTasks = new Map<string, AbortController>();
 
+type RawCharacter = {
+  name: string;
+  description: string;
+  appearancePrompt: string;
+};
+
+type ImageGenerationInput = {
+  prompt: string;
+  inputImageUrl?: string;
+};
+
+/** Build unique Character records from model output without mutating inputs. */
+function extractNewCharacters(existing: Character[], incoming: RawCharacter[]): Character[] {
+  const names = new Set(existing.map((character) => character.name.trim().toLocaleLowerCase()));
+  return incoming.filter((character) => {
+    const normalizedName = character.name.trim().toLocaleLowerCase();
+    if (!normalizedName || names.has(normalizedName)) return false;
+    names.add(normalizedName);
+    return true;
+  }).map((character) => ({
+    id: newId("char"),
+    name: character.name,
+    description: character.description,
+    appearancePrompt: character.appearancePrompt,
+    assetNamespace: generateAssetNamespace(character.name),
+    fullPrompt: generateFullPrompt(character),
+  }));
+}
+
+/** Compose the complete image prompt and the best available img2img reference. */
+function buildImageGenerationInput(
+  shot: Shot,
+  project: { style: string; sceneReferences?: SceneReference[]; styleReferenceUrl?: string; characters: Character[] },
+): ImageGenerationInput {
+  let prompt = injectCharacterDescriptions(
+    composeVisualPrompt(shot),
+    shot.activeCharacterIds ?? [],
+    project.characters,
+  );
+  if (project.style) prompt = `${project.style} style. ${prompt}`;
+  return { prompt, inputImageUrl: findBestReference(shot, project) };
+}
+
 export function useWizardActions() {
 
   /** Step 1→2: Extract characters from idea, advance to assets step */
@@ -58,26 +101,7 @@ export function useWizardActions() {
         characters: project.characters,
       });
 
-      // 构造提取到的角色（带唯一 ID）
-      // AI 可能在重复点击“生成”时再次返回相同角色；按名称去重，避免资产列表重复。
-      const existingNames = new Set(
-        project.characters.map((character) => character.name.trim().toLocaleLowerCase()),
-      );
-      const newCharacters: Character[] = result.characters
-        .filter((char) => {
-          const normalizedName = char.name.trim().toLocaleLowerCase();
-          if (!normalizedName || existingNames.has(normalizedName)) return false;
-          existingNames.add(normalizedName);
-          return true;
-        })
-        .map((char) => ({
-          id: newId("char"),
-          name: char.name,
-          description: char.description,
-          appearancePrompt: char.appearancePrompt,
-          assetNamespace: generateAssetNamespace(char.name),
-          fullPrompt: generateFullPrompt(char),
-        }));
+      const newCharacters = extractNewCharacters(project.characters, result.characters);
 
       // 原子地写回发起项目：追加新角色 + 复位状态 + 推进到资产步骤
       useProjectStore.getState().updateProjectById(targetProjectId, (p) => ({
@@ -132,26 +156,12 @@ export function useWizardActions() {
     store.setShotsByProjectId(targetProjectId, shots);
 
     // Auto-add any newly extracted characters
-    if (result.characters.length > 0) {
-      const existingNames = new Set(project.characters.map((c) => c.name));
-      for (const char of result.characters) {
-        if (!existingNames.has(char.name)) {
-          const namespace = generateAssetNamespace(char.name);
-          const fullPrompt = `a character named ${char.name}, ${char.appearancePrompt}`;
-          const newCharacter: Character = {
-            id: newId("char"),
-            name: char.name,
-            description: char.description,
-            appearancePrompt: char.appearancePrompt,
-            assetNamespace: namespace,
-            fullPrompt,
-          };
-          useProjectStore.getState().updateProjectById(targetProjectId, (p) => ({
-            ...p,
-            characters: [...p.characters, newCharacter],
-          }));
-        }
-      }
+    const newCharacters = extractNewCharacters(project.characters, result.characters);
+    if (newCharacters.length > 0) {
+      useProjectStore.getState().updateProjectById(targetProjectId, (p) => ({
+        ...p,
+        characters: [...p.characters, ...newCharacters],
+      }));
     }
 
     useProjectStore.getState().setProjectStatusById(targetProjectId, "idle");
@@ -370,19 +380,7 @@ export function useWizardActions() {
       useProjectStore.getState().setShotStatusByProjectId(targetProjectId, shot.id, "imaging");
 
       try {
-        let enrichedPrompt = injectCharacterDescriptions(
-          composeVisualPrompt(shot),
-          shot.activeCharacterIds ?? [],
-          project.characters,
-        );
-
-        // Prepend style reference description if available
-        if (project.style) {
-          enrichedPrompt = `${project.style} style. ${enrichedPrompt}`;
-        }
-
-        // Find best img2img reference: scene reference > character portrait > style reference
-        const referenceImageUrl = findBestReference(shot, project);
+        const { prompt: enrichedPrompt, inputImageUrl: referenceImageUrl } = buildImageGenerationInput(shot, project);
 
         const imageUrl = await generateImage({
           apiKey: providerConfig.apiKey,
@@ -429,17 +427,7 @@ export function useWizardActions() {
     store.setShotStatus(shotId, "imaging");
 
     try {
-      let enrichedPrompt = injectCharacterDescriptions(
-        composeVisualPrompt(shot),
-        shot.activeCharacterIds ?? [],
-        project.characters,
-      );
-
-      if (project.style) {
-        enrichedPrompt = `${project.style} style. ${enrichedPrompt}`;
-      }
-
-      const referenceImageUrl = findBestReference(shot, project);
+      const { prompt: enrichedPrompt, inputImageUrl: referenceImageUrl } = buildImageGenerationInput(shot, project);
 
       const imageUrl = await generateImage({
         apiKey: providerConfig.apiKey,
