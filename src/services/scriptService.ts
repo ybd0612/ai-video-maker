@@ -5,8 +5,7 @@
 // ────────────────────────────────────────────────────────────────────────────
 
 import type { Shot, Character, SceneReference } from "@/stores/projectStore";
-import { MODELS } from "@/lib/models";
-import { fetchWithRetry } from "@/lib/fetchWithRetry";
+import { createAIService } from "@/services/ai/factory";
 
 interface GenerateScriptOptions {
   apiKey: string;
@@ -265,69 +264,33 @@ export async function generateScript(
 ): Promise<GenerateScriptResult> {
   const systemPrompt = buildSystemPrompt(opts.language, opts.characters, opts.sceneReferences);
 
-  const url = `${opts.baseUrl.replace(/\/+$/, "")}/chat/completions`;
+  const service = createAIService({
+    provider: "openai",
+    apiKey: opts.apiKey,
+    baseUrl: opts.baseUrl,
+  });
 
   let lastError: Error | null = null;
 
   for (let attempt = 0; attempt <= MAX_SCRIPT_RETRIES; attempt++) {
-    const resp = await fetchWithRetry(url, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${opts.apiKey}`,
-      },
-      body: JSON.stringify({
-        model: MODELS.text,
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: opts.prompt },
-        ],
-        temperature: 0.7,
-        // 推理模型会先消耗 token 用于思考，剩余才输出 JSON。
-        // 分镜 JSON 本身较大（4-8 个镜头），需预留充足预算避免思考耗尽导致 content 为空。
-        max_tokens: 8192,
-        // 关闭 Thinking 模式：分镜生成无需深度推理，所有预算用于输出 JSON，避免思考耗尽导致 content 为空。
-        chat_template_kwargs: { enable_thinking: false },
-      }),
+    const result = await service.chatCompletion({
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: opts.prompt },
+      ],
+      temperature: 0.7,
+      maxTokens: 8192,
+      enableThinking: false,
     });
-
-    if (!resp.ok) {
-      const body = await resp.text().catch(() => "");
-      throw new Error(`Script API error ${resp.status}: ${body}`);
-    }
-
-    const contentType = resp.headers.get("content-type") ?? "";
-    if (!contentType.includes("application/json")) {
-      const body = await resp.text().catch(() => "");
-      throw new Error(
-        `Script API 返回了非 JSON 响应 (Content-Type: ${contentType})。请检查 Base URL 是否正确。响应前 200 字符：${body.slice(0, 200)}`,
-      );
-    }
-
-    const json = await resp.json();
-    const choice = json.choices?.[0];
-    const finishReason: string = choice?.finish_reason ?? choice?.finishReason ?? "";
-
-    // 规范化 content：部分提供商返回数组形式（[{type, text}]）或 null
-    let rawContent: unknown = choice?.message?.content ?? "";
-    if (Array.isArray(rawContent)) {
-      rawContent = rawContent
-        .map((part) => (typeof part === "string" ? part : (part?.text ?? "")))
-        .join("");
-    }
-    const content: string = typeof rawContent === "string" ? rawContent : "";
+    const content = result.content;
 
     const jsonStr = extractJsonFromResponse(content);
     if (!jsonStr) {
-      // 诊断信息：区分“内容为空”（常见于内容过滤/拒绝）与“有内容但非 JSON”
-      const isEmpty = content.trim().length === 0;
-      const filterHint =
-        finishReason === "content_filter" || finishReason === "sensitive"
-          ? "（finish_reason 提示内容被安全过滤）"
-          : "";
-      const detail = isEmpty
-        ? `模型返回了空内容${filterHint || "，可能触发了内容安全过滤或模型拒绝"}。finish_reason: ${finishReason || "未知"}`
-        : `模型返回的内容不是有效 JSON。finish_reason: ${finishReason || "未知"}。响应内容：${content.slice(0, 200)}`;
+      // Unified chatCompletion already validates non-empty content. Keep
+      // diagnostics focused on malformed JSON and preserve retry behavior.
+      const detail = content.trim().length === 0
+        ? "模型返回了空内容，可能触发了内容安全过滤或模型拒绝"
+        : `模型返回的内容不是有效 JSON。响应内容：${content.slice(0, 200)}`;
       lastError = new Error(
         `无法从模型响应中提取 JSON（第 ${attempt + 1} 次尝试）。${detail}`,
       );

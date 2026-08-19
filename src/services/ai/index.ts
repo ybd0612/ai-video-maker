@@ -37,6 +37,7 @@ export interface VideoParams {
   lastFrameUrl?: string;
   prompt: string;
   duration: number;
+  size?: string;
 }
 
 export interface VideoResult {
