@@ -12,7 +12,7 @@ import { generateImage, aspectRatioToImageSize } from "@/services/imageService";
 import { generateAssetNamespace } from "@/lib/assetNamespace";
 import { generateVideo, aspectRatioToVideoSize, VideoTaskCreatedError } from "@/services/videoService";
 import { injectCharacterDescriptions } from "@/lib/characterUtils";
-import { composeVisualPrompt, composeMotionPrompt } from "@/lib/promptUtils";
+import { composeVisualPrompt, composeMotionPrompt, generateFullPrompt } from "@/lib/promptUtils";
 
 /**
  * 正在运行的视频生成任务：projectId -> AbortController。
@@ -76,7 +76,7 @@ export function useWizardActions() {
           description: char.description,
           appearancePrompt: char.appearancePrompt,
           assetNamespace: generateAssetNamespace(char.name),
-          fullPrompt: `a character named ${char.name}, ${char.appearancePrompt}`,
+          fullPrompt: generateFullPrompt(char),
         }));
 
       // 原子地写回发起项目：追加新角色 + 复位状态 + 推进到资产步骤

@@ -9,6 +9,7 @@
 
 import { MODELS } from "@/lib/models";
 import { fetchWithRetry } from "@/lib/fetchWithRetry";
+import { calcNumFrames } from "@/lib/validation";
 import { rateLimiter } from "@/services/rateLimit";
 
 const VIDEO_POLL_INTERVAL_MS = 5_000;
@@ -276,13 +277,4 @@ export async function generateVideo(
   }
 
   return { videoUrl, coverImageUrl, duration };
-}
-
-/**
- * Calculate num_frames from duration and fps using the 8n+1 rule (max 441).
- */
-function calcNumFrames(durationSec: number, fps: number): number {
-  const raw = durationSec * fps;
-  const n = Math.floor((raw - 1) / 8);
-  return Math.min(n * 8 + 1, 441);
 }
