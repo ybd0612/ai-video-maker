@@ -1,36 +1,27 @@
-# 画幅比例不可点击问题修复
+# wxhb 项目结构与复用性重构概览
 
-## 完成内容
-- 修复“输入想法/视频”页面在尚未创建项目时，画幅比例按钮点击后没有任何视觉或状态反馈的问题。
-- 新增页面本地画幅选择状态；未创建项目时先保存选择，点击“下一步”创建项目时再写入项目。
-- 已存在项目时仍直接同步更新项目画幅比例。
+## 已完成
 
-## 本轮附加修复
-- 修复资产角色按名称（忽略首尾空格和大小写）去重，避免重复生成同一角色。
-- 免费套餐视频并发调整为 1；付费/企业套餐保持 2，界面不会提前把多个视频都标记为生成中。
-- 视频单任务轮询从 10 分钟延长到 30 分钟，任务注册等待从 30 秒延长到 2 分钟。
-- 服务端任务已创建但轮询超时不再标记为 failed，也不创建重复任务，保留 videoing 状态。
-- 修复 Agnes 完成响应解析：官方成片地址位于 `metadata.url`，同时兼容旧版 `video_url` / `output.url` 字段。
-- 只有任务明确 `failed` / `cancelled` 才显示失败；已创建但仍可能运行的任务继续保持生成状态。
-- 全面调研视频生成失败根因（报告：docs/video-generation-investigation-2026-08-18.md），修复：
-  - StepVideos 自动触发 effect 重入导致任务被误杀/重复创建（去掉 videoGenerationStarted 依赖）；
-  - 批量生成加幂等守卫 + 独立 AbortController（模块级 activeVideoTasks 注册表）；
-  - 刷新后残留 videoing 自动重置为 imaged 重新接管（解决永久加载中）；
-  - rerollVideo 独立 controller，服务端任务仍运行时不误报失败；
-  - “重试失败”改走并发受控的批量生成。
-- 全面修复同类问题：
-  - StepImages 同样存在 effect 重入缺陷（图片请求被误杀/重复生成）→ 依赖修复 + 幂等守卫 + 独立 controller + 刷新恢复 imaging；
-  - StepAssets 的 assetGenerationStarted 刷新后卡 true 导致按钮永久转圈 → 挂载重置 + 幂等守卫；
-  - “全部重新生成/重试失败”全部改走批量生成（消除 forEach 并发）；
-  - 移除 ProjectWorkspace 的 retryFailedVideos 自动重试入口（与向导双入口冲突，会重复创建服务端任务）；
-  - StepVideos 增加免费档排队提示（约 1 分钟/条）。
-- 决定性修复：用户提供真实成功响应，确认 Agnes 中国站实际把成片地址放在**顶层 `url` 字段**（与文档示例 metadata.url 不一致）。解析链已改为 url → metadata.url → video_url → output.url 等，并识别 internal_status="completed"。
-- 提示词覆盖修复：用户实测视频请求体 prompt 仅为兜底文案 "Camera slowly pans, gentle movement"。根因是 StepStoryboard 在生成分镜后又调 translateToMotion 覆盖提示词，其 JSON 解析失败时用兜底值覆盖 AI 完整输出。已移除该覆盖步骤及孤儿代码（translateToMotion / MotionTranslationResult），视频提示词现在使用分镜阶段 AI 生成的完整英文 motionPrompt，且每个分镜省一次文本调用。
+本轮按低风险到高风险分批完成 5 批重构：
 
-## 验证结果
-- TypeScript 类型检查通过。
-- `git diff --check` 通过。
-- Vite 生产构建通过；仅保留已有的 chunk 体积提示。
+1. 删除不再需要的 `src/providers/` 模型抽象层，统一视频帧数规则，并复用角色完整提示词构造。
+2. 将 `scriptService` 收敛到 `services/ai` 的统一文本调用入口，使分镜生成进入统一限流器；同时补齐视频尺寸参数透传。
+3. 删除 `ProjectWorkspace` 中与向导重复的失败重试和单镜头生成实现，右侧编辑器统一调用 `useWizardActions`。
+4. 清理确认无引用的服务包装函数和辅助函数。
+5. 抽取 `useWizardActions` 中重复的角色合并与图片生成请求构造逻辑。
 
-## 备注
-- `.workbuddy/` 为工作区工具数据，未纳入提交。
+## 提交记录
+
+- `9fc43c4` 重构：清理无用模型抽象并统一帧数规则
+- `30ce5ac` 重构：统一分镜文本调用与视频尺寸参数
+- `c03886e` 重构：收敛旧版镜头重生成入口
+- `1d67f57` 清理：移除未使用的服务包装函数
+- `673019d` 重构：抽取向导角色与图片生成复用逻辑
+
+## 验证与遗留
+
+- `tsc --noEmit`：通过。
+- `git diff --check`：通过。
+- Vite 已完成源码模块转换，但构建清理既有 `dist/assets` 时被 safe-delete/文件占用中止；未擅自删除目录。
+- Playwright 因清理 `test-results` 时同类 safe-delete 中止，未执行测试。
+- 未继续改动 Zustand store 的 active/byId 双 API，也未抽取 `StepImages`/`StepVideos` 通用壳，避免本轮扩大回归范围。
