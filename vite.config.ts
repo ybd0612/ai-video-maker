@@ -23,6 +23,15 @@ export default defineConfig({
         changeOrigin: true,
         rewrite: (p) => p.replace(/^\/cdn-proxy/, ""),
       },
+      // FFmpeg 核心文件走国内 npm 镜像，代理后变为同源请求，避免 CORS 和跨境下载慢。
+      "/ffmpeg-core": {
+        target: "https://cdn.npmmirror.com",
+        changeOrigin: true,
+        rewrite: (p) => p.replace(
+          /^\/ffmpeg-core\/@ffmpeg\/core@(\d+\.\d+\.\d+)\/dist/,
+          "/packages/@ffmpeg/core/$1/files/dist",
+        ),
+      },
     },
   },
   preview: {

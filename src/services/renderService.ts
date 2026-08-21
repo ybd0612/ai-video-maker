@@ -36,14 +36,35 @@ async function getFFmpeg(): Promise<FFmpeg> {
   ffmpeg.on("log", onFfmpegLog);
   ffmpeg.on("progress", onFfmpegProgress);
 
-  const baseURL = "https://unpkg.com/@ffmpeg/core@0.12.6/dist/esm";
-  await ffmpeg.load({
-    coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, "text/javascript"),
-    wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, "application/wasm"),
-  });
+  // 国内网络优先走 npmmirror；开发环境通过 Vite 代理转为同源请求，避免镜像 CORS 头不稳定。
+  // 生产环境保留 fastly.jsdelivr.net 回退，避免部署环境没有同名代理。
+  const cdnBases = import.meta.env.DEV
+    ? [
+        "/ffmpeg-core/@ffmpeg/core@0.12.6/dist/esm",
+        "https://fastly.jsdelivr.net/npm/@ffmpeg/core@0.12.6/dist/esm",
+        "https://unpkg.com/@ffmpeg/core@0.12.6/dist/esm",
+      ]
+    : [
+        "https://fastly.jsdelivr.net/npm/@ffmpeg/core@0.12.6/dist/esm",
+        "https://unpkg.com/@ffmpeg/core@0.12.6/dist/esm",
+      ];
 
-  ffmpegInstance = ffmpeg;
-  return ffmpeg;
+  let loadError: unknown;
+  for (const baseURL of cdnBases) {
+    try {
+      await ffmpeg.load({
+        coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, "text/javascript"),
+        wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, "application/wasm"),
+      });
+      ffmpegInstance = ffmpeg;
+      return ffmpeg;
+    } catch (err) {
+      loadError = err;
+      console.warn(`[render] FFmpeg 核心加载失败，尝试下一个源: ${baseURL}`, err);
+    }
+  }
+
+  throw loadError instanceof Error ? loadError : new Error("FFmpeg 核心加载失败。");
 }
 
 export interface RenderOptions {
