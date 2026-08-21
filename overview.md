@@ -17,6 +17,7 @@
 - `c03886e` 重构：收敛旧版镜头重生成入口
 - `1d67f57` 清理：移除未使用的服务包装函数
 - `673019d` 重构：抽取向导角色与图片生成复用逻辑
+- `7045644` 文档：记录项目结构重构结果
 
 ## 验证与遗留
 
@@ -25,3 +26,4 @@
 - Vite 已完成源码模块转换，但构建清理既有 `dist/assets` 时被 safe-delete/文件占用中止；未擅自删除目录。
 - Playwright 因清理 `test-results` 时同类 safe-delete 中止，未执行测试。
 - 未继续改动 Zustand store 的 active/byId 双 API，也未抽取 `StepImages`/`StepVideos` 通用壳，避免本轮扩大回归范围。
+- 当前工作区有未跟踪的 `.workbuddy/`、`playwright-report/`、`test-results/`，它们属于工具/测试产物，后续提交业务改动时不要误提交。
