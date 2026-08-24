@@ -89,7 +89,7 @@ npm run preview
 | 5️⃣ | **Videos** | Generate video per shot (optional dual-frame), re-roll individually |
 | 6️⃣ | **Assembly** | Validate all clips, concat with FFmpeg.wasm, download MP4 |
 
-- **semi-auto (default)**: confirm progression after each step, go back and edit anytime
+- **semi-auto (default)**: confirm images before video generation, go back and edit anytime
 - **auto**: all steps advance automatically to the final video
 - Free plan generates videos at about **1/min** (RPM=1); multiple shots queue with an estimated wait shown in the UI
 

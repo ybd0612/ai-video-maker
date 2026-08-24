@@ -242,6 +242,28 @@ class RateLimiter {
 
   /* ── 辅助 ───────────────────────────────────────────────────────────── */
 
+  /**
+   * 当前套餐的每日配额用量快照（供 UI 在审核卡点等处展示成本）。
+   * 非 Token Plan（default/enterprise，无每日配额）时返回 null。
+   */
+  getQuotaUsageSnapshot(): { imageUsed: number; imageLimit: number; videoUsed: number; videoLimit: number } | null {
+    const plan = resolvePlan(useSettingsStore.getState().providerConfig.plan as PlanId | undefined);
+    if (plan.accessType !== "tokenplan") return null;
+    const now = Date.now();
+    const imageKey = `tokenplan:${plan.id}:image:day`;
+    const videoKey = `tokenplan:${plan.id}:video:day`;
+    const sum = (key: string) =>
+      (this.usage[key] ?? [])
+        .filter((e) => now - e.t < WINDOW.DAY)
+        .reduce((s, e) => s + e.v, 0);
+    return {
+      imageUsed: sum(imageKey),
+      imageLimit: plan.quota.imagePerDay ?? 0,
+      videoUsed: sum(videoKey),
+      videoLimit: plan.quota.videoSecondsPerDay ?? 0,
+    };
+  }
+
   private fmtReset(ms: number): string {
     const min = Math.ceil(ms / 60000);
     if (min < 60) return `${min} 分钟`;
@@ -256,6 +278,11 @@ class RateLimiter {
 /* ── 单例 ───────────────────────────────────────────────────────────────── */
 
 export const rateLimiter = new RateLimiter();
+
+/** 当前套餐每日配额用量快照（非 Token Plan 返回 null），供审核卡点等处展示 */
+export function getQuotaUsageSnapshot() {
+  return rateLimiter.getQuotaUsageSnapshot();
+}
 
 /** 便捷：把像素尺寸字符串映射为图片档位（供调用方使用） */
 export { imageSizeToTier };

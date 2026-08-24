@@ -140,7 +140,10 @@ export function StepImages() {
         <ReviewCheckpoint
           mode={project?.automationMode ?? "semi-auto"}
           onConfirm={() => setWizardStep(5)}
-          failedCount={failedCount}
+          failedShots={shots
+            .filter((s) => s.status === "failed")
+            .map((s) => ({ index: s.index, error: s.error }))}
+          onRetryFailed={() => generateImagesForStep()}
         />
       )}
     </div>

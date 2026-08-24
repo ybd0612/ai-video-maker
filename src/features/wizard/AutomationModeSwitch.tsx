@@ -12,7 +12,6 @@ export function AutomationModeSwitch({ mode, onChange }: AutomationModeSwitchPro
   const modes: Array<{ value: AutomationMode; label: string; hint: string }> = [
     { value: 'semi-auto', label: t("automation.semi-auto"), hint: t("automation.semi-autoHint") },
     { value: 'auto', label: t("automation.auto"), hint: t("automation.autoHint") },
-    { value: 'manual', label: t("automation.manual"), hint: t("automation.manualHint") },
   ];
 
   const currentHint = modes.find((m) => m.value === mode)?.hint ?? "";

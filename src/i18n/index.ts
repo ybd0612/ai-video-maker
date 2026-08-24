@@ -423,17 +423,17 @@ const zh = {
   // 自动化模式
   "automation.semi-auto": "半自动",
   "automation.auto": "全自动",
-  "automation.manual": "手动",
-  "automation.semi-autoHint": "关键节点需要确认",
+  "automation.semi-autoHint": "图片生成后确认，再进入视频生成",
   "automation.autoHint": "全程自动，无需确认",
-  "automation.manualHint": "每步都需要确认",
 
   // 审核卡点
   "review.confirmImages": "确认图片，进入视频生成",
-  "review.skipReview": "跳过审核",
   "review.qualityCheck": "质量检查",
   "review.hint": "请确认所有图片质量符合预期，然后进入视频生成阶段。",
-  "review.someFailed": "{count} 张图片生成失败，将在视频阶段被跳过。",
+  "review.someFailed": "{count} 张图片生成失败，对应镜头将不会生成视频。",
+  "review.failedShotList": "失败镜头：{shots}",
+  "review.retryFailedShots": "重试失败镜头",
+  "review.quotaUsage": "今日配额用量：图片 {imageUsed}/{imageLimit} 张 · 视频 {videoUsed}/{videoLimit} 秒",
   "wizard.waiting": "等待中...",
 
 } as const;
@@ -857,17 +857,17 @@ const en = {
   // Automation mode
   "automation.semi-auto": "Semi-auto",
   "automation.auto": "Full auto",
-  "automation.manual": "Manual",
-  "automation.semi-autoHint": "Confirmation at key checkpoints",
+  "automation.semi-autoHint": "Confirm images before proceeding to video",
   "automation.autoHint": "Fully automatic, no confirmation needed",
-  "automation.manualHint": "Confirmation at every step",
 
   // Review checkpoints
   "review.confirmImages": "Confirm images, proceed to video generation",
-  "review.skipReview": "Skip review",
   "review.qualityCheck": "Quality check",
   "review.hint": "Please confirm all images meet quality expectations before proceeding to video generation.",
-  "review.someFailed": "{count} image(s) failed to generate and will be skipped in the video stage.",
+  "review.someFailed": "{count} image(s) failed to generate; those shots will not have videos.",
+  "review.failedShotList": "Failed shots: {shots}",
+  "review.retryFailedShots": "Retry Failed Shots",
+  "review.quotaUsage": "Today's quota usage: {imageUsed}/{imageLimit} images · {videoUsed}/{videoLimit}s video",
   "wizard.waiting": "Waiting...",
 } as const;
 

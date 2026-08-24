@@ -32,7 +32,7 @@ export type AspectRatio = "9:16" | "16:9" | "1:1";
 
 export type WizardStep = 1 | 2 | 3 | 4 | 5 | 6;
 
-export type AutomationMode = 'auto' | 'semi-auto' | 'manual';
+export type AutomationMode = 'auto' | 'semi-auto';
 
 /* ── Data models ────────────────────────────────────────────────────────── */
 
