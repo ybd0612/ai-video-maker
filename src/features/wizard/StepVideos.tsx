@@ -53,12 +53,19 @@ export function StepVideos() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [shots.length]);
 
-  // auto 模式：所有视频完成后自动推进到 Step 6
+  // auto 模式：所有视频完成后自动推进到 Step 6。
+  // 仅在本次观察期间「从缺到齐」（false→true）时推进：挂载时已全部就绪
+  // （如从后续步骤返回）不推进，避免用户无法返回上一步修改。
+  const prevAllVideoedByProjectRef = useRef<Record<string, boolean>>({});
   useEffect(() => {
-    if (allVideoed && project?.automationMode === "auto") {
+    const pid = project?.id;
+    if (!pid) return;
+    const prev = prevAllVideoedByProjectRef.current[pid] ?? allVideoed;
+    prevAllVideoedByProjectRef.current[pid] = allVideoed;
+    if (allVideoed && !prev && project?.automationMode === "auto") {
       setWizardStep(6);
     }
-  }, [allVideoed, project?.automationMode, setWizardStep]);
+  }, [allVideoed, project?.id, project?.automationMode, setWizardStep]);
 
   return (
     <div className="mx-auto flex max-w-4xl flex-col gap-4 py-4">

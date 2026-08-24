@@ -44,6 +44,8 @@ export interface Character {
   avatarUrl?: string;
   /** AI-generated portrait from appearancePrompt (text-to-image) */
   generatedPortraitUrl?: string;
+  /** 定妆照生成失败原因（便于 UI 展示重试入口） */
+  error?: string;
   /** 资产一致性优化 - 用于标识角色在提示词中的命名空间 */
   assetNamespace: string;  // 如 "[Hero_A]"
   /** 自动生成的完整提示词 */
@@ -104,6 +106,8 @@ export interface SceneReference {
   imageUrl?: string;    // 生成的场景参考图
   prompt: string;       // 英文生成提示词
   description: string;  // 中文描述
+  /** 场景参考图生成失败原因（便于 UI 展示重试入口） */
+  error?: string;
 }
 
 export interface Project {
@@ -128,6 +132,8 @@ export interface Project {
   sceneReferences?: SceneReference[];
   /** Step 2: overall style reference image URL */
   styleReferenceUrl?: string;
+  /** 风格参考图生成失败原因 */
+  styleReferenceError?: string;
   /** 步骤级生成标记：防止导航切换后重复触发 */
   assetGenerationStarted?: boolean;
   imageGenerationStarted?: boolean;
@@ -325,20 +331,26 @@ export const useProjectStore = create<ProjectState>()(
         const source = get().projects.find((p) => p.id === id);
         if (!source) return null;
         const now = Date.now();
+        const dupShots = source.shots.map((sh, i) => ({
+          ...sh,
+          id: newId("shot"),
+          index: i,
+          status: "idle" as const,
+          error: undefined,
+          videoProgress: undefined,
+        }));
+        // 按复制内容推断向导步骤：有分镜 → 3；全部有图 → 4；全部有视频 → 5。
+        // 避免复制完成后被重置回步骤 1，需连点多次“下一步”才能回到原进度。
+        const allImaged = dupShots.length > 0 && dupShots.every((sh) => !!sh.imageUrl);
+        const allVideoed = allImaged && dupShots.every((sh) => !!sh.videoUrl);
+        const wizardStep: WizardStep = allVideoed ? 5 : allImaged ? 4 : dupShots.length > 0 ? 3 : 1;
         const dup: Project = {
           ...structuredClone(source),
           id: newId("proj"),
           title: `${source.title} (副本)`,
           status: "idle",
-          wizardStep: 1 as WizardStep,
-          shots: source.shots.map((sh, i) => ({
-            ...sh,
-            id: newId("shot"),
-            index: i,
-            status: "idle" as const,
-            error: undefined,
-            videoProgress: undefined,
-          })),
+          wizardStep,
+          shots: dupShots,
           createdAt: now,
           updatedAt: now,
         };

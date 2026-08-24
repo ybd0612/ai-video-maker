@@ -3,7 +3,7 @@
 // Step 4: Generate images for all shots, with re-roll support.
 // ────────────────────────────────────────────────────────────────────────────
 
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { useProjectStore, selectActiveProject } from "@/stores/projectStore";
 import { useT } from "@/i18n";
 import { ShotCard } from "./ShotCard";
@@ -40,12 +40,19 @@ export function StepImages() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [shots.length]);
 
-  // auto 模式：所有图片完成后自动推进到 Step 5（跳过审核卡点）
+  // auto 模式：所有图片完成后自动推进到 Step 5（跳过审核卡点）。
+  // 仅在本次观察期间「从缺到齐」（false→true）时推进：挂载时已全部就绪
+  // （如从后续步骤返回）不推进，避免用户无法返回上一步修改。
+  const prevAllImagedByProjectRef = useRef<Record<string, boolean>>({});
   useEffect(() => {
-    if (allImaged && project?.automationMode === "auto") {
+    const pid = project?.id;
+    if (!pid) return;
+    const prev = prevAllImagedByProjectRef.current[pid] ?? allImaged;
+    prevAllImagedByProjectRef.current[pid] = allImaged;
+    if (allImaged && !prev && project?.automationMode === "auto") {
       setWizardStep(5);
     }
-  }, [allImaged, project?.automationMode, setWizardStep]);
+  }, [allImaged, project?.id, project?.automationMode, setWizardStep]);
 
   return (
     <div className="mx-auto flex max-w-4xl flex-col gap-4 py-4">

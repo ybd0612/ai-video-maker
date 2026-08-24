@@ -15,7 +15,7 @@ import {
   UserPlus, Pencil, Trash2, ImageIcon, Loader2, Plus, Wand2,
 } from "lucide-react";
 import { CharacterEditor } from "@/features/characters/CharacterEditor";
-import { useWizardActions } from "./useWizardActions";
+import { useWizardActions, hasActiveAssetTask } from "./useWizardActions";
 import { generateImage, aspectRatioToImageSize } from "@/services/imageService";
 
 export function StepAssets() {
@@ -42,8 +42,9 @@ export function StepAssets() {
 
   // 刷新/中断后恢复：assetGenerationStarted 卡 true 且没有存活任务时重置，
   // 避免“生成全部”按钮永久禁用转圈（用户反馈过“资产第一个自动在加载”）。
+  // 注意：任务仍在后台运行时（普通导航切项目再回来）不重置，避免 UI 与真实任务脱节。
   useEffect(() => {
-    if (project?.assetGenerationStarted) {
+    if (project?.assetGenerationStarted && !hasActiveAssetTask(project.id)) {
       useProjectStore.getState().setAssetGenerationStartedByProjectId(project.id, false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -210,6 +211,11 @@ export function StepAssets() {
                   <p className="mt-0.5 text-xs text-slate-500 line-clamp-2">
                     {char.description || char.appearancePrompt || "—"}
                   </p>
+                  {char.error && (
+                    <p className="mt-0.5 truncate text-[10px] text-red-400" title={char.error}>
+                      生成失败：{char.error}
+                    </p>
+                  )}
                 </div>
                 <div className="flex shrink-0 gap-1 opacity-0 transition group-hover:opacity-100">
                   <button
@@ -312,6 +318,11 @@ export function StepAssets() {
                 rows={2}
                 className="w-full resize-none bg-transparent text-xs text-slate-300 placeholder:text-slate-600 focus:outline-none"
               />
+              {scene.error && (
+                <p className="truncate text-[10px] text-red-400" title={scene.error}>
+                  生成失败：{scene.error}
+                </p>
+              )}
             </div>
 
             {/* Actions */}
@@ -377,6 +388,11 @@ export function StepAssets() {
             <p className="text-xs text-slate-400">
               {project?.style || "未设置风格描述"}
             </p>
+            {project?.styleReferenceError && (
+              <p className="mt-1 truncate text-[10px] text-red-400" title={project.styleReferenceError}>
+                生成失败：{project.styleReferenceError}
+              </p>
+            )}
             <button
               onClick={handleGenerateStyle}
               disabled={generatingStyle}

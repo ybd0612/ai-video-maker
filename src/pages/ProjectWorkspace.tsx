@@ -4,20 +4,19 @@
 // Layout: left sidebar (projects/shots) | center preview | right editor.
 // ────────────────────────────────────────────────────────────────────────────
 
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback } from "react";
 import { useProjectStore, selectActiveProject } from "@/stores/projectStore";
 import { useSettingsStore } from "@/stores/settingsStore";
 import { useT } from "@/i18n";
 import { ShotList } from "@/features/shots/ShotList";
 import { ShotEditor } from "@/features/shots/ShotEditor";
-import { runPipeline } from "@/services/pipelineService";
 import { SYSTEM_PROMPT_SCRIPT_TEXT, SYSTEM_PROMPT_VISUAL_PROMPT, SYSTEM_PROMPT_MOTION_PROMPT } from "@/services/chatService";
 import { AiAssistDrawer } from "@/components/ui/AiAssistDrawer";
 import { CharacterPanel } from "@/features/characters/CharacterPanel";
 import { ProjectSidebar } from "@/features/projects/ProjectSidebar";
 import { HistoryPanel } from "@/features/history/HistoryPanel";
 import {
-  Settings, Trash2, Play, Square,
+  Settings, Trash2,
   FolderOpen, Clock, Layers,
 } from "lucide-react";
 import { ApiKeyBanner } from "@/components/ApiKeyBanner";
@@ -35,14 +34,11 @@ export function ProjectWorkspace() {
   const updateProject = useProjectStore((s) => s.updateProject);
   const clearProject = useProjectStore((s) => s.clearProject);
   const updateShot = useProjectStore((s) => s.updateShot);
-  const addHistory = useProjectStore((s) => s.addHistory);
   const openSettings = useSettingsStore((s) => s.setSettingsDialogOpen);
   const { rerollImage, rerollVideo } = useWizardActions();
 
   const [selectedShotId, setSelectedShotId] = useState<string | null>(null);
-  const [isRunning, setIsRunning] = useState(false);
   const [leftTab, setLeftTab] = useState<LeftTab>("shots");
-  const abortRef = useRef<AbortController | null>(null);
 
   // AI Assist drawer state
   const [aiAssistTarget, setAiAssistTarget] = useState<{
@@ -88,34 +84,9 @@ export function ProjectWorkspace() {
   );
 
   // Run full pipeline
-  const handleRunAll = useCallback(async () => {
-    const proj = selectActiveProject(useProjectStore.getState());
-    if (!proj || proj.shots.length === 0) return;
-
-    setIsRunning(true);
-    abortRef.current = new AbortController();
-    addHistory("pipeline_started", "开始一键成片");
-
-    try {
-      await runPipeline("", {
-        signal: abortRef.current.signal,
-      });
-      addHistory("pipeline_completed", "一键成片完成");
-    } catch (err) {
-      if (err instanceof Error && err.message !== "Pipeline cancelled.") {
-        alert(err.message);
-        addHistory("pipeline_failed", `成片失败: ${err.message}`);
-      }
-    } finally {
-      setIsRunning(false);
-      abortRef.current = null;
-    }
-  }, [addHistory]);
-
-  // Cancel running pipeline
-  const handleCancel = useCallback(() => {
-    abortRef.current?.abort();
-  }, []);
+  // 注：旧版“一键成片”入口已从顶栏移除——它与 6 步向导主流程并存时
+  // 会并行重新生成全部图片/视频（无幂等守卫），导致重复服务端任务（token 双倍消耗）。
+  // 失败视频的自动重试已统一由向导视频步骤（StepVideos → generateVideosForStep）接管。
 
   // Clear project
   const handleClear = useCallback(async () => {
@@ -126,7 +97,6 @@ export function ProjectWorkspace() {
       variant: "danger",
     });
     if (ok) {
-      abortRef.current?.abort();
       clearProject();
       setSelectedShotId(null);
     }
@@ -167,29 +137,6 @@ export function ProjectWorkspace() {
               <option value="9:16">9:16</option>
               <option value="1:1">1:1</option>
             </select>
-          )}
-
-          {/* Run all / Cancel / Retry */}
-          {shots.length > 0 && (
-            isRunning ? (
-              <button
-                onClick={handleCancel}
-                className="flex items-center gap-1.5 rounded-md bg-red-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-red-500"
-              >
-                <Square size={12} />
-                {t("pipeline.cancel")}
-              </button>
-            ) : (
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={handleRunAll}
-                  className="flex items-center gap-1.5 rounded-md bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-emerald-500"
-                >
-                  <Play size={12} />
-                  {t("pipeline.runAll")}
-                </button>
-              </div>
-            )
           )}
 
           {/* Settings */}
@@ -294,7 +241,6 @@ export function ProjectWorkspace() {
               onRegenerateImage={rerollImage}
               onRegenerateVideo={rerollVideo}
               onOpenAiAssist={handleOpenShotAiAssist}
-              isProcessing={isRunning}
             />
           </aside>
         )}

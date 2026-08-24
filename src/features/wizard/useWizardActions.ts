@@ -4,7 +4,7 @@
 // ────────────────────────────────────────────────────────────────────────────
 
 import { useCallback } from "react";
-import { useProjectStore, selectActiveProject, newId, type Shot, type SceneReference, type Character } from "@/stores/projectStore";
+import { useProjectStore, selectActiveProject, newId, type Shot, type SceneReference, type Character, type Project } from "@/stores/projectStore";
 import { useSettingsStore } from "@/stores/settingsStore";
 import { resolvePlan, type PlanId } from "@/lib/plans";
 import { generateScript } from "@/services/scriptService";
@@ -27,6 +27,11 @@ const activeImageTasks = new Map<string, AbortController>();
 
 /** 正在运行的资产生成任务（同 video：幂等守卫 + 刷新恢复） */
 const activeAssetTasks = new Map<string, AbortController>();
+
+/** 查询某项目是否仍有存活的资产生成任务（供 UI 判断是否可安全重置生成标记） */
+export function hasActiveAssetTask(projectId: string): boolean {
+  return activeAssetTasks.has(projectId);
+}
 
 type RawCharacter = {
   name: string;
@@ -148,62 +153,72 @@ export function useWizardActions() {
 
     store.setProjectStatusById(targetProjectId, "scripting");
 
-    const result = await generateScript({
-      apiKey: providerConfig.apiKey,
-      baseUrl: providerConfig.baseUrl,
-      prompt,
-      language: project.language,
-      aspectRatio: project.aspectRatio,
-      characters: project.characters,
-      sceneReferences: project.sceneReferences,
-    });
+    try {
+      const result = await generateScript({
+        apiKey: providerConfig.apiKey,
+        baseUrl: providerConfig.baseUrl,
+        prompt,
+        language: project.language,
+        aspectRatio: project.aspectRatio,
+        characters: project.characters,
+        sceneReferences: project.sceneReferences,
+      });
 
-    // 角色 ID 回填：模型可能返回自编 ID（如 char_1）引用新角色，而新角色入库时
-    // 由 newId() 生成全新 ID，两者无映射。此处建立「名字 → store 角色 ID」映射，
-    // 统一回填 activeCharacterIds 与 dialogues.characterId，避免对白归属丢失、
-    // 角色描述无法注入图片提示词（角色一致性失效）。
-    const idByName = new Map<string, string>();
-    for (const c of project.characters) idByName.set(c.name.trim().toLocaleLowerCase(), c.id);
+      // 角色 ID 回填：模型可能返回自编 ID（如 char_1）引用新角色，而新角色入库时
+      // 由 newId() 生成全新 ID，两者无映射。此处建立「名字 → store 角色 ID」映射，
+      // 统一回填 activeCharacterIds 与 dialogues.characterId，避免对白归属丢失、
+      // 角色描述无法注入图片提示词（角色一致性失效）。
+      const idByName = new Map<string, string>();
+      for (const c of project.characters) idByName.set(c.name.trim().toLocaleLowerCase(), c.id);
 
-    const { characters: newCharacters } = extractNewCharacters(
-      project.characters,
-      result.characters,
-    );
-    for (const c of newCharacters) idByName.set(c.name.trim().toLocaleLowerCase(), c.id);
+      const { characters: newCharacters } = extractNewCharacters(
+        project.characters,
+        result.characters,
+      );
+      for (const c of newCharacters) idByName.set(c.name.trim().toLocaleLowerCase(), c.id);
 
-    const resolveCharacterId = (ref: string): string | null => {
-      const normalized = ref.trim().toLocaleLowerCase();
-      const matched = idByName.get(normalized);
-      if (matched) return matched;
-      // 已是 store 中的合法角色 ID 则保留；否则视为无效引用，清理掉
-      return project.characters.some((c) => c.id === ref) ? ref : null;
-    };
+      const resolveCharacterId = (ref: string): string | null => {
+        const normalized = ref.trim().toLocaleLowerCase();
+        const matched = idByName.get(normalized);
+        if (matched) return matched;
+        // 已是 store 中的合法角色 ID 则保留；否则视为无效引用，清理掉
+        return project.characters.some((c) => c.id === ref) ? ref : null;
+      };
 
-    const shots: Shot[] = result.shots.map((s, i) => ({
-      id: `shot_${Date.now()}_${i}`,
-      index: i,
-      status: "scripted" as const,
-      ...s,
-      activeCharacterIds: (s.activeCharacterIds ?? [])
-        .map(resolveCharacterId)
-        .filter((x): x is string => x !== null),
-      dialogues: (s.dialogues ?? []).map((d) => ({
-        ...d,
-        characterId: d.characterId ? resolveCharacterId(d.characterId) : null,
-      })),
-    }));
+      const shots: Shot[] = result.shots.map((s, i) => ({
+        id: `shot_${Date.now()}_${i}`,
+        index: i,
+        status: "scripted" as const,
+        ...s,
+        activeCharacterIds: (s.activeCharacterIds ?? [])
+          .map(resolveCharacterId)
+          .filter((x): x is string => x !== null),
+        dialogues: (s.dialogues ?? []).map((d) => ({
+          ...d,
+          characterId: d.characterId ? resolveCharacterId(d.characterId) : null,
+        })),
+      }));
 
-    store.setShotsByProjectId(targetProjectId, shots);
+      store.setShotsByProjectId(targetProjectId, shots);
 
-    // Auto-add any newly extracted characters
-    if (newCharacters.length > 0) {
+      // Auto-add any newly extracted characters
+      if (newCharacters.length > 0) {
+        useProjectStore.getState().updateProjectById(targetProjectId, (p) => ({
+          ...p,
+          characters: [...p.characters, ...newCharacters],
+        }));
+      }
+
+      useProjectStore.getState().setProjectStatusById(targetProjectId, "idle");
+    } catch (err) {
+      // 失败时复位发起项目的状态，避免永久停留在 scripting（侧边栏一直转圈）
       useProjectStore.getState().updateProjectById(targetProjectId, (p) => ({
         ...p,
-        characters: [...p.characters, ...newCharacters],
+        status: "failed",
+        error: err instanceof Error ? err.message : String(err),
       }));
+      throw err;
     }
-
-    useProjectStore.getState().setProjectStatusById(targetProjectId, "idle");
   }, []);
 
   /** Re-roll a single shot's script */
@@ -214,11 +229,12 @@ export function useWizardActions() {
     const store = useProjectStore.getState();
     const project = selectActiveProject(store);
     if (!project) return;
+    const targetProjectId = project.id;
 
     const shot = project.shots.find((s) => s.id === shotId);
     if (!shot) return;
 
-    store.setShotStatus(shotId, "scripting");
+    store.setShotStatusByProjectId(targetProjectId, shotId, "scripting");
 
     try {
       const result = await generateScript({
@@ -232,7 +248,7 @@ export function useWizardActions() {
 
       if (result.shots.length > 0) {
         const newShot = result.shots[0];
-        store.updateShot(shotId, {
+        store.updateShotByProjectId(targetProjectId, shotId, {
           scriptText: newShot.scriptText,
           visualPrompt: newShot.visualPrompt,
           motionPrompt: newShot.motionPrompt,
@@ -251,9 +267,11 @@ export function useWizardActions() {
           status: "scripted",
           error: undefined,
         });
+        // 此前可能因部分失败置为 failed；全部镜头恢复后复位项目状态
+        restoreProjectStatusIfReady(targetProjectId, (p) => p.shots.every((s) => s.status !== "failed"));
       }
     } catch (err) {
-      store.setShotStatus(shotId, "failed", err instanceof Error ? err.message : String(err));
+      store.setShotStatusByProjectId(targetProjectId, shotId, "failed", err instanceof Error ? err.message : String(err));
     }
   }, []);
 
@@ -295,8 +313,12 @@ export function useWizardActions() {
               prompt: portraitPrompt,
               size: imageSize,
             });
-            useProjectStore.getState().updateCharacterByProjectId(targetProjectId, char.id, { generatedPortraitUrl: url });
+            useProjectStore.getState().updateCharacterByProjectId(targetProjectId, char.id, { generatedPortraitUrl: url, error: undefined });
           } catch (err) {
+            // 失败原因写入角色，UI 展示重试入口（不能只 console.error，用户完全无感知）
+            useProjectStore.getState().updateCharacterByProjectId(targetProjectId, char.id, {
+              error: err instanceof Error ? err.message : String(err),
+            });
             console.error(`Failed to generate portrait for ${char.name}:`, err);
           }
         });
@@ -316,8 +338,11 @@ export function useWizardActions() {
               prompt: scene.prompt,
               size: imageSize,
             });
-            useProjectStore.getState().updateSceneReferenceByProjectId(targetProjectId, scene.id, { imageUrl: url });
+            useProjectStore.getState().updateSceneReferenceByProjectId(targetProjectId, scene.id, { imageUrl: url, error: undefined });
           } catch (err) {
+            useProjectStore.getState().updateSceneReferenceByProjectId(targetProjectId, scene.id, {
+              error: err instanceof Error ? err.message : String(err),
+            });
             console.error(`Failed to generate scene image for ${scene.name}:`, err);
           }
         });
@@ -338,8 +363,12 @@ export function useWizardActions() {
             prompt: stylePrompt,
             size: imageSize,
           });
-          useProjectStore.getState().updateProjectById(targetProjectId, (p) => ({ ...p, styleReferenceUrl: url }));
+          useProjectStore.getState().updateProjectById(targetProjectId, (p) => ({ ...p, styleReferenceUrl: url, styleReferenceError: undefined }));
         } catch (err) {
+          useProjectStore.getState().updateProjectById(targetProjectId, (p) => ({
+            ...p,
+            styleReferenceError: err instanceof Error ? err.message : String(err),
+          }));
           console.error("Failed to generate style reference:", err);
         }
       });
@@ -363,14 +392,9 @@ export function useWizardActions() {
       activeAssetTasks.delete(targetProjectId);
     }
 
-    // 所有资产生成完成后清除标记
-    const updatedProject = useProjectStore.getState().projects.find((p) => p.id === targetProjectId);
-    const allPortraitsDone = updatedProject?.characters.every((c) => !!c.generatedPortraitUrl);
-    const allScenesDone = (updatedProject?.sceneReferences ?? []).every((s) => !!s.imageUrl);
-    const styleDone = !!updatedProject?.styleReferenceUrl;
-    if (allPortraitsDone && allScenesDone && styleDone) {
-      useProjectStore.getState().setAssetGenerationStartedByProjectId(targetProjectId, false);
-    }
+    // 无论成功与否都清除标记：部分失败时若保留 true，步骤 2 的“生成全部”按钮
+    // 会永久转圈禁用（此前仅在全成功时清除，失败即卡死）
+    useProjectStore.getState().setAssetGenerationStartedByProjectId(targetProjectId, false);
   }, []);
 
   /** Step 4: Generate images for all shots (with img2img from scene/style references) */
@@ -448,6 +472,15 @@ export function useWizardActions() {
     if (allImaged) {
       useProjectStore.getState().setImageGenerationStartedByProjectId(targetProjectId, false);
       useProjectStore.getState().setProjectStatusById(targetProjectId, "done");
+    } else {
+      // 部分失败：清除标记并复位状态，避免项目永久停留在 imaging（侧边栏一直转圈）
+      useProjectStore.getState().setImageGenerationStartedByProjectId(targetProjectId, false);
+      const failedCount = (updatedProject?.shots ?? []).filter((s) => s.status === "failed").length;
+      useProjectStore.getState().setProjectStatusById(
+        targetProjectId,
+        "failed",
+        `图片生成失败 ${failedCount} 个镜头，请重试失败项。`,
+      );
     }
   }, []);
 
@@ -459,11 +492,12 @@ export function useWizardActions() {
     const store = useProjectStore.getState();
     const project = selectActiveProject(store);
     if (!project) return;
+    const targetProjectId = project.id;
 
     const shot = project.shots.find((s) => s.id === shotId);
     if (!shot) return;
 
-    store.setShotStatus(shotId, "imaging");
+    store.setShotStatusByProjectId(targetProjectId, shotId, "imaging");
 
     try {
       const { prompt: enrichedPrompt, inputImageUrl: referenceImageUrl } = buildImageGenerationInput(shot, project);
@@ -476,9 +510,11 @@ export function useWizardActions() {
         inputImageUrl: referenceImageUrl,
       });
 
-      store.updateShot(shotId, { imageUrl, status: "imaged" });
+      store.updateShotByProjectId(targetProjectId, shotId, { imageUrl, status: "imaged" });
+      // 此前可能因部分失败置为 failed；全部镜头图片就绪后复位项目状态
+      restoreProjectStatusIfReady(targetProjectId, (p) => p.shots.every((s) => !!s.imageUrl));
     } catch (err) {
-      store.setShotStatus(shotId, "failed", err instanceof Error ? err.message : String(err));
+      store.setShotStatusByProjectId(targetProjectId, shotId, "failed", err instanceof Error ? err.message : String(err));
     }
   }, []);
 
@@ -601,9 +637,22 @@ export function useWizardActions() {
 
     // 只有全部成功或明确失败后才清除标记；仍在服务端运行的任务继续保留“生成中”。
     const updatedProject = useProjectStore.getState().projects.find((p) => p.id === targetProjectId);
+    const allVideoed = updatedProject?.shots.every((s) => !!s.videoUrl);
     const allSettled = updatedProject?.shots.every((s) => !!s.videoUrl || s.status === "failed");
     if (allSettled) {
       useProjectStore.getState().setVideoGenerationStartedByProjectId(targetProjectId, false);
+    }
+    // 复位项目状态，避免视频完成后侧边栏永久显示“生成中”：
+    // 全部成功 → idle（成片拼接完成时才置 done）；存在失败 → failed + 摘要
+    if (allVideoed) {
+      useProjectStore.getState().setProjectStatusById(targetProjectId, "idle");
+    } else if (allSettled) {
+      const failedCount = (updatedProject?.shots ?? []).filter((s) => s.status === "failed").length;
+      useProjectStore.getState().setProjectStatusById(
+        targetProjectId,
+        "failed",
+        `视频生成失败 ${failedCount} 个镜头，请重试失败项。`,
+      );
     }
   }, []);
 
@@ -647,6 +696,8 @@ export function useWizardActions() {
       );
 
       useProjectStore.getState().updateShotByProjectId(targetProjectId, shotId, { videoUrl: result.videoUrl, status: "videoed" });
+      // 此前可能因部分失败置为 failed；全部镜头视频就绪后复位项目状态
+      restoreProjectStatusIfReady(targetProjectId, (p) => p.shots.every((s) => !!s.videoUrl));
     } catch (err) {
       if (err instanceof VideoTaskCreatedError) {
         if (!err.stillRunning) {
@@ -714,6 +765,17 @@ function findBestReference(
 }
 
 /* ── Concurrency helper ─────────────────────────────────────────────────── */
+
+/**
+ * 单镜头重试成功后，若项目此前因部分失败置为 failed、且现在所有镜头满足就绪条件，
+ * 则复位项目状态为 idle，避免侧边栏状态永久停留在 failed。
+ */
+function restoreProjectStatusIfReady(projectId: string, ready: (p: Project) => boolean): void {
+  const project = useProjectStore.getState().projects.find((p) => p.id === projectId);
+  if (project && project.status === "failed" && ready(project)) {
+    useProjectStore.getState().setProjectStatusById(projectId, "idle");
+  }
+}
 
 async function runWithConcurrency(
   tasks: Array<() => Promise<void>>,

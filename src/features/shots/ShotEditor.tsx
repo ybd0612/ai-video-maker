@@ -14,7 +14,6 @@ interface ShotEditorProps {
   onRegenerateImage: (shotId: string) => void;
   onRegenerateVideo: (shotId: string) => void;
   onOpenAiAssist: (field: "scriptText" | "visualPrompt" | "motionPrompt", currentValue: string) => void;
-  isProcessing: boolean;
 }
 
 export function ShotEditor({
@@ -23,7 +22,6 @@ export function ShotEditor({
   onRegenerateImage,
   onRegenerateVideo,
   onOpenAiAssist,
-  isProcessing,
 }: ShotEditorProps) {
   const updateShot = useProjectStore((s) => s.updateShot);
   const setActiveCharacters = useProjectStore((s) => s.setActiveCharacters);
@@ -186,7 +184,6 @@ export function ShotEditor({
             onClick={() => {
               updateShot(shot.id, { status: "idle", error: undefined, videoProgress: undefined });
             }}
-            disabled={isProcessing}
             className="flex items-center justify-center gap-1.5 rounded-md border border-red-700 bg-red-950/30 px-3 py-1.5 text-xs text-red-300 transition hover:bg-red-900/40 disabled:opacity-50"
           >
             <RotateCcw size={11} />
@@ -196,7 +193,7 @@ export function ShotEditor({
 
         <button
           onClick={() => onRegenerateImage(shot.id)}
-          disabled={isProcessing}
+          disabled={shot.status === "imaging"}
           className="flex items-center justify-center gap-1.5 rounded-md border border-violet-700 bg-violet-950/30 px-3 py-1.5 text-xs text-violet-300 transition hover:bg-violet-900/40 disabled:opacity-50"
         >
           <RefreshCw size={11} />
@@ -204,7 +201,7 @@ export function ShotEditor({
         </button>
         <button
           onClick={() => onRegenerateVideo(shot.id)}
-          disabled={isProcessing || !shot.imageUrl}
+          disabled={shot.status === "videoing" || !shot.imageUrl}
           className="flex items-center justify-center gap-1.5 rounded-md border border-amber-700 bg-amber-950/30 px-3 py-1.5 text-xs text-amber-300 transition hover:bg-amber-900/40 disabled:opacity-50"
         >
           <RefreshCw size={11} />
