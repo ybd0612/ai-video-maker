@@ -51,10 +51,18 @@ interface RawProduct {
   appearancePrompt: string;
 }
 
+/** 场景资产（模型输出格式，与产品同构；appearancePrompt 为英文场景描述） */
+interface RawScene {
+  name: string;
+  description: string;
+  appearancePrompt: string;
+}
+
 export interface GenerateScriptResult {
   shots: Omit<Shot, "id" | "index" | "status">[];
   characters: RawCharacter[];
   products: RawProduct[];
+  scenes: RawScene[];
 }
 
 /* ── Motion translation ─────────────────────────────────────────────────── */
@@ -145,6 +153,7 @@ function buildPromptZh(assets?: Asset[]): string {
 1. 将其拆分为 4-8 个分镜镜头
 2. 如果内容中有人物角色，提取角色信息
 3. 如果内容是产品/商品/实物主体，提取产品信息
+4. 如果内容涉及具体场景，提取场景信息
 ${charSection}${sceneSection}${productSection}
 严格按以下 JSON 格式返回，不要包含任何其他文字：
 {
@@ -160,6 +169,13 @@ ${charSection}${sceneSection}${productSection}
       "name": "产品名",
       "description": "产品简介（类型、用途）",
       "appearancePrompt": "外观描述（英文，用于 AI 绘图，包含款式、颜色、材质、细节、logo 等）"
+    }
+  ],
+  "scenes": [
+    {
+      "name": "场景名",
+      "description": "场景简介（中文）",
+      "appearancePrompt": "场景英文描述（用于 AI 绘图：环境、光线、氛围）"
     }
   ],
   "shots": [
@@ -191,6 +207,7 @@ ${charSection}${sceneSection}${productSection}
 重要规则：
 - characters 数组：仅当内容中有人物角色时才填写，纯风景/产品/抽象内容返回空数组 []
 - products 数组：仅当内容是产品/商品/实物主体时才填写，纯人物/风景/抽象内容返回空数组 []
+- scenes 数组：仅当内容涉及具体场景（室内/室外/城市/自然等）时才填写，纯抽象内容返回空数组 []
 - 如有已有角色，复用其 ID（不要重复创建）；如是新角色，生成新的 ID
 - visualPrompt 和 motionPrompt 必须用英文（直接用于 AI API）
 - 如有角色出场，visualPrompt 必须包含角色完整外貌描述
@@ -246,6 +263,7 @@ function buildPromptEn(assets?: Asset[]): string {
 1. Break it into 4-8 shot scenes
 2. If the content involves characters, extract character info
 3. If the content involves a product/goods subject, extract product info
+4. If the content involves concrete scenes, extract scene info
 ${charSection}${sceneSection}${productSection}
 Return strictly in this JSON format, no other text:
 {
@@ -261,6 +279,13 @@ Return strictly in this JSON format, no other text:
       "name": "Product name",
       "description": "Brief description (type, purpose)",
       "appearancePrompt": "Appearance description in English (style, color, material, details, logo, etc. for AI image generation)"
+    }
+  ],
+  "scenes": [
+    {
+      "name": "Scene name",
+      "description": "Brief description of the scene",
+      "appearancePrompt": "English scene description (environment, lighting, atmosphere for AI image generation)"
     }
   ],
   "shots": [
@@ -292,6 +317,7 @@ Return strictly in this JSON format, no other text:
 Important rules:
 - characters array: ONLY fill if content has characters. For landscape/product/abstract content, return empty array []
 - products array: ONLY fill if content has a product/goods subject. For character/landscape/abstract content, return empty array []
+- scenes array: ONLY fill if content involves concrete scenes (indoor/outdoor/city/nature etc.). For abstract content, return empty array []
 - Reuse existing character IDs if applicable; generate new IDs for new characters
 - visualPrompt and motionPrompt MUST be in English (sent directly to AI APIs)
 - If characters appear, visualPrompt MUST include their full appearance
@@ -358,6 +384,7 @@ export async function generateScript(
         shots: RawShot[];
         characters?: RawCharacter[];
         products?: RawProduct[];
+        scenes?: RawScene[];
       };
       if (!Array.isArray(parsed.shots) || parsed.shots.length === 0) {
         throw new Error("Model returned empty or invalid shots array.");
@@ -424,6 +451,15 @@ export async function generateScript(
           }))
         : [];
 
+      // 场景提取（供步骤 2 生成场景参考图）
+      const extractedScenes: RawScene[] = Array.isArray(parsed.scenes)
+        ? parsed.scenes.map((c) => ({
+            name: c.name ?? "",
+            description: c.description ?? "",
+            appearancePrompt: c.appearancePrompt ?? "",
+          }))
+        : [];
+
       // Update activeCharacterIds in shots to reference existing characters by name match
       // (AI may generate new IDs that don't match existing store IDs)
       const existingCharacters = (opts.assets ?? []).filter((a) => a.type === "character");
@@ -447,7 +483,7 @@ export async function generateScript(
         }
       }
 
-      return { shots, characters: extractedCharacters, products: extractedProducts };
+      return { shots, characters: extractedCharacters, products: extractedProducts, scenes: extractedScenes };
     } catch (parseErr) {
       lastError = new Error(
         `JSON 解析失败（第 ${attempt + 1} 次尝试）：${parseErr instanceof Error ? parseErr.message : String(parseErr)}。提取内容：${jsonStr.slice(0, 200)}`,
@@ -458,4 +494,117 @@ export async function generateScript(
   }
 
   throw lastError ?? new Error("Script generation failed after retries.");
+}
+
+/* ── 轻量资产提取（步骤 1 使用，不生成分镜，节省 token） ──────────────────── */
+
+function buildExtractPromptZh(assets?: Asset[]): string {
+  const charSection =
+    (assets ?? []).filter((a) => a.type === "character").length > 0
+      ? "\n已有角色：" + (assets ?? []).filter((a) => a.type === "character").map((c) => `- ${c.name}`).join("\n") + "\n"
+      : "";
+  const productSection =
+    (assets ?? []).filter((a) => a.type === "product").length > 0
+      ? "\n已有产品：" + (assets ?? []).filter((a) => a.type === "product").map((p) => `- ${p.name}`).join("\n") + "\n"
+      : "";
+  return `你是一位专业的短视频资产提取助手。用户会给你一个视频主题或想法，请提取其中的资产信息，严格按以下 JSON 格式返回，不要包含任何其他文字：
+{
+  "characters": [
+    { "name": "角色名", "description": "角色简介（性格、身份）", "appearancePrompt": "外貌描述（英文，用于 AI 绘图）" }
+  ],
+  "products": [
+    { "name": "产品名", "description": "产品简介（类型、用途）", "appearancePrompt": "外观描述（英文，用于 AI 绘图，包含款式、颜色、材质、logo 等）" }
+  ],
+  "scenes": [
+    { "name": "场景名", "description": "场景简介（中文）", "appearancePrompt": "场景英文描述（环境、光线、氛围）" }
+  ]
+}
+${charSection}${productSection}
+规则：
+- characters 仅当有人物角色时填写，否则 []
+- products 仅当有产品/商品主体时填写，否则 []
+- scenes 仅当有具体场景（室内/室外/城市/自然等）时填写，否则 []
+- 不要生成分镜，只返回上述 JSON`;
+}
+
+function buildExtractPromptEn(assets?: Asset[]): string {
+  const charSection =
+    (assets ?? []).filter((a) => a.type === "character").length > 0
+      ? "\nExisting characters: " + (assets ?? []).filter((a) => a.type === "character").map((c) => `- ${c.name}`).join("\n") + "\n"
+      : "";
+  const productSection =
+    (assets ?? []).filter((a) => a.type === "product").length > 0
+      ? "\nExisting products: " + (assets ?? []).filter((a) => a.type === "product").map((p) => `- ${p.name}`).join("\n") + "\n"
+      : "";
+  return `You are a professional short-video asset extraction assistant. The user will give you a video topic or idea. Extract asset info and return strictly in this JSON format, no other text:
+{
+  "characters": [
+    { "name": "Character name", "description": "Brief description", "appearancePrompt": "Appearance description in English (for AI image generation)" }
+  ],
+  "products": [
+    { "name": "Product name", "description": "Brief description", "appearancePrompt": "Appearance description in English (style, color, material, logo, etc.)" }
+  ],
+  "scenes": [
+    { "name": "Scene name", "description": "Brief description", "appearancePrompt": "English scene description (environment, lighting, atmosphere)" }
+  ]
+}
+${charSection}${productSection}
+Rules:
+- characters: ONLY fill if content has characters, otherwise []
+- products: ONLY fill if content has a product/goods subject, otherwise []
+- scenes: ONLY fill if content involves concrete scenes, otherwise []
+- Do NOT generate storyboard shots; return only the JSON above`;
+}
+
+/**
+ * 轻量资产提取：只返回 characters/products/scenes，不生成分镜。
+ * 供步骤 1「AI 提取角色/产品并继续」使用，避免完整分镜生成（8192 tokens）的浪费。
+ */
+export async function extractAssetsFromIdea(
+  opts: GenerateScriptOptions,
+): Promise<{ characters: RawCharacter[]; products: RawProduct[]; scenes: RawScene[] }> {
+  const systemPrompt =
+    opts.language === "en" ? buildExtractPromptEn(opts.assets) : buildExtractPromptZh(opts.assets);
+
+  const service = createAIService({
+    provider: "openai",
+    apiKey: opts.apiKey,
+    baseUrl: opts.baseUrl,
+  });
+
+  const result = await service.chatCompletion({
+    messages: [
+      { role: "system", content: systemPrompt },
+      { role: "user", content: opts.prompt },
+    ],
+    temperature: 0.3,
+    maxTokens: 1024,
+    enableThinking: false,
+  });
+
+  const jsonStr = extractJsonFromResponse(result.content);
+  if (!jsonStr) {
+    throw new Error("无法从模型响应中提取资产 JSON。");
+  }
+
+  const parsed = JSON.parse(jsonStr) as {
+    characters?: RawCharacter[];
+    products?: RawProduct[];
+    scenes?: RawScene[];
+  };
+
+  const map = (arr: RawCharacter[] | undefined) =>
+    Array.isArray(arr)
+      ? arr.map((c) => ({
+          name: c.name ?? "",
+          description: c.description ?? "",
+          appearancePrompt: c.appearancePrompt ?? "",
+        }))
+      : [];
+
+  return {
+    characters: map(parsed.characters),
+    products: map(parsed.products),
+    scenes: map(parsed.scenes),
+  };
 }

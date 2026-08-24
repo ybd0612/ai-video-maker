@@ -116,6 +116,13 @@ export function ShotCard({
             <div className="border-t border-slate-700/30 px-3 py-2 space-y-2">
               {children}
 
+              {/* 失败原因（分镜/图片/视频生成失败均可显示） */}
+              {shot.error && (
+                <p className="rounded border border-red-800 bg-red-950/30 px-2 py-1 text-[10px] text-red-300">
+                  {shot.error}
+                </p>
+              )}
+
               {/* Action buttons */}
               <div className="flex items-center gap-2 pt-1">
                 {onReroll && (

@@ -7,7 +7,7 @@ import { useCallback } from "react";
 import { useProjectStore, selectActiveProject, newId, type Shot, type Asset, type Project } from "@/stores/projectStore";
 import { useSettingsStore } from "@/stores/settingsStore";
 import { resolvePlan, type PlanId } from "@/lib/plans";
-import { generateScript } from "@/services/scriptService";
+import { generateScript, extractAssetsFromIdea } from "@/services/scriptService";
 import { generateImage, aspectRatioToImageSize } from "@/services/imageService";
 import { generateAssetNamespace } from "@/lib/assetNamespace";
 import { generateVideo, aspectRatioToVideoSize, VideoTaskCreatedError } from "@/services/videoService";
@@ -53,7 +53,7 @@ type ImageGenerationInput = {
 function extractNewAssets(
   existing: Asset[],
   incoming: RawAsset[],
-  type: "character" | "product",
+  type: "character" | "product" | "scene",
 ): { assets: Asset[]; idByName: Map<string, string> } {
   const names = new Set(existing.map((a) => a.name.trim().toLocaleLowerCase()));
   const assets: Asset[] = [];
@@ -119,8 +119,8 @@ export function useWizardActions() {
     store.setProjectStatus("scripting");
 
     try {
-      // Use generateScript to extract characters + products (shots are discarded)
-      const result = await generateScript({
+      // 轻量提取：只返回角色/产品/场景资产，不生成分镜（避免完整分镜生成的 token 浪费）
+      const result = await extractAssetsFromIdea({
         apiKey: providerConfig.apiKey,
         baseUrl: providerConfig.baseUrl,
         prompt,
@@ -129,10 +129,11 @@ export function useWizardActions() {
         assets: project.assets,
       });
 
-      // 统一提取角色与产品资产（去重后追加到发起项目）
+      // 统一提取角色/产品/场景资产（去重后追加到发起项目）
       const newCharacters = extractNewAssets(project.assets, result.characters, "character");
       const newProducts = extractNewAssets(project.assets, result.products, "product");
-      const newAssets = [...newCharacters.assets, ...newProducts.assets];
+      const newScenes = extractNewAssets(project.assets, result.scenes, "scene");
+      const newAssets = [...newCharacters.assets, ...newProducts.assets, ...newScenes.assets];
 
       // 原子地写回发起项目：追加新资产 + 复位状态 + 推进到资产步骤
       useProjectStore.getState().updateProjectById(targetProjectId, (p) => ({
@@ -216,9 +217,10 @@ export function useWizardActions() {
 
       store.setShotsByProjectId(targetProjectId, shots);
 
-      // Auto-add any newly extracted characters and products
+      // Auto-add any newly extracted characters, products and scenes
       const newProducts = extractNewAssets(project.assets, result.products, "product").assets;
-      const newAssets = [...newCharacters, ...newProducts];
+      const newScenes = extractNewAssets(project.assets, result.scenes, "scene").assets;
+      const newAssets = [...newCharacters, ...newProducts, ...newScenes];
       if (newAssets.length > 0) {
         useProjectStore.getState().updateProjectById(targetProjectId, (p) => ({
           ...p,
