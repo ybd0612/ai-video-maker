@@ -106,7 +106,7 @@ src/
 
 1. **脚本阶段** — 调用文本模型生成 4-6 个结构化分镜（scriptText + visualPrompt + motionPrompt + duration）
 2. **图片阶段** — 为每个分镜生成参考图（使用 visualPrompt，并发度 3）
-3. **视频阶段** — 为每个分镜生成视频（使用 motionPrompt，按套餐并发：免费档 1，企业 2，Token Plan 5；异步创建 + 5 秒轮询，单任务 30 分钟超时，任务注册等待 2 分钟）
+3. **视频阶段** — 为每个分镜生成视频（使用 motionPrompt，按套餐并发：免费档 1，企业 2，Token Plan 3；异步创建 + 5 秒轮询，单任务 30 分钟超时，任务注册等待 2 分钟）
 4. **拼接阶段** — FFmpeg.wasm concat demuxer 拼接所有视频为最终 MP4
 
 - 并发控制使用 `Promise.allSettled`，确保所有 worker 完成后再检查状态
@@ -125,6 +125,7 @@ src/
 - “重试失败 / 全部重新生成”按钮必须走批量生成函数（幂等 + 并发受控），禁止 forEach 并发 reroll。
 - 视频完成响应解析链：`url`（顶层）→ `metadata.url` → `video_url` → `output.url` → `output.video_url` → `remixed_from_video_id`。
 - 分镜阶段 `generateScript` 已产出完整英文双提示词，**禁止二次翻译覆盖**（translateToMotion 已移除）。
+- 分镜生成后必须**回填角色 ID 引用**：模型返回的 `activeCharacterIds` / `dialogues.characterId` 可能是自编 ID，需按「角色名 → store 角色 ID」映射统一回填（新角色由 `extractNewCharacters` 建映射），匹配不到的对白置 `null`（归旁白），否则角色一致性（图片注入/定妆照参考）与对白归属会失效。
 
 ## 双提示词系统
 
@@ -161,20 +162,22 @@ src/
   - 文本 — `src/services/ai/openai.ts` 的 `chatCompletion`
   - 图片 — `openai.ts` 的 `generateImage`（按 `imageSizeToTier(size)` 区分 1K/2K/3K/4K 档位）
   - 视频 — `src/services/videoService.ts` 的 `generateVideo`（cost = 请求时长秒数）
-- **RPM 节流**：按模型种类（图片再按尺寸档位）做 60s 滑动窗口；达到上限即等待到最早一条滑出窗口。以官方「实际 RPM」作安全上限（更保守）。默认档视频 RPM=1，向导已按套餐同步并发（免费档 1、企业 2、Token Plan 2），不会同时显示多个“生成中”。
+- **RPM 节流**：按模型种类（图片再按尺寸档位）做 60s 滑动窗口；达到上限即等待到最早一条滑出窗口。以官方「实际 RPM」作安全上限（更保守）。默认档视频 RPM=1，向导已按套餐同步并发（免费档 1、企业 2、Token Plan 3），不会同时显示多个“生成中”。
 - **订阅配额（仅 Token Plan）**：文本（每 5h / 每周）、图片（每日张数）、视频（每日秒数）计数并持久化到 localStorage（key `wxhb-usage`），刷新不丢失。用尽抛出 `RateLimitError`（reason=`quota`），由 `pipelineService.isRetriableError` 识别为终态错误（消息不含瞬时关键字），不会进入视频自动重试。
 - **取消**：`acquire` 支持 `AbortSignal`，取消时抛 `RateLimitError`（reason=`aborted`）。
 - **套餐升级即生效**：用户切换套餐后，限流器实时读取 `providerConfig.plan`，无需刷新页面。
 
 ## 数据模型
 
-- **Project**：项目（title / aspectRatio / style / language / shots / status / error / createdAt / updatedAt）
+- **Project**：项目（title / aspectRatio / style / language / shots / status / error / createdAt / updatedAt / styleReferenceUrl / styleReferenceError）
+- **Character**：角色（name / description / appearancePrompt / generatedPortraitUrl / error / assetNamespace / fullPrompt）
+- **SceneReference**：场景参考（name / description / prompt / imageUrl / error）
 - **Shot**：分镜（scriptText / visualPrompt / motionPrompt / duration / imageUrl / videoUrl / status / videoRetryCount）
 - **HistoryEntry**：操作记录（projectId / action / description / timestamp）
-- 项目状态流转：`idle → scripting → imaging → videoing → rendering → done`（可卡在 `failed`）
+- 项目状态流转：`idle → scripting → imaging → videoing → rendering → done`（可卡在 `failed`；向导内图片/视频批量完成后会复位为 `idle` 或 `failed`，成片拼接完成才置 `done`）
 - 分镜状态流转：`idle → scripting → scripted → imaging → imaged → videoing → videoed`（可卡在 `failed`）
 - 多项目存储：`projects[]` + `activeProjectId`，通过 `getActiveProject()` 派生活跃项目
-- 历史记录保留最近 200 条，按日期分组展示
+- 历史记录保留最近 200 条，按日期分组展示；`addHistory(action, description, projectId?)` 支持异步任务完成后按发起项目写历史
 
 ## 多项目管理
 

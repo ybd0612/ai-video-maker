@@ -141,3 +141,19 @@
 
 - 本轮为纯源码走查 + 状态机推演，未消耗真实 API 配额、未改动业务代码。
 - 优先级按「数据正确性 → 状态健壮性 → 交互体验」排序；P0 问题 #1 的实际出现频率受模型行为影响，建议先在真实生成中抽查 `dialogues[].characterId` 是否能在 `project.characters` 中命中。
+
+---
+
+## 修复状态附录（2026-08-24 更新）
+
+全部 22 个问题已按 P0 → P1 → P2 三批修复完成，每批均通过 `npx tsc --noEmit` + `git diff --check` + `npm run build` 验证：
+
+| 批次 | 提交 | 覆盖问题 | 说明 |
+|---|---|---|---|
+| 1（P0） | `29fb381` | #1 | 角色 ID 回填（scriptService dialogues 兜底 + useWizardActions 映射回填 + DialogueEditor 渲染兜底） |
+| 2（P1） | `9259f1a` | #2-#8 | 状态机复位、reroll 按项目写回、移除旧版一键入口、资产失败反馈与标记修复、右键菜单恢复、auto 模式可返回、复制项目步骤推断 |
+| 3（P2） | `494fd2e` | #9-#24 | 状态语义、并发映射、i18n 补齐、单镜头 Blob 拼接、历史记录补全、死代码清理、失败提示等 |
+
+**待后续实测跟进**：
+- #1 的角色 ID 回填逻辑已按「名字映射 + 无效清理」实现，建议在真实生成中抽查命中率（`dialogues[].characterId` 是否能命中 `project.characters`），如模型返回 ID 模式与名字差异过大，可进一步在系统提示词中强制模型使用角色名作为 ID。
+- #13 的视频并发对 Token Plan 保守取 3（RPM=5 未吃满），如需榨满可调 `useWizardActions` 中 `videoConcurrency` 映射。
