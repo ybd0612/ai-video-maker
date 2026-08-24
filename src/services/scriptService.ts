@@ -361,7 +361,7 @@ export async function generateScript(
 
       // Update activeCharacterIds in shots to reference existing characters by name match
       // (AI may generate new IDs that don't match existing store IDs)
-      if (opts.characters && opts.characters.length > 0 && extractedCharacters.length > 0) {
+      if (opts.characters && opts.characters.length > 0) {
         const nameToId = new Map(
           opts.characters.map((c) => [c.name.toLowerCase(), c.id]),
         );
@@ -372,6 +372,12 @@ export async function generateScript(
             // Otherwise try to match by name (the AI may have used name as ID)
             return nameToId.get(refId.toLowerCase()) ?? refId;
           });
+          // 对白同样按名字匹配回填；匹配不到的置 null（归为旁白），避免残留无效角色 ID
+          for (const line of shot.dialogues ?? []) {
+            if (line.characterId && !opts.characters.some((c) => c.id === line.characterId)) {
+              line.characterId = nameToId.get(line.characterId.toLowerCase()) ?? null;
+            }
+          }
         }
       }
 

@@ -39,22 +39,34 @@ type ImageGenerationInput = {
   inputImageUrl?: string;
 };
 
-/** Build unique Character records from model output without mutating inputs. */
-function extractNewCharacters(existing: Character[], incoming: RawCharacter[]): Character[] {
+/**
+ * Build unique Character records from model output without mutating inputs.
+ * 返回 name→id 映射表：模型可能在 shots/dialogues 中使用自编 ID 引用角色，
+ * 调用方需据此回填引用，保证对白归属与角色一致性。
+ */
+function extractNewCharacters(
+  existing: Character[],
+  incoming: RawCharacter[],
+): { characters: Character[]; idByName: Map<string, string> } {
   const names = new Set(existing.map((character) => character.name.trim().toLocaleLowerCase()));
-  return incoming.filter((character) => {
+  const characters: Character[] = [];
+  const idByName = new Map<string, string>();
+  for (const character of incoming) {
     const normalizedName = character.name.trim().toLocaleLowerCase();
-    if (!normalizedName || names.has(normalizedName)) return false;
+    if (!normalizedName || names.has(normalizedName)) continue;
     names.add(normalizedName);
-    return true;
-  }).map((character) => ({
-    id: newId("char"),
-    name: character.name,
-    description: character.description,
-    appearancePrompt: character.appearancePrompt,
-    assetNamespace: generateAssetNamespace(character.name),
-    fullPrompt: generateFullPrompt(character),
-  }));
+    const record: Character = {
+      id: newId("char"),
+      name: character.name,
+      description: character.description,
+      appearancePrompt: character.appearancePrompt,
+      assetNamespace: generateAssetNamespace(character.name),
+      fullPrompt: generateFullPrompt(character),
+    };
+    characters.push(record);
+    idByName.set(normalizedName, record.id);
+  }
+  return { characters, idByName };
 }
 
 /** Compose the complete image prompt and the best available img2img reference. */
@@ -106,7 +118,7 @@ export function useWizardActions() {
       // 原子地写回发起项目：追加新角色 + 复位状态 + 推进到资产步骤
       useProjectStore.getState().updateProjectById(targetProjectId, (p) => ({
         ...p,
-        characters: [...p.characters, ...newCharacters],
+        characters: [...p.characters, ...newCharacters.characters],
         status: "idle",
         error: undefined,
         wizardStep: 2,
@@ -146,17 +158,44 @@ export function useWizardActions() {
       sceneReferences: project.sceneReferences,
     });
 
+    // 角色 ID 回填：模型可能返回自编 ID（如 char_1）引用新角色，而新角色入库时
+    // 由 newId() 生成全新 ID，两者无映射。此处建立「名字 → store 角色 ID」映射，
+    // 统一回填 activeCharacterIds 与 dialogues.characterId，避免对白归属丢失、
+    // 角色描述无法注入图片提示词（角色一致性失效）。
+    const idByName = new Map<string, string>();
+    for (const c of project.characters) idByName.set(c.name.trim().toLocaleLowerCase(), c.id);
+
+    const { characters: newCharacters } = extractNewCharacters(
+      project.characters,
+      result.characters,
+    );
+    for (const c of newCharacters) idByName.set(c.name.trim().toLocaleLowerCase(), c.id);
+
+    const resolveCharacterId = (ref: string): string | null => {
+      const normalized = ref.trim().toLocaleLowerCase();
+      const matched = idByName.get(normalized);
+      if (matched) return matched;
+      // 已是 store 中的合法角色 ID 则保留；否则视为无效引用，清理掉
+      return project.characters.some((c) => c.id === ref) ? ref : null;
+    };
+
     const shots: Shot[] = result.shots.map((s, i) => ({
       id: `shot_${Date.now()}_${i}`,
       index: i,
       status: "scripted" as const,
       ...s,
+      activeCharacterIds: (s.activeCharacterIds ?? [])
+        .map(resolveCharacterId)
+        .filter((x): x is string => x !== null),
+      dialogues: (s.dialogues ?? []).map((d) => ({
+        ...d,
+        characterId: d.characterId ? resolveCharacterId(d.characterId) : null,
+      })),
     }));
 
     store.setShotsByProjectId(targetProjectId, shots);
 
     // Auto-add any newly extracted characters
-    const newCharacters = extractNewCharacters(project.characters, result.characters);
     if (newCharacters.length > 0) {
       useProjectStore.getState().updateProjectById(targetProjectId, (p) => ({
         ...p,

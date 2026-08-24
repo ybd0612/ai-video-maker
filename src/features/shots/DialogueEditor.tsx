@@ -47,29 +47,36 @@ export function DialogueEditor({ shotId }: DialogueEditorProps) {
       </div>
 
       <div className="flex flex-col gap-1.5">
-        {dialogues.map((line) => (
-          <div
-            key={line.id}
-            className="rounded-md border border-slate-700/50 bg-slate-800/30 p-1.5"
-          >
-            {/* Character selector + delete */}
-            <div className="mb-1 flex items-center justify-between">
-              <select
-                value={line.characterId ?? ""}
-                onChange={(e) =>
-                  updateDialogueLine(shotId, line.id, {
-                    characterId: e.target.value || null,
-                  })
-                }
-                className="rounded border border-slate-700 bg-slate-800 px-1.5 py-0.5 text-[10px] text-slate-300 focus:border-sky-500 focus:outline-none"
-              >
-                <option value="">{t("dialogue.narrator")}</option>
-                {characters.map((char) => (
-                  <option key={char.id} value={char.id}>
-                    {char.name}
-                  </option>
-                ))}
-              </select>
+        {dialogues.map((line) => {
+          // 渲染兜底：历史数据中可能残留无效 characterId（模型自编 ID），
+          // 归一为旁白展示，避免 select 显示空白，用户可重新选择角色。
+          const selectValue =
+            line.characterId && characters.some((c) => c.id === line.characterId)
+              ? line.characterId
+              : "";
+          return (
+            <div
+              key={line.id}
+              className="rounded-md border border-slate-700/50 bg-slate-800/30 p-1.5"
+            >
+              {/* Character selector + delete */}
+              <div className="mb-1 flex items-center justify-between">
+                <select
+                  value={selectValue}
+                  onChange={(e) =>
+                    updateDialogueLine(shotId, line.id, {
+                      characterId: e.target.value || null,
+                    })
+                  }
+                  className="rounded border border-slate-700 bg-slate-800 px-1.5 py-0.5 text-[10px] text-slate-300 focus:border-sky-500 focus:outline-none"
+                >
+                  <option value="">{t("dialogue.narrator")}</option>
+                  {characters.map((char) => (
+                    <option key={char.id} value={char.id}>
+                      {char.name}
+                    </option>
+                  ))}
+                </select>
               <button
                 onClick={() => removeDialogueLine(shotId, line.id)}
                 className="rounded p-0.5 text-slate-600 hover:text-red-400"
@@ -100,7 +107,8 @@ export function DialogueEditor({ shotId }: DialogueEditorProps) {
               className="w-full rounded border border-slate-800 bg-transparent px-2 py-0.5 text-[10px] text-slate-500 placeholder:text-slate-700 focus:border-slate-600 focus:outline-none"
             />
           </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );
