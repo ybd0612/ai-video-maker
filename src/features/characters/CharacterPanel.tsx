@@ -4,7 +4,7 @@
 // ────────────────────────────────────────────────────────────────────────────
 
 import { useState } from "react";
-import { useProjectStore, selectActiveProject, type Character } from "@/stores/projectStore";
+import { useProjectStore, selectActiveProject, type Asset } from "@/stores/projectStore";
 import { useT } from "@/i18n";
 import { UserPlus, Pencil, Trash2 } from "lucide-react";
 import { CharacterEditor } from "./CharacterEditor";
@@ -12,25 +12,25 @@ import { CharacterEditor } from "./CharacterEditor";
 export function CharacterPanel() {
   const t = useT();
   const project = useProjectStore(selectActiveProject);
-  const removeCharacter = useProjectStore((s) => s.removeCharacter);
-  const [editingChar, setEditingChar] = useState<Character | null>(null);
+  const removeAsset = useProjectStore((s) => s.removeAsset);
+  const [editingChar, setEditingChar] = useState<Asset | null>(null);
   const [showEditor, setShowEditor] = useState(false);
 
-  const characters = project?.characters ?? [];
+  const characters = (project?.assets ?? []).filter((a) => a.type === "character");
 
   const handleAdd = () => {
     setEditingChar(null);
     setShowEditor(true);
   };
 
-  const handleEdit = (char: Character) => {
+  const handleEdit = (char: Asset) => {
     setEditingChar(char);
     setShowEditor(true);
   };
 
-  const handleDelete = (char: Character) => {
+  const handleDelete = (char: Asset) => {
     if (confirm(t("characters.deleteConfirm", { name: char.name }))) {
-      removeCharacter(char.id);
+      removeAsset(char.id);
     }
   };
 
@@ -72,9 +72,9 @@ export function CharacterPanel() {
             >
               {/* Avatar */}
               <div className="h-8 w-8 shrink-0 overflow-hidden rounded-full border border-slate-700 bg-slate-800">
-                {(char.generatedPortraitUrl || char.avatarUrl) ? (
+                {(char.imageUrl || char.avatarUrl) ? (
                   <img
-                    src={char.generatedPortraitUrl || char.avatarUrl}
+                    src={char.imageUrl || char.avatarUrl}
                     alt={char.name}
                     className="h-full w-full object-cover"
                   />

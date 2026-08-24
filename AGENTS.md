@@ -125,7 +125,7 @@ src/
 - “重试失败 / 全部重新生成”按钮必须走批量生成函数（幂等 + 并发受控），禁止 forEach 并发 reroll。
 - 视频完成响应解析链：`url`（顶层）→ `metadata.url` → `video_url` → `output.url` → `output.video_url` → `remixed_from_video_id`。
 - 分镜阶段 `generateScript` 已产出完整英文双提示词，**禁止二次翻译覆盖**（translateToMotion 已移除）。
-- 分镜生成后必须**回填角色 ID 引用**：模型返回的 `activeCharacterIds` / `dialogues.characterId` 可能是自编 ID，需按「角色名 → store 角色 ID」映射统一回填（新角色由 `extractNewCharacters` 建映射），匹配不到的对白置 `null`（归旁白），否则角色一致性（图片注入/定妆照参考）与对白归属会失效。
+- 分镜生成后必须**回填角色 ID 引用**：模型返回的 `activeCharacterIds` / `dialogues.characterId` 可能是自编 ID，需按「角色名 → store 角色 ID」映射统一回填（新资产由 `extractNewAssets` 建映射），匹配不到的对白置 `null`（归旁白），否则角色一致性（图片注入/定妆照参考）与对白归属会失效。
 
 ## 双提示词系统
 
@@ -170,8 +170,7 @@ src/
 ## 数据模型
 
 - **Project**：项目（title / aspectRatio / style / language / shots / status / error / createdAt / updatedAt / styleReferenceUrl / styleReferenceError）
-- **Character**：角色（name / description / appearancePrompt / generatedPortraitUrl / error / assetNamespace / fullPrompt）
-- **SceneReference**：场景参考（name / description / prompt / imageUrl / error）
+- **Asset**：统一资产（type: character / scene / product；name / description / prompt / imageUrl / error；character 另有 appearancePrompt / assetNamespace / fullPrompt / avatarUrl）——角色、场景、产品共用一套存储与参考链
 - **Shot**：分镜（scriptText / visualPrompt / motionPrompt / duration / imageUrl / videoUrl / status / videoRetryCount）
 - **HistoryEntry**：操作记录（projectId / action / description / timestamp）
 - 项目状态流转：`idle → scripting → imaging → videoing → rendering → done`（可卡在 `failed`；向导内图片/视频批量完成后会复位为 `idle` 或 `failed`，成片拼接完成才置 `done`）

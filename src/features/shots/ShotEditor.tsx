@@ -27,7 +27,7 @@ export function ShotEditor({
   const setActiveCharacters = useProjectStore((s) => s.setActiveCharacters);
   const project = useProjectStore(selectActiveProject);
   const t = useT();
-  const characters = project?.characters ?? [];
+  const characters = (project?.assets ?? []).filter((a) => a.type === "character");
 
   if (!shot) {
     return (

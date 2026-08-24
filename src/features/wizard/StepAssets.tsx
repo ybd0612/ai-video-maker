@@ -1,13 +1,13 @@
 // ────────────────────────────────────────────────────────────────────────────
 // src/features/wizard/StepAssets.tsx
-// Step 2: Asset preparation — characters, scene references, style anchor.
-// Generates reference images that will be used as img2img anchors for storyboard.
+// Step 2: Asset preparation — characters / scenes / products / style anchor.
+// Generates reference images used as img2img anchors for storyboard consistency.
 // ────────────────────────────────────────────────────────────────────────────
 
 import { useState, useEffect } from "react";
 import {
   useProjectStore, selectActiveProject,
-  type Character, type SceneReference,
+  type Asset,
 } from "@/stores/projectStore";
 import { useSettingsStore } from "@/stores/settingsStore";
 import { useT } from "@/i18n";
@@ -21,23 +21,25 @@ import { generateImage, aspectRatioToImageSize } from "@/services/imageService";
 export function StepAssets() {
   const t = useT();
   const project = useProjectStore(selectActiveProject);
-  const removeCharacter = useProjectStore((s) => s.removeCharacter);
-  const addSceneReference = useProjectStore((s) => s.addSceneReference);
-  const updateSceneReference = useProjectStore((s) => s.updateSceneReference);
-  const removeSceneReference = useProjectStore((s) => s.removeSceneReference);
+  const removeAsset = useProjectStore((s) => s.removeAsset);
+  const addAsset = useProjectStore((s) => s.addAsset);
+  const updateAsset = useProjectStore((s) => s.updateAsset);
   const updateProject = useProjectStore((s) => s.updateProject);
   const setWizardStep = useProjectStore((s) => s.setWizardStep);
   const providerConfig = useSettingsStore((s) => s.providerConfig);
   const { generateAssetImages } = useWizardActions();
 
-  const [editingChar, setEditingChar] = useState<Character | null>(null);
+  const [editingChar, setEditingChar] = useState<Asset | null>(null);
   const [showEditor, setShowEditor] = useState(false);
   const [generatingScenes, setGeneratingScenes] = useState<Set<string>>(new Set());
+  const [generatingProducts, setGeneratingProducts] = useState<Set<string>>(new Set());
   const [generatingStyle, setGeneratingStyle] = useState(false);
   const isGenerating = project?.assetGenerationStarted ?? false;
 
-  const characters = project?.characters ?? [];
-  const sceneReferences = project?.sceneReferences ?? [];
+  const assets = project?.assets ?? [];
+  const characters = assets.filter((a) => a.type === "character");
+  const sceneReferences = assets.filter((a) => a.type === "scene");
+  const products = assets.filter((a) => a.type === "product");
   const styleReferenceUrl = project?.styleReferenceUrl;
 
   // 刷新/中断后恢复：assetGenerationStarted 卡 true 且没有存活任务时重置，
@@ -57,14 +59,14 @@ export function StepAssets() {
     setShowEditor(true);
   };
 
-  const handleEdit = (char: Character) => {
+  const handleEdit = (char: Asset) => {
     setEditingChar(char);
     setShowEditor(true);
   };
 
-  const handleDelete = (char: Character) => {
+  const handleDelete = (char: Asset) => {
     if (confirm(t("characters.deleteConfirm", { name: char.name }))) {
-      removeCharacter(char.id);
+      removeAsset(char.id);
     }
   };
 
@@ -76,19 +78,25 @@ export function StepAssets() {
   // ── Batch generate portraits ──────────────────────────────────────────
 
   const handleBatchPortraits = async () => {
-    await generateAssetImages({ generatePortraits: true, generateScenes: false, generateStyle: false });
+    await generateAssetImages({ generatePortraits: true, generateScenes: false, generateProducts: false, generateStyle: false });
   };
 
   // ── Batch generate scene images ───────────────────────────────────────
 
   const handleBatchScenes = async () => {
-    await generateAssetImages({ generatePortraits: false, generateScenes: true, generateStyle: false });
+    await generateAssetImages({ generatePortraits: false, generateScenes: true, generateProducts: false, generateStyle: false });
+  };
+
+  // ── Batch generate product images ─────────────────────────────────────
+
+  const handleBatchProducts = async () => {
+    await generateAssetImages({ generatePortraits: false, generateScenes: false, generateProducts: true, generateStyle: false });
   };
 
   // ── Generate all assets ───────────────────────────────────────────────
 
   const handleGenerateAll = async () => {
-    await generateAssetImages({ generatePortraits: true, generateScenes: true, generateStyle: true });
+    await generateAssetImages({ generatePortraits: true, generateScenes: true, generateProducts: true, generateStyle: true });
     // 资产生成完成后，自动进入分镜步骤
     setWizardStep(3);
   };
@@ -96,14 +104,10 @@ export function StepAssets() {
   // ── Scene reference handlers ──────────────────────────────────────────
 
   const handleAddScene = () => {
-    addSceneReference({
-      name: "",
-      prompt: "",
-      description: "",
-    });
+    addAsset({ type: "scene", name: "", prompt: "", description: "" });
   };
 
-  const handleGenerateScene = async (scene: SceneReference) => {
+  const handleGenerateScene = async (scene: Asset) => {
     if (!scene.prompt.trim() || !providerConfig.apiKey) return;
     setGeneratingScenes((prev) => new Set(prev).add(scene.id));
     try {
@@ -114,13 +118,44 @@ export function StepAssets() {
         prompt: scene.prompt,
         size,
       });
-      updateSceneReference(scene.id, { imageUrl: url });
+      updateAsset(scene.id, { imageUrl: url, error: undefined });
     } catch (err) {
+      updateAsset(scene.id, { error: err instanceof Error ? err.message : String(err) });
       console.error("Failed to generate scene image:", err);
     } finally {
       setGeneratingScenes((prev) => {
         const next = new Set(prev);
         next.delete(scene.id);
+        return next;
+      });
+    }
+  };
+
+  // ── Product reference handlers ────────────────────────────────────────
+
+  const handleAddProduct = () => {
+    addAsset({ type: "product", name: "", prompt: "", description: "" });
+  };
+
+  const handleGenerateProduct = async (product: Asset) => {
+    if (!product.prompt.trim() || !providerConfig.apiKey) return;
+    setGeneratingProducts((prev) => new Set(prev).add(product.id));
+    try {
+      const size = aspectRatioToImageSize(project?.aspectRatio ?? "16:9");
+      const url = await generateImage({
+        apiKey: providerConfig.apiKey,
+        baseUrl: providerConfig.baseUrl,
+        prompt: product.prompt,
+        size,
+      });
+      updateAsset(product.id, { imageUrl: url, error: undefined });
+    } catch (err) {
+      updateAsset(product.id, { error: err instanceof Error ? err.message : String(err) });
+      console.error("Failed to generate product image:", err);
+    } finally {
+      setGeneratingProducts((prev) => {
+        const next = new Set(prev);
+        next.delete(product.id);
         return next;
       });
     }
@@ -174,7 +209,7 @@ export function StepAssets() {
           <h3 className="text-sm font-semibold text-slate-300">
             {t("characters.title" as any) || "角色"} ({characters.length})
           </h3>
-          {characters.some((c) => !c.generatedPortraitUrl) && (
+          {characters.some((c) => !c.imageUrl) && (
             <button
               onClick={handleBatchPortraits}
               disabled={isGenerating}
@@ -194,9 +229,9 @@ export function StepAssets() {
                 className="group flex items-start gap-3 rounded-xl border border-slate-700 bg-slate-800/50 p-3 transition hover:border-slate-600"
               >
                 <div className="h-12 w-12 shrink-0 overflow-hidden rounded-full border border-slate-700 bg-slate-800">
-                  {(char.generatedPortraitUrl || char.avatarUrl) ? (
+                  {(char.imageUrl || char.avatarUrl) ? (
                     <img
-                      src={char.generatedPortraitUrl || char.avatarUrl}
+                      src={char.imageUrl || char.avatarUrl}
                       alt={char.name}
                       className="h-full w-full object-cover"
                     />
@@ -300,20 +335,20 @@ export function StepAssets() {
               <input
                 type="text"
                 value={scene.name}
-                onChange={(e) => updateSceneReference(scene.id, { name: e.target.value })}
+                onChange={(e) => updateAsset(scene.id, { name: e.target.value })}
                 placeholder="场景名称 (如: 城市街道)"
                 className="w-full bg-transparent text-sm font-medium text-slate-200 placeholder:text-slate-600 focus:outline-none"
               />
               <input
                 type="text"
                 value={scene.description}
-                onChange={(e) => updateSceneReference(scene.id, { description: e.target.value })}
+                onChange={(e) => updateAsset(scene.id, { description: e.target.value })}
                 placeholder="中文描述"
                 className="w-full bg-transparent text-xs text-slate-400 placeholder:text-slate-600 focus:outline-none"
               />
               <textarea
                 value={scene.prompt}
-                onChange={(e) => updateSceneReference(scene.id, { prompt: e.target.value })}
+                onChange={(e) => updateAsset(scene.id, { prompt: e.target.value })}
                 placeholder="English prompt for image generation..."
                 rows={2}
                 className="w-full resize-none bg-transparent text-xs text-slate-300 placeholder:text-slate-600 focus:outline-none"
@@ -340,7 +375,7 @@ export function StepAssets() {
                 )}
               </button>
               <button
-                onClick={() => removeSceneReference(scene.id)}
+                onClick={() => removeAsset(scene.id)}
                 className="rounded p-1.5 text-slate-500 hover:bg-red-950 hover:text-red-400"
                 title="删除"
               >
@@ -356,6 +391,113 @@ export function StepAssets() {
         >
           <Plus size={14} />
           {t("wizard.addScene")}
+        </button>
+      </section>
+
+      {/* ── Product references section（产品主体一致性锚点） ─────────────── */}
+      <section className="flex flex-col gap-3">
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="text-sm font-semibold text-slate-300">
+              {t("wizard.productReferences")} ({products.length})
+            </h3>
+            <p className="text-[11px] text-slate-600 mt-0.5">
+              {t("wizard.productReferencesHint")}
+            </p>
+          </div>
+          {products.some((p) => !p.imageUrl && p.prompt.trim()) && (
+            <button
+              onClick={handleBatchProducts}
+              disabled={isGenerating}
+              className="flex items-center gap-1.5 rounded px-2 py-1 text-[11px] text-violet-400 hover:bg-violet-950/30 transition disabled:opacity-50"
+            >
+              {isGenerating ? <Loader2 size={11} className="animate-spin" /> : <Wand2 size={11} />}
+              {t("wizard.generateAllProducts")}
+            </button>
+          )}
+        </div>
+
+        {products.map((product) => (
+          <div
+            key={product.id}
+            className="group flex items-start gap-3 rounded-xl border border-slate-700 bg-slate-800/50 p-3 transition hover:border-slate-600"
+          >
+            {/* Product image preview */}
+            <div className="h-16 w-24 shrink-0 overflow-hidden rounded-lg border border-slate-700 bg-slate-800">
+              {product.imageUrl ? (
+                <img
+                  src={product.imageUrl}
+                  alt={product.name}
+                  className="h-full w-full object-cover"
+                />
+              ) : (
+                <div className="flex h-full w-full items-center justify-center text-slate-600">
+                  <ImageIcon size={16} />
+                </div>
+              )}
+            </div>
+
+            {/* Product fields */}
+            <div className="min-w-0 flex-1 flex flex-col gap-1.5">
+              <input
+                type="text"
+                value={product.name}
+                onChange={(e) => updateAsset(product.id, { name: e.target.value })}
+                placeholder="产品名称 (如: 白色羽绒服)"
+                className="w-full bg-transparent text-sm font-medium text-slate-200 placeholder:text-slate-600 focus:outline-none"
+              />
+              <input
+                type="text"
+                value={product.description}
+                onChange={(e) => updateAsset(product.id, { description: e.target.value })}
+                placeholder="中文描述"
+                className="w-full bg-transparent text-xs text-slate-400 placeholder:text-slate-600 focus:outline-none"
+              />
+              <textarea
+                value={product.prompt}
+                onChange={(e) => updateAsset(product.id, { prompt: e.target.value })}
+                placeholder="English prompt for image generation..."
+                rows={2}
+                className="w-full resize-none bg-transparent text-xs text-slate-300 placeholder:text-slate-600 focus:outline-none"
+              />
+              {product.error && (
+                <p className="truncate text-[10px] text-red-400" title={product.error}>
+                  生成失败：{product.error}
+                </p>
+              )}
+            </div>
+
+            {/* Actions */}
+            <div className="flex shrink-0 flex-col gap-1 opacity-0 transition group-hover:opacity-100">
+              <button
+                onClick={() => handleGenerateProduct(product)}
+                disabled={!product.prompt.trim() || generatingProducts.has(product.id)}
+                className="rounded p-1.5 text-violet-400 hover:bg-violet-950/30 disabled:opacity-30"
+                title="生成产品图"
+              >
+                {generatingProducts.has(product.id) ? (
+                  <Loader2 size={12} className="animate-spin" />
+                ) : (
+                  <Wand2 size={12} />
+                )}
+              </button>
+              <button
+                onClick={() => removeAsset(product.id)}
+                className="rounded p-1.5 text-slate-500 hover:bg-red-950 hover:text-red-400"
+                title="删除"
+              >
+                <Trash2 size={12} />
+              </button>
+            </div>
+          </div>
+        ))}
+
+        <button
+          onClick={handleAddProduct}
+          className="flex items-center justify-center gap-2 rounded-xl border border-dashed border-slate-600 bg-slate-800/30 px-4 py-2.5 text-xs text-slate-400 transition hover:border-emerald-500 hover:text-emerald-400"
+        >
+          <Plus size={14} />
+          {t("wizard.addProduct")}
         </button>
       </section>
 

@@ -34,22 +34,29 @@ export type WizardStep = 1 | 2 | 3 | 4 | 5 | 6;
 
 export type AutomationMode = 'auto' | 'semi-auto';
 
-/* ── Data models ────────────────────────────────────────────────────────── */
+/* ── Asset model（角色/场景/产品统一为资产） ────────────────────────────── */
 
-export interface Character {
+export type AssetType = "character" | "scene" | "product";
+
+export interface Asset {
   id: string;
+  type: AssetType;
   name: string;
   description: string;
-  appearancePrompt: string;
-  avatarUrl?: string;
-  /** AI-generated portrait from appearancePrompt (text-to-image) */
-  generatedPortraitUrl?: string;
-  /** 定妆照生成失败原因（便于 UI 展示重试入口） */
+  /** 英文参考图生成提示词（scene/product 直接使用；character 与 appearancePrompt 一致） */
+  prompt: string;
+  /** 生成的参考图（角色=定妆照、场景=场景参考图、产品=产品参考图） */
+  imageUrl?: string;
+  /** 参考图生成失败原因（便于 UI 展示重试入口） */
   error?: string;
+  /** 以下仅 character 类型使用 */
+  appearancePrompt?: string;
   /** 资产一致性优化 - 用于标识角色在提示词中的命名空间 */
-  assetNamespace: string;  // 如 "[Hero_A]"
+  assetNamespace?: string;
   /** 自动生成的完整提示词 */
-  fullPrompt: string;
+  fullPrompt?: string;
+  /** 手动上传/指定的头像 URL */
+  avatarUrl?: string;
   /** 多视角矩阵图 */
   multiViewUrl?: string;
 }
@@ -60,7 +67,6 @@ export interface DialogueLine {
   text: string;
   delivery?: string; // e.g. "温柔地", for Phase 2 TTS
 }
-
 export interface Shot {
   id: string;
   index: number;
@@ -100,22 +106,12 @@ export interface ChatTurn {
   content: string;
 }
 
-export interface SceneReference {
-  id: string;
-  name: string;         // 场景名称，如"城市街道"
-  imageUrl?: string;    // 生成的场景参考图
-  prompt: string;       // 英文生成提示词
-  description: string;  // 中文描述
-  /** 场景参考图生成失败原因（便于 UI 展示重试入口） */
-  error?: string;
-}
-
 export interface Project {
   id: string;
   title: string;
   wizardStep: WizardStep;
   automationMode: AutomationMode;
-  characters: Character[];
+  assets: Asset[];
   aspectRatio: AspectRatio;
   style: string;
   language: "zh" | "en";
@@ -128,8 +124,6 @@ export interface Project {
   ideaPrompt?: string;
   /** Step 1: saved AI chat history */
   ideaChatHistory?: ChatTurn[];
-  /** Step 2: scene reference images for img2img consistency */
-  sceneReferences?: SceneReference[];
   /** Step 2: overall style reference image URL */
   styleReferenceUrl?: string;
   /** 风格参考图生成失败原因 */
@@ -181,7 +175,7 @@ interface ProjectState {
   /* Project actions */
   createProject: (title: string) => Project;
   switchProject: (id: string) => void;
-  updateProject: (updates: Partial<Pick<Project, "title" | "aspectRatio" | "style" | "language" | "ideaPrompt" | "ideaChatHistory" | "sceneReferences" | "styleReferenceUrl" | "assetGenerationStarted" | "imageGenerationStarted" | "videoGenerationStarted">>) => void;
+  updateProject: (updates: Partial<Pick<Project, "title" | "aspectRatio" | "style" | "language" | "ideaPrompt" | "ideaChatHistory" | "assets" | "styleReferenceUrl" | "assetGenerationStarted" | "imageGenerationStarted" | "videoGenerationStarted">>) => void;
   /** 按 ID 更新指定项目（用于异步操作完成后写回发起项目，而非当前活跃项目，避免跨项目污染） */
   updateProjectById: (projectId: string, updater: (p: Project) => Project) => void;
   deleteProject: (id: string) => void;
@@ -201,23 +195,17 @@ interface ProjectState {
   setShotStatus: (id: string, status: ShotStatus, error?: string) => void;
   setShotStatusByProjectId: (projectId: string, id: string, status: ShotStatus, error?: string) => void;
 
-  /* Character actions */
-  addCharacter: (character: Omit<Character, "id">) => Character;
-  updateCharacter: (id: string, updates: Partial<Omit<Character, "id">>) => void;
-  updateCharacterByProjectId: (projectId: string, id: string, updates: Partial<Omit<Character, "id">>) => void;
-  removeCharacter: (id: string) => void;
+  /* Asset actions（角色/场景/产品统一资产） */
+  addAsset: (asset: Omit<Asset, "id">) => Asset;
+  updateAsset: (id: string, updates: Partial<Omit<Asset, "id">>) => void;
+  updateAssetByProjectId: (projectId: string, id: string, updates: Partial<Omit<Asset, "id">>) => void;
+  removeAsset: (id: string) => void;
 
   /* Wizard step */
   setWizardStep: (step: WizardStep) => void;
 
   /* Automation mode */
   setAutomationMode: (mode: AutomationMode) => void;
-
-  /* Scene reference actions */
-  addSceneReference: (ref: Omit<SceneReference, "id">) => SceneReference;
-  updateSceneReference: (id: string, updates: Partial<Omit<SceneReference, "id">>) => void;
-  updateSceneReferenceByProjectId: (projectId: string, id: string, updates: Partial<Omit<SceneReference, "id">>) => void;
-  removeSceneReference: (id: string) => void;
 
   /* Dialogue actions */
   addDialogueLine: (shotId: string, line: Omit<DialogueLine, "id">) => void;
@@ -268,7 +256,7 @@ export const useProjectStore = create<ProjectState>()(
           title,
           wizardStep: 1 as WizardStep,
           automationMode: 'semi-auto',
-          characters: [],
+          assets: [],
           aspectRatio: "16:9",
           style: "",
           language: "zh",
@@ -503,46 +491,46 @@ export const useProjectStore = create<ProjectState>()(
           ),
         })),
 
-      /* ── Character actions ───────────────────────────────────────────── */
+      /* ── Asset actions（角色/场景/产品统一资产） ─────────────────────── */
 
-      addCharacter: (character) => {
-        const newChar: Character = { ...character, id: newId("char") };
+      addAsset: (asset) => {
+        const newAsset: Asset = { ...asset, id: newId("asset") };
         set((s) => ({
           projects: updateActive(s.projects, s.activeProjectId, (p) => ({
             ...p,
-            characters: [...p.characters, newChar],
+            assets: [...p.assets, newAsset],
             updatedAt: Date.now(),
           })),
         }));
-        return newChar;
+        return newAsset;
       },
 
-      updateCharacter: (id, updates) =>
+      updateAsset: (id, updates) =>
         set((s) => ({
           projects: updateActive(s.projects, s.activeProjectId, (p) => ({
             ...p,
-            characters: p.characters.map((c) =>
-              c.id === id ? { ...c, ...updates } : c,
+            assets: p.assets.map((a) =>
+              a.id === id ? { ...a, ...updates } : a,
             ),
             updatedAt: Date.now(),
           })),
         })),
 
-      updateCharacterByProjectId: (projectId, id, updates) =>
+      updateAssetByProjectId: (projectId, id, updates) =>
         set((s) => ({
           projects: s.projects.map((p) =>
             p.id === projectId
-              ? { ...p, characters: p.characters.map((c) => c.id === id ? { ...c, ...updates } : c), updatedAt: Date.now() }
+              ? { ...p, assets: p.assets.map((a) => a.id === id ? { ...a, ...updates } : a), updatedAt: Date.now() }
               : p,
           ),
         })),
 
-      removeCharacter: (id) =>
+      removeAsset: (id) =>
         set((s) => ({
           projects: updateActive(s.projects, s.activeProjectId, (p) => ({
             ...p,
-            characters: p.characters.filter((c) => c.id !== id),
-            // Nullify dialogues referencing this character, remove from activeCharacterIds
+            assets: p.assets.filter((a) => a.id !== id),
+            // 删除角色时清理其对白引用与镜头角色选择（产品/场景无引用关系）
             shots: p.shots.map((sh) => ({
               ...sh,
               activeCharacterIds: sh.activeCharacterIds.filter((cid) => cid !== id),
@@ -568,49 +556,6 @@ export const useProjectStore = create<ProjectState>()(
           projects: updateActive(s.projects, s.activeProjectId, (p) => ({
             ...p,
             automationMode: mode,
-            updatedAt: Date.now(),
-          })),
-        })),
-
-      /* ── Scene reference actions ─────────────────────────────────────── */
-
-      addSceneReference: (ref) => {
-        const newRef: SceneReference = { ...ref, id: newId("scene") };
-        set((s) => ({
-          projects: updateActive(s.projects, s.activeProjectId, (p) => ({
-            ...p,
-            sceneReferences: [...(p.sceneReferences ?? []), newRef],
-            updatedAt: Date.now(),
-          })),
-        }));
-        return newRef;
-      },
-
-      updateSceneReference: (id, updates) =>
-        set((s) => ({
-          projects: updateActive(s.projects, s.activeProjectId, (p) => ({
-            ...p,
-            sceneReferences: (p.sceneReferences ?? []).map((r) =>
-              r.id === id ? { ...r, ...updates } : r,
-            ),
-            updatedAt: Date.now(),
-          })),
-        })),
-
-      updateSceneReferenceByProjectId: (projectId, id, updates) =>
-        set((s) => ({
-          projects: s.projects.map((p) =>
-            p.id === projectId
-              ? { ...p, sceneReferences: (p.sceneReferences ?? []).map((r) => r.id === id ? { ...r, ...updates } : r), updatedAt: Date.now() }
-              : p,
-          ),
-        })),
-
-      removeSceneReference: (id) =>
-        set((s) => ({
-          projects: updateActive(s.projects, s.activeProjectId, (p) => ({
-            ...p,
-            sceneReferences: (p.sceneReferences ?? []).filter((r) => r.id !== id),
             updatedAt: Date.now(),
           })),
         })),
@@ -749,7 +694,7 @@ export const useProjectStore = create<ProjectState>()(
     }),
     {
       name: "wxhb-project",
-      version: 7,
+      version: 8,
       migrate: (persisted: unknown, version: number) => {
         // Migrate from v1 (single project) to v2 (multi-project)
         if (version < 2) {
@@ -845,6 +790,46 @@ export const useProjectStore = create<ProjectState>()(
               imageGenerationStarted: false,
               videoGenerationStarted: false,
             }));
+          }
+        }
+
+        // Migrate from v7 to v8: 角色/场景/产品统一为 assets 数组。
+        // 旧 characters[] / sceneReferences[] 合并进 assets（保持原 ID，
+        // 否则对白引用与 activeCharacterIds 会断裂）；风格参考图保留为项目字段。
+        if (version < 8) {
+          const state = persisted as {
+            projects?: Array<Record<string, unknown>>;
+          };
+          if (state.projects) {
+            state.projects = state.projects.map((p) => {
+              const { characters, sceneReferences, ...rest } = p;
+              const merged: Asset[] = [
+                ...((characters as Array<Record<string, unknown>> | undefined) ?? []).map((c) => ({
+                  id: c.id as string,
+                  type: "character" as const,
+                  name: c.name as string,
+                  description: (c.description as string) ?? "",
+                  prompt: (c.appearancePrompt as string) ?? "",
+                  imageUrl: c.generatedPortraitUrl as string | undefined,
+                  error: c.error as string | undefined,
+                  appearancePrompt: c.appearancePrompt as string | undefined,
+                  assetNamespace: c.assetNamespace as string | undefined,
+                  fullPrompt: c.fullPrompt as string | undefined,
+                  avatarUrl: c.avatarUrl as string | undefined,
+                  multiViewUrl: c.multiViewUrl as string | undefined,
+                })),
+                ...((sceneReferences as Array<Record<string, unknown>> | undefined) ?? []).map((s) => ({
+                  id: s.id as string,
+                  type: "scene" as const,
+                  name: s.name as string,
+                  description: (s.description as string) ?? "",
+                  prompt: (s.prompt as string) ?? "",
+                  imageUrl: s.imageUrl as string | undefined,
+                  error: s.error as string | undefined,
+                })),
+              ];
+              return { ...rest, assets: merged };
+            });
           }
         }
 

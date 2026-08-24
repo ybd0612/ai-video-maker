@@ -23,7 +23,7 @@ A wizard-based short video production tool: enter a topic, and the AI automatica
 
 | Feature | Description |
 |---------|-------------|
-| 🧭 **6-Step Wizard** | Idea → Character assets → Storyboard → Images → Videos → Assembly, each step controllable and independently retryable |
+| 🧭 **6-Step Wizard** | Idea → Assets (characters/scenes/products) → Storyboard → Images → Videos → Assembly, each step controllable and independently retryable |
 | 🎬 **Auto Pipeline** | Auto mode: from topic to final video in one run (script → image → video → concat) |
 | 🤖 **Smart Storyboard** | `agnes-2.5-flash` — generates 4-6 shots with dual prompts (text-to-image + image-to-video) |
 | 🎨 **Image Generation** | `agnes-image-2.1-flash` — reference images from visual prompts (concurrency: 3) |
@@ -83,7 +83,7 @@ npm run preview
 | Step | Page | Description |
 |------|------|-------------|
 | 1️⃣ | **Idea** | Describe the topic, pick 16:9 / 9:16 / 1:1 ratio, refine via multi-turn AI chat |
-| 2️⃣ | **Assets** | Auto-extracted characters, generate portraits, scene references, style reference |
+| 2️⃣ | **Assets** | Auto-extracted characters/products, generate portraits, scene references, product references, style reference |
 | 3️⃣ | **Storyboard** | 4-6 shots (copy / visual prompt / motion prompt / duration), edit & re-roll per shot |
 | 4️⃣ | **Images** | Generate reference image per shot, re-roll individually |
 | 5️⃣ | **Videos** | Generate video per shot (optional dual-frame), re-roll individually |

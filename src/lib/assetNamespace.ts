@@ -4,7 +4,7 @@
 // Namespaces allow shorthand [Hero_A] in prompts that resolve to full descriptions.
 // ────────────────────────────────────────────────────────────────────────────
 
-import type { Character, SceneReference } from "@/stores/projectStore";
+import type { Asset } from "@/stores/projectStore";
 
 /**
  * 为角色生成资产命名空间
@@ -33,13 +33,13 @@ export function generateFullPrompt(character: { name: string; appearancePrompt: 
  */
 export function resolveAssetNamespaces(
   prompt: string,
-  characters: Character[],
-  scenes: SceneReference[],
+  characters: Asset[],
+  scenes: Asset[],
 ): string {
   let resolved = prompt;
 
   for (const char of characters) {
-    if (!char.assetNamespace) continue;
+    if (!char.assetNamespace || !char.fullPrompt) continue;
     // 转义命名空间中的特殊正则字符
     const escaped = char.assetNamespace.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
     resolved = resolved.replace(new RegExp(escaped, "g"), char.fullPrompt);

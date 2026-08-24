@@ -4,7 +4,7 @@
 // ────────────────────────────────────────────────────────────────────────────
 
 import { useState, useCallback } from "react";
-import { useProjectStore, type Character } from "@/stores/projectStore";
+import { useProjectStore, type Asset } from "@/stores/projectStore";
 import { useSettingsStore } from "@/stores/settingsStore";
 import { useT } from "@/i18n";
 import { ArrowLeft, Sparkles, Loader2, RefreshCw, ImageIcon } from "lucide-react";
@@ -13,14 +13,14 @@ import { generateImage } from "@/services/imageService";
 import { generateAssetNamespace, generateFullPrompt } from "@/lib/assetNamespace";
 
 interface CharacterEditorProps {
-  character: Character | null; // null = creating new
+  character: Asset | null; // null = creating new
   onClose: () => void;
 }
 
 export function CharacterEditor({ character, onClose }: CharacterEditorProps) {
   const t = useT();
-  const addCharacter = useProjectStore((s) => s.addCharacter);
-  const updateCharacter = useProjectStore((s) => s.updateCharacter);
+  const addAsset = useProjectStore((s) => s.addAsset);
+  const updateAsset = useProjectStore((s) => s.updateAsset);
   const providerConfig = useSettingsStore((s) => s.providerConfig);
 
   const [name, setName] = useState(character?.name ?? "");
@@ -43,9 +43,9 @@ export function CharacterEditor({ character, onClose }: CharacterEditorProps) {
         prompt: `Portrait photo of ${appearancePrompt.trim()}, facing camera, clean background, high quality, detailed facial features, photorealistic, professional, all-ages appropriate`,
         size: "1024x1024",
       });
-      // Save portrait to character
+      // Save portrait to character（统一资产 imageUrl 字段）
       if (character) {
-        updateCharacter(character.id, { generatedPortraitUrl: portraitUrl });
+        updateAsset(character.id, { imageUrl: portraitUrl });
       }
       // Store for new character creation
       setGeneratedPortraitUrl(portraitUrl);
@@ -54,10 +54,10 @@ export function CharacterEditor({ character, onClose }: CharacterEditorProps) {
     } finally {
       setIsGeneratingPortrait(false);
     }
-  }, [appearancePrompt, providerConfig, character, updateCharacter]);
+  }, [appearancePrompt, providerConfig, character, updateAsset]);
 
   const [generatedPortraitUrl, setGeneratedPortraitUrl] = useState(
-    character?.generatedPortraitUrl ?? "",
+    character?.imageUrl ?? "",
   );
 
   const handleSave = () => {
@@ -69,19 +69,21 @@ export function CharacterEditor({ character, onClose }: CharacterEditorProps) {
     const fullPrompt = generateFullPrompt({ name: trimmedName, appearancePrompt: trimmedAppearance });
 
     const updates = {
+      type: "character" as const,
       name: trimmedName,
       description: description.trim(),
+      prompt: trimmedAppearance,
       appearancePrompt: trimmedAppearance,
       avatarUrl: avatarUrl.trim() || undefined,
-      generatedPortraitUrl: generatedPortraitUrl || undefined,
+      imageUrl: generatedPortraitUrl || undefined,
       assetNamespace: namespace,
       fullPrompt,
     };
 
     if (character) {
-      updateCharacter(character.id, updates);
+      updateAsset(character.id, updates);
     } else {
-      addCharacter(updates);
+      addAsset(updates);
     }
     onClose();
   };

@@ -19,7 +19,7 @@ export function DialogueEditor({ shotId }: DialogueEditorProps) {
   const removeDialogueLine = useProjectStore((s) => s.removeDialogueLine);
 
   const shot = project?.shots.find((s) => s.id === shotId);
-  const characters = project?.characters ?? [];
+  const characters = (project?.assets ?? []).filter((a) => a.type === "character");
   const dialogues = shot?.dialogues ?? [];
 
   const handleAdd = () => {

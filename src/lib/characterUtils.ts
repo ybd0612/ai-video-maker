@@ -3,7 +3,7 @@
 // Utilities for character description injection.
 // ────────────────────────────────────────────────────────────────────────────
 
-import type { Character } from "@/stores/projectStore";
+import type { Asset } from "@/stores/projectStore";
 
 /**
  * Inject active characters' appearance descriptions into a visual prompt.
@@ -12,20 +12,20 @@ import type { Character } from "@/stores/projectStore";
 export function injectCharacterDescriptions(
   visualPrompt: string,
   activeCharacterIds: string[],
-  characters: Character[],
+  assets: Asset[],
 ): string {
-  if (!activeCharacterIds?.length || !characters.length) {
+  if (!activeCharacterIds?.length || !assets.length) {
     return visualPrompt;
   }
 
   const activeChars = activeCharacterIds
-    .map((id) => characters.find((c) => c.id === id))
+    .map((id) => assets.find((a) => a.id === id && a.type === "character"))
     .filter(
-      (c): c is Character => c != null && !!c.appearancePrompt.trim(),
+      (c): c is Asset => c != null && !!c.appearancePrompt?.trim(),
     );
 
   if (activeChars.length === 0) return visualPrompt;
 
-  const charDescs = activeChars.map((c) => c.appearancePrompt.trim()).join("; ");
+  const charDescs = activeChars.map((c) => c.appearancePrompt!.trim()).join("; ");
   return `${charDescs}. ${visualPrompt}`;
 }

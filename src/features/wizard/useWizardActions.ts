@@ -4,7 +4,7 @@
 // ────────────────────────────────────────────────────────────────────────────
 
 import { useCallback } from "react";
-import { useProjectStore, selectActiveProject, newId, type Shot, type SceneReference, type Character, type Project } from "@/stores/projectStore";
+import { useProjectStore, selectActiveProject, newId, type Shot, type Asset, type Project } from "@/stores/projectStore";
 import { useSettingsStore } from "@/stores/settingsStore";
 import { resolvePlan, type PlanId } from "@/lib/plans";
 import { generateScript } from "@/services/scriptService";
@@ -33,7 +33,7 @@ export function hasActiveAssetTask(projectId: string): boolean {
   return activeAssetTasks.has(projectId);
 }
 
-type RawCharacter = {
+type RawAsset = {
   name: string;
   description: string;
   appearancePrompt: string;
@@ -45,45 +45,56 @@ type ImageGenerationInput = {
 };
 
 /**
- * Build unique Character records from model output without mutating inputs.
+ * Build unique Asset records from model output without mutating inputs.
  * 返回 name→id 映射表：模型可能在 shots/dialogues 中使用自编 ID 引用角色，
  * 调用方需据此回填引用，保证对白归属与角色一致性。
+ * 角色与产品共用此函数（type 区分），场景资产由用户手动添加。
  */
-function extractNewCharacters(
-  existing: Character[],
-  incoming: RawCharacter[],
-): { characters: Character[]; idByName: Map<string, string> } {
-  const names = new Set(existing.map((character) => character.name.trim().toLocaleLowerCase()));
-  const characters: Character[] = [];
+function extractNewAssets(
+  existing: Asset[],
+  incoming: RawAsset[],
+  type: "character" | "product",
+): { assets: Asset[]; idByName: Map<string, string> } {
+  const names = new Set(existing.map((a) => a.name.trim().toLocaleLowerCase()));
+  const assets: Asset[] = [];
   const idByName = new Map<string, string>();
-  for (const character of incoming) {
-    const normalizedName = character.name.trim().toLocaleLowerCase();
+  for (const item of incoming) {
+    const normalizedName = item.name.trim().toLocaleLowerCase();
     if (!normalizedName || names.has(normalizedName)) continue;
     names.add(normalizedName);
-    const record: Character = {
-      id: newId("char"),
-      name: character.name,
-      description: character.description,
-      appearancePrompt: character.appearancePrompt,
-      assetNamespace: generateAssetNamespace(character.name),
-      fullPrompt: generateFullPrompt(character),
+    const record: Asset = {
+      id: newId("asset"),
+      type,
+      name: item.name,
+      description: item.description,
+      prompt: item.appearancePrompt,
+      ...(type === "character"
+        ? {
+            appearancePrompt: item.appearancePrompt,
+            assetNamespace: generateAssetNamespace(item.name),
+            fullPrompt: generateFullPrompt(item),
+          }
+        : {}),
     };
-    characters.push(record);
+    assets.push(record);
     idByName.set(normalizedName, record.id);
   }
-  return { characters, idByName };
+  return { assets, idByName };
 }
 
 /** Compose the complete image prompt and the best available img2img reference. */
 function buildImageGenerationInput(
   shot: Shot,
-  project: { style: string; sceneReferences?: SceneReference[]; styleReferenceUrl?: string; characters: Character[] },
+  project: { style: string; assets: Asset[]; styleReferenceUrl?: string },
 ): ImageGenerationInput {
   let prompt = injectCharacterDescriptions(
     composeVisualPrompt(shot),
     shot.activeCharacterIds ?? [],
-    project.characters,
+    project.assets,
   );
+  // 产品主体注入：有产品资产时把产品外观描述前置到提示词，保证主体一致性
+  const product = project.assets.find((a) => a.type === "product" && !!a.prompt.trim());
+  if (product) prompt = `${product.prompt.trim()}. ${prompt}`;
   if (project.style) prompt = `${project.style} style. ${prompt}`;
   return { prompt, inputImageUrl: findBestReference(shot, project) };
 }
@@ -108,22 +119,25 @@ export function useWizardActions() {
     store.setProjectStatus("scripting");
 
     try {
-      // Use generateScript to extract characters (shots are discarded)
+      // Use generateScript to extract characters + products (shots are discarded)
       const result = await generateScript({
         apiKey: providerConfig.apiKey,
         baseUrl: providerConfig.baseUrl,
         prompt,
         language: project.language,
         aspectRatio: project.aspectRatio,
-        characters: project.characters,
+        assets: project.assets,
       });
 
-      const newCharacters = extractNewCharacters(project.characters, result.characters);
+      // 统一提取角色与产品资产（去重后追加到发起项目）
+      const newCharacters = extractNewAssets(project.assets, result.characters, "character");
+      const newProducts = extractNewAssets(project.assets, result.products, "product");
+      const newAssets = [...newCharacters.assets, ...newProducts.assets];
 
-      // 原子地写回发起项目：追加新角色 + 复位状态 + 推进到资产步骤
+      // 原子地写回发起项目：追加新资产 + 复位状态 + 推进到资产步骤
       useProjectStore.getState().updateProjectById(targetProjectId, (p) => ({
         ...p,
-        characters: [...p.characters, ...newCharacters.characters],
+        assets: [...p.assets, ...newAssets],
         status: "idle",
         error: undefined,
         wizardStep: 2,
@@ -160,20 +174,21 @@ export function useWizardActions() {
         prompt,
         language: project.language,
         aspectRatio: project.aspectRatio,
-        characters: project.characters,
-        sceneReferences: project.sceneReferences,
+        assets: project.assets,
       });
 
       // 角色 ID 回填：模型可能返回自编 ID（如 char_1）引用新角色，而新角色入库时
       // 由 newId() 生成全新 ID，两者无映射。此处建立「名字 → store 角色 ID」映射，
       // 统一回填 activeCharacterIds 与 dialogues.characterId，避免对白归属丢失、
       // 角色描述无法注入图片提示词（角色一致性失效）。
+      const existingCharacters = project.assets.filter((a) => a.type === "character");
       const idByName = new Map<string, string>();
-      for (const c of project.characters) idByName.set(c.name.trim().toLocaleLowerCase(), c.id);
+      for (const c of existingCharacters) idByName.set(c.name.trim().toLocaleLowerCase(), c.id);
 
-      const { characters: newCharacters } = extractNewCharacters(
-        project.characters,
+      const { assets: newCharacters } = extractNewAssets(
+        project.assets,
         result.characters,
+        "character",
       );
       for (const c of newCharacters) idByName.set(c.name.trim().toLocaleLowerCase(), c.id);
 
@@ -182,7 +197,7 @@ export function useWizardActions() {
         const matched = idByName.get(normalized);
         if (matched) return matched;
         // 已是 store 中的合法角色 ID 则保留；否则视为无效引用，清理掉
-        return project.characters.some((c) => c.id === ref) ? ref : null;
+        return existingCharacters.some((c) => c.id === ref) ? ref : null;
       };
 
       const shots: Shot[] = result.shots.map((s, i) => ({
@@ -201,11 +216,13 @@ export function useWizardActions() {
 
       store.setShotsByProjectId(targetProjectId, shots);
 
-      // Auto-add any newly extracted characters
-      if (newCharacters.length > 0) {
+      // Auto-add any newly extracted characters and products
+      const newProducts = extractNewAssets(project.assets, result.products, "product").assets;
+      const newAssets = [...newCharacters, ...newProducts];
+      if (newAssets.length > 0) {
         useProjectStore.getState().updateProjectById(targetProjectId, (p) => ({
           ...p,
-          characters: [...p.characters, ...newCharacters],
+          assets: [...p.assets, ...newAssets],
         }));
       }
 
@@ -239,11 +256,14 @@ export function useWizardActions() {
 
     try {
       // 附带主题与角色上下文，避免单镜头重试结果与整体风格漂移
+      const characterNames = project.assets
+        .filter((a) => a.type === "character")
+        .map((c) => c.name);
       const contextParts = [
         `Regenerate this shot: ${shot.scriptText}`,
         project.ideaPrompt?.trim() ? `Original idea: ${project.ideaPrompt.trim()}` : "",
-        project.characters.length > 0
-          ? `Characters: ${project.characters.map((c) => c.name).join(", ")}`
+        characterNames.length > 0
+          ? `Characters: ${characterNames.join(", ")}`
           : "",
       ].filter(Boolean);
       const result = await generateScript({
@@ -252,7 +272,7 @@ export function useWizardActions() {
         prompt: contextParts.join("\n"),
         language: project.language,
         aspectRatio: project.aspectRatio,
-        characters: project.characters,
+        assets: project.assets,
       });
 
       if (result.shots.length > 0) {
@@ -293,6 +313,7 @@ export function useWizardActions() {
   const generateAssetImages = useCallback(async (opts?: {
     generatePortraits?: boolean;
     generateScenes?: boolean;
+    generateProducts?: boolean;
     generateStyle?: boolean;
   }) => {
     const { providerConfig } = useSettingsStore.getState();
@@ -309,28 +330,29 @@ export function useWizardActions() {
     const imageSize = aspectRatioToImageSize(project.aspectRatio);
     const generatePortraits = opts?.generatePortraits !== false;
     const generateScenes = opts?.generateScenes !== false;
+    const generateProducts = opts?.generateProducts !== false;
     const generateStyle = opts?.generateStyle !== false;
 
     const tasks: Array<() => Promise<void>> = [];
 
-    // Character portrait tasks
+    // Character portrait tasks（角色定妆照）
     if (generatePortraits) {
-      for (const char of project.characters) {
-        if (char.generatedPortraitUrl) continue; // skip already generated
+      for (const char of project.assets.filter((a) => a.type === "character")) {
+        if (char.imageUrl) continue; // skip already generated
         tasks.push(async () => {
           if (signal?.aborted) return;
           try {
-            const portraitPrompt = `Portrait of ${char.appearancePrompt}, head and shoulders, looking at camera, high detail, photorealistic`;
+            const portraitPrompt = `Portrait of ${char.prompt}, head and shoulders, looking at camera, high detail, photorealistic`;
             const url = await generateImage({
               apiKey: providerConfig.apiKey,
               baseUrl: providerConfig.baseUrl,
               prompt: portraitPrompt,
               size: imageSize,
             });
-            useProjectStore.getState().updateCharacterByProjectId(targetProjectId, char.id, { generatedPortraitUrl: url, error: undefined });
+            useProjectStore.getState().updateAssetByProjectId(targetProjectId, char.id, { imageUrl: url, error: undefined });
           } catch (err) {
-            // 失败原因写入角色，UI 展示重试入口（不能只 console.error，用户完全无感知）
-            useProjectStore.getState().updateCharacterByProjectId(targetProjectId, char.id, {
+            // 失败原因写入资产，UI 展示重试入口（不能只 console.error，用户完全无感知）
+            useProjectStore.getState().updateAssetByProjectId(targetProjectId, char.id, {
               error: err instanceof Error ? err.message : String(err),
             });
             console.error(`Failed to generate portrait for ${char.name}:`, err);
@@ -339,9 +361,9 @@ export function useWizardActions() {
       }
     }
 
-    // Scene reference tasks
+    // Scene reference tasks（场景参考图）
     if (generateScenes) {
-      for (const scene of project.sceneReferences ?? []) {
+      for (const scene of project.assets.filter((a) => a.type === "scene")) {
         if (scene.imageUrl) continue; // skip already generated
         tasks.push(async () => {
           if (signal?.aborted) return;
@@ -352,9 +374,9 @@ export function useWizardActions() {
               prompt: scene.prompt,
               size: imageSize,
             });
-            useProjectStore.getState().updateSceneReferenceByProjectId(targetProjectId, scene.id, { imageUrl: url, error: undefined });
+            useProjectStore.getState().updateAssetByProjectId(targetProjectId, scene.id, { imageUrl: url, error: undefined });
           } catch (err) {
-            useProjectStore.getState().updateSceneReferenceByProjectId(targetProjectId, scene.id, {
+            useProjectStore.getState().updateAssetByProjectId(targetProjectId, scene.id, {
               error: err instanceof Error ? err.message : String(err),
             });
             console.error(`Failed to generate scene image for ${scene.name}:`, err);
@@ -363,7 +385,31 @@ export function useWizardActions() {
       }
     }
 
-    // Style reference task
+    // Product reference tasks（产品参考图：主体一致性锚点）
+    if (generateProducts) {
+      for (const product of project.assets.filter((a) => a.type === "product")) {
+        if (product.imageUrl) continue; // skip already generated
+        tasks.push(async () => {
+          if (signal?.aborted) return;
+          try {
+            const url = await generateImage({
+              apiKey: providerConfig.apiKey,
+              baseUrl: providerConfig.baseUrl,
+              prompt: product.prompt,
+              size: imageSize,
+            });
+            useProjectStore.getState().updateAssetByProjectId(targetProjectId, product.id, { imageUrl: url, error: undefined });
+          } catch (err) {
+            useProjectStore.getState().updateAssetByProjectId(targetProjectId, product.id, {
+              error: err instanceof Error ? err.message : String(err),
+            });
+            console.error(`Failed to generate product image for ${product.name}:`, err);
+          }
+        });
+      }
+    }
+
+    // Style reference task（风格参考图，项目级锚点）
     if (generateStyle && !project.styleReferenceUrl) {
       tasks.push(async () => {
         if (signal?.aborted) return;
@@ -749,17 +795,18 @@ export function useWizardActions() {
 /* ── Reference image resolution ─────────────────────────────────────────── */
 
 /**
- * Find the best img2img reference for a shot:
- * 1. Scene reference (if shot's sceneDesc matches a scene name)
- * 2. Character portrait (first active character with a portrait)
- * 3. Style reference (project-level style anchor)
+ * Find the best img2img reference for a shot（统一资产参考链）：
+ * 1. 场景参考（shot.sceneDesc 匹配场景名）
+ * 2. 角色定妆照（activeCharacterIds 命中的角色）
+ * 3. 产品参考图（全局主体锚点）
+ * 4. 风格参考（项目级风格锚点）
  */
 function findBestReference(
   shot: Shot,
-  project: { sceneReferences?: SceneReference[]; styleReferenceUrl?: string; characters: Array<{ id: string; generatedPortraitUrl?: string; avatarUrl?: string }> },
+  project: { assets: Asset[]; styleReferenceUrl?: string },
 ): string | undefined {
+  const scenes = project.assets.filter((a) => a.type === "scene");
   // Try scene reference match
-  const scenes = project.sceneReferences ?? [];
   if (scenes.length > 0 && shot.sceneDesc) {
     const shotScene = shot.sceneDesc.toLowerCase();
     const matched = scenes.find((s) =>
@@ -773,11 +820,15 @@ function findBestReference(
 
   // Fall back to character portrait
   const portraitUrls = (shot.activeCharacterIds ?? [])
-    .map((id) => project.characters.find((c) => c.id === id))
-    .filter((c): c is NonNullable<typeof c> => c != null)
-    .map((c) => c.generatedPortraitUrl ?? c.avatarUrl)
+    .map((id) => project.assets.find((a) => a.id === id && a.type === "character"))
+    .filter((c): c is Asset => c != null)
+    .map((c) => c.imageUrl ?? c.avatarUrl)
     .filter((url): url is string => !!url);
   if (portraitUrls[0]) return portraitUrls[0];
+
+  // Fall back to product reference（全局主体锚点）
+  const product = project.assets.find((a) => a.type === "product" && !!a.imageUrl);
+  if (product?.imageUrl) return product.imageUrl;
 
   // Fall back to style reference
   return project.styleReferenceUrl;

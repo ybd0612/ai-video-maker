@@ -4,7 +4,7 @@
 // Unified prompt — no mode branching. AI auto-detects characters in content.
 // ────────────────────────────────────────────────────────────────────────────
 
-import type { Shot, Character, SceneReference } from "@/stores/projectStore";
+import type { Shot, Asset } from "@/stores/projectStore";
 import { createAIService } from "@/services/ai/factory";
 
 interface GenerateScriptOptions {
@@ -13,8 +13,8 @@ interface GenerateScriptOptions {
   prompt: string;
   language: "zh" | "en";
   aspectRatio: string;
-  characters?: Character[];
-  sceneReferences?: SceneReference[];
+  /** 项目统一资产（角色/场景/产品），用于构建一致性提示词 */
+  assets?: Asset[];
 }
 
 interface RawShot {
@@ -44,9 +44,17 @@ interface RawCharacter {
   appearancePrompt: string;
 }
 
+/** 产品资产（模型输出格式，与角色同构） */
+interface RawProduct {
+  name: string;
+  description: string;
+  appearancePrompt: string;
+}
+
 export interface GenerateScriptResult {
   shots: Omit<Shot, "id" | "index" | "status">[];
   characters: RawCharacter[];
+  products: RawProduct[];
 }
 
 /* ── Motion translation ─────────────────────────────────────────────────── */
@@ -91,17 +99,20 @@ const MAX_SCRIPT_RETRIES = 2;
 
 function buildSystemPrompt(
   language: "zh" | "en",
-  characters?: Character[],
-  sceneReferences?: SceneReference[],
+  assets?: Asset[],
 ): string {
   return language === "zh"
-    ? buildPromptZh(characters, sceneReferences)
-    : buildPromptEn(characters, sceneReferences);
+    ? buildPromptZh(assets)
+    : buildPromptEn(assets);
 }
 
-function buildPromptZh(characters?: Character[], sceneReferences?: SceneReference[]): string {
+function buildPromptZh(assets?: Asset[]): string {
+  const characters = (assets ?? []).filter((a) => a.type === "character");
+  const scenes = (assets ?? []).filter((a) => a.type === "scene");
+  const products = (assets ?? []).filter((a) => a.type === "product");
+
   let charSection = "";
-  if (characters && characters.length > 0) {
+  if (characters.length > 0) {
     charSection =
       "\n已有角色（如内容涉及这些角色，请使用对应 ID）：\n" +
       characters
@@ -111,11 +122,21 @@ function buildPromptZh(characters?: Character[], sceneReferences?: SceneReferenc
   }
 
   let sceneSection = "";
-  if (sceneReferences && sceneReferences.length > 0) {
+  if (scenes.length > 0) {
     sceneSection =
       "\n已有场景参考（请在分镜中使用这些场景，保持 sceneDesc 与场景名称一致）：\n" +
-      sceneReferences
+      scenes
         .map((s) => `- ${s.name}：${s.description}`)
+        .join("\n") +
+      "\n";
+  }
+
+  let productSection = "";
+  if (products.length > 0) {
+    productSection =
+      "\n已有产品主体（如内容涉及这些产品，请确保镜头主体保持一致）：\n" +
+      products
+        .map((p) => `- ${p.name}：${p.description}`)
         .join("\n") +
       "\n";
   }
@@ -123,7 +144,8 @@ function buildPromptZh(characters?: Character[], sceneReferences?: SceneReferenc
   return `你是一位专业的短视频分镜策划师。用户会给你一个主题或想法，你需要：
 1. 将其拆分为 4-8 个分镜镜头
 2. 如果内容中有人物角色，提取角色信息
-${charSection}${sceneSection}
+3. 如果内容是产品/商品/实物主体，提取产品信息
+${charSection}${sceneSection}${productSection}
 严格按以下 JSON 格式返回，不要包含任何其他文字：
 {
   "characters": [
@@ -131,6 +153,13 @@ ${charSection}${sceneSection}
       "name": "角色名",
       "description": "角色简介（性格、身份）",
       "appearancePrompt": "外貌描述（英文，用于 AI 绘图，包含年龄、体型、发型、服饰等）"
+    }
+  ],
+  "products": [
+    {
+      "name": "产品名",
+      "description": "产品简介（类型、用途）",
+      "appearancePrompt": "外观描述（英文，用于 AI 绘图，包含款式、颜色、材质、细节、logo 等）"
     }
   ],
   "shots": [
@@ -161,9 +190,11 @@ ${charSection}${sceneSection}
 
 重要规则：
 - characters 数组：仅当内容中有人物角色时才填写，纯风景/产品/抽象内容返回空数组 []
+- products 数组：仅当内容是产品/商品/实物主体时才填写，纯人物/风景/抽象内容返回空数组 []
 - 如有已有角色，复用其 ID（不要重复创建）；如是新角色，生成新的 ID
 - visualPrompt 和 motionPrompt 必须用英文（直接用于 AI API）
 - 如有角色出场，visualPrompt 必须包含角色完整外貌描述
+- 如有产品主体，visualPrompt 必须包含产品完整外观描述（款式、颜色、材质）
 - 中文子字段给用户在界面上看，用中文填写
 - dialogues：characterId 为 null 表示旁白
 - 每镜头 duration 为 3、5 或 8 秒
@@ -176,9 +207,13 @@ ${charSection}${sceneSection}
 - 服饰描述得体，适合全年龄段`;
 }
 
-function buildPromptEn(characters?: Character[], sceneReferences?: SceneReference[]): string {
+function buildPromptEn(assets?: Asset[]): string {
+  const characters = (assets ?? []).filter((a) => a.type === "character");
+  const scenes = (assets ?? []).filter((a) => a.type === "scene");
+  const products = (assets ?? []).filter((a) => a.type === "product");
+
   let charSection = "";
-  if (characters && characters.length > 0) {
+  if (characters.length > 0) {
     charSection =
       "\nExisting characters (use corresponding IDs if content involves them):\n" +
       characters
@@ -188,11 +223,21 @@ function buildPromptEn(characters?: Character[], sceneReferences?: SceneReferenc
   }
 
   let sceneSection = "";
-  if (sceneReferences && sceneReferences.length > 0) {
+  if (scenes.length > 0) {
     sceneSection =
       "\nAvailable scene references (use these scenes, keep sceneDesc consistent with scene names):\n" +
-      sceneReferences
+      scenes
         .map((s) => `- ${s.name}: ${s.description}`)
+        .join("\n") +
+      "\n";
+  }
+
+  let productSection = "";
+  if (products.length > 0) {
+    productSection =
+      "\nExisting product subjects (if content involves these products, keep the subject consistent across shots):\n" +
+      products
+        .map((p) => `- ${p.name}: ${p.description}`)
         .join("\n") +
       "\n";
   }
@@ -200,7 +245,8 @@ function buildPromptEn(characters?: Character[], sceneReferences?: SceneReferenc
   return `You are a professional short-video storyboard planner. The user will give you a topic or idea. You need to:
 1. Break it into 4-8 shot scenes
 2. If the content involves characters, extract character info
-${charSection}${sceneSection}
+3. If the content involves a product/goods subject, extract product info
+${charSection}${sceneSection}${productSection}
 Return strictly in this JSON format, no other text:
 {
   "characters": [
@@ -208,6 +254,13 @@ Return strictly in this JSON format, no other text:
       "name": "Character name",
       "description": "Brief description (personality, role)",
       "appearancePrompt": "Appearance description in English (age, build, hair, clothing, etc. for AI image generation)"
+    }
+  ],
+  "products": [
+    {
+      "name": "Product name",
+      "description": "Brief description (type, purpose)",
+      "appearancePrompt": "Appearance description in English (style, color, material, details, logo, etc. for AI image generation)"
     }
   ],
   "shots": [
@@ -238,9 +291,11 @@ Return strictly in this JSON format, no other text:
 
 Important rules:
 - characters array: ONLY fill if content has characters. For landscape/product/abstract content, return empty array []
+- products array: ONLY fill if content has a product/goods subject. For character/landscape/abstract content, return empty array []
 - Reuse existing character IDs if applicable; generate new IDs for new characters
 - visualPrompt and motionPrompt MUST be in English (sent directly to AI APIs)
 - If characters appear, visualPrompt MUST include their full appearance
+- If a product subject appears, visualPrompt MUST include its full appearance (style, color, material)
 - Sub-fields (subjectDesc etc.) are shown to users in their language
 - dialogues: characterId null = narrator
 - Each shot duration: 3, 5, or 8 seconds
@@ -262,7 +317,7 @@ Content safety:
 export async function generateScript(
   opts: GenerateScriptOptions,
 ): Promise<GenerateScriptResult> {
-  const systemPrompt = buildSystemPrompt(opts.language, opts.characters, opts.sceneReferences);
+  const systemPrompt = buildSystemPrompt(opts.language, opts.assets);
 
   const service = createAIService({
     provider: "openai",
@@ -302,6 +357,7 @@ export async function generateScript(
       const parsed = JSON.parse(jsonStr) as {
         shots: RawShot[];
         characters?: RawCharacter[];
+        products?: RawProduct[];
       };
       if (!Array.isArray(parsed.shots) || parsed.shots.length === 0) {
         throw new Error("Model returned empty or invalid shots array.");
@@ -359,29 +415,39 @@ export async function generateScript(
           }))
         : [];
 
+      // 产品主体提取（与角色同构，供步骤 2 生成产品参考图）
+      const extractedProducts: RawProduct[] = Array.isArray(parsed.products)
+        ? parsed.products.map((c) => ({
+            name: c.name ?? "",
+            description: c.description ?? "",
+            appearancePrompt: c.appearancePrompt ?? "",
+          }))
+        : [];
+
       // Update activeCharacterIds in shots to reference existing characters by name match
       // (AI may generate new IDs that don't match existing store IDs)
-      if (opts.characters && opts.characters.length > 0) {
+      const existingCharacters = (opts.assets ?? []).filter((a) => a.type === "character");
+      if (existingCharacters.length > 0) {
         const nameToId = new Map(
-          opts.characters.map((c) => [c.name.toLowerCase(), c.id]),
+          existingCharacters.map((c) => [c.name.toLowerCase(), c.id]),
         );
         for (const shot of shots) {
           shot.activeCharacterIds = shot.activeCharacterIds.map((refId) => {
             // If this ID matches an existing character, keep it
-            if (opts.characters!.some((c) => c.id === refId)) return refId;
+            if (existingCharacters.some((c) => c.id === refId)) return refId;
             // Otherwise try to match by name (the AI may have used name as ID)
             return nameToId.get(refId.toLowerCase()) ?? refId;
           });
           // 对白同样按名字匹配回填；匹配不到的置 null（归为旁白），避免残留无效角色 ID
           for (const line of shot.dialogues ?? []) {
-            if (line.characterId && !opts.characters.some((c) => c.id === line.characterId)) {
+            if (line.characterId && !existingCharacters.some((c) => c.id === line.characterId)) {
               line.characterId = nameToId.get(line.characterId.toLowerCase()) ?? null;
             }
           }
         }
       }
 
-      return { shots, characters: extractedCharacters };
+      return { shots, characters: extractedCharacters, products: extractedProducts };
     } catch (parseErr) {
       lastError = new Error(
         `JSON 解析失败（第 ${attempt + 1} 次尝试）：${parseErr instanceof Error ? parseErr.message : String(parseErr)}。提取内容：${jsonStr.slice(0, 200)}`,

@@ -25,7 +25,8 @@ export function StepStoryboard() {
   const [error, setError] = useState<string | null>(null);
 
   const shots = project?.shots ?? [];
-  const hasCharacters = (project?.characters?.length ?? 0) > 0;
+  const assets = project?.assets ?? [];
+  const hasCharacters = assets.some((a) => a.type === "character");
   const ideaPrompt = project?.ideaPrompt ?? "";
 
   const handleGenerateStoryboard = async () => {
@@ -80,8 +81,11 @@ export function StepStoryboard() {
 
         {/* Asset summary */}
         <div className="flex gap-4 text-xs text-slate-500">
-          <span>{t("wizard.assetCharacters")}: {project?.characters?.length ?? 0}</span>
-          <span>{t("wizard.assetScenes")}: {project?.sceneReferences?.length ?? 0}</span>
+          <span>{t("wizard.assetCharacters")}: {assets.filter((a) => a.type === "character").length}</span>
+          <span>{t("wizard.assetScenes")}: {assets.filter((a) => a.type === "scene").length}</span>
+          {assets.some((a) => a.type === "product") && (
+            <span>{t("wizard.productReferences")}: {assets.filter((a) => a.type === "product").length}</span>
+          )}
           {project?.styleReferenceUrl && <span>{t("wizard.assetStyle")}: ✓</span>}
         </div>
 

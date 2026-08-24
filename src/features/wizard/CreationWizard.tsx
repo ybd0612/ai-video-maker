@@ -25,12 +25,12 @@ export function CreationWizard() {
   const setAutomationMode = useProjectStore((s) => s.setAutomationMode);
   const currentStep = project?.wizardStep ?? 1;
   const shots = project?.shots ?? [];
-  const characters = project?.characters ?? [];
+  const assets = project?.assets ?? [];
 
   const canAdvance = (() => {
     switch (currentStep) {
       case 1: return !!project?.ideaPrompt?.trim();
-      case 2: return characters.length > 0 || (project?.sceneReferences?.length ?? 0) > 0;
+      case 2: return assets.length > 0;
       case 3: return shots.length > 0 && shots.every((s) => s.scriptText.trim());
       case 4: return shots.length > 0 && shots.every((s) => !!s.imageUrl);
       case 5: return shots.length > 0 && shots.every((s) => !!s.videoUrl);

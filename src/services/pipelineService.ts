@@ -53,7 +53,7 @@ export async function runPipeline(prompt: string, opts: RunOptions = {}) {
         prompt,
         language: project.language,
         aspectRatio: project.aspectRatio,
-        characters: project.characters,
+        assets: project.assets,
       });
 
       const shots: Shot[] = rawShots.shots.map((s, i) => ({
@@ -92,15 +92,15 @@ export async function runPipeline(prompt: string, opts: RunOptions = {}) {
         const enrichedPrompt = injectCharacterDescriptions(
           shot.visualPrompt,
           shot.activeCharacterIds ?? [],
-          selectActiveProject(useProjectStore.getState())?.characters ?? [],
+          selectActiveProject(useProjectStore.getState())?.assets ?? [],
         );
 
         // Collect portrait URLs from active characters for img2img
-        const currentChars = selectActiveProject(useProjectStore.getState())?.characters ?? [];
+        const currentAssets = selectActiveProject(useProjectStore.getState())?.assets ?? [];
         const portraitUrls = (shot.activeCharacterIds ?? [])
-          .map((id) => currentChars.find((c) => c.id === id))
+          .map((id) => currentAssets.find((a) => a.id === id && a.type === "character"))
           .filter((c): c is NonNullable<typeof c> => c != null)
-          .map((c) => c.generatedPortraitUrl ?? c.avatarUrl)
+          .map((c) => c.imageUrl ?? c.avatarUrl)
           .filter((url): url is string => !!url);
 
         const imageUrl = await generateImage({
@@ -207,14 +207,14 @@ export async function runSingleShot(shotId: string, opts: RunOptions = {}) {
     const enrichedPrompt = injectCharacterDescriptions(
       shot.visualPrompt,
       shot.activeCharacterIds ?? [],
-      project.characters,
+      project.assets,
     );
 
     // Collect portrait URLs from active characters for img2img
     const portraitUrls = (shot.activeCharacterIds ?? [])
-      .map((id) => project.characters.find((c) => c.id === id))
+      .map((id) => project.assets.find((a) => a.id === id && a.type === "character"))
       .filter((c): c is NonNullable<typeof c> => c != null)
-      .map((c) => c.generatedPortraitUrl ?? c.avatarUrl)
+      .map((c) => c.imageUrl ?? c.avatarUrl)
       .filter((url): url is string => !!url);
 
     imageUrl = await generateImage({
