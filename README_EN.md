@@ -83,13 +83,13 @@ npm run preview
 | Step | Page | Description |
 |------|------|-------------|
 | 1️⃣ | **Idea** | Describe the topic, pick 16:9 / 9:16 / 1:1 ratio, refine via multi-turn AI chat |
-| 2️⃣ | **Assets** | Auto-extracted characters/products, generate portraits, scene references, product references, style reference |
+| 2️⃣ | **Assets** | Auto-extracted characters/products/scenes, generate portraits, scene references, product references, style reference |
 | 3️⃣ | **Storyboard** | 4-6 shots (copy / visual prompt / motion prompt / duration), edit & re-roll per shot |
 | 4️⃣ | **Images** | Generate reference image per shot, re-roll individually |
 | 5️⃣ | **Videos** | Generate video per shot (optional dual-frame), re-roll individually |
 | 6️⃣ | **Assembly** | Validate all clips, concat with FFmpeg.wasm, download MP4 |
 
-- **semi-auto (default)**: confirm images before video generation, go back and edit anytime
+- **semi-auto (default)**: confirm storyboard/images before proceeding, go back and edit anytime
 - **auto**: all steps advance automatically to the final video
 - Free plan generates videos at about **1/min** (RPM=1); multiple shots queue with an estimated wait shown in the UI
 
