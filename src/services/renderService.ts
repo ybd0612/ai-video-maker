@@ -70,6 +70,8 @@ async function getFFmpeg(): Promise<FFmpeg> {
 export interface RenderOptions {
   videoUrls: string[];
   onProgress?: (progress: number) => void;
+  /** 取消拼接：下载阶段中止 fetch，FFmpeg 阶段终止进程 */
+  signal?: AbortSignal;
 }
 
 // 走本地 Vite 代理（/cdn-proxy）的已知输出域名，须与 vite.config.ts 保持一致。
@@ -102,16 +104,21 @@ function toProxyUrl(url: string): string {
 async function fetchWithTimeout(url: string, init?: RequestInit): Promise<Response> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+  // 外部取消信号与超时信号合并：任一触发即中止
+  const externalSignal = init?.signal;
+  const onExternalAbort = () => controller.abort();
+  externalSignal?.addEventListener("abort", onExternalAbort);
   try {
     return await fetch(url, { ...init, signal: controller.signal });
   } finally {
     clearTimeout(timer);
+    externalSignal?.removeEventListener("abort", onExternalAbort);
   }
 }
 
 /** 下载单个视频为字节数组，HTTP 非 2xx 视为失败。 */
-async function downloadToBytes(url: string): Promise<Uint8Array> {
-  const res = await fetchWithTimeout(url);
+async function downloadToBytes(url: string, signal?: AbortSignal): Promise<Uint8Array> {
+  const res = await fetchWithTimeout(url, { signal });
   if (!res.ok) {
     throw new Error(`下载视频失败 HTTP ${res.status}: ${url}`);
   }
@@ -120,13 +127,13 @@ async function downloadToBytes(url: string): Promise<Uint8Array> {
 }
 
 /** 下载单个视频：先走代理，失败则回退直连原 URL（若服务端允许 CORS 也能救回）。 */
-async function fetchVideoBytes(proxyUrl: string, originalUrl: string): Promise<Uint8Array> {
+async function fetchVideoBytes(proxyUrl: string, originalUrl: string, signal?: AbortSignal): Promise<Uint8Array> {
   try {
-    return await downloadToBytes(proxyUrl);
+    return await downloadToBytes(proxyUrl, signal);
   } catch (err) {
     if (proxyUrl !== originalUrl) {
       console.warn(`[render] 代理下载失败，回退直连: ${originalUrl}`, err);
-      return await downloadToBytes(originalUrl);
+      return await downloadToBytes(originalUrl, signal);
     }
     throw err;
   }
@@ -172,14 +179,14 @@ async function runConcat(
  * Returns a blob URL of the final video.
  */
 export async function concatenateVideos(opts: RenderOptions): Promise<string> {
-  const { videoUrls, onProgress } = opts;
+  const { videoUrls, onProgress, signal } = opts;
   if (videoUrls.length === 0) throw new Error("没有可拼接的视频。");
 
   // 单镜头项目同样包一层 Blob URL：直接返回远程 URL 时，跨域下载的
   // a.download 文件名不生效（可能打开新页面而非下载），且 revokeObjectURL 无意义。
   if (videoUrls.length === 1) {
     const originalUrl = videoUrls[0];
-    const data = await fetchVideoBytes(toProxyUrl(originalUrl), originalUrl);
+    const data = await fetchVideoBytes(toProxyUrl(originalUrl), originalUrl, signal);
     // 拷贝为标准 ArrayBuffer 视图（fetch 返回的视图 buffer 类型为 ArrayBufferLike，Blob 不接受）
     const blob = new Blob([new Uint8Array(data)], { type: "video/mp4" });
     onProgress?.(100);
@@ -189,12 +196,24 @@ export async function concatenateVideos(opts: RenderOptions): Promise<string> {
   const ffmpeg = await getFFmpeg();
   ffmpegLogLines.length = 0;
 
+  // 取消监听：FFmpeg 阶段 abort 时终止进程（terminate 后实例失效，需重置缓存）
+  const onAbort = () => {
+    ffmpegInstance = null;
+    try {
+      ffmpeg.terminate();
+    } catch {
+      /* 已终止则忽略 */
+    }
+  };
+  signal?.addEventListener("abort", onAbort);
+
   try {
     // Download all videos into FFmpeg virtual filesystem
     for (let i = 0; i < videoUrls.length; i++) {
+      if (signal?.aborted) throw new Error("拼接已取消。");
       const originalUrl = videoUrls[i];
       const proxyUrl = toProxyUrl(originalUrl);
-      const data = await fetchVideoBytes(proxyUrl, originalUrl);
+      const data = await fetchVideoBytes(proxyUrl, originalUrl, signal);
       await ffmpeg.writeFile(`input${i}.mp4`, data);
       onProgress?.(Math.round(((i + 1) / (videoUrls.length + 1)) * 50));
     }
@@ -241,6 +260,7 @@ export async function concatenateVideos(opts: RenderOptions): Promise<string> {
     const msg = logTail ? `${detail}\nFFmpeg 日志尾部：\n${logTail}` : detail;
     throw new Error(msg);
   } finally {
+    signal?.removeEventListener("abort", onAbort);
     // Cleanup virtual FS
     for (let i = 0; i < videoUrls.length; i++) {
       await ffmpeg.deleteFile(`input${i}.mp4`).catch(() => {});

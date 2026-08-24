@@ -145,7 +145,22 @@ export function ProjectSidebar() {
               return (
                 <div
                   key={proj.id}
-                  onClick={() => switchProject(proj.id)}
+                  onClick={async () => {
+                    // 切换项目前提示：当前项目仍有任务在后台运行（写回按项目 ID，切换安全，但需用户知情）
+                    const current = useProjectStore.getState().projects.find((p) => p.id === activeProjectId);
+                    const running = current &&
+                      (current.status === "scripting" || current.status === "imaging" ||
+                        current.status === "videoing" || current.status === "rendering");
+                    if (running) {
+                      const ok = await confirmDialog({
+                        title: t("wizard.taskRunningSwitchTitle"),
+                        message: t("wizard.taskRunningSwitchConfirm", { title: current!.title }),
+                        confirmLabel: t("dialog.confirm"),
+                      });
+                      if (!ok) return;
+                    }
+                    switchProject(proj.id);
+                  }}
                   className={`group flex cursor-pointer flex-col gap-1 border-b border-slate-800/50 px-3 py-2 transition hover:bg-slate-900 ${
                     isActive ? "bg-slate-900 border-l-2 border-l-emerald-500" : ""
                   }`}

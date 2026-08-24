@@ -12,6 +12,7 @@ import { PromptSubFields } from "./PromptSubFields";
 import { DualFrameToggle } from "./DualFrameToggle";
 import { Lightbox } from "@/components/ui/Lightbox";
 import { useWizardActions } from "./useWizardActions";
+import { confirmDialog } from "@/components/ui/ConfirmDialog";
 import { RefreshCw } from "lucide-react";
 
 export function StepVideos() {
@@ -28,6 +29,11 @@ export function StepVideos() {
   const generatingCount = shots.filter((s) => s.status === "videoing").length;
   // 排队中的镜头：已准备好（有图片）但尚未开始生成
   const queueCount = shots.filter((s) => !s.videoUrl && s.status === "imaged" && s.imageUrl).length;
+  // 成本预估：成片总时长 + 待生成视频的配额消耗（时长秒数）
+  const totalDuration = shots.reduce((sum, s) => sum + (s.duration || 0), 0);
+  const pendingSeconds = shots
+    .filter((s) => !s.videoUrl && s.imageUrl && s.status !== "videoing")
+    .reduce((sum, s) => sum + (s.duration || 0), 0);
 
   // 生成完成 toast：allVideoed 从 false→true 时短暂提示
   const [showDoneToast, setShowDoneToast] = useState(false);
@@ -99,8 +105,15 @@ export function StepVideos() {
             </button>
           )}
           <button
-            onClick={() => {
-              // 全部重新生成：先清空已有视频，再走批量生成（幂等 + 并发受控）
+            onClick={async () => {
+              // 全部重新生成：先确认成本（整套视频配额），再清空走批量生成（幂等 + 并发受控）
+              const ok = await confirmDialog({
+                title: t("wizard.rerollAllConfirmTitle"),
+                message: t("wizard.rerollAllVideosConfirm", { count: shots.filter((s) => !!s.videoUrl).length }),
+                confirmLabel: t("dialog.confirm"),
+                variant: "danger",
+              });
+              if (!ok) return;
               const pid = project?.id;
               if (!pid) return;
               for (const s of shots) {
@@ -121,6 +134,16 @@ export function StepVideos() {
             {t("wizard.rerollAll")}
           </button>
         </div>
+      </div>
+
+      {/* 成本预估：成片总时长 + 待生成视频配额消耗 */}
+      <div className="flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-slate-500">
+        <span>{t("wizard.videoDurationEstimate", { seconds: totalDuration })}</span>
+        {pendingSeconds > 0 && (
+          <span className="text-amber-400/80">
+            {t("wizard.videoQuotaEstimate", { seconds: pendingSeconds })}
+          </span>
+        )}
       </div>
 
       {/* 步骤级进度条 */}

@@ -7,7 +7,7 @@ import { useState, useCallback, useEffect, useRef } from "react";
 import { useProjectStore, selectActiveProject } from "@/stores/projectStore";
 import { useT } from "@/i18n";
 import { concatenateVideos } from "@/services/renderService";
-import { Download, Loader2, Film } from "lucide-react";
+import { Download, Loader2, Film, Square } from "lucide-react";
 
 export function StepAssembly() {
   const t = useT();
@@ -23,6 +23,7 @@ export function StepAssembly() {
   const [renderProgress, setRenderProgress] = useState(0);
   const [renderError, setRenderError] = useState<string | null>(null);
   const [renderedUrl, setRenderedUrl] = useState<string | null>(null);
+  const renderAbortRef = useRef<AbortController | null>(null);
   const renderedUrlRef = useRef<string | null>(null);
   const renderedProjectIdRef = useRef<string | null>(project?.id ?? null);
 
@@ -54,6 +55,8 @@ export function StepAssembly() {
   const handleRender = useCallback(async () => {
     if (!canRender || !project) return;
     const targetProjectId = project.id;
+    const controller = new AbortController();
+    renderAbortRef.current = controller;
     setIsRendering(true);
     setRenderProgress(0);
     setRenderError(null);
@@ -64,6 +67,7 @@ export function StepAssembly() {
       const url = await concatenateVideos({
         videoUrls: urls,
         onProgress: setRenderProgress,
+        signal: controller.signal,
       });
       const activeProjectId = useProjectStore.getState().activeProjectId;
       if (activeProjectId !== targetProjectId) {
@@ -78,13 +82,24 @@ export function StepAssembly() {
       setRenderedUrl(url);
       setProjectStatusById(targetProjectId, "done");
     } catch (err) {
+      // 用户取消拼接：不视为失败，复位状态并允许重新拼接
+      if (controller.signal.aborted) {
+        setProjectStatusById(targetProjectId, "idle");
+        return;
+      }
       console.error("Assembly failed:", err);
       setRenderError(err instanceof Error ? err.message : String(err));
       setProjectStatusById(targetProjectId, "failed", err instanceof Error ? err.message : String(err));
     } finally {
+      renderAbortRef.current = null;
       setIsRendering(false);
     }
   }, [canRender, project, videoShots, setProjectStatusById]);
+
+  /** 取消拼接：中止下载/终止 FFmpeg 进程 */
+  const handleCancelRender = () => {
+    renderAbortRef.current?.abort();
+  };
 
   const handleDownload = () => {
     if (!renderedUrl || !project) return;
@@ -144,23 +159,34 @@ export function StepAssembly() {
 
       {/* 拼接按钮 */}
       {!renderedUrl && (
-        <button
-          onClick={handleRender}
-          disabled={isRendering || !canRender}
-          className="mx-auto flex items-center gap-2 rounded-xl bg-emerald-600 px-8 py-3 text-sm font-semibold text-white transition hover:bg-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          {isRendering ? (
-            <>
-              <Loader2 size={16} className="animate-spin" />
-              {t("wizard.generating")} {renderProgress}%
-            </>
-          ) : (
-            <>
-              <Film size={16} />
-              {t("pipeline.concatVideos")}
-            </>
+        <div className="mx-auto flex items-center gap-2">
+          <button
+            onClick={handleRender}
+            disabled={isRendering || !canRender}
+            className="flex items-center gap-2 rounded-xl bg-emerald-600 px-8 py-3 text-sm font-semibold text-white transition hover:bg-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {isRendering ? (
+              <>
+                <Loader2 size={16} className="animate-spin" />
+                {t("wizard.generating")} {renderProgress}%
+              </>
+            ) : (
+              <>
+                <Film size={16} />
+                {t("pipeline.concatVideos")}
+              </>
+            )}
+          </button>
+          {isRendering && (
+            <button
+              onClick={handleCancelRender}
+              className="flex items-center gap-1.5 rounded-lg bg-red-600 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-red-500"
+            >
+              <Square size={14} />
+              {t("wizard.cancelRender")}
+            </button>
           )}
-        </button>
+        </div>
       )}
 
       {/* 拼接进度条 */}

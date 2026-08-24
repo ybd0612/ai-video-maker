@@ -14,7 +14,7 @@ import { StepImages } from "./StepImages";
 import { StepVideos } from "./StepVideos";
 import { StepAssembly } from "./StepAssembly";
 import { AutomationModeSwitch } from "./AutomationModeSwitch";
-import { ChevronLeft, ChevronRight, SkipForward } from "lucide-react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 
 const TOTAL_STEPS = 6;
 
@@ -25,12 +25,13 @@ export function CreationWizard() {
   const setAutomationMode = useProjectStore((s) => s.setAutomationMode);
   const currentStep = project?.wizardStep ?? 1;
   const shots = project?.shots ?? [];
-  const assets = project?.assets ?? [];
 
   const canAdvance = (() => {
     switch (currentStep) {
       case 1: return !!project?.ideaPrompt?.trim();
-      case 2: return assets.length > 0;
+      // 步骤 2 无资产也可直接下一步（等价跳过）：纯想法项目无需资产，
+      // 与显式“跳过”按钮语义一致，消除“下一步禁用 + 跳过可用”的矛盾。
+      case 2: return true;
       case 3: return shots.length > 0 && shots.every((s) => s.scriptText.trim());
       case 4: return shots.length > 0 && shots.every((s) => !!s.imageUrl);
       case 5: return shots.length > 0 && shots.every((s) => !!s.videoUrl);
@@ -51,10 +52,6 @@ export function CreationWizard() {
     if (canAdvance && currentStep < TOTAL_STEPS) {
       setWizardStep((currentStep + 1) as WizardStep);
     }
-  };
-
-  const handleSkipAssets = () => {
-    setWizardStep(3);
   };
 
   return (
@@ -91,16 +88,6 @@ export function CreationWizard() {
           </button>
 
           <div className="flex items-center gap-2">
-            {currentStep === 2 && (
-              <button
-                onClick={handleSkipAssets}
-                className="flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium text-slate-500 transition hover:bg-slate-800 hover:text-slate-300"
-              >
-                <SkipForward size={14} />
-                {t("wizard.skip")}
-              </button>
-            )}
-
             {currentStep < TOTAL_STEPS && (
               <button
                 onClick={handleNext}

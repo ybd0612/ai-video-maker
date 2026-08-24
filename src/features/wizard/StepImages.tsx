@@ -11,6 +11,7 @@ import { PromptSubFields } from "./PromptSubFields";
 import { Lightbox } from "@/components/ui/Lightbox";
 import { useWizardActions } from "./useWizardActions";
 import { ReviewCheckpoint } from "./ReviewCheckpoint";
+import { confirmDialog } from "@/components/ui/ConfirmDialog";
 import { RefreshCw } from "lucide-react";
 
 export function StepImages() {
@@ -23,6 +24,8 @@ export function StepImages() {
   const imagedCount = shots.filter((s) => !!s.imageUrl).length;
   const allImaged = shots.length > 0 && shots.every((s) => !!s.imageUrl);
   const failedCount = shots.filter((s) => s.status === "failed").length;
+  // 缺少画面描述的镜头：不会参与图片生成（静默跳过会让用户困惑）
+  const missingPromptCount = shots.filter((s) => !s.visualPrompt.trim()).length;
   // 所有 shot 均已落定（成功或失败）时才显示审核卡点，避免失败时用户卡住
   const allSettled = shots.length > 0 && shots.every((s) => !!s.imageUrl || s.status === "failed");
   const generatingCount = shots.filter((s) => s.status === "imaging").length;
@@ -78,8 +81,15 @@ export function StepImages() {
             </button>
           )}
           <button
-            onClick={() => {
-              // 全部重新生成：先清空已有图片，再走批量生成（幂等 + 并发受控）
+            onClick={async () => {
+              // 全部重新生成：先确认成本（整套图片配额），再清空走批量生成（幂等 + 并发受控）
+              const ok = await confirmDialog({
+                title: t("wizard.rerollAllConfirmTitle"),
+                message: t("wizard.rerollAllImagesConfirm", { count: shots.filter((s) => !!s.imageUrl).length }),
+                confirmLabel: t("dialog.confirm"),
+                variant: "danger",
+              });
+              if (!ok) return;
               const pid = project?.id;
               if (!pid) return;
               for (const s of shots) {
@@ -100,6 +110,13 @@ export function StepImages() {
           </button>
         </div>
       </div>
+
+      {/* 缺少画面描述的镜头提示（不会参与生成） */}
+      {missingPromptCount > 0 && (
+        <div className="rounded-lg border border-amber-800 bg-amber-950/30 px-3 py-2 text-xs text-amber-300">
+          {t("wizard.missingVisualPrompt", { count: missingPromptCount })}
+        </div>
+      )}
 
       {/* 步骤级进度条 */}
       {shots.length > 0 && (

@@ -5,13 +5,14 @@
 // ────────────────────────────────────────────────────────────────────────────
 
 import { useState } from "react";
-import { useProjectStore, selectActiveProject } from "@/stores/projectStore";
-import { useT } from "@/i18n";
+import { useProjectStore, selectActiveProject, type Asset } from "@/stores/projectStore";
+import { useT, type TranslationKey } from "@/i18n";
 import { ShotCard } from "./ShotCard";
 import { PromptSubFields } from "./PromptSubFields";
 import { PromptField } from "./PromptField";
 import { DialogueEditor } from "@/features/shots/DialogueEditor";
 import { useWizardActions } from "./useWizardActions";
+import { confirmDialog } from "@/components/ui/ConfirmDialog";
 import { Plus, Sparkles, Loader2 } from "lucide-react";
 
 export function StepStoryboard() {
@@ -20,6 +21,7 @@ export function StepStoryboard() {
   const updateShot = useProjectStore((s) => s.updateShot);
   const removeShot = useProjectStore((s) => s.removeShot);
   const addShot = useProjectStore((s) => s.addShot);
+  const setWizardStep = useProjectStore((s) => s.setWizardStep);
   const { rerollShot, generateStoryboard } = useWizardActions();
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -31,6 +33,17 @@ export function StepStoryboard() {
 
   const handleGenerateStoryboard = async () => {
     if (!ideaPrompt.trim() || !project) return;
+    // 已有分镜时，顶部“重新生成”会整体覆盖所有镜头：先确认，防止误触
+    // 丢失手动修改并白耗一次文本配额。
+    if (shots.length > 0) {
+      const ok = await confirmDialog({
+        title: t("wizard.storyboardRegenerateTitle"),
+        message: t("wizard.storyboardRegenerateConfirm", { count: shots.length }),
+        confirmLabel: t("dialog.confirm"),
+        variant: "danger",
+      });
+      if (!ok) return;
+    }
     setIsGenerating(true);
     setError(null);
     try {
@@ -39,6 +52,11 @@ export function StepStoryboard() {
       // 会用 "Camera slowly pans, gentle movement" 等兜底文案覆盖完整提示词，
       // 导致视频生成请求体 prompt 内容缺失（用户实测发现的提示词丢失问题）。
       await generateStoryboard(ideaPrompt.trim());
+      // auto 模式：分镜生成成功后自动推进到图片步骤（无需确认）
+      const latest = useProjectStore.getState().projects.find((p) => p.id === project.id);
+      if (latest?.automationMode === "auto") {
+        setWizardStep(4);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -80,14 +98,7 @@ export function StepStoryboard() {
         )}
 
         {/* Asset summary */}
-        <div className="flex gap-4 text-xs text-slate-500">
-          <span>{t("wizard.assetCharacters")}: {assets.filter((a) => a.type === "character").length}</span>
-          <span>{t("wizard.assetScenes")}: {assets.filter((a) => a.type === "scene").length}</span>
-          {assets.some((a) => a.type === "product") && (
-            <span>{t("wizard.productReferences")}: {assets.filter((a) => a.type === "product").length}</span>
-          )}
-          {project?.styleReferenceUrl && <span>{t("wizard.assetStyle")}: ✓</span>}
-        </div>
+        <AssetSummaryBar assets={assets} t={t} styleReady={!!project?.styleReferenceUrl} />
 
         <button
           onClick={handleGenerateStoryboard}
@@ -146,6 +157,9 @@ export function StepStoryboard() {
         </div>
       </div>
 
+      {/* 资产摘要：常驻显示，让用户感知分镜生成时自动提取的资产 */}
+      <AssetSummaryBar assets={assets} t={t} styleReady={!!project?.styleReferenceUrl} />
+
       {/* Shot cards */}
       <div className="flex flex-col gap-2">
         {shots.map((shot) => (
@@ -192,6 +206,48 @@ export function StepStoryboard() {
           </ShotCard>
         ))}
       </div>
+
+      {/* 分镜确认卡：semi-auto 模式下确认后进入图片生成（auto 模式已自动推进） */}
+      {project?.automationMode !== "auto" && (
+        <div className="rounded-xl border border-slate-700 bg-slate-800/50 p-6">
+          <h3 className="text-sm font-semibold text-slate-100">
+            {t("review.qualityCheck")}
+          </h3>
+          <p className="mt-2 text-xs text-slate-400">
+            {t("wizard.storyboardConfirmHint")}
+          </p>
+          <button
+            onClick={() => setWizardStep(4)}
+            className="mt-4 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-emerald-500"
+          >
+            {t("wizard.confirmStoryboard")}
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** 资产摘要条：常驻显示角色/场景/产品/风格资产数量 */
+function AssetSummaryBar({
+  assets,
+  t,
+  styleReady,
+}: {
+  assets: Asset[];
+  t: (key: TranslationKey, vars?: Record<string, string | number>) => string;
+  styleReady: boolean;
+}) {
+  const chars = assets.filter((a) => a.type === "character").length;
+  const scenes = assets.filter((a) => a.type === "scene").length;
+  const products = assets.filter((a) => a.type === "product").length;
+  if (chars === 0 && scenes === 0 && products === 0 && !styleReady) return null;
+  return (
+    <div className="flex flex-wrap gap-3 text-[11px] text-slate-500">
+      <span>{t("wizard.assetCharacters")}: {chars}</span>
+      <span>{t("wizard.assetScenes")}: {scenes}</span>
+      <span>{t("wizard.productReferences")}: {products}</span>
+      {styleReady && <span>{t("wizard.assetStyle")}: ✓</span>}
     </div>
   );
 }

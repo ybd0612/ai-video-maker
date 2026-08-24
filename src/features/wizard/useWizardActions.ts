@@ -279,6 +279,17 @@ export function useWizardActions() {
 
       if (result.shots.length > 0) {
         const newShot = result.shots[0];
+        // 对白/角色引用回填：模型可能返回自编角色 ID，先按已有角色名映射，
+        // 匹配不到的置 null（归旁白）或移除，避免重roll后对白与脚本脱节
+        const existingCharacters = project.assets.filter((a) => a.type === "character");
+        const idByName = new Map(
+          existingCharacters.map((c) => [c.name.trim().toLocaleLowerCase(), c.id]),
+        );
+        const resolveCharacterId = (ref: string): string | null => {
+          const matched = idByName.get(ref.trim().toLocaleLowerCase());
+          if (matched) return matched;
+          return existingCharacters.some((c) => c.id === ref) ? ref : null;
+        };
         store.updateShotByProjectId(targetProjectId, shotId, {
           scriptText: newShot.scriptText,
           visualPrompt: newShot.visualPrompt,
@@ -295,6 +306,13 @@ export function useWizardActions() {
           motionSpeedDesc: newShot.motionSpeedDesc,
           negativeMotionPrompt: newShot.negativeMotionPrompt,
           duration: newShot.duration,
+          dialogues: (newShot.dialogues ?? []).map((d) => ({
+            ...d,
+            characterId: d.characterId ? resolveCharacterId(d.characterId) : null,
+          })),
+          activeCharacterIds: (newShot.activeCharacterIds ?? [])
+            .map(resolveCharacterId)
+            .filter((x): x is string => x !== null),
           status: "scripted",
           error: undefined,
         });

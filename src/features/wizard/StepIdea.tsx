@@ -166,8 +166,10 @@ export function StepIdea({ onGenerated }: StepIdeaProps) {
       setChatHistory((prev) => [...prev, assistantMsg]);
       // Auto-apply: AI always outputs the complete idea
       setPrompt(result.content);
-    } catch {
-      setChatHistory((prev) => [...prev, { role: "assistant", content: "请求失败，请重试。" }]);
+    } catch (err) {
+      // 显示具体失败原因（限流/配额/网络），避免用户只能猜测
+      const detail = err instanceof Error ? err.message : String(err);
+      setChatHistory((prev) => [...prev, { role: "assistant", content: `请求失败：${detail}` }]);
     } finally {
       setIsRefining(false);
       // Auto-focus chat input so user can continue typing

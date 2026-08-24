@@ -440,6 +440,21 @@ const zh = {
   "review.quotaUsage": "今日配额用量：图片 {imageUsed}/{imageLimit} 张 · 视频 {videoUsed}/{videoLimit} 秒",
   "wizard.waiting": "等待中...",
 
+  // 流程优化（分镜确认/成本感知/任务提示）
+  "wizard.storyboardRegenerateTitle": "重新生成全部分镜？",
+  "wizard.storyboardRegenerateConfirm": "将重新生成全部 {count} 个镜头，覆盖手动修改，并消耗一次文本配额。",
+  "wizard.storyboardConfirmHint": "请确认分镜文案与画面描述符合预期，然后进入图片生成。",
+  "wizard.noAssetsContinueHint": "当前无角色/场景/产品资产：画面一致性会减弱，可手动添加资产，或直接继续。",
+  "wizard.missingVisualPrompt": "{count} 个镜头缺少画面描述，将跳过图片生成，请返回分镜步骤补充。",
+  "wizard.rerollAllConfirmTitle": "全部重新生成？",
+  "wizard.rerollAllImagesConfirm": "将重新生成全部 {count} 张图片，消耗对应图片配额。已手动修改将丢失。",
+  "wizard.rerollAllVideosConfirm": "将重新生成全部 {count} 条视频，消耗对应视频配额。已手动修改将丢失。",
+  "wizard.videoDurationEstimate": "预估成片时长：{seconds} 秒",
+  "wizard.videoQuotaEstimate": "本次将消耗 {seconds} 秒视频配额",
+  "wizard.cancelRender": "取消拼接",
+  "wizard.taskRunningSwitchTitle": "任务仍在后台运行",
+  "wizard.taskRunningSwitchConfirm": "项目「{title}」仍有任务在后台运行，切换后任务将继续完成并写回该项目。确定切换？",
+
 } as const;
 
 const en = {
@@ -877,6 +892,21 @@ const en = {
   "review.retryFailedShots": "Retry Failed Shots",
   "review.quotaUsage": "Today's quota usage: {imageUsed}/{imageLimit} images · {videoUsed}/{videoLimit}s video",
   "wizard.waiting": "Waiting...",
+
+  // Flow optimizations (storyboard confirm / cost awareness / task notice)
+  "wizard.storyboardRegenerateTitle": "Regenerate all shots?",
+  "wizard.storyboardRegenerateConfirm": "Will regenerate all {count} shots, overwriting manual edits and consuming one text quota.",
+  "wizard.storyboardConfirmHint": "Please confirm the storyboard copy and visual descriptions before proceeding to image generation.",
+  "wizard.noAssetsContinueHint": "No assets yet: visual consistency will be weaker. Add characters/scenes/products or continue directly.",
+  "wizard.missingVisualPrompt": "{count} shot(s) lack visual descriptions and will be skipped. Go back to the storyboard step to fill them in.",
+  "wizard.rerollAllConfirmTitle": "Re-roll everything?",
+  "wizard.rerollAllImagesConfirm": "Will regenerate all {count} images, consuming image quota. Manual edits will be lost.",
+  "wizard.rerollAllVideosConfirm": "Will regenerate all {count} videos, consuming video quota. Manual edits will be lost.",
+  "wizard.videoDurationEstimate": "Estimated video length: {seconds}s",
+  "wizard.videoQuotaEstimate": "This run consumes {seconds}s of video quota",
+  "wizard.cancelRender": "Cancel",
+  "wizard.taskRunningSwitchTitle": "Task still running",
+  "wizard.taskRunningSwitchConfirm": "Project \"{title}\" still has tasks running in the background. They will continue and write back to that project. Switch anyway?",
 } as const;
 
 export type TranslationKey = keyof typeof zh;
