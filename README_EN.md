@@ -43,7 +43,7 @@ A wizard-based short video production tool: enter a topic, and the AI automatica
 
 ### Prerequisites
 
-- Node.js >= 18
+- Node.js ^20.19.0 or >= 22.12.0 (required by Vite 8)
 - npm >= 9
 
 ### Install & Run
