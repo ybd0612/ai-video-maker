@@ -203,6 +203,13 @@ export function StepAssets() {
         </p>
       </div>
 
+      {/* 无资产提示：可直接下一步（等价跳过），但说明一致性影响 */}
+      {characters.length === 0 && sceneReferences.length === 0 && products.length === 0 && (
+        <p className="rounded-lg border border-amber-800/50 bg-amber-950/20 px-3 py-2 text-center text-[11px] text-amber-300/90">
+          {t("wizard.noAssetsContinueHint")}
+        </p>
+      )}
+
       {/* ── Characters section ────────────────────────────────────────── */}
       <section className="flex flex-col gap-3">
         <div className="flex items-center justify-between">
