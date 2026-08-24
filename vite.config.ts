@@ -4,6 +4,9 @@ import tailwindcss from "@tailwindcss/vite";
 import path from "node:path";
 
 export default defineConfig({
+  // 相对路径 base：兼容 GitHub Pages 子路径（https://<user>.github.io/<repo>/）
+  // 与自定义域名；构建产物资源引用变为 ./assets/...
+  base: "./",
   plugins: [react(), tailwindcss()],
   resolve: {
     alias: {
