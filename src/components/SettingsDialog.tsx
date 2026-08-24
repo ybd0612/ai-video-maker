@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { X, Eye, EyeOff, CheckCircle2, Loader2, AlertTriangle } from "lucide-react";
 import { useSettingsStore } from "@/stores/settingsStore";
+import { useProjectStore } from "@/stores/projectStore";
 import { motion, AnimatePresence } from "framer-motion";
 import { resolveBaseUrl } from '@/lib/resolveBaseUrl';
 import { useT } from '@/i18n';
@@ -91,6 +92,7 @@ export function SettingsDialog() {
       return;
     }
     setProviderConfig({ apiKey, baseUrl, plan });
+    useProjectStore.getState().addHistory("settings_changed", "更新设置（API Key / 套餐）");
     showToast("success", t("settings.saved"));
     setOpen(false);
   };
@@ -206,10 +208,9 @@ export function SettingsDialog() {
                   <input
                     type="text"
                     value={baseUrl}
-                    readOnly
-
+                    onChange={(e) => setBaseUrl(e.target.value)}
                     placeholder="https://api.agnes-ai.cn/v1"
-                    className="w-full cursor-not-allowed rounded-lg border border-slate-700/50 bg-slate-800/50 px-3 py-2 text-xs text-slate-500 focus:outline-none"
+                    className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-xs text-slate-100 placeholder:text-slate-600 focus:border-emerald-500 focus:outline-none"
                   />
                 </div>
 

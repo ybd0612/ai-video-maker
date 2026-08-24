@@ -94,6 +94,16 @@ export function StepAssembly() {
     a.click();
   };
 
+  // 重新拼接：释放旧 Blob URL 后重新执行拼接（复用 handleRender 的完整性校验与状态管理）
+  const handleRerender = () => {
+    if (renderedUrlRef.current) {
+      URL.revokeObjectURL(renderedUrlRef.current);
+      renderedUrlRef.current = null;
+    }
+    setRenderedUrl(null);
+    handleRender();
+  };
+
   return (
     <div className="mx-auto flex max-w-3xl flex-col gap-6 py-6">
       <div className="text-center">
@@ -185,13 +195,23 @@ export function StepAssembly() {
               className="w-full"
             />
           </div>
-          <button
-            onClick={handleDownload}
-            className="flex items-center gap-2 rounded-lg bg-sky-600 px-6 py-2.5 text-sm font-medium text-white transition hover:bg-sky-500"
-          >
-            <Download size={14} />
-            {t("pipeline.download")}
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleRerender}
+              disabled={isRendering}
+              className="flex items-center gap-2 rounded-lg bg-slate-700 px-6 py-2.5 text-sm font-medium text-slate-200 transition hover:bg-slate-600 disabled:opacity-50"
+            >
+              <Film size={14} />
+              {t("wizard.reassemble")}
+            </button>
+            <button
+              onClick={handleDownload}
+              className="flex items-center gap-2 rounded-lg bg-sky-600 px-6 py-2.5 text-sm font-medium text-white transition hover:bg-sky-500"
+            >
+              <Download size={14} />
+              {t("pipeline.download")}
+            </button>
+          </div>
         </div>
       )}
     </div>

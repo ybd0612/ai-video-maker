@@ -130,7 +130,22 @@ export function ProjectWorkspace() {
           {project && (
             <select
               value={project.aspectRatio}
-              onChange={(e) => updateProject({ aspectRatio: e.target.value as AspectRatio })}
+              onChange={async (e) => {
+                const next = e.target.value as AspectRatio;
+                if (next === project.aspectRatio) return;
+                // 画幅变更后已生成的图片/视频不会自动重新生成：若有生成产物，
+                // 先确认再切换，避免用户误以为内容会跟随新画幅自动更新
+                const hasGenerated = project.shots.some((s) => s.imageUrl || s.videoUrl);
+                if (hasGenerated) {
+                  const ok = await confirmDialog({
+                    title: t("wizard.aspectRatioChangeTitle"),
+                    message: t("wizard.aspectRatioChangeMessage"),
+                    confirmLabel: t("dialog.confirm"),
+                  });
+                  if (!ok) return; // 受控 select 保持原值，自动回退
+                }
+                updateProject({ aspectRatio: next });
+              }}
               className="rounded border border-slate-700 bg-slate-800 px-2 py-1 text-xs text-slate-300 focus:outline-none"
             >
               <option value="16:9">16:9</option>

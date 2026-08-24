@@ -9,12 +9,11 @@ import type { AutomationMode } from "@/stores/projectStore";
 interface ReviewCheckpointProps {
   mode: AutomationMode;
   onConfirm: () => void;
-  onSkip: () => void;
   /** 生成失败的图片数量（>0 时显示警告，失败项将在视频阶段被跳过） */
   failedCount?: number;
 }
 
-export function ReviewCheckpoint({ mode, onConfirm, onSkip, failedCount = 0 }: ReviewCheckpointProps) {
+export function ReviewCheckpoint({ mode, onConfirm, failedCount = 0 }: ReviewCheckpointProps) {
   const t = useT();
 
   // 全自动模式下自动跳过审核
@@ -37,22 +36,13 @@ export function ReviewCheckpoint({ mode, onConfirm, onSkip, failedCount = 0 }: R
         </p>
       )}
 
-      <div className="mt-4 flex gap-3">
+      <div className="mt-4">
         <button
           onClick={onConfirm}
           className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-emerald-500"
         >
           {t("review.confirmImages")}
         </button>
-
-        {mode === "manual" && (
-          <button
-            onClick={onSkip}
-            className="rounded-lg bg-slate-700 px-4 py-2 text-sm font-medium text-slate-300 transition hover:bg-slate-600"
-          >
-            {t("review.skipReview")}
-          </button>
-        )}
       </div>
     </div>
   );

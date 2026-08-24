@@ -11,9 +11,9 @@ import {
   AlertCircle,
   Loader2,
   Hash,
-  GripVertical,
   Trash2,
 } from "lucide-react";
+import { confirmDialog } from "@/components/ui/ConfirmDialog";
 
 interface ShotListProps {
   selectedShotId: string | null;
@@ -62,7 +62,6 @@ export function ShotList({ selectedShotId, onSelect }: ShotListProps) {
                 : "border-transparent hover:bg-slate-800/60 text-slate-400 hover:text-slate-200"
             }`}
           >
-            <GripVertical size={12} className="mt-0.5 shrink-0 text-slate-700" />
             <div className="h-10 w-14 shrink-0 overflow-hidden rounded border border-slate-700 bg-slate-800">
               {shot.imageUrl ? (
                 <img src={shot.imageUrl} alt="" className="h-full w-full object-cover" />
@@ -84,7 +83,16 @@ export function ShotList({ selectedShotId, onSelect }: ShotListProps) {
               </p>
             </div>
             <button
-              onClick={(e) => { e.stopPropagation(); removeShot(shot.id); }}
+              onClick={async (e) => {
+                e.stopPropagation();
+                const ok = await confirmDialog({
+                  title: t("dialog.delete"),
+                  message: `${t("pipeline.shot")} ${shot.index + 1}`,
+                  confirmLabel: t("dialog.confirm"),
+                  variant: "danger",
+                });
+                if (ok) removeShot(shot.id);
+              }}
               className="mt-0.5 shrink-0 opacity-0 group-hover:opacity-100 text-slate-600 hover:text-red-400 transition"
               title={t("dialog.delete")}
             >

@@ -235,7 +235,7 @@ interface ProjectState {
   setVideoGenerationStartedByProjectId: (projectId: string, v: boolean) => void;
 
   /* History actions */
-  addHistory: (action: HistoryAction, description: string) => void;
+  addHistory: (action: HistoryAction, description: string, projectId?: string) => void;
   clearHistory: () => void;
 }
 
@@ -730,11 +730,12 @@ export const useProjectStore = create<ProjectState>()(
 
       /* ── History actions ────────────────────────────────────────────── */
 
-      addHistory: (action, description) => {
+      addHistory: (action, description, projectId) => {
         const { activeProjectId } = get();
+        // 异步任务完成后写历史时显式传入发起项目 ID，避免记录到已切换的活动项目
         const entry: HistoryEntry = {
           id: newId("hist"),
-          projectId: activeProjectId ?? "",
+          projectId: projectId ?? activeProjectId ?? "",
           action,
           description,
           timestamp: Date.now(),

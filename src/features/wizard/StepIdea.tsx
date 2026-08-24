@@ -30,6 +30,21 @@ const IDEA_SYSTEM_PROMPT = `你是一位专业的短视频创意策划师。用�
 - 如果用户的想法已经足够好，告诉他们可以点击"下一步"进入资产准备
 - 如果用户提出修改意见，在完整版本中体现修改`;
 
+const IDEA_SYSTEM_PROMPT_EN = `You are a professional short-video creative planner. The user is brainstorming a short video topic and idea; help them refine it step by step.
+
+Core rules:
+- Every reply must be a COMPLETE video idea/description, incorporating all previous edits and additions
+- Do not reply with incremental changes only; output the current latest full version
+- The user can copy your reply directly as the final idea
+
+Content requirements:
+- Help clarify the video's theme, emotional tone, and visual style
+- Provide concrete scene suggestions and narrative direction
+- Be specific, visual, and actionable
+- Keep each reply under 200 characters
+- If the idea is already good enough, tell them they can click "Next" to proceed to asset preparation
+- If the user requests changes, reflect them in the full version`;
+
 interface StepIdeaProps {
   onGenerated?: () => void;
 }
@@ -112,7 +127,7 @@ export function StepIdea({ onGenerated }: StepIdeaProps) {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [chatHistory]);
 
-  const systemPrompt = IDEA_SYSTEM_PROMPT;
+  const systemPrompt = project?.language === "en" ? IDEA_SYSTEM_PROMPT_EN : IDEA_SYSTEM_PROMPT;
 
   /** Send a message in the conversation */
   const handleChatSend = async () => {

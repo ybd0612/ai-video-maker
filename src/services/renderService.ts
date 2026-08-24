@@ -174,7 +174,17 @@ async function runConcat(
 export async function concatenateVideos(opts: RenderOptions): Promise<string> {
   const { videoUrls, onProgress } = opts;
   if (videoUrls.length === 0) throw new Error("没有可拼接的视频。");
-  if (videoUrls.length === 1) return videoUrls[0];
+
+  // 单镜头项目同样包一层 Blob URL：直接返回远程 URL 时，跨域下载的
+  // a.download 文件名不生效（可能打开新页面而非下载），且 revokeObjectURL 无意义。
+  if (videoUrls.length === 1) {
+    const originalUrl = videoUrls[0];
+    const data = await fetchVideoBytes(toProxyUrl(originalUrl), originalUrl);
+    // 拷贝为标准 ArrayBuffer 视图（fetch 返回的视图 buffer 类型为 ArrayBufferLike，Blob 不接受）
+    const blob = new Blob([new Uint8Array(data)], { type: "video/mp4" });
+    onProgress?.(100);
+    return URL.createObjectURL(blob);
+  }
 
   const ffmpeg = await getFFmpeg();
   ffmpegLogLines.length = 0;

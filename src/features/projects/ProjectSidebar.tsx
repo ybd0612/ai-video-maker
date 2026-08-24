@@ -132,7 +132,7 @@ export function ProjectSidebar() {
         {filtered.length === 0 ? (
           <div className="flex h-full items-center justify-center">
             <span className="text-xs text-slate-600">
-              {search ? "未找到匹配项目" : t("pipeline.noProjects")}
+              {search ? t("pipeline.noSearchResults") : t("pipeline.noProjects")}
             </span>
           </div>
         ) : (

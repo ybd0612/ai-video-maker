@@ -210,6 +210,7 @@ export function useWizardActions() {
       }
 
       useProjectStore.getState().setProjectStatusById(targetProjectId, "idle");
+      useProjectStore.getState().addHistory("script_generated", `生成分镜（${shots.length} 个镜头）`, targetProjectId);
     } catch (err) {
       // 失败时复位发起项目的状态，避免永久停留在 scripting（侧边栏一直转圈）
       useProjectStore.getState().updateProjectById(targetProjectId, (p) => ({
@@ -237,10 +238,18 @@ export function useWizardActions() {
     store.setShotStatusByProjectId(targetProjectId, shotId, "scripting");
 
     try {
+      // 附带主题与角色上下文，避免单镜头重试结果与整体风格漂移
+      const contextParts = [
+        `Regenerate this shot: ${shot.scriptText}`,
+        project.ideaPrompt?.trim() ? `Original idea: ${project.ideaPrompt.trim()}` : "",
+        project.characters.length > 0
+          ? `Characters: ${project.characters.map((c) => c.name).join(", ")}`
+          : "",
+      ].filter(Boolean);
       const result = await generateScript({
         apiKey: providerConfig.apiKey,
         baseUrl: providerConfig.baseUrl,
-        prompt: `Regenerate this shot: ${shot.scriptText}`,
+        prompt: contextParts.join("\n"),
         language: project.language,
         aspectRatio: project.aspectRatio,
         characters: project.characters,
@@ -269,6 +278,11 @@ export function useWizardActions() {
         });
         // 此前可能因部分失败置为 failed；全部镜头恢复后复位项目状态
         restoreProjectStatusIfReady(targetProjectId, (p) => p.shots.every((s) => s.status !== "failed"));
+        useProjectStore.getState().addHistory(
+          "shot_regenerated",
+          `重新生成镜头 ${shot.index + 1}`,
+          targetProjectId,
+        );
       }
     } catch (err) {
       store.setShotStatusByProjectId(targetProjectId, shotId, "failed", err instanceof Error ? err.message : String(err));
@@ -471,7 +485,8 @@ export function useWizardActions() {
     const allImaged = updatedProject?.shots.every((s) => !!s.imageUrl);
     if (allImaged) {
       useProjectStore.getState().setImageGenerationStartedByProjectId(targetProjectId, false);
-      useProjectStore.getState().setProjectStatusById(targetProjectId, "done");
+      // 图片全部完成 ≠ 项目完成（视频/成片尚未生成），置 idle 避免侧边栏误显“已完成”
+      useProjectStore.getState().setProjectStatusById(targetProjectId, "idle");
     } else {
       // 部分失败：清除标记并复位状态，避免项目永久停留在 imaging（侧边栏一直转圈）
       useProjectStore.getState().setImageGenerationStartedByProjectId(targetProjectId, false);
@@ -513,6 +528,7 @@ export function useWizardActions() {
       store.updateShotByProjectId(targetProjectId, shotId, { imageUrl, status: "imaged" });
       // 此前可能因部分失败置为 failed；全部镜头图片就绪后复位项目状态
       restoreProjectStatusIfReady(targetProjectId, (p) => p.shots.every((s) => !!s.imageUrl));
+      useProjectStore.getState().addHistory("shot_regenerated", `重新生成镜头图片 ${shot.index + 1}`, targetProjectId);
     } catch (err) {
       store.setShotStatusByProjectId(targetProjectId, shotId, "failed", err instanceof Error ? err.message : String(err));
     }
@@ -533,8 +549,10 @@ export function useWizardActions() {
     if (activeVideoTasks.has(targetProjectId)) return;
 
     const plan = resolvePlan(providerConfig.plan as PlanId | undefined);
-    // 免费档视频 RPM=1，限流器会串行排队；这里同步使用相同并发度，避免界面同时显示多个“生成中”。
-    const videoConcurrency = plan.rpm.video <= 1 ? 1 : 2;
+    // 视频并发与套餐同步：免费档 RPM=1 串行；企业 2；Token Plan 保守取 3（RPM=5，
+    // 避免同时创建过多轮询任务）。限流器会进一步串行化，不会突破 RPM 上限。
+    const videoConcurrency =
+      plan.accessType === "tokenplan" ? 3 : plan.rpm.video <= 1 ? 1 : 2;
 
     // 刷新/新会话恢复：videoing 状态没有对应的存活任务（注册表为空）→ 重置为 imaged，
     // 让下面重新接管这些 shot，避免“永久加载中”卡死。
@@ -698,6 +716,7 @@ export function useWizardActions() {
       useProjectStore.getState().updateShotByProjectId(targetProjectId, shotId, { videoUrl: result.videoUrl, status: "videoed" });
       // 此前可能因部分失败置为 failed；全部镜头视频就绪后复位项目状态
       restoreProjectStatusIfReady(targetProjectId, (p) => p.shots.every((s) => !!s.videoUrl));
+      useProjectStore.getState().addHistory("shot_regenerated", `重新生成镜头视频 ${shot.index + 1}`, targetProjectId);
     } catch (err) {
       if (err instanceof VideoTaskCreatedError) {
         if (!err.stillRunning) {

@@ -20,12 +20,10 @@ export interface ProviderConfig {
 }
 
 interface SettingsState {
-  darkMode: boolean;
   language: Language;
   settingsDialogOpen: boolean;
   providerConfig: ProviderConfig;
 
-  toggleDarkMode: () => void;
   setLanguage: (lang: Language) => void;
   setSettingsDialogOpen: (open: boolean) => void;
   setProviderConfig: (config: Partial<ProviderConfig>) => void;
@@ -34,7 +32,6 @@ interface SettingsState {
 export const useSettingsStore = create<SettingsState>()(
   persist(
     (set) => ({
-      darkMode: true,
       language: 'zh',
       settingsDialogOpen: false,
       providerConfig: {
@@ -43,7 +40,6 @@ export const useSettingsStore = create<SettingsState>()(
         plan: "default",
       },
 
-      toggleDarkMode: () => set((s) => ({ darkMode: !s.darkMode })),
       setLanguage: (language) => set({ language }),
       setSettingsDialogOpen: (open) => set({ settingsDialogOpen: open }),
       setProviderConfig: (config) =>

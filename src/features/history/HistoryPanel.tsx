@@ -44,7 +44,11 @@ function formatTime(ts: number): string {
 function formatDate(ts: number): string {
   const d = new Date(ts);
   const pad = (n: number) => String(n).padStart(2, "0");
-  return `${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  // 非当年条目带年份，避免跨年时间线歧义
+  if (d.getFullYear() === new Date().getFullYear()) {
+    return `${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  }
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
 
 export function HistoryPanel() {

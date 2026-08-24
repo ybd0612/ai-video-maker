@@ -140,7 +140,6 @@ export function StepImages() {
         <ReviewCheckpoint
           mode={project?.automationMode ?? "semi-auto"}
           onConfirm={() => setWizardStep(5)}
-          onSkip={() => setWizardStep(5)}
           failedCount={failedCount}
         />
       )}

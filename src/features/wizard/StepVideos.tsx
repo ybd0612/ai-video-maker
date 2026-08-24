@@ -5,6 +5,7 @@
 
 import { useEffect, useState, useRef } from "react";
 import { useProjectStore, selectActiveProject } from "@/stores/projectStore";
+import { useSettingsStore } from "@/stores/settingsStore";
 import { useT } from "@/i18n";
 import { ShotCard } from "./ShotCard";
 import { PromptSubFields } from "./PromptSubFields";
@@ -16,6 +17,7 @@ import { RefreshCw } from "lucide-react";
 export function StepVideos() {
   const t = useT();
   const project = useProjectStore(selectActiveProject);
+  const plan = useSettingsStore((s) => s.providerConfig.plan);
   const setWizardStep = useProjectStore((s) => s.setWizardStep);
   const { generateVideosForStep, rerollVideo } = useWizardActions();
 
@@ -82,7 +84,8 @@ export function StepVideos() {
           )}
           {queueCount > 0 && (
             <span className="text-[11px] text-slate-500">
-              {queueCount} 个排队中，免费档约 1 分钟/条
+              {t("wizard.queueCount", { count: queueCount })} ·{" "}
+              {t(plan === "default" ? "wizard.queueHintDefault" : "wizard.queueHintFaster")}
             </span>
           )}
           {failedCount > 0 && (

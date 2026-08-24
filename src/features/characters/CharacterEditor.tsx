@@ -29,11 +29,13 @@ export function CharacterEditor({ character, onClose }: CharacterEditorProps) {
   const [avatarUrl, setAvatarUrl] = useState(character?.avatarUrl ?? "");
   const [isGenerating, setIsGenerating] = useState(false);
   const [isGeneratingPortrait, setIsGeneratingPortrait] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   /** Generate a portrait image from the appearance prompt */
   const handleGeneratePortrait = useCallback(async () => {
     if (!appearancePrompt.trim() || !providerConfig.apiKey || !providerConfig.baseUrl) return;
     setIsGeneratingPortrait(true);
+    setError(null);
     try {
       const portraitUrl = await generateImage({
         apiKey: providerConfig.apiKey,
@@ -47,8 +49,8 @@ export function CharacterEditor({ character, onClose }: CharacterEditorProps) {
       }
       // Store for new character creation
       setGeneratedPortraitUrl(portraitUrl);
-    } catch {
-      // Silent fail — user can retry
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
     } finally {
       setIsGeneratingPortrait(false);
     }
@@ -87,6 +89,7 @@ export function CharacterEditor({ character, onClose }: CharacterEditorProps) {
   const handleAiGenerate = useCallback(async () => {
     if (!providerConfig.apiKey || !providerConfig.baseUrl) return;
     setIsGenerating(true);
+    setError(null);
     try {
       const descHint = description.trim()
         ? `Based on this character description: ${description}`
@@ -101,8 +104,8 @@ export function CharacterEditor({ character, onClose }: CharacterEditorProps) {
         ],
       });
       setAppearancePrompt(result.content);
-    } catch {
-      // Silently fail — user can retry
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
     } finally {
       setIsGenerating(false);
     }
@@ -246,6 +249,13 @@ export function CharacterEditor({ character, onClose }: CharacterEditorProps) {
       >
         {character ? t("characters.edit") : t("characters.add")}
       </button>
+
+      {/* Error */}
+      {error && (
+        <div className="rounded-md border border-red-800 bg-red-950/30 p-2 text-[11px] text-red-300">
+          {error}
+        </div>
+      )}
     </div>
   );
 }
