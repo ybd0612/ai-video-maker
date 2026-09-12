@@ -23,7 +23,8 @@ export function debugDumpPlugin(): Plugin {
     name: "wxhb-debug-dump",
     apply: "serve",
     configureServer(server) {
-      outDir = path.resolve(__dirname, OUT_RELATIVE_DIR);
+      // 以 Vite 项目根为基准（而非插件文件所在目录），保证落盘到 <项目根>/debug-dump/
+      outDir = path.resolve(server.config.root, OUT_RELATIVE_DIR);
       fs.mkdirSync(outDir, { recursive: true });
 
       server.middlewares.use(
