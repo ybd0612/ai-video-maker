@@ -94,9 +94,14 @@ export function CharacterEditor({ character, onClose }: CharacterEditorProps) {
     setIsGenerating(true);
     setError(null);
     try {
-      const descHint = description.trim()
-        ? `Based on this character description: ${description}`
-        : "Create a detailed character appearance for a short drama character.";
+      // 角色名必须一起传入：名字本身常含物种/身份信息（如「小兔子」），
+      // 只发描述会让模型脱离主体自由发挥（实测会被套成人类模板）。
+      const descHint = [
+        `Name: ${name.trim() || "(unnamed)"}`,
+        `Description: ${description.trim() || "(none provided)"}`,
+        "",
+        "Write the appearance description for THIS subject. Keep its species/type exactly as given above.",
+      ].join("\n");
 
       const result = await chatCompletion({
         apiKey: providerConfig.apiKey,
@@ -112,7 +117,7 @@ export function CharacterEditor({ character, onClose }: CharacterEditorProps) {
     } finally {
       setIsGenerating(false);
     }
-  }, [providerConfig, description]);
+  }, [providerConfig, name, description]);
 
   return (
     <div className="flex flex-col gap-3 p-3">
@@ -166,7 +171,7 @@ export function CharacterEditor({ character, onClose }: CharacterEditorProps) {
           </label>
           <button
             onClick={handleAiGenerate}
-            disabled={isGenerating || !providerConfig.apiKey}
+            disabled={isGenerating || !providerConfig.apiKey || !(name.trim() || description.trim())}
             className="flex items-center gap-1 rounded px-1.5 py-0.5 text-[0.625rem] text-emerald-400 hover:bg-emerald-950/30 transition disabled:opacity-50"
             title={t("characters.aiGenerate")}
           >
