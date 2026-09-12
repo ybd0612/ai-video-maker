@@ -36,7 +36,7 @@ export function ShotEditor({
   if (!shot) {
     return (
       <div className="flex flex-1 items-center justify-center p-4">
-        <p className="text-xs text-slate-600 text-center">
+        <p className="text-xs text-ink-5 text-center">
           {t("pipeline.selectShot")}
         </p>
       </div>
@@ -48,10 +48,10 @@ export function ShotEditor({
   return (
     <div className="flex flex-col gap-3 overflow-y-auto p-4">
       <div className="flex items-center justify-between">
-        <h3 className="text-sm font-semibold text-slate-200">
+        <h3 className="text-sm font-semibold text-ink">
           {t("pipeline.shot")} {shot.index + 1}
         </h3>
-        <button onClick={onClose} className="text-slate-500 hover:text-slate-300">
+        <button onClick={onClose} className="text-ink-4 hover:text-ink-2">
           <X size={14} />
         </button>
       </div>
@@ -59,7 +59,7 @@ export function ShotEditor({
       {/* Character selector (both modes) */}
       {characters.length > 0 && (
         <div className="space-y-1.5">
-          <label className="flex items-center gap-1 text-[0.6875rem] font-medium text-slate-500">
+          <label className="flex items-center gap-1 text-[0.6875rem] font-medium text-ink-4">
             <Users size={10} />
             {t("shot.characters")}
           </label>
@@ -77,8 +77,8 @@ export function ShotEditor({
                   }}
                   className={`rounded-full px-2 py-0.5 text-[0.625rem] font-medium transition ${
                     isActive
-                      ? "bg-emerald-900/50 text-emerald-300 border border-emerald-700"
-                      : "bg-slate-800 text-slate-500 border border-slate-700 hover:border-slate-600"
+                      ? "bg-success-deep/50 text-success border border-success"
+                      : "bg-raised text-ink-4 border border-line hover:border-line-strong"
                   }`}
                 >
                   {char.name}
@@ -95,7 +95,7 @@ export function ShotEditor({
 
       {/* Script text */}
       <div className="space-y-1">
-        <label className="text-[0.6875rem] font-medium text-slate-500">
+        <label className="text-[0.6875rem] font-medium text-ink-4">
           {t("pipeline.scriptText")}
         </label>
         <AiPolishField
@@ -104,13 +104,13 @@ export function ShotEditor({
           systemPrompt={SYSTEM_PROMPT_SCRIPT_TEXT}
           resetKey={shot.id}
           rows={3}
-          focusClass="focus:border-sky-500"
+          focusClass="focus:border-info"
         />
       </div>
 
       {/* Visual prompt (text-to-image) */}
       <div className="space-y-1">
-        <label className="text-[0.6875rem] font-medium text-slate-500">
+        <label className="text-[0.6875rem] font-medium text-ink-4">
           {t("pipeline.visualPrompt")}
         </label>
         <AiPolishField
@@ -119,13 +119,13 @@ export function ShotEditor({
           systemPrompt={SYSTEM_PROMPT_VISUAL_PROMPT}
           resetKey={shot.id}
           rows={3}
-          focusClass="focus:border-violet-500"
+          focusClass="focus:border-accent"
         />
       </div>
 
       {/* Motion prompt (image-to-video) */}
       <div className="space-y-1">
-        <label className="text-[0.6875rem] font-medium text-slate-500">
+        <label className="text-[0.6875rem] font-medium text-ink-4">
           {t("pipeline.motionPrompt")}
         </label>
         <AiPolishField
@@ -134,24 +134,24 @@ export function ShotEditor({
           systemPrompt={SYSTEM_PROMPT_MOTION_PROMPT}
           resetKey={shot.id}
           rows={3}
-          focusClass="focus:border-amber-500"
+          focusClass="focus:border-warn"
         />
       </div>
 
       {/* Duration */}
       <div className="space-y-1">
         <div className="flex items-center justify-between">
-          <label className="text-[0.6875rem] font-medium text-slate-500">
+          <label className="text-[0.6875rem] font-medium text-ink-4">
             {t("pipeline.duration")}
           </label>
-          <span className="text-[0.625rem] text-emerald-600">
+          <span className="text-[0.625rem] text-success">
             ≈{(shot.duration ?? 5) * 15}s
           </span>
         </div>
         <select
           value={shot.duration}
           onChange={(e) => updateShot(shot.id, { duration: parseInt(e.target.value) })}
-          className="w-full rounded-md border border-slate-700 bg-slate-800 px-2 py-1.5 text-xs text-slate-300 focus:border-amber-500 focus:outline-none"
+          className="w-full rounded-md border border-line bg-raised px-2 py-1.5 text-xs text-ink-2 focus:border-warn focus:outline-none"
         >
           <option value={4}>4s</option>
           <option value={5}>5s</option>
@@ -167,7 +167,7 @@ export function ShotEditor({
             onClick={() => {
               updateShot(shot.id, { status: "idle", error: undefined, videoProgress: undefined });
             }}
-            className="flex items-center justify-center gap-1.5 rounded-md border border-red-700 bg-red-950/30 px-3 py-1.5 text-xs text-red-300 transition hover:bg-red-900/40 disabled:opacity-50"
+            className="flex items-center justify-center gap-1.5 rounded-md border border-danger bg-danger-deep/30 px-3 py-1.5 text-xs text-danger transition hover:bg-danger-deep/40 disabled:opacity-50"
           >
             <RotateCcw size={11} />
             {t("pipeline.retryShot")}
@@ -177,7 +177,7 @@ export function ShotEditor({
         <button
           onClick={() => onRegenerateImage(shot.id)}
           disabled={shot.status === "imaging"}
-          className="flex items-center justify-center gap-1.5 rounded-md border border-violet-700 bg-violet-950/30 px-3 py-1.5 text-xs text-violet-300 transition hover:bg-violet-900/40 disabled:opacity-50"
+          className="flex items-center justify-center gap-1.5 rounded-md border border-accent bg-accent-deep/30 px-3 py-1.5 text-xs text-accent transition hover:bg-accent-deep/40 disabled:opacity-50"
         >
           <RefreshCw size={11} />
           {t("pipeline.regenerateImage")}
@@ -185,7 +185,7 @@ export function ShotEditor({
         <button
           onClick={() => onRegenerateVideo(shot.id)}
           disabled={shot.status === "videoing" || !shot.imageUrl}
-          className="flex items-center justify-center gap-1.5 rounded-md border border-amber-700 bg-amber-950/30 px-3 py-1.5 text-xs text-amber-300 transition hover:bg-amber-900/40 disabled:opacity-50"
+          className="flex items-center justify-center gap-1.5 rounded-md border border-warn bg-warn-deep/30 px-3 py-1.5 text-xs text-warn transition hover:bg-warn-deep/40 disabled:opacity-50"
         >
           <RefreshCw size={11} />
           {t("pipeline.regenerateVideo")}
@@ -194,7 +194,7 @@ export function ShotEditor({
 
       {/* Error */}
       {shot.error && (
-        <div className="rounded-md border border-red-800 bg-red-950/30 p-2 text-[0.6875rem] text-red-300">
+        <div className="rounded-md border border-danger bg-danger-deep/30 p-2 text-[0.6875rem] text-danger">
           {shot.error}
         </div>
       )}

@@ -27,14 +27,14 @@ function PlanLimitSummary({
   const hasQuota = plan.accessType === "tokenplan";
 
   return (
-    <div className="mt-2 space-y-1 rounded-lg border border-slate-700/60 bg-slate-800/40 px-3 py-2 text-[0.625rem] leading-relaxed text-slate-400">
+    <div className="mt-2 space-y-1 rounded-lg border border-line/60 bg-raised/40 px-3 py-2 text-[0.625rem] leading-relaxed text-ink-3">
       <p>{t("settings.planHint")}</p>
       <p>
-        <span className="text-slate-500">{t("settings.planRpm")}：</span>{" "}
+        <span className="text-ink-4">{t("settings.planRpm")}：</span>{" "}
         文本 {plan.rpm.text} · 图片(1K) {plan.rpm.image["1K"]} · 视频 {plan.rpm.video}
       </p>
       <p>
-        <span className="text-slate-500">{t("settings.planQuota")}：</span>{" "}
+        <span className="text-ink-4">{t("settings.planQuota")}：</span>{" "}
         {hasQuota ? (
           <>
             文本 每5h {q.textPer5h?.toLocaleString()} / 每周 {q.textPerWeek?.toLocaleString()}；
@@ -161,11 +161,11 @@ function PromptRulesSettings({
   };
 
   const iconBtn =
-    "flex items-center gap-1 rounded-lg border border-slate-700 bg-slate-800 px-2.5 py-1.5 text-[0.6875rem] font-medium text-slate-300 transition hover:border-emerald-600 hover:text-white";
+    "flex items-center gap-1 rounded-lg border border-line bg-raised px-2.5 py-1.5 text-[0.6875rem] font-medium text-ink-2 transition hover:border-success hover:text-white";
 
   return (
     <div className="flex max-h-[65vh] flex-col gap-3">
-      <p className="text-[0.6875rem] leading-relaxed text-slate-500">{t("settings.rules.hint")}</p>
+      <p className="text-[0.6875rem] leading-relaxed text-ink-4">{t("settings.rules.hint")}</p>
 
       {/* 全局操作：恢复默认 / 导出 / 导入 */}
       <div className="flex flex-wrap gap-2">
@@ -198,7 +198,7 @@ function PromptRulesSettings({
           if (rules.length === 0) return null;
           return (
             <section key={task} className="space-y-2">
-              <h3 className="text-[0.6875rem] font-semibold text-slate-300">
+              <h3 className="text-[0.6875rem] font-semibold text-ink-2">
                 {t(("settings.rules.task." + task) as TranslationKey)}
               </h3>
               {rules.map((rule) => {
@@ -209,31 +209,31 @@ function PromptRulesSettings({
                     key={rule.id}
                     className={`rounded-lg border p-2 ${
                       rule.enabled
-                        ? "border-slate-700/60 bg-slate-800/40"
-                        : "border-slate-800 bg-slate-900/60 opacity-60"
+                        ? "border-line/60 bg-raised/40"
+                        : "border-line-soft bg-surface/60 opacity-60"
                     }`}
                   >
                     <div className="mb-1 flex items-center gap-2">
-                      <span title={rule.id} className="min-w-0 flex-1 truncate text-[0.625rem] text-slate-500">
+                      <span title={rule.id} className="min-w-0 flex-1 truncate text-[0.625rem] text-ink-4">
                         {rule.id}
                       </span>
                       <span
                         className={`shrink-0 rounded px-1.5 py-0.5 text-[0.625rem] ${
                           rule.source === "custom"
-                            ? "bg-violet-950/60 text-violet-300"
-                            : "bg-slate-700/50 text-slate-400"
+                            ? "bg-accent-deep/60 text-accent"
+                            : "bg-hover/50 text-ink-3"
                         }`}
                       >
                         {rule.source === "custom"
                           ? t("settings.rules.customBadge")
                           : t("settings.rules.builtinBadge")}
                       </span>
-                      <label className="flex shrink-0 cursor-pointer items-center gap-1 text-[0.625rem] text-slate-400">
+                      <label className="flex shrink-0 cursor-pointer items-center gap-1 text-[0.625rem] text-ink-3">
                         <input
                           type="checkbox"
                           checked={rule.enabled}
                           onChange={() => toggleEnabled(rule)}
-                          className="accent-emerald-600"
+                          className="accent-success-solid"
                         />
                         {t("settings.rules.enabled")}
                       </label>
@@ -242,7 +242,7 @@ function PromptRulesSettings({
                           type="button"
                           onClick={() => removeFromStored(rule.id)}
                           title={t("settings.rules.delete")}
-                          className="shrink-0 rounded p-1 text-slate-500 hover:bg-slate-800 hover:text-red-400"
+                          className="shrink-0 rounded p-1 text-ink-4 hover:bg-raised hover:text-danger"
                         >
                           <Trash2 size={12} />
                         </button>
@@ -252,7 +252,7 @@ function PromptRulesSettings({
                             type="button"
                             onClick={() => removeFromStored(rule.id)}
                             title={t("settings.rules.restoreItem")}
-                            className="shrink-0 rounded p-1 text-slate-500 hover:bg-slate-800 hover:text-amber-300"
+                            className="shrink-0 rounded p-1 text-ink-4 hover:bg-raised hover:text-warn"
                           >
                             <RotateCcw size={12} />
                           </button>
@@ -275,13 +275,13 @@ function PromptRulesSettings({
       </div>
 
       {/* 新增自定义条目 */}
-      <div className="space-y-2 rounded-lg border border-slate-700/60 bg-slate-800/40 p-3">
-        <p className="text-[0.6875rem] font-semibold text-slate-300">{t("settings.rules.addTitle")}</p>
+      <div className="space-y-2 rounded-lg border border-line/60 bg-raised/40 p-3">
+        <p className="text-[0.6875rem] font-semibold text-ink-2">{t("settings.rules.addTitle")}</p>
         <div className="grid grid-cols-2 gap-2">
           <select
             value={newTask}
             onChange={(e) => setNewTask(e.target.value as PromptTask)}
-            className="w-full rounded-lg border border-slate-700 bg-slate-800 px-2 py-1.5 text-[0.6875rem] text-slate-100 focus:border-emerald-500 focus:outline-none"
+            className="w-full rounded-lg border border-line bg-raised px-2 py-1.5 text-[0.6875rem] text-ink focus:border-success focus:outline-none"
           >
             {RULE_TASKS.map((task) => (
               <option key={task} value={task}>
@@ -292,7 +292,7 @@ function PromptRulesSettings({
           <select
             value={newSection}
             onChange={(e) => setNewSection(e.target.value as RuleSection)}
-            className="w-full rounded-lg border border-slate-700 bg-slate-800 px-2 py-1.5 text-[0.6875rem] text-slate-100 focus:border-emerald-500 focus:outline-none"
+            className="w-full rounded-lg border border-line bg-raised px-2 py-1.5 text-[0.6875rem] text-ink focus:border-success focus:outline-none"
           >
             {RULE_SECTIONS.map((sec) => (
               <option key={sec} value={sec}>
@@ -312,7 +312,7 @@ function PromptRulesSettings({
           type="button"
           onClick={addCustom}
           disabled={!newContent.trim()}
-          className="flex items-center gap-1 rounded-lg bg-emerald-600 px-3 py-1.5 text-[0.6875rem] font-semibold text-white transition hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-50"
+          className="flex items-center gap-1 rounded-lg bg-success-solid px-3 py-1.5 text-[0.6875rem] font-semibold text-white transition hover:bg-success-solid disabled:cursor-not-allowed disabled:opacity-50"
         >
           <Plus size={12} /> {t("settings.rules.add")}
         </button>
@@ -436,12 +436,12 @@ export function SettingsDialog() {
               initial={{ scale: 0.95, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.95, opacity: 0 }}
-              className="w-full max-w-lg rounded-2xl border border-slate-700 bg-slate-900 p-6 shadow-2xl"
+              className="w-full max-w-lg rounded-2xl border border-line bg-surface p-6 shadow-2xl"
               onClick={(e) => e.stopPropagation()}
             >
               <div className="mb-4 flex items-center justify-between">
-                <h2 className="text-sm font-bold text-slate-100">{t("settings.title")}</h2>
-                <button onClick={() => setOpen(false)} className="text-slate-500 hover:text-slate-300">
+                <h2 className="text-sm font-bold text-ink">{t("settings.title")}</h2>
+                <button onClick={() => setOpen(false)} className="text-ink-4 hover:text-ink-2">
                   <X size={16} />
                 </button>
               </div>
@@ -458,8 +458,8 @@ export function SettingsDialog() {
                     onClick={() => setTab(id)}
                     className={`flex-1 rounded-lg border px-3 py-1.5 text-[0.6875rem] font-medium transition ${
                       tab === id
-                        ? "border-emerald-500 bg-emerald-950/40 text-emerald-300"
-                        : "border-slate-700 bg-slate-800 text-slate-400 hover:border-slate-600 hover:text-slate-200"
+                        ? "border-success bg-success-deep/40 text-success"
+                        : "border-line bg-raised text-ink-3 hover:border-line-strong hover:text-ink"
                     }`}
                   >
                     {label}
@@ -471,13 +471,13 @@ export function SettingsDialog() {
               <div className="space-y-4">
                 {/* API Key */}
                 <div>
-                  <label className="mb-1 block text-[0.6875rem] font-medium text-slate-400">
+                  <label className="mb-1 block text-[0.6875rem] font-medium text-ink-3">
 {t("settings.apiKey")}
                                       <a
                       href="https://platform.agnes-ai.cn/settings/apiKeys"
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="ml-1 text-emerald-400 hover:text-emerald-300 underline"
+                      className="ml-1 text-success hover:text-success underline"
                     >
                       {t("settings.getApiKey")}
                     </a>
@@ -488,11 +488,11 @@ export function SettingsDialog() {
                       value={apiKey}
                       onChange={(e) => setApiKey(e.target.value)}
                       placeholder="sk-..."
-                      className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 pr-10 text-xs text-slate-100 focus:border-emerald-500 focus:outline-none"
+                      className="w-full rounded-lg border border-line bg-raised px-3 py-2 pr-10 text-xs text-ink focus:border-success focus:outline-none"
                     />
                     <button
                       onClick={() => setShowKey(!showKey)}
-                      className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300"
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-ink-4 hover:text-ink-2"
                     >
                       {showKey ? <EyeOff size={14} /> : <Eye size={14} />}
                     </button>
@@ -501,7 +501,7 @@ export function SettingsDialog() {
 
                 {/* Base URL */}
                 <div>
-                  <label className="mb-1 block text-[0.6875rem] font-medium text-slate-400">
+                  <label className="mb-1 block text-[0.6875rem] font-medium text-ink-3">
 {t("settings.baseUrl")}
                   </label>
                   <input
@@ -509,19 +509,19 @@ export function SettingsDialog() {
                     value={baseUrl}
                     onChange={(e) => setBaseUrl(e.target.value)}
                     placeholder="https://api.agnes-ai.cn/v1"
-                    className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-xs text-slate-100 placeholder:text-slate-600 focus:border-emerald-500 focus:outline-none"
+                    className="w-full rounded-lg border border-line bg-raised px-3 py-2 text-xs text-ink placeholder:text-ink-5 focus:border-success focus:outline-none"
                   />
                 </div>
 
                 {/* Plan / access tier */}
                 <div>
-                  <label className="mb-1 block text-[0.6875rem] font-medium text-slate-400">
+                  <label className="mb-1 block text-[0.6875rem] font-medium text-ink-3">
                     {t("settings.plan")}
                   </label>
                   <select
                     value={plan}
                     onChange={(e) => setPlan(e.target.value as PlanId)}
-                    className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-xs text-slate-100 focus:border-emerald-500 focus:outline-none"
+                    className="w-full rounded-lg border border-line bg-raised px-3 py-2 text-xs text-ink focus:border-success focus:outline-none"
                   >
                     {(Object.keys(PLANS) as PlanId[]).map((id) => (
                       <option key={id} value={id}>
@@ -535,7 +535,7 @@ export function SettingsDialog() {
                 <div className="grid grid-cols-2 gap-2">
                   <button
                     onClick={handleSave}
-                    className="flex items-center justify-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-xs font-semibold text-white transition hover:bg-emerald-500"
+                    className="flex items-center justify-center gap-2 rounded-lg bg-success-solid px-4 py-2 text-xs font-semibold text-white transition hover:bg-success-solid"
                   >
 {t("settings.save")}
                   </button>
@@ -543,7 +543,7 @@ export function SettingsDialog() {
                   <button
                     onClick={handleTestConnection}
                     disabled={testing}
-                    className="flex items-center justify-center gap-2 rounded-lg border border-slate-700 bg-slate-800 px-4 py-2 text-xs font-semibold text-slate-200 transition hover:border-emerald-600 hover:text-white disabled:opacity-60"
+                    className="flex items-center justify-center gap-2 rounded-lg border border-line bg-raised px-4 py-2 text-xs font-semibold text-ink transition hover:border-success hover:text-white disabled:opacity-60"
                   >
                     {testing ? (
                       <>
@@ -556,7 +556,7 @@ export function SettingsDialog() {
                 </div>
 
                 {testResult.status !== "idle" && (
-                  <div className={`flex items-start gap-2 rounded-lg border px-3 py-2 text-[0.6875rem] leading-relaxed ${testResult.status === "success" ? "border-emerald-700 bg-emerald-950/40 text-emerald-200" : "border-red-700 bg-red-950/40 text-red-200"}`}>
+                  <div className={`flex items-start gap-2 rounded-lg border px-3 py-2 text-[0.6875rem] leading-relaxed ${testResult.status === "success" ? "border-success bg-success-deep/40 text-success" : "border-danger bg-danger-deep/40 text-danger"}`}>
                     {testResult.status === "success" ? <CheckCircle2 size={14} className="mt-0.5" /> : <AlertTriangle size={14} className="mt-0.5" />}
                     <span>{testResult.message}</span>
                   </div>
@@ -564,7 +564,7 @@ export function SettingsDialog() {
 
                 {/* Language */}
                 <div>
-                  <label className="mb-1 block text-[0.6875rem] font-medium text-slate-400">
+                  <label className="mb-1 block text-[0.6875rem] font-medium text-ink-3">
                     {t("settings.language")}
                   </label>
                   <div className="flex gap-2">
@@ -574,8 +574,8 @@ export function SettingsDialog() {
                         onClick={() => setLanguage(lng)}
                         className={`flex-1 rounded-lg border px-3 py-2 text-xs font-medium transition ${
                           language === lng
-                            ? "border-emerald-500 bg-emerald-950/40 text-emerald-300"
-                            : "border-slate-700 bg-slate-800 text-slate-400 hover:border-slate-600 hover:text-slate-200"
+                            ? "border-success bg-success-deep/40 text-success"
+                            : "border-line bg-raised text-ink-3 hover:border-line-strong hover:text-ink"
                         }`}
                       >
                         {lng === "zh" ? "中文" : "English"}
@@ -583,18 +583,18 @@ export function SettingsDialog() {
                     ))}
                   </div>
                 </div>
-                <p className="text-[0.625rem] text-slate-600">
+                <p className="text-[0.625rem] text-ink-5">
 {t("settings.storageNote")}
                 </p>
                 <a
                   href="https://github.com/ybd0612/ai-flow-canvas"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="mt-2 flex items-center gap-2 rounded-lg border border-slate-700/50 bg-slate-800/40 px-3 py-2 text-[0.6875rem] text-slate-400 hover:text-slate-200 hover:border-slate-600 transition"
+                  className="mt-2 flex items-center gap-2 rounded-lg border border-line/50 bg-raised/40 px-3 py-2 text-[0.6875rem] text-ink-3 hover:text-ink hover:border-line-strong transition"
                 >
                   <svg className="w-4 h-4 shrink-0" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
                   <span>GitHub</span>
-                  <span className="ml-auto text-[0.625rem] text-slate-500">{t("settings.github.desc")}</span>
+                  <span className="ml-auto text-[0.625rem] text-ink-4">{t("settings.github.desc")}</span>
                 </a>
               </div>
               ) : (
@@ -612,7 +612,7 @@ export function SettingsDialog() {
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -20 }}
-            className={`fixed top-6 right-6 z-[200] flex items-center gap-2 rounded-lg border px-4 py-2.5 text-xs font-medium shadow-xl backdrop-blur-sm ${toast.type === "success" ? "border-emerald-600 bg-emerald-950/90 text-emerald-200" : "border-red-600 bg-red-950/90 text-red-200"}`}
+            className={`fixed top-6 right-6 z-[200] flex items-center gap-2 rounded-lg border px-4 py-2.5 text-xs font-medium shadow-xl backdrop-blur-sm ${toast.type === "success" ? "border-success bg-success-deep/90 text-success" : "border-danger bg-danger-deep/90 text-danger"}`}
           >
             {toast.type === "success" ? <CheckCircle2 size={15} /> : <AlertTriangle size={15} />}
             {toast.message}

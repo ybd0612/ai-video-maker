@@ -33,24 +33,24 @@ export function ReviewCheckpoint({ mode, onConfirm, failedShots = [], onRetryFai
   const quota = getQuotaUsageSnapshot();
 
   return (
-    <div className="rounded-xl border border-slate-700 bg-slate-800/50 p-6">
-      <h3 className="text-lg font-semibold text-slate-100">
+    <div className="rounded-xl border border-line bg-raised/50 p-6">
+      <h3 className="text-lg font-semibold text-ink">
         {t("review.qualityCheck")}
       </h3>
-      <p className="mt-2 text-sm text-slate-400">
+      <p className="mt-2 text-sm text-ink-3">
         {t("review.hint")}
       </p>
 
       {failedShots.length > 0 && (
-        <div className="mt-2 rounded-lg border border-amber-800 bg-amber-950/30 px-3 py-2 text-xs text-amber-300">
+        <div className="mt-2 rounded-lg border border-warn bg-warn-deep/30 px-3 py-2 text-xs text-warn">
           <p>{t("review.someFailed", { count: failedShots.length })}</p>
-          <p className="mt-1 text-amber-400/80">
+          <p className="mt-1 text-warn/80">
             {t("review.failedShotList", { shots: failedShots.map((s) => `#${s.index + 1}`).join("、") })}
           </p>
           {failedShots.some((s) => s.error) && (
             <ul className="mt-1 space-y-0.5">
               {failedShots.filter((s) => s.error).map((s) => (
-                <li key={s.index} className="truncate text-[0.6875rem] text-red-300/80" title={s.error}>
+                <li key={s.index} className="truncate text-[0.6875rem] text-danger/80" title={s.error}>
                   #{s.index + 1}: {s.error}
                 </li>
               ))}
@@ -59,7 +59,7 @@ export function ReviewCheckpoint({ mode, onConfirm, failedShots = [], onRetryFai
           {onRetryFailed && (
             <button
               onClick={onRetryFailed}
-              className="mt-2 flex items-center gap-1 rounded px-2 py-1 text-[0.6875rem] text-red-400 hover:bg-red-950/40 transition"
+              className="mt-2 flex items-center gap-1 rounded px-2 py-1 text-[0.6875rem] text-danger hover:bg-danger-deep/40 transition"
             >
               <RefreshCw size={11} />
               {t("review.retryFailedShots")}
@@ -69,7 +69,7 @@ export function ReviewCheckpoint({ mode, onConfirm, failedShots = [], onRetryFai
       )}
 
       {quota && (
-        <p className="mt-2 text-[0.6875rem] text-slate-500">
+        <p className="mt-2 text-[0.6875rem] text-ink-4">
           {t("review.quotaUsage", {
             imageUsed: quota.imageUsed,
             imageLimit: quota.imageLimit,
@@ -82,7 +82,7 @@ export function ReviewCheckpoint({ mode, onConfirm, failedShots = [], onRetryFai
       <div className="mt-4">
         <button
           onClick={onConfirm}
-          className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-emerald-500"
+          className="rounded-lg bg-success-solid px-4 py-2 text-sm font-medium text-white transition hover:bg-success-solid"
         >
           {t("review.confirmImages")}
         </button>

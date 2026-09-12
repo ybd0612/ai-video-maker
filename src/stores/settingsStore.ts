@@ -10,6 +10,9 @@ import type { PromptRule } from "@/lib/promptRules";
 
 export type Language = 'zh' | 'en';
 
+/** 界面主题：light 为默认（2026-09-12 用户拍板），dark 通过 <html data-theme="dark"> 生效 */
+export type Theme = 'light' | 'dark';
+
 export interface ProviderConfig {
   apiKey: string;
   baseUrl: string;
@@ -21,6 +24,7 @@ export interface ProviderConfig {
 }
 
 interface SettingsState {
+  theme: Theme;
   language: Language;
   settingsDialogOpen: boolean;
   providerConfig: ProviderConfig;
@@ -30,6 +34,7 @@ interface SettingsState {
    */
   promptRules: PromptRule[];
 
+  setTheme: (theme: Theme) => void;
   setLanguage: (lang: Language) => void;
   setSettingsDialogOpen: (open: boolean) => void;
   setProviderConfig: (config: Partial<ProviderConfig>) => void;
@@ -40,7 +45,8 @@ interface SettingsState {
 /**
  * persist 存储迁移主体（导出纯函数，便于单测）：
  * - v0 → v1：历史遗留国际站地址（apihub.agnes-ai.com）迁移到中国站；
- * - v1 → v2：新增 promptRules（用户动过的提示词规则），缺失/非法一律兜底 []。
+ * - v1 → v2：新增 promptRules（用户动过的提示词规则），缺失/非法一律兜底 []；
+ * - v2 → v3：新增 theme（黑白主题切换），缺失兜底 light（默认白色），已存 dark 保留。
  */
 export function migratePersistedSettings(
   persisted: unknown,
@@ -66,12 +72,18 @@ export function migratePersistedSettings(
     state.promptRules = [];
   }
 
+  // v2 → v3：theme 兜底（缺失 / 非法 → light；显式 dark 保留）
+  if (version < 3 && state.theme !== "dark") {
+    state.theme = "light";
+  }
+
   return state;
 }
 
 export const useSettingsStore = create<SettingsState>()(
   persist(
     (set) => ({
+      theme: "light",
       language: 'zh',
       settingsDialogOpen: false,
       providerConfig: {
@@ -81,6 +93,7 @@ export const useSettingsStore = create<SettingsState>()(
       },
       promptRules: [],
 
+      setTheme: (theme) => set({ theme }),
       setLanguage: (language) => set({ language }),
       setSettingsDialogOpen: (open) => set({ settingsDialogOpen: open }),
       setProviderConfig: (config) =>
@@ -89,9 +102,10 @@ export const useSettingsStore = create<SettingsState>()(
     }),
     {
       name: "wxhb-settings",
-      version: 2,
-      // 迁移主体提取为导出纯函数 migratePersistedSettings（见上方），便于单测
-      migrate: (persisted) => migratePersistedSettings(persisted, 0),
+      version: 3,
+      // 迁移主体提取为导出纯函数 migratePersistedSettings（见上方），便于单测。
+      // version 透传 zustand persist 提供的「已持久化数据的版本号」，各分支按 version 门控。
+      migrate: (persisted, version) => migratePersistedSettings(persisted, version),
     },
   ),
 );

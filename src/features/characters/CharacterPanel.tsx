@@ -47,12 +47,12 @@ export function CharacterPanel() {
   return (
     <div className="flex flex-col gap-2 p-3">
       <div className="flex items-center justify-between">
-        <span className="text-xs font-medium text-slate-400">
+        <span className="text-xs font-medium text-ink-3">
           {t("characters.title")} ({characters.length})
         </span>
         <button
           onClick={handleAdd}
-          className="flex items-center gap-1 rounded px-2 py-1 text-[0.6875rem] text-emerald-400 hover:bg-emerald-950/30 transition"
+          className="flex items-center gap-1 rounded px-2 py-1 text-[0.6875rem] text-success hover:bg-success-deep/30 transition"
         >
           <UserPlus size={11} />
           {t("characters.add")}
@@ -61,8 +61,8 @@ export function CharacterPanel() {
 
       {characters.length === 0 ? (
         <div className="flex flex-col items-center justify-center gap-2 py-8 text-center">
-          <UserPlus size={20} className="text-slate-700" />
-          <p className="text-[0.6875rem] text-slate-600">{t("characters.noCharacters")}</p>
+          <UserPlus size={20} className="text-ink-5" />
+          <p className="text-[0.6875rem] text-ink-5">{t("characters.noCharacters")}</p>
         </div>
       ) : (
         <div className="flex flex-col gap-1.5">
@@ -79,10 +79,10 @@ export function CharacterPanel() {
                 }
               }}
               title={t("characters.edit")}
-              className="group flex cursor-pointer items-start gap-2 rounded-md border border-slate-800 bg-slate-900/50 p-2 transition hover:border-slate-700 focus:border-emerald-500 focus:outline-none"
+              className="group flex cursor-pointer items-start gap-2 rounded-md border border-line-soft bg-surface/50 p-2 transition hover:border-line focus:border-success focus:outline-none"
             >
               {/* Avatar（点击放大查看） */}
-              <div className="h-8 w-8 shrink-0 overflow-hidden rounded-full border border-slate-700 bg-slate-800">
+              <div className="h-8 w-8 shrink-0 overflow-hidden rounded-full border border-line bg-raised">
                 {(char.imageUrl || char.avatarUrl) ? (
                   <Lightbox src={char.imageUrl || char.avatarUrl} alt={char.name}>
                     <img
@@ -92,7 +92,7 @@ export function CharacterPanel() {
                     />
                   </Lightbox>
                 ) : (
-                  <div className="flex h-full w-full items-center justify-center text-[0.625rem] text-slate-500">
+                  <div className="flex h-full w-full items-center justify-center text-[0.625rem] text-ink-4">
                     {char.name.charAt(0).toUpperCase()}
                   </div>
                 )}
@@ -100,10 +100,10 @@ export function CharacterPanel() {
 
               {/* Info */}
               <div className="min-w-0 flex-1">
-                <p className="truncate text-xs font-medium text-slate-200">
+                <p className="truncate text-xs font-medium text-ink">
                   {char.name}
                 </p>
-                <p className="truncate text-[0.625rem] text-slate-500">
+                <p className="truncate text-[0.625rem] text-ink-4">
                   {char.description || char.appearancePrompt || "—"}
                 </p>
               </div>
@@ -116,7 +116,7 @@ export function CharacterPanel() {
                     e.stopPropagation();
                     handleDelete(char);
                   }}
-                  className="rounded p-1 text-slate-500 hover:bg-red-950 hover:text-red-400"
+                  className="rounded p-1 text-ink-4 hover:bg-danger-deep hover:text-danger"
                   title={t("characters.delete")}
                 >
                   <Trash2 size={10} />

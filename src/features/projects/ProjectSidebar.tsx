@@ -59,23 +59,23 @@ export function ProjectSidebar() {
   const statusIcon = (status: string) => {
     switch (status) {
       case "done":
-        return <CheckCircle2 size={10} className="text-emerald-400" />;
+        return <CheckCircle2 size={10} className="text-success" />;
       case "scripting":
       case "imaging":
       case "videoing":
       case "rendering":
-        return <Loader2 size={10} className="animate-spin text-sky-400" />;
+        return <Loader2 size={10} className="animate-spin text-info" />;
       case "failed":
-        return <span className="block h-2 w-2 rounded-full bg-red-500" />;
+        return <span className="block h-2 w-2 rounded-full bg-danger-solid" />;
       default:
-        return <Film size={10} className="text-slate-600" />;
+        return <Film size={10} className="text-ink-5" />;
     }
   };
 
   return (
     <div className="flex flex-1 flex-col overflow-hidden">
       {/* Create project */}
-      <div className="border-b border-slate-800 p-2">
+      <div className="border-b border-line-soft p-2">
         {isCreating ? (
           <div className="flex gap-1">
             <input
@@ -87,11 +87,11 @@ export function ProjectSidebar() {
                 if (e.key === "Escape") setIsCreating(false);
               }}
               placeholder={t("pipeline.projectNamePlaceholder")}
-              className="flex-1 rounded border border-slate-700 bg-slate-800 px-2 py-1 text-xs text-slate-200 placeholder:text-slate-600 focus:border-emerald-500 focus:outline-none"
+              className="flex-1 rounded border border-line bg-raised px-2 py-1 text-xs text-ink placeholder:text-ink-5 focus:border-success focus:outline-none"
             />
             <button
               onClick={handleCreate}
-              className="rounded bg-emerald-600 px-2 py-1 text-[0.625rem] text-white hover:bg-emerald-500"
+              className="rounded bg-success-solid px-2 py-1 text-[0.625rem] text-white hover:bg-success-solid"
             >
               {t("dialog.confirm")}
             </button>
@@ -99,7 +99,7 @@ export function ProjectSidebar() {
         ) : (
           <button
             onClick={() => setIsCreating(true)}
-            className="flex w-full items-center justify-center gap-1 rounded border border-dashed border-slate-700 py-1.5 text-[0.625rem] text-slate-500 hover:border-emerald-600 hover:text-emerald-400 transition"
+            className="flex w-full items-center justify-center gap-1 rounded border border-dashed border-line py-1.5 text-[0.625rem] text-ink-4 hover:border-success hover:text-success transition"
           >
             <Plus size={10} />
             {t("pipeline.newProject")}
@@ -108,20 +108,20 @@ export function ProjectSidebar() {
       </div>
 
       {/* Search + Sort */}
-      <div className="flex items-center gap-1 border-b border-slate-800 px-2 py-1.5">
+      <div className="flex items-center gap-1 border-b border-line-soft px-2 py-1.5">
         <div className="relative flex-1">
-          <Search size={10} className="absolute left-1.5 top-1/2 -translate-y-1/2 text-slate-600" />
+          <Search size={10} className="absolute left-1.5 top-1/2 -translate-y-1/2 text-ink-5" />
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder={t("pipeline.searchPlaceholder")}
-            className="w-full rounded border border-slate-700 bg-slate-800 pl-5 pr-2 py-1 text-[0.625rem] text-slate-200 placeholder:text-slate-600 focus:border-emerald-500 focus:outline-none"
+            className="w-full rounded border border-line bg-raised pl-5 pr-2 py-1 text-[0.625rem] text-ink placeholder:text-ink-5 focus:border-success focus:outline-none"
           />
         </div>
         <button
           onClick={() => setSort(s => s === 'newest' ? 'oldest' : 'newest')}
           title={t(sort === 'newest' ? "pipeline.sortOldest" : "pipeline.sortNewest")}
-          className="rounded p-1 text-slate-600 hover:text-emerald-400"
+          className="rounded p-1 text-ink-5 hover:text-success"
         >
           {sort === 'newest' ? <SortDesc size={10} /> : <SortAsc size={10} />}
         </button>
@@ -131,7 +131,7 @@ export function ProjectSidebar() {
       <div className="flex-1 overflow-y-auto">
         {filtered.length === 0 ? (
           <div className="flex h-full items-center justify-center">
-            <span className="text-xs text-slate-600">
+            <span className="text-xs text-ink-5">
               {search ? t("pipeline.noSearchResults") : t("pipeline.noProjects")}
             </span>
           </div>
@@ -161,15 +161,15 @@ export function ProjectSidebar() {
                     }
                     switchProject(proj.id);
                   }}
-                  className={`group flex cursor-pointer flex-col gap-1 border-b border-slate-800/50 px-3 py-2 transition hover:bg-slate-900 ${
-                    isActive ? "bg-slate-900 border-l-2 border-l-emerald-500" : ""
+                  className={`group flex cursor-pointer flex-col gap-1 border-b border-line-soft/50 px-3 py-2 transition hover:bg-surface ${
+                    isActive ? "bg-surface border-l-2 border-l-emerald-500" : ""
                   }`}
                 >
                   <div className="flex items-center gap-2">
                     {statusIcon(proj.status)}
                     <span
                       className={`flex-1 truncate text-xs font-medium ${
-                        isActive ? "text-emerald-300" : "text-slate-300"
+                        isActive ? "text-success" : "text-ink-2"
                       }`}
                     >
                       {proj.title}
@@ -181,7 +181,7 @@ export function ProjectSidebar() {
                           e.stopPropagation();
                           handleDuplicate(proj.id);
                         }}
-                        className="rounded p-0.5 text-slate-600 hover:text-sky-400"
+                        className="rounded p-0.5 text-ink-5 hover:text-info"
                         title={t("pipeline.duplicateProject")}
                       >
                         <Copy size={10} />
@@ -191,7 +191,7 @@ export function ProjectSidebar() {
                           e.stopPropagation();
                           handleDelete(proj.id, proj.title);
                         }}
-                        className="rounded p-0.5 text-slate-600 hover:text-red-400"
+                        className="rounded p-0.5 text-ink-5 hover:text-danger"
                         title={t("pipeline.deleteProject")}
                       >
                         <Trash2 size={10} />
@@ -200,13 +200,13 @@ export function ProjectSidebar() {
                   </div>
                   {shotCount > 0 && (
                     <div className="flex items-center gap-2 pl-5">
-                      <div className="h-1 flex-1 overflow-hidden rounded-full bg-slate-800">
+                      <div className="h-1 flex-1 overflow-hidden rounded-full bg-raised">
                         <div
-                          className="h-full rounded-full bg-emerald-600 transition-all"
+                          className="h-full rounded-full bg-success-solid transition-all"
                           style={{ width: `${(doneCount / shotCount) * 100}%` }}
                         />
                       </div>
-                      <span className="text-[0.5625rem] text-slate-600">
+                      <span className="text-[0.5625rem] text-ink-5">
                         {doneCount}/{shotCount}
                       </span>
                     </div>

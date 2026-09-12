@@ -39,7 +39,7 @@ export function StepIndicator() {
             {i > 0 && (
               <div
                 className={`h-px w-6 transition-colors ${
-                  isCompleted ? "bg-emerald-500" : "bg-slate-700"
+                  isCompleted ? "bg-success-solid" : "bg-hover"
                 }`}
               />
             )}
@@ -48,10 +48,10 @@ export function StepIndicator() {
               disabled={step > currentStep}
               className={`flex items-center gap-1.5 rounded-full px-3 py-1 text-[0.6875rem] font-medium transition ${
                 isCurrent
-                  ? "bg-emerald-600 text-white"
+                  ? "bg-success-solid text-white"
                   : isCompleted
-                    ? "bg-emerald-900/40 text-emerald-400 hover:bg-emerald-900/60"
-                    : "bg-slate-800 text-slate-500 cursor-not-allowed"
+                    ? "bg-success-deep/40 text-success hover:bg-success-deep/60"
+                    : "bg-raised text-ink-4 cursor-not-allowed"
               }`}
             >
               {isCompleted ? (

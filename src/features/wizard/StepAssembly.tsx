@@ -122,10 +122,10 @@ export function StepAssembly() {
   return (
     <div className="mx-auto flex max-w-3xl flex-col gap-6 py-6">
       <div className="text-center">
-        <h2 className="text-lg font-bold text-slate-100">
+        <h2 className="text-lg font-bold text-ink">
           {t("wizard.step6")}
         </h2>
-        <p className="mt-1 text-sm text-slate-500">
+        <p className="mt-1 text-sm text-ink-4">
           {videoShots.length}/{shots.length} {t("wizard.step5")} ready
         </p>
       </div>
@@ -134,14 +134,14 @@ export function StepAssembly() {
       <div className="flex flex-wrap gap-2">
         {videoShots.map((shot) => (
           <div key={shot.id} className="flex flex-col items-center gap-1">
-            <div className="h-16 w-24 overflow-hidden rounded border border-slate-700 bg-black">
+            <div className="h-16 w-24 overflow-hidden rounded border border-line bg-black">
               <video
                 src={shot.videoUrl!}
                 className="h-full w-full object-contain"
                 muted
               />
             </div>
-            <span className="text-[0.5625rem] text-slate-500">
+            <span className="text-[0.5625rem] text-ink-4">
               #{shot.index + 1}
             </span>
           </div>
@@ -149,9 +149,9 @@ export function StepAssembly() {
       </div>
 
       {missingShots.length > 0 && (
-        <div className="rounded-lg border border-amber-800 bg-amber-950/30 p-3 text-center text-xs text-amber-300">
+        <div className="rounded-lg border border-warn bg-warn-deep/30 p-3 text-center text-xs text-warn">
           {t("pipeline.needAllVideos", { done: videoShots.length, total: shots.length })}
-          <div className="mt-1 text-amber-400/80">
+          <div className="mt-1 text-warn/80">
             缺少镜头：{missingShots.map((shot) => `#${shot.index + 1}`).join("、")}
           </div>
         </div>
@@ -163,7 +163,7 @@ export function StepAssembly() {
           <button
             onClick={handleRender}
             disabled={isRendering || !canRender}
-            className="flex items-center gap-2 rounded-xl bg-emerald-600 px-8 py-3 text-sm font-semibold text-white transition hover:bg-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex items-center gap-2 rounded-xl bg-success-solid px-8 py-3 text-sm font-semibold text-white transition hover:bg-success-solid disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isRendering ? (
               <>
@@ -180,7 +180,7 @@ export function StepAssembly() {
           {isRendering && (
             <button
               onClick={handleCancelRender}
-              className="flex items-center gap-1.5 rounded-lg bg-red-600 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-red-500"
+              className="flex items-center gap-1.5 rounded-lg bg-danger-solid px-4 py-2.5 text-sm font-medium text-white transition hover:bg-danger-solid"
             >
               <Square size={14} />
               {t("wizard.cancelRender")}
@@ -192,9 +192,9 @@ export function StepAssembly() {
       {/* 拼接进度条 */}
       {isRendering && (
         <div className="mx-auto w-full max-w-md">
-          <div className="h-2 overflow-hidden rounded-full bg-slate-800">
+          <div className="h-2 overflow-hidden rounded-full bg-raised">
             <div
-              className="h-full rounded-full bg-emerald-500 transition-all duration-300"
+              className="h-full rounded-full bg-success-solid transition-all duration-300"
               style={{ width: `${renderProgress}%` }}
             />
           </div>
@@ -203,8 +203,8 @@ export function StepAssembly() {
 
       {/* 拼接失败原因（含 FFmpeg 日志尾部，便于反馈定位） */}
       {renderError && (
-        <div className="mx-auto w-full max-w-md rounded-lg border border-red-800 bg-red-950/30 p-3 text-left text-xs text-red-300">
-          <div className="font-semibold text-red-400">拼接失败：</div>
+        <div className="mx-auto w-full max-w-md rounded-lg border border-danger bg-danger-deep/30 p-3 text-left text-xs text-danger">
+          <div className="font-semibold text-danger">拼接失败：</div>
           <pre className="mt-1 max-h-40 overflow-auto whitespace-pre-wrap break-all">{renderError}</pre>
         </div>
       )}
@@ -212,7 +212,7 @@ export function StepAssembly() {
       {/* 成片预览与下载 */}
       {renderedUrl && (
         <div className="flex flex-col items-center gap-4">
-          <div className="w-full max-w-lg overflow-hidden rounded-xl border border-slate-700 bg-black">
+          <div className="w-full max-w-lg overflow-hidden rounded-xl border border-line bg-black">
             <video
               src={renderedUrl}
               controls
@@ -225,14 +225,14 @@ export function StepAssembly() {
             <button
               onClick={handleRerender}
               disabled={isRendering}
-              className="flex items-center gap-2 rounded-lg bg-slate-700 px-6 py-2.5 text-sm font-medium text-slate-200 transition hover:bg-slate-600 disabled:opacity-50"
+              className="flex items-center gap-2 rounded-lg bg-hover px-6 py-2.5 text-sm font-medium text-ink transition hover:bg-hover disabled:opacity-50"
             >
               <Film size={14} />
               {t("wizard.reassemble")}
             </button>
             <button
               onClick={handleDownload}
-              className="flex items-center gap-2 rounded-lg bg-sky-600 px-6 py-2.5 text-sm font-medium text-white transition hover:bg-sky-500"
+              className="flex items-center gap-2 rounded-lg bg-info-solid px-6 py-2.5 text-sm font-medium text-white transition hover:bg-info-solid"
             >
               <Download size={14} />
               {t("pipeline.download")}

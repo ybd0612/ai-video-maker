@@ -60,12 +60,12 @@ export function StepImages() {
   return (
     <div className="mx-auto flex max-w-4xl flex-col gap-4 py-4">
       <div className="flex items-center justify-between">
-        <h2 className="text-sm font-bold text-slate-200">
+        <h2 className="text-sm font-bold text-ink">
           {t("wizard.step4")} ({imagedCount}/{shots.length})
         </h2>
         <div className="flex items-center gap-2">
           {generatingCount > 0 && (
-            <span className="flex items-center gap-1 text-[0.6875rem] text-violet-400">
+            <span className="flex items-center gap-1 text-[0.6875rem] text-accent">
               <RefreshCw size={11} className="animate-spin" />
               {generatingCount} {t("wizard.generating")}
             </span>
@@ -74,7 +74,7 @@ export function StepImages() {
             <button
               onClick={() => generateImagesForStep()}
               disabled={generatingCount > 0}
-              className="flex items-center gap-1 rounded px-2 py-1 text-[0.6875rem] text-red-400 hover:bg-red-950/30 transition disabled:opacity-50"
+              className="flex items-center gap-1 rounded px-2 py-1 text-[0.6875rem] text-danger hover:bg-danger-deep/30 transition disabled:opacity-50"
             >
               <RefreshCw size={11} />
               {t("wizard.retryFailed")} ({failedCount})
@@ -103,7 +103,7 @@ export function StepImages() {
               generateImagesForStep();
             }}
             disabled={generatingCount > 0}
-            className="flex items-center gap-1 rounded px-2 py-1 text-[0.6875rem] text-emerald-400 hover:bg-emerald-950/30 transition disabled:opacity-50"
+            className="flex items-center gap-1 rounded px-2 py-1 text-[0.6875rem] text-success hover:bg-success-deep/30 transition disabled:opacity-50"
           >
             <RefreshCw size={11} />
             {t("wizard.rerollAll")}
@@ -113,16 +113,16 @@ export function StepImages() {
 
       {/* 缺少画面描述的镜头提示（不会参与生成） */}
       {missingPromptCount > 0 && (
-        <div className="rounded-lg border border-amber-800 bg-amber-950/30 px-3 py-2 text-xs text-amber-300">
+        <div className="rounded-lg border border-warn bg-warn-deep/30 px-3 py-2 text-xs text-warn">
           {t("wizard.missingVisualPrompt", { count: missingPromptCount })}
         </div>
       )}
 
       {/* 步骤级进度条 */}
       {shots.length > 0 && (
-        <div className="h-1 w-full overflow-hidden rounded-full bg-slate-800">
+        <div className="h-1 w-full overflow-hidden rounded-full bg-raised">
           <div
-            className="h-full rounded-full bg-violet-500 transition-all duration-300"
+            className="h-full rounded-full bg-accent-solid transition-all duration-300"
             style={{ width: `${(imagedCount / shots.length) * 100}%` }}
           />
         </div>
@@ -139,7 +139,7 @@ export function StepImages() {
           >
             {shot.imageUrl && (
               <Lightbox src={shot.imageUrl} alt={`Shot ${shot.index + 1}`}>
-                <div className="overflow-hidden rounded-md border border-slate-700">
+                <div className="overflow-hidden rounded-md border border-line">
                   <img
                     src={shot.imageUrl}
                     alt={`Shot ${shot.index + 1}`}

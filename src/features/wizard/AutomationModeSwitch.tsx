@@ -25,8 +25,8 @@ export function AutomationModeSwitch({ mode, onChange }: AutomationModeSwitchPro
             onClick={() => onChange(m.value)}
             className={`rounded-md px-3 py-1.5 text-xs font-medium transition ${
               mode === m.value
-                ? 'bg-violet-600 text-white'
-                : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
+                ? 'bg-accent-solid text-white'
+                : 'bg-raised text-ink-3 hover:bg-hover'
             }`}
             title={m.hint}
           >
@@ -35,7 +35,7 @@ export function AutomationModeSwitch({ mode, onChange }: AutomationModeSwitchPro
         ))}
       </div>
       {/* 当前模式说明，替代仅靠 hover tooltip */}
-      <span className="text-[0.625rem] text-slate-500">{currentHint}</span>
+      <span className="text-[0.625rem] text-ink-4">{currentHint}</span>
     </div>
   );
 }

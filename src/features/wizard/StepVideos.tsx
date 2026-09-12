@@ -78,18 +78,18 @@ export function StepVideos() {
   return (
     <div className="mx-auto flex max-w-4xl flex-col gap-4 py-4">
       <div className="flex items-center justify-between">
-        <h2 className="text-sm font-bold text-slate-200">
+        <h2 className="text-sm font-bold text-ink">
           {t("wizard.step5")} ({videoedCount}/{shots.length})
         </h2>
         <div className="flex items-center gap-2">
           {generatingCount > 0 && (
-            <span className="flex items-center gap-1 text-[0.6875rem] text-amber-400">
+            <span className="flex items-center gap-1 text-[0.6875rem] text-warn">
               <RefreshCw size={11} className="animate-spin" />
               {generatingCount} {t("wizard.generating")}
             </span>
           )}
           {queueCount > 0 && (
-            <span className="text-[0.6875rem] text-slate-500">
+            <span className="text-[0.6875rem] text-ink-4">
               {t("wizard.queueCount", { count: queueCount })} ·{" "}
               {t(plan === "default" ? "wizard.queueHintDefault" : "wizard.queueHintFaster")}
             </span>
@@ -98,7 +98,7 @@ export function StepVideos() {
             <button
               onClick={() => generateVideosForStep()}
               disabled={generatingCount > 0}
-              className="flex items-center gap-1 rounded px-2 py-1 text-[0.6875rem] text-red-400 hover:bg-red-950/30 transition disabled:opacity-50"
+              className="flex items-center gap-1 rounded px-2 py-1 text-[0.6875rem] text-danger hover:bg-danger-deep/30 transition disabled:opacity-50"
             >
               <RefreshCw size={11} />
               {t("wizard.retryFailed")} ({failedCount})
@@ -128,7 +128,7 @@ export function StepVideos() {
               generateVideosForStep();
             }}
             disabled={generatingCount > 0}
-            className="flex items-center gap-1 rounded px-2 py-1 text-[0.6875rem] text-emerald-400 hover:bg-emerald-950/30 transition disabled:opacity-50"
+            className="flex items-center gap-1 rounded px-2 py-1 text-[0.6875rem] text-success hover:bg-success-deep/30 transition disabled:opacity-50"
           >
             <RefreshCw size={11} />
             {t("wizard.rerollAll")}
@@ -137,10 +137,10 @@ export function StepVideos() {
       </div>
 
       {/* 成本预估：成片总时长 + 待生成视频配额消耗 */}
-      <div className="flex flex-wrap gap-x-4 gap-y-1 text-[0.6875rem] text-slate-500">
+      <div className="flex flex-wrap gap-x-4 gap-y-1 text-[0.6875rem] text-ink-4">
         <span>{t("wizard.videoDurationEstimate", { seconds: totalDuration })}</span>
         {pendingSeconds > 0 && (
-          <span className="text-amber-400/80">
+          <span className="text-warn/80">
             {t("wizard.videoQuotaEstimate", { seconds: pendingSeconds })}
           </span>
         )}
@@ -148,9 +148,9 @@ export function StepVideos() {
 
       {/* 步骤级进度条 */}
       {shots.length > 0 && (
-        <div className="h-1 w-full overflow-hidden rounded-full bg-slate-800">
+        <div className="h-1 w-full overflow-hidden rounded-full bg-raised">
           <div
-            className="h-full rounded-full bg-amber-500 transition-all duration-300"
+            className="h-full rounded-full bg-warn-solid transition-all duration-300"
             style={{ width: `${(videoedCount / shots.length) * 100}%` }}
           />
         </div>
@@ -158,7 +158,7 @@ export function StepVideos() {
 
       {/* 生成完成 toast */}
       {showDoneToast && (
-        <div className="rounded-lg border border-emerald-700 bg-emerald-950/40 px-4 py-2.5 text-center text-xs text-emerald-300">
+        <div className="rounded-lg border border-success bg-success-deep/40 px-4 py-2.5 text-center text-xs text-success">
           ✓ {t("wizard.videosDone")}
         </div>
       )}
@@ -175,7 +175,7 @@ export function StepVideos() {
             <div className="flex gap-2">
               {shot.imageUrl && (
                 <Lightbox src={shot.imageUrl} alt={`Ref ${shot.index + 1}`}>
-                  <div className="w-1/3 overflow-hidden rounded-md border border-slate-700">
+                  <div className="w-1/3 overflow-hidden rounded-md border border-line">
                     <img
                       src={shot.imageUrl}
                       alt={`Ref ${shot.index + 1}`}
@@ -185,7 +185,7 @@ export function StepVideos() {
                 </Lightbox>
               )}
               {shot.videoUrl ? (
-                <div className="flex-1 overflow-hidden rounded-md border border-slate-700">
+                <div className="flex-1 overflow-hidden rounded-md border border-line">
                   <video
                     src={shot.videoUrl}
                     controls
@@ -194,27 +194,27 @@ export function StepVideos() {
                   />
                 </div>
               ) : shot.status === "videoing" ? (
-                <div className="flex flex-1 items-center justify-center rounded-md border border-dashed border-amber-700 bg-amber-950/10 h-24">
+                <div className="flex flex-1 items-center justify-center rounded-md border border-dashed border-warn bg-warn-deep/10 h-24">
                   <div className="flex flex-col items-center gap-1">
-                    <div className="h-1.5 w-20 overflow-hidden rounded-full bg-slate-800">
+                    <div className="h-1.5 w-20 overflow-hidden rounded-full bg-raised">
                       <div
-                        className="h-full rounded-full bg-amber-500 transition-all duration-500"
+                        className="h-full rounded-full bg-warn-solid transition-all duration-500"
                         style={{ width: `${shot.videoProgress ?? 0}%` }}
                       />
                     </div>
-                    <span className="text-[0.625rem] text-amber-400">
+                    <span className="text-[0.625rem] text-warn">
                       {shot.videoProgress ?? 0}%
                     </span>
                     {shot.videoRetryCount && shot.videoRetryCount > 0 && (
-                      <span className="text-[0.5625rem] text-slate-500">
+                      <span className="text-[0.5625rem] text-ink-4">
                         Retry {shot.videoRetryCount}/3
                       </span>
                     )}
                   </div>
                 </div>
               ) : (
-                <div className="flex flex-1 items-center justify-center rounded-md border border-dashed border-slate-700 bg-slate-800/30 h-24">
-                  <span className="text-[0.625rem] text-slate-600">{t("wizard.waiting")}</span>
+                <div className="flex flex-1 items-center justify-center rounded-md border border-dashed border-line bg-raised/30 h-24">
+                  <span className="text-[0.625rem] text-ink-5">{t("wizard.waiting")}</span>
                 </div>
               )}
             </div>
@@ -228,7 +228,7 @@ export function StepVideos() {
       </div>
 
       {allVideoed && (
-        <div className="text-center text-emerald-400 text-xs">
+        <div className="text-center text-success text-xs">
           ✓ {t("wizard.allReady")}
         </div>
       )}

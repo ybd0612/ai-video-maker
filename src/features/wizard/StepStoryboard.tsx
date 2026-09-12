@@ -82,19 +82,19 @@ export function StepStoryboard() {
     return (
       <div className="mx-auto flex max-w-2xl flex-col items-center gap-6 py-16">
         <div className="text-center">
-          <h2 className="text-lg font-bold text-slate-100">
+          <h2 className="text-lg font-bold text-ink">
             {t("wizard.step2")}
           </h2>
-          <p className="mt-2 text-xs text-slate-500">
+          <p className="mt-2 text-xs text-ink-4">
             {t("wizard.storyboardHint")}
           </p>
         </div>
 
         {/* Idea preview */}
         {ideaPrompt && (
-          <div className="w-full rounded-xl border border-slate-700 bg-slate-800/50 p-4">
-            <p className="text-[0.6875rem] font-medium text-slate-500 mb-1">{t("wizard.step1")}</p>
-            <p className="text-sm text-slate-300 line-clamp-4">{ideaPrompt}</p>
+          <div className="w-full rounded-xl border border-line bg-raised/50 p-4">
+            <p className="text-[0.6875rem] font-medium text-ink-4 mb-1">{t("wizard.step1")}</p>
+            <p className="text-sm text-ink-2 line-clamp-4">{ideaPrompt}</p>
           </div>
         )}
 
@@ -104,7 +104,7 @@ export function StepStoryboard() {
         <button
           onClick={handleGenerateStoryboard}
           disabled={!ideaPrompt.trim() || isGenerating}
-          className="flex items-center gap-2 rounded-xl bg-emerald-600 px-8 py-3 text-sm font-semibold text-white transition hover:bg-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed"
+          className="flex items-center gap-2 rounded-xl bg-success-solid px-8 py-3 text-sm font-semibold text-white transition hover:bg-success-solid disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {isGenerating ? (
             <Loader2 size={16} className="animate-spin" />
@@ -115,7 +115,7 @@ export function StepStoryboard() {
         </button>
 
         {error && (
-          <div className="rounded-lg border border-red-800 bg-red-950/30 p-3 text-sm text-red-300">
+          <div className="rounded-lg border border-danger bg-danger-deep/30 p-3 text-sm text-danger">
             {error}
           </div>
         )}
@@ -123,7 +123,7 @@ export function StepStoryboard() {
         {/* Manual add option */}
         <button
           onClick={handleAddShot}
-          className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-300 transition"
+          className="flex items-center gap-1.5 text-xs text-ink-4 hover:text-ink-2 transition"
         >
           <Plus size={12} />
           {t("wizard.addShotManual")}
@@ -136,21 +136,21 @@ export function StepStoryboard() {
     <div className="mx-auto flex max-w-4xl flex-col gap-4 py-4">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <h2 className="text-sm font-bold text-slate-200">
+        <h2 className="text-sm font-bold text-ink">
           {t("wizard.step2")} ({shots.length})
         </h2>
         <div className="flex items-center gap-2">
           <button
             onClick={handleGenerateStoryboard}
             disabled={isGenerating}
-            className="flex items-center gap-1 rounded px-2 py-1 text-[0.6875rem] text-violet-400 hover:bg-violet-950/30 transition disabled:opacity-50"
+            className="flex items-center gap-1 rounded px-2 py-1 text-[0.6875rem] text-accent hover:bg-accent-deep/30 transition disabled:opacity-50"
           >
             {isGenerating ? <Loader2 size={11} className="animate-spin" /> : <Sparkles size={11} />}
             {isGenerating ? t("wizard.generating") : t("wizard.reroll")}
           </button>
           <button
             onClick={handleAddShot}
-            className="flex items-center gap-1 rounded px-2 py-1 text-[0.6875rem] text-emerald-400 hover:bg-emerald-950/30 transition"
+            className="flex items-center gap-1 rounded px-2 py-1 text-[0.6875rem] text-success hover:bg-success-deep/30 transition"
           >
             <Plus size={12} />
             {t("wizard.addShot")}
@@ -184,13 +184,13 @@ export function StepStoryboard() {
 
             {/* Duration */}
             <div className="flex items-center gap-2">
-              <label className="text-[0.6875rem] font-medium text-slate-500">
+              <label className="text-[0.6875rem] font-medium text-ink-4">
                 {t("pipeline.duration")}
               </label>
               <select
                 value={shot.duration}
                 onChange={(e) => updateShot(shot.id, { duration: parseInt(e.target.value) })}
-                className="rounded border border-slate-700 bg-slate-800 px-2 py-1 text-xs text-slate-300 focus:outline-none"
+                className="rounded border border-line bg-raised px-2 py-1 text-xs text-ink-2 focus:outline-none"
               >
                 <option value={4}>4s</option>
                 <option value={5}>5s</option>
@@ -212,16 +212,16 @@ export function StepStoryboard() {
 
       {/* 分镜确认卡：semi-auto 模式下确认后进入图片生成（auto 模式已自动推进） */}
       {project?.automationMode !== "auto" && (
-        <div className="rounded-xl border border-slate-700 bg-slate-800/50 p-6">
-          <h3 className="text-sm font-semibold text-slate-100">
+        <div className="rounded-xl border border-line bg-raised/50 p-6">
+          <h3 className="text-sm font-semibold text-ink">
             {t("review.qualityCheck")}
           </h3>
-          <p className="mt-2 text-xs text-slate-400">
+          <p className="mt-2 text-xs text-ink-3">
             {t("wizard.storyboardConfirmHint")}
           </p>
           <button
             onClick={() => setWizardStep(4)}
-            className="mt-4 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-emerald-500"
+            className="mt-4 rounded-lg bg-success-solid px-4 py-2 text-sm font-medium text-white transition hover:bg-success-solid"
           >
             {t("wizard.confirmStoryboard")}
           </button>
@@ -246,7 +246,7 @@ function AssetSummaryBar({
   const products = assets.filter((a) => a.type === "product").length;
   if (chars === 0 && scenes === 0 && products === 0 && !styleReady) return null;
   return (
-    <div className="flex flex-wrap gap-3 text-[0.6875rem] text-slate-500">
+    <div className="flex flex-wrap gap-3 text-[0.6875rem] text-ink-4">
       <span>{t("wizard.assetCharacters")}: {chars}</span>
       <span>{t("wizard.assetScenes")}: {scenes}</span>
       <span>{t("wizard.productReferences")}: {products}</span>

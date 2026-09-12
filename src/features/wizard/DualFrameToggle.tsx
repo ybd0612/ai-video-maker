@@ -36,10 +36,10 @@ export function DualFrameToggle({ shot }: DualFrameToggleProps) {
               ...(e.target.checked ? {} : { lastFrameUrl: undefined }),
             })
           }
-          className="h-3.5 w-3.5 rounded border-slate-600 bg-slate-800 text-amber-500 focus:ring-amber-500 focus:ring-offset-0"
+          className="h-3.5 w-3.5 rounded border-line-strong bg-raised text-warn focus:ring-warn focus:ring-offset-0"
         />
-        <span className="flex items-center gap-1 text-[0.6875rem] text-slate-400">
-          <Film size={11} className="text-amber-400" />
+        <span className="flex items-center gap-1 text-[0.6875rem] text-ink-3">
+          <Film size={11} className="text-warn" />
           {t("wizard.useDualFrame")}
         </span>
       </label>
@@ -50,7 +50,7 @@ export function DualFrameToggle({ shot }: DualFrameToggleProps) {
           {/* 从其他分镜图中点选尾帧 */}
           {candidateFrames.length > 0 && (
             <div className="space-y-1">
-              <label className="text-[0.6875rem] font-medium text-slate-500">
+              <label className="text-[0.6875rem] font-medium text-ink-4">
                 {t("wizard.pickLastFrame")}
               </label>
               <div className="flex gap-1.5 overflow-x-auto pb-1">
@@ -60,8 +60,8 @@ export function DualFrameToggle({ shot }: DualFrameToggleProps) {
                     onClick={() => updateShot(shot.id, { lastFrameUrl: s.imageUrl })}
                     className={`shrink-0 overflow-hidden rounded border transition ${
                       shot.lastFrameUrl === s.imageUrl
-                        ? "border-amber-500 ring-1 ring-amber-500"
-                        : "border-slate-700 hover:border-slate-500"
+                        ? "border-warn ring-1 ring-warn"
+                        : "border-line hover:border-line-strong"
                     }`}
                     title={`Shot ${s.index + 1}`}
                   >
@@ -76,7 +76,7 @@ export function DualFrameToggle({ shot }: DualFrameToggleProps) {
             </div>
           )}
 
-          <label className="text-[0.6875rem] font-medium text-slate-500">
+          <label className="text-[0.6875rem] font-medium text-ink-4">
             {t("wizard.lastFrameUrl")}
           </label>
           <input
@@ -86,11 +86,11 @@ export function DualFrameToggle({ shot }: DualFrameToggleProps) {
               updateShot(shot.id, { lastFrameUrl: e.target.value || undefined })
             }
             placeholder={t("wizard.lastFrameUrlPlaceholder")}
-            className="w-full rounded-md border border-slate-700 bg-slate-800 p-2 text-xs text-slate-100 placeholder:text-slate-600 focus:border-amber-500 focus:outline-none"
+            className="w-full rounded-md border border-line bg-raised p-2 text-xs text-ink placeholder:text-ink-5 focus:border-warn focus:outline-none"
           />
           {/* 尾帧预览（点击放大查看） */}
           {shot.lastFrameUrl && (
-            <div className="mt-1 overflow-hidden rounded border border-slate-700 w-20 h-14">
+            <div className="mt-1 overflow-hidden rounded border border-line w-20 h-14">
               <Lightbox src={shot.lastFrameUrl} alt="Last frame preview">
                 <img
                   src={shot.lastFrameUrl}

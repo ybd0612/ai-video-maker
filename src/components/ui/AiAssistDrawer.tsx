@@ -137,16 +137,16 @@ export function AiAssistDrawer({
 
           {/* Drawer */}
           <motion.div
-            className="fixed right-0 top-0 bottom-0 z-[91] flex w-96 flex-col border-l border-slate-800 bg-slate-900"
+            className="fixed right-0 top-0 bottom-0 z-[91] flex w-96 flex-col border-l border-line-soft bg-surface"
             initial={{ x: "100%" }}
             animate={{ x: 0 }}
             exit={{ x: "100%" }}
             transition={{ type: "tween", duration: 0.25 }}
           >
             {/* Header */}
-            <div className="flex items-center justify-between border-b border-slate-800 px-4 py-3">
+            <div className="flex items-center justify-between border-b border-line-soft px-4 py-3">
               <div className="flex items-center gap-2">
-                <span className="text-sm font-semibold text-slate-200">
+                <span className="text-sm font-semibold text-ink">
                   {fieldName} — {t("aiAssist.title")}
                 </span>
               </div>
@@ -154,7 +154,7 @@ export function AiAssistDrawer({
                 {messages.length > 0 && (
                   <button
                     onClick={handleNewConversation}
-                    className="rounded p-1 text-slate-500 hover:bg-slate-800 hover:text-slate-300"
+                    className="rounded p-1 text-ink-4 hover:bg-raised hover:text-ink-2"
                     title={t("aiAssist.newConversation")}
                   >
                     <RotateCcw size={13} />
@@ -162,7 +162,7 @@ export function AiAssistDrawer({
                 )}
                 <button
                   onClick={onClose}
-                  className="rounded p-1 text-slate-500 hover:bg-slate-800 hover:text-slate-300"
+                  className="rounded p-1 text-ink-4 hover:bg-raised hover:text-ink-2"
                   title={t("aiAssist.close")}
                 >
                   <X size={14} />
@@ -171,13 +171,13 @@ export function AiAssistDrawer({
             </div>
 
             {/* Current content context */}
-            <div className="border-b border-slate-800 px-4 py-2">
-              <p className="mb-1 text-[0.625rem] font-medium text-slate-600">
+            <div className="border-b border-line-soft px-4 py-2">
+              <p className="mb-1 text-[0.625rem] font-medium text-ink-5">
                 {t("aiAssist.currentContent")}
               </p>
-              <div className="max-h-20 overflow-y-auto rounded-md border border-slate-700 bg-slate-800/50 p-2 text-[0.6875rem] leading-relaxed text-slate-400">
+              <div className="max-h-20 overflow-y-auto rounded-md border border-line bg-raised/50 p-2 text-[0.6875rem] leading-relaxed text-ink-3">
                 {currentValue || (
-                  <span className="italic text-slate-600">{t("aiAssist.emptyField")}</span>
+                  <span className="italic text-ink-5">{t("aiAssist.emptyField")}</span>
                 )}
               </div>
             </div>
@@ -193,8 +193,8 @@ export function AiAssistDrawer({
                     <div
                       className={`max-w-[85%] rounded-lg border p-2.5 text-xs leading-relaxed ${
                         msg.role === "user"
-                          ? "border-emerald-700 bg-emerald-950/40 text-emerald-100"
-                          : "border-slate-700 bg-slate-800 text-slate-200"
+                          ? "border-success bg-success-deep/40 text-success"
+                          : "border-line bg-raised text-ink"
                       }`}
                     >
                       <p className="whitespace-pre-wrap">{msg.content}</p>
@@ -207,8 +207,8 @@ export function AiAssistDrawer({
                         disabled={appliedIndex === i}
                         className={`mt-1 flex items-center gap-1 rounded px-2 py-0.5 text-[0.625rem] font-medium transition ${
                           appliedIndex === i
-                            ? "bg-emerald-900/30 text-emerald-400"
-                            : "bg-slate-800 text-slate-400 hover:bg-emerald-900/30 hover:text-emerald-300"
+                            ? "bg-success-deep/30 text-success"
+                            : "bg-raised text-ink-3 hover:bg-success-deep/30 hover:text-success"
                         }`}
                       >
                         <Check size={10} />
@@ -221,8 +221,8 @@ export function AiAssistDrawer({
                 {/* Loading indicator */}
                 {isLoading && (
                   <div className="flex items-start">
-                    <div className="flex items-center gap-2 rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-xs text-slate-400">
-                      <Loader2 size={12} className="animate-spin text-emerald-400" />
+                    <div className="flex items-center gap-2 rounded-lg border border-line bg-raised px-3 py-2 text-xs text-ink-3">
+                      <Loader2 size={12} className="animate-spin text-success" />
                       {t("aiAssist.thinking")}
                     </div>
                   </div>
@@ -230,7 +230,7 @@ export function AiAssistDrawer({
 
                 {/* Error */}
                 {error && (
-                  <div className="rounded-md border border-red-800 bg-red-950/30 p-2 text-[0.6875rem] text-red-300">
+                  <div className="rounded-md border border-danger bg-danger-deep/30 p-2 text-[0.6875rem] text-danger">
                     {error}
                   </div>
                 )}
@@ -240,7 +240,7 @@ export function AiAssistDrawer({
             </div>
 
             {/* Input area */}
-            <div className="border-t border-slate-800 px-4 py-3">
+            <div className="border-t border-line-soft px-4 py-3">
               <div className="flex gap-2">
                 <textarea
                   value={input}
@@ -249,12 +249,12 @@ export function AiAssistDrawer({
                   placeholder={t("aiAssist.placeholder")}
                   rows={2}
                   disabled={isLoading}
-                  className="flex-1 resize-none rounded-md border border-slate-700 bg-slate-800 p-2 text-xs text-slate-100 placeholder:text-slate-600 focus:border-emerald-500 focus:outline-none disabled:opacity-50"
+                  className="flex-1 resize-none rounded-md border border-line bg-raised p-2 text-xs text-ink placeholder:text-ink-5 focus:border-success focus:outline-none disabled:opacity-50"
                 />
                 <button
                   onClick={handleSend}
                   disabled={!input.trim() || isLoading}
-                  className="flex h-9 w-9 shrink-0 items-center justify-center self-end rounded-md bg-emerald-600 text-white transition hover:bg-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="flex h-9 w-9 shrink-0 items-center justify-center self-end rounded-md bg-success-solid text-white transition hover:bg-success-solid disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <Send size={13} />
                 </button>

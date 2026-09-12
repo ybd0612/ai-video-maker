@@ -35,13 +35,13 @@ export function DialogueEditor({ shotId }: DialogueEditorProps) {
   return (
     <div className="space-y-1.5">
       <div className="flex items-center justify-between">
-        <label className="flex items-center gap-1 text-[0.6875rem] font-medium text-slate-500">
+        <label className="flex items-center gap-1 text-[0.6875rem] font-medium text-ink-4">
           <MessageSquare size={10} />
           {t("dialogue.title")} ({dialogues.length})
         </label>
         <button
           onClick={handleAdd}
-          className="flex items-center gap-1 rounded px-1.5 py-0.5 text-[0.625rem] text-emerald-400 hover:bg-emerald-950/30 transition"
+          className="flex items-center gap-1 rounded px-1.5 py-0.5 text-[0.625rem] text-success hover:bg-success-deep/30 transition"
         >
           <Plus size={10} />
           {t("dialogue.add")}
@@ -59,7 +59,7 @@ export function DialogueEditor({ shotId }: DialogueEditorProps) {
           return (
             <div
               key={line.id}
-              className="rounded-md border border-slate-700/50 bg-slate-800/30 p-1.5"
+              className="rounded-md border border-line/50 bg-raised/30 p-1.5"
             >
               {/* Character selector + delete */}
               <div className="mb-1 flex items-center justify-between">
@@ -70,7 +70,7 @@ export function DialogueEditor({ shotId }: DialogueEditorProps) {
                       characterId: e.target.value || null,
                     })
                   }
-                  className="rounded border border-slate-700 bg-slate-800 px-1.5 py-0.5 text-[0.625rem] text-slate-300 focus:border-sky-500 focus:outline-none"
+                  className="rounded border border-line bg-raised px-1.5 py-0.5 text-[0.625rem] text-ink-2 focus:border-info focus:outline-none"
                 >
                   <option value="">{t("dialogue.narrator")}</option>
                   {characters.map((char) => (
@@ -81,7 +81,7 @@ export function DialogueEditor({ shotId }: DialogueEditorProps) {
                 </select>
               <button
                 onClick={() => removeDialogueLine(shotId, line.id)}
-                className="rounded p-0.5 text-slate-600 hover:text-red-400"
+                className="rounded p-0.5 text-ink-5 hover:text-danger"
               >
                 <Trash2 size={10} />
               </button>
@@ -96,8 +96,8 @@ export function DialogueEditor({ shotId }: DialogueEditorProps) {
                 resetKey={`${shotId}:${line.id}`}
                 placeholder={t("dialogue.textPlaceholder")}
                 singleLine
-                appearanceClass="rounded border border-slate-700/50 bg-slate-900/50 text-[0.6875rem] text-slate-200 placeholder:text-slate-600"
-                focusClass="focus:border-sky-500"
+                appearanceClass="rounded border border-line/50 bg-surface/50 text-[0.6875rem] text-ink placeholder:text-ink-5"
+                focusClass="focus:border-info"
               />
             </div>
 
@@ -109,7 +109,7 @@ export function DialogueEditor({ shotId }: DialogueEditorProps) {
                 updateDialogueLine(shotId, line.id, { delivery: e.target.value })
               }
               placeholder={t("dialogue.deliveryPlaceholder")}
-              className="w-full rounded border border-slate-800 bg-transparent px-2 py-0.5 text-[0.625rem] text-slate-500 placeholder:text-slate-700 focus:border-slate-600 focus:outline-none"
+              className="w-full rounded border border-line-soft bg-transparent px-2 py-0.5 text-[0.625rem] text-ink-4 placeholder:text-ink-5 focus:border-line-strong focus:outline-none"
             />
           </div>
           );

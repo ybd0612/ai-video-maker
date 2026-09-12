@@ -22,14 +22,14 @@ interface ShotCardProps {
 }
 
 const STATUS_ICONS: Record<string, { icon: typeof Check; color: string }> = {
-  idle: { icon: ChevronDown, color: "text-slate-500" },
-  scripting: { icon: Loader2, color: "text-sky-400 animate-spin" },
-  scripted: { icon: Check, color: "text-sky-400" },
-  imaging: { icon: Loader2, color: "text-violet-400 animate-spin" },
-  imaged: { icon: Check, color: "text-violet-400" },
-  videoing: { icon: Loader2, color: "text-amber-400 animate-spin" },
-  videoed: { icon: Check, color: "text-amber-400" },
-  failed: { icon: AlertCircle, color: "text-red-400" },
+  idle: { icon: ChevronDown, color: "text-ink-4" },
+  scripting: { icon: Loader2, color: "text-info animate-spin" },
+  scripted: { icon: Check, color: "text-info" },
+  imaging: { icon: Loader2, color: "text-accent animate-spin" },
+  imaged: { icon: Check, color: "text-accent" },
+  videoing: { icon: Loader2, color: "text-warn animate-spin" },
+  videoed: { icon: Check, color: "text-warn" },
+  failed: { icon: AlertCircle, color: "text-danger" },
 };
 
 export function ShotCard({
@@ -58,14 +58,14 @@ export function ShotCard({
   })();
 
   return (
-    <div className="flex flex-col rounded-lg border border-slate-700 bg-slate-900/50 overflow-hidden transition hover:border-slate-600">
+    <div className="flex flex-col rounded-lg border border-line bg-surface/50 overflow-hidden transition hover:border-line-strong">
       {/* Header */}
       <button
         onClick={() => setExpanded(!expanded)}
         className="flex items-center gap-2 px-3 py-2 text-left"
       >
         {/* Shot number */}
-        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-slate-800 text-[0.625rem] font-bold text-slate-400">
+        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-raised text-[0.625rem] font-bold text-ink-3">
           {shot.index + 1}
         </span>
 
@@ -73,13 +73,13 @@ export function ShotCard({
         <StatusIcon size={12} className={`shrink-0 ${statusInfo.color}`} />
 
         {/* Summary */}
-        <span className="flex-1 truncate text-[0.6875rem] text-slate-400">
+        <span className="flex-1 truncate text-[0.6875rem] text-ink-3">
           {summary}
         </span>
 
         {/* Image thumbnail for image/video modes（点击放大查看） */}
         {(mode === "image" || mode === "video") && shot.imageUrl && (
-          <div className="h-8 w-8 shrink-0 overflow-hidden rounded border border-slate-700">
+          <div className="h-8 w-8 shrink-0 overflow-hidden rounded border border-line">
             <Lightbox src={shot.imageUrl} alt={`Shot ${shot.index + 1}`}>
               <img
                 src={shot.imageUrl}
@@ -92,7 +92,7 @@ export function ShotCard({
 
         {/* Progress for videoing */}
         {shot.status === "videoing" && (shot.videoProgress ?? 0) > 0 && (
-          <span className="text-[0.625rem] text-amber-400">
+          <span className="text-[0.625rem] text-warn">
             {shot.videoProgress}%
           </span>
         )}
@@ -102,7 +102,7 @@ export function ShotCard({
           animate={{ rotate: expanded ? 180 : 0 }}
           transition={{ duration: 0.15 }}
         >
-          <ChevronDown size={12} className="text-slate-600" />
+          <ChevronDown size={12} className="text-ink-5" />
         </motion.div>
       </button>
 
@@ -116,12 +116,12 @@ export function ShotCard({
             transition={{ duration: 0.2, ease: "easeInOut" }}
             className="overflow-hidden"
           >
-            <div className="border-t border-slate-700/30 px-3 py-2 space-y-2">
+            <div className="border-t border-line/30 px-3 py-2 space-y-2">
               {children}
 
               {/* 失败原因（分镜/图片/视频生成失败均可显示） */}
               {shot.error && (
-                <p className="rounded border border-red-800 bg-red-950/30 px-2 py-1 text-[0.625rem] text-red-300">
+                <p className="rounded border border-danger bg-danger-deep/30 px-2 py-1 text-[0.625rem] text-danger">
                   {shot.error}
                 </p>
               )}
@@ -132,7 +132,7 @@ export function ShotCard({
                   <button
                     onClick={onReroll}
                     disabled={isGenerating}
-                    className="flex items-center gap-1 rounded px-2 py-1 text-[0.625rem] text-emerald-400 hover:bg-emerald-950/30 transition disabled:opacity-50"
+                    className="flex items-center gap-1 rounded px-2 py-1 text-[0.625rem] text-success hover:bg-success-deep/30 transition disabled:opacity-50"
                   >
                     <RefreshCw size={10} className={isGenerating ? "animate-spin" : ""} />
                     {t("wizard.reroll")}
@@ -141,7 +141,7 @@ export function ShotCard({
                 {onDelete && (
                   <button
                     onClick={onDelete}
-                    className="flex items-center gap-1 rounded px-2 py-1 text-[0.625rem] text-red-400 hover:bg-red-950/30 transition"
+                    className="flex items-center gap-1 rounded px-2 py-1 text-[0.625rem] text-danger hover:bg-danger-deep/30 transition"
                   >
                     <Trash2 size={10} />
                   </button>

@@ -20,10 +20,10 @@ interface PromptFieldProps {
 }
 
 const FOCUS_COLORS = {
-  violet: "focus:border-violet-500",
-  amber: "focus:border-amber-500",
-  red: "focus:border-red-500",
-  sky: "focus:border-sky-500",
+  violet: "focus:border-accent",
+  amber: "focus:border-warn",
+  red: "focus:border-danger",
+  sky: "focus:border-info",
 };
 
 export function PromptField({
@@ -38,7 +38,7 @@ export function PromptField({
 }: PromptFieldProps) {
   return (
     <div className="space-y-1">
-      <label className="text-[0.6875rem] font-medium text-slate-500">
+      <label className="text-[0.6875rem] font-medium text-ink-4">
         {label}
       </label>
       <AiPolishField

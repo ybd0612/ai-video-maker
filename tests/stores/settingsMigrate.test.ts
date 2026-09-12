@@ -3,6 +3,7 @@
 // settingsStore 持久化迁移（migratePersistedSettings 纯函数）的单测：
 // - v0 → v1：apihub.agnes-ai.com 旧域名迁移到中国站（旧分支不回归）
 // - v1 → v2：promptRules 缺失/非法兜底 []；合法数组原样保留
+// - v2 → v3：theme 缺失兜底 light（默认白色）；显式 dark 保留
 // - 坏结构不抛错
 // 用 tests/helpers/localStorage.ts 桩（node 环境，persist 模块加载期读 storage）。
 // ────────────────────────────────────────────────────────────────────────────
@@ -90,6 +91,34 @@ describe("migratePersistedSettings：v1 → v2（promptRules 兜底）", () => {
     );
     expect(migrated.providerConfig?.baseUrl).toBe("https://api.agnes-ai.cn/v1");
     expect(migrated.promptRules).toEqual([]);
+  });
+});
+
+describe("migratePersistedSettings：v2 → v3（theme 默认白色）", () => {
+  it("缺失 theme 兜底为 light", () => {
+    const migrated = migratePersistedSettings(
+      { providerConfig: { apiKey: "k", baseUrl: "u", plan: "default" } },
+      2,
+    );
+    expect(migrated.theme).toBe("light");
+  });
+
+  it("非法 theme 兜底为 light", () => {
+    const migrated = migratePersistedSettings(
+      { theme: "blue" as unknown as "light" | "dark" },
+      2,
+    );
+    expect(migrated.theme).toBe("light");
+  });
+
+  it("已存显式 dark 保留（用户主动切过黑主题不丢）", () => {
+    const migrated = migratePersistedSettings({ theme: "dark" }, 2);
+    expect(migrated.theme).toBe("dark");
+  });
+
+  it("version >= 3 时不再兜底（幂等 no-op）", () => {
+    const migrated = migratePersistedSettings({}, 3);
+    expect(migrated.theme).toBeUndefined();
   });
 });
 

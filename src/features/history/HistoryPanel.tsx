@@ -25,16 +25,16 @@ const actionIcons: Record<HistoryAction, typeof FolderPlus> = {
 };
 
 const actionColors: Record<HistoryAction, string> = {
-  project_created: "text-emerald-400",
-  project_deleted: "text-red-400",
-  project_switched: "text-sky-400",
-  script_generated: "text-violet-400",
-  style_generated: "text-fuchsia-400",
-  pipeline_started: "text-amber-400",
-  pipeline_completed: "text-emerald-400",
-  pipeline_failed: "text-red-400",
-  shot_regenerated: "text-sky-400",
-  settings_changed: "text-slate-400",
+  project_created: "text-success",
+  project_deleted: "text-danger",
+  project_switched: "text-info",
+  script_generated: "text-accent",
+  style_generated: "text-accent",
+  pipeline_started: "text-warn",
+  pipeline_completed: "text-success",
+  pipeline_failed: "text-danger",
+  shot_regenerated: "text-info",
+  settings_changed: "text-ink-3",
 };
 
 function formatTime(ts: number): string {
@@ -70,14 +70,14 @@ export function HistoryPanel() {
   return (
     <div className="flex flex-1 flex-col overflow-hidden">
       {/* Header */}
-      <div className="flex items-center justify-between border-b border-slate-800 px-3 py-1.5">
-        <span className="text-[0.625rem] text-slate-500">
+      <div className="flex items-center justify-between border-b border-line-soft px-3 py-1.5">
+        <span className="text-[0.625rem] text-ink-4">
           {t("pipeline.historyCount").replace("{count}", String(history.length))}
         </span>
         {history.length > 0 && (
           <button
             onClick={clearHistory}
-            className="rounded p-0.5 text-slate-600 hover:text-red-400 transition"
+            className="rounded p-0.5 text-ink-5 hover:text-danger transition"
             title={t("pipeline.clearHistory")}
           >
             <Trash2 size={10} />
@@ -89,35 +89,35 @@ export function HistoryPanel() {
       <div className="flex-1 overflow-y-auto">
         {history.length === 0 ? (
           <div className="flex h-full items-center justify-center">
-            <span className="text-xs text-slate-600">{t("pipeline.noHistory")}</span>
+            <span className="text-xs text-ink-5">{t("pipeline.noHistory")}</span>
           </div>
         ) : (
           Object.entries(grouped).map(([dateKey, entries]) => (
             <div key={dateKey}>
-              <div className="sticky top-0 bg-slate-950 px-3 py-1 text-[0.5625rem] font-medium text-slate-600">
+              <div className="sticky top-0 bg-app px-3 py-1 text-[0.5625rem] font-medium text-ink-5">
                 {dateKey}
               </div>
               {entries.map((entry) => {
                 const Icon = actionIcons[entry.action] ?? FileText;
-                const color = actionColors[entry.action] ?? "text-slate-400";
+                const color = actionColors[entry.action] ?? "text-ink-3";
                 const project = projects.find((p) => p.id === entry.projectId);
 
                 return (
                   <div
                     key={entry.id}
-                    className="flex items-start gap-2 px-3 py-1.5 hover:bg-slate-900/50 transition"
+                    className="flex items-start gap-2 px-3 py-1.5 hover:bg-surface/50 transition"
                   >
                     <Icon size={10} className={`mt-0.5 flex-shrink-0 ${color}`} />
                     <div className="flex-1 min-w-0">
-                      <p className="truncate text-[0.625rem] text-slate-300">
+                      <p className="truncate text-[0.625rem] text-ink-2">
                         {entry.description}
                       </p>
                       <div className="flex items-center gap-1.5">
-                        <span className="text-[0.5625rem] text-slate-600">
+                        <span className="text-[0.5625rem] text-ink-5">
                           {formatTime(entry.timestamp)}
                         </span>
                         {project && (
-                          <span className="truncate text-[0.5625rem] text-slate-700">
+                          <span className="truncate text-[0.5625rem] text-ink-5">
                             {project.title}
                           </span>
                         )}

@@ -82,17 +82,17 @@ export function ConfirmDialogProvider({ children }: { children: ReactNode }) {
               initial={{ scale: 0.95, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.95, opacity: 0 }}
-              className="w-full max-w-sm rounded-2xl border border-slate-700 bg-slate-900 p-5 shadow-2xl"
+              className="w-full max-w-sm rounded-2xl border border-line bg-surface p-5 shadow-2xl"
               onClick={(e) => e.stopPropagation()}
             >
-              <h3 className="mb-2 text-sm font-bold text-slate-100">{options.title}</h3>
-              <div className="mb-5 text-xs leading-relaxed text-slate-400">
+              <h3 className="mb-2 text-sm font-bold text-ink">{options.title}</h3>
+              <div className="mb-5 text-xs leading-relaxed text-ink-3">
                 {options.message}
               </div>
               <div className="flex justify-end gap-2">
                 <button
                   onClick={() => handleClose(false)}
-                  className="rounded-lg border border-slate-700 bg-slate-800 px-3.5 py-1.5 text-[0.6875rem] font-medium text-slate-300 transition hover:border-slate-500 hover:text-slate-100"
+                  className="rounded-lg border border-line bg-raised px-3.5 py-1.5 text-[0.6875rem] font-medium text-ink-2 transition hover:border-line-strong hover:text-ink"
                 >
                   {options.cancelLabel ?? t("dialog.cancel")}
                 </button>
@@ -101,8 +101,8 @@ export function ConfirmDialogProvider({ children }: { children: ReactNode }) {
                   autoFocus
                   className={`rounded-lg px-3.5 py-1.5 text-[0.6875rem] font-semibold text-white transition ${
                     isDanger
-                      ? "bg-red-600 hover:bg-red-500"
-                      : "bg-emerald-600 hover:bg-emerald-500"
+                      ? "bg-danger-solid hover:bg-danger-solid"
+                      : "bg-success-solid hover:bg-success-solid"
                   }`}
                 >
                   {options.confirmLabel ?? t("dialog.confirm")}

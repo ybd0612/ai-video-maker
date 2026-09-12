@@ -44,12 +44,12 @@ export function HelpTooltip({ children }: { children: ReactNode }) {
     >
       <HelpCircle
         size={12}
-        className="cursor-help text-slate-600 transition hover:text-slate-400"
+        className="cursor-help text-ink-5 transition hover:text-ink-3"
       />
       {visible &&
         createPortal(
           <span
-            className="fixed z-[9999] w-52 -translate-x-1/2 -translate-y-full rounded-lg border border-slate-600 bg-slate-800 px-2.5 py-2 text-[0.6875rem] leading-relaxed text-slate-300 shadow-xl"
+            className="fixed z-[9999] w-52 -translate-x-1/2 -translate-y-full rounded-lg border border-line-strong bg-raised px-2.5 py-2 text-[0.6875rem] leading-relaxed text-ink-2 shadow-xl"
             style={{ top: pos.top, left: pos.left, pointerEvents: "none" }}
           >
             {children}

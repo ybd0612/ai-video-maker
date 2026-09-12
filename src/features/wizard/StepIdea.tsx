@@ -125,7 +125,7 @@ export function StepIdea({ onGenerated }: StepIdeaProps) {
     <div className="mx-auto flex max-w-2xl flex-col gap-5 py-8">
       {/* Title */}
       <div className="flex items-center justify-center gap-3">
-        <h2 className="text-lg font-bold text-slate-100">
+        <h2 className="text-lg font-bold text-ink">
           {t("wizard.enterIdea")}
         </h2>
       </div>
@@ -143,15 +143,15 @@ export function StepIdea({ onGenerated }: StepIdeaProps) {
           placeholder={t("wizard.ideaPlaceholder")}
           rows={7}
           disabled={isGenerating}
-          appearanceClass="rounded-xl border border-slate-700 bg-slate-800 text-sm text-slate-100 placeholder:text-slate-600"
+          appearanceClass="rounded-xl border border-line bg-raised text-sm text-ink placeholder:text-ink-5"
         />
 
         {/* Generating overlay */}
         {isGenerating && (
-          <div className="absolute inset-0 flex items-center justify-center rounded-xl bg-slate-900/80 backdrop-blur-sm">
+          <div className="absolute inset-0 flex items-center justify-center rounded-xl bg-surface/80 backdrop-blur-sm">
             <div className="flex flex-col items-center gap-2">
-              <Loader2 size={24} className="animate-spin text-emerald-400" />
-              <span className="text-sm text-emerald-300">{t("wizard.generating")}</span>
+              <Loader2 size={24} className="animate-spin text-success" />
+              <span className="text-sm text-success">{t("wizard.generating")}</span>
             </div>
           </div>
         )}
@@ -172,8 +172,8 @@ export function StepIdea({ onGenerated }: StepIdeaProps) {
             }}
             className={`flex items-center gap-2 rounded-lg border px-4 py-2 text-sm transition ${
               aspectRatio === value
-                ? "border-emerald-500 bg-emerald-950/30 text-emerald-400"
-                : "border-slate-700 bg-slate-800 text-slate-400 hover:border-slate-600"
+                ? "border-success bg-success-deep/30 text-success"
+                : "border-line bg-raised text-ink-3 hover:border-line-strong"
             }`}
           >
             <Icon size={16} />
@@ -186,7 +186,7 @@ export function StepIdea({ onGenerated }: StepIdeaProps) {
       <button
         onClick={handleGenerate}
         disabled={!prompt.trim() || isGenerating}
-        className="mx-auto flex items-center gap-2 rounded-xl bg-emerald-600 px-8 py-3 text-sm font-semibold text-white transition hover:bg-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed"
+        className="mx-auto flex items-center gap-2 rounded-xl bg-success-solid px-8 py-3 text-sm font-semibold text-white transition hover:bg-success-solid disabled:opacity-50 disabled:cursor-not-allowed"
       >
         {isGenerating ? (
           <Loader2 size={16} className="animate-spin" />
@@ -198,7 +198,7 @@ export function StepIdea({ onGenerated }: StepIdeaProps) {
 
       {/* Error */}
       {error && (
-        <div className="rounded-lg border border-red-800 bg-red-950/30 p-3 text-sm text-red-300">
+        <div className="rounded-lg border border-danger bg-danger-deep/30 p-3 text-sm text-danger">
           {error}
         </div>
       )}

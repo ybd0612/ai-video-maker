@@ -58,7 +58,7 @@ export function CreationWizard() {
     <div className="flex h-full flex-col overflow-hidden">
       {/* Show header only when project exists */}
       {project && (
-        <div className="flex items-center justify-between border-b border-slate-800 px-6 py-3">
+        <div className="flex items-center justify-between border-b border-line-soft px-6 py-3">
           <StepIndicator />
           <AutomationModeSwitch
             mode={project?.automationMode ?? 'semi-auto'}
@@ -77,11 +77,11 @@ export function CreationWizard() {
       </div>
 
       {project && (
-        <div className="flex items-center justify-between border-t border-slate-800 bg-slate-950 px-6 py-3">
+        <div className="flex items-center justify-between border-t border-line-soft bg-app px-6 py-3">
           <button
             onClick={handlePrev}
             disabled={!canGoBack}
-            className="flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium text-slate-400 transition hover:bg-slate-800 hover:text-slate-200 disabled:opacity-30 disabled:cursor-not-allowed"
+            className="flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium text-ink-3 transition hover:bg-raised hover:text-ink disabled:opacity-30 disabled:cursor-not-allowed"
           >
             <ChevronLeft size={14} />
             {t("wizard.prev")}
@@ -92,7 +92,7 @@ export function CreationWizard() {
               <button
                 onClick={handleNext}
                 disabled={!canAdvance}
-                className="flex items-center gap-1.5 rounded-md bg-emerald-600 px-4 py-1.5 text-xs font-medium text-white transition hover:bg-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex items-center gap-1.5 rounded-md bg-success-solid px-4 py-1.5 text-xs font-medium text-white transition hover:bg-success-solid disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {t("wizard.next")}
                 <ChevronRight size={14} />

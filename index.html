@@ -3,6 +3,24 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <script>
+      // 防主题闪白（FOUC）：React 挂载前从 localStorage（zustand persist: wxhb-settings）
+      // 预读 theme 写到 <html data-theme>；默认 light（白色），解析失败也按 light。
+      // React 挂载后由 App.tsx 的 effect 接管同步。
+      (function () {
+        var theme = "light";
+        try {
+          var raw = localStorage.getItem("wxhb-settings");
+          if (raw) {
+            var t = (JSON.parse(raw).state || {}).theme;
+            if (t === "dark") theme = "dark";
+          }
+        } catch (e) {
+          /* 解析失败按默认 light */
+        }
+        document.documentElement.dataset.theme = theme;
+      })();
+    </script>
     <title>AI Canvas Creator</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />

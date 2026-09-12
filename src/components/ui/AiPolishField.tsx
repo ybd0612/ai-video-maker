@@ -26,7 +26,7 @@ interface AiPolishFieldProps {
   disabled?: boolean;
   /** 透明背景的内联样式（用于卡片内直接编辑），默认带边框与底色 */
   bare?: boolean;
-  /** 焦点边框色，例如 "focus:border-violet-500" */
+  /** 焦点边框色，例如 "focus:border-accent" */
   focusClass?: string;
   /** 该值变化时清空撤销栈（如切换镜头 / 资产 / 项目） */
   resetKey?: string;
@@ -40,14 +40,14 @@ interface AiPolishFieldProps {
 
 /** 默认外观：带边框与底色（抽屉 / 表单场景） */
 const BOXED_APPEARANCE =
-  "rounded-md border border-slate-700 bg-slate-800 text-xs text-slate-100 placeholder:text-slate-600";
+  "rounded-md border border-line bg-raised text-xs text-ink placeholder:text-ink-5";
 /** 默认外观：透明背景（卡片内联编辑场景） */
 const BARE_APPEARANCE =
-  "bg-transparent text-xs text-slate-300 placeholder:text-slate-600";
+  "bg-transparent text-xs text-ink-2 placeholder:text-ink-5";
 
 /** 内嵌操作按钮：纯图标 + 固定方形尺寸（不显示文字，含义靠 title 提示） */
 const ACTION_BUTTON =
-  "pointer-events-auto flex h-5 w-5 items-center justify-center rounded border border-slate-600/70 bg-slate-900/85 text-slate-400 backdrop-blur-sm transition disabled:cursor-not-allowed disabled:opacity-40";
+  "pointer-events-auto flex h-5 w-5 items-center justify-center rounded border border-line-strong/70 bg-surface/85 text-ink-3 backdrop-blur-sm transition disabled:cursor-not-allowed disabled:opacity-40";
 
 export function AiPolishField({
   value,
@@ -58,7 +58,7 @@ export function AiPolishField({
   singleLine = false,
   disabled = false,
   bare = false,
-  focusClass = "focus:border-emerald-500",
+  focusClass = "focus:border-success",
   resetKey,
   appearanceClass,
   onKeyDown,
@@ -168,7 +168,7 @@ export function AiPolishField({
               type="button"
               onClick={handleUndo}
               disabled={disabled || polishing}
-              className={`${ACTION_BUTTON} hover:border-amber-600/70 hover:text-amber-300`}
+              className={`${ACTION_BUTTON} hover:border-warn/70 hover:text-warn`}
               title={t("polish.undo")}
             >
               <Undo2 size={12} />
@@ -180,7 +180,7 @@ export function AiPolishField({
               onClick={handlePolish}
               disabled={!canPolish}
               className={`${ACTION_BUTTON} ${
-                canPolish ? "hover:border-emerald-600/70 hover:text-emerald-300" : ""
+                canPolish ? "hover:border-success/70 hover:text-success" : ""
               }`}
               title={
                 apiKey
@@ -202,7 +202,7 @@ export function AiPolishField({
 
       {/* 失败原因（不弹窗，就地提示） */}
       {error && (
-        <p className="mt-1 truncate text-[0.625rem] text-red-400" title={error}>
+        <p className="mt-1 truncate text-[0.625rem] text-danger" title={error}>
           {error}
         </p>
       )}

@@ -1,19 +1,133 @@
 @import "tailwindcss";
 
-/* ── Global dark-theme defaults ──────────────────────────────────────────── */
-
-/*
- * 整体界面缩放：Tailwind 的尺寸/字号类均以 rem 为单位，改动根字号即可等比放大
- * 所有元素（含间距、圆角、控件宽高）。需要整体调大/调小界面时只改这一处。
- * 当前 112.5% = 18px（基准 16px，整体 +12.5%）。
+/* ── 语义色 token（2026-09-12 方案 A：变量为单一事实源）─────────────────────
+ * light 为默认值（用户拍板：默认白色）；dark 通过 <html data-theme="dark"> 覆盖。
+ * Tailwind 工具类经 @theme inline 映射：bg-app / bg-surface / text-ink / border-line
+ * / text-accent / text-success / text-warn / text-danger …（支持 /xx 透明度修饰符）。
+ * 规则：新组件禁用 slate/red/emerald 等原始色类，一律用语义 token。
  */
+
 :root {
-  color-scheme: dark;
+  color-scheme: light;
+  /*
+   * 整体界面缩放：Tailwind 的尺寸/字号类均以 rem 为单位，改动根字号即可等比放大
+   * 所有元素（含间距、圆角、控件宽高）。需要整体调大/调小界面时只改这一处。
+   * 当前 112.5% = 18px（基准 16px，整体 +12.5%）。
+   */
   font-size: 112.5%;
+
+  /* 中性色 */
+  --c-app: #f1f5f9;          /* 页面底 */
+  --c-surface: #ffffff;      /* 面板/侧栏/弹窗 */
+  --c-raised: #f8fafc;       /* 卡片浮起层 */
+  --c-hover: #e2e8f0;        /* hover 底色 / 滚动条 */
+  --c-line: #e2e8f0;         /* 常规边框 */
+  --c-line-soft: #eef2f7;    /* 弱边框 */
+  --c-line-strong: #cbd5e1;  /* 强边框 / 连线 */
+  --c-ink: #0f172a;          /* 主文字 */
+  --c-ink-2: #334155;        /* 次要文字 */
+  --c-ink-3: #64748b;        /* 辅助文字 */
+  --c-ink-4: #64748b;        /* 弱化文字（双主题同值） */
+  --c-ink-5: #94a3b8;        /* 极弱文字/图标 */
+
+  /* 强调色 */
+  --c-accent: #7c3aed;       /* AI 功能色（文字/图标） */
+  --c-accent-solid: #7c3aed; /* AI 功能色（实底按钮） */
+  --c-accent-deep: #ede9fe;  /* AI 功能色（浅底 tint） */
+
+  --c-info: #0284c7;
+  --c-info-solid: #0284c7;
+
+  --c-success: #059669;
+  --c-success-solid: #059669;
+  --c-success-deep: #d1fae5;
+
+  --c-warn: #b45309;
+  --c-warn-solid: #d97706;
+  --c-warn-deep: #fef3c7;
+
+  --c-danger: #dc2626;
+  --c-danger-solid: #dc2626;
+  --c-danger-deep: #fee2e2;
+
+  /* 画布 / 阴影 */
+  --c-edge-selected: #0891b2;
+  --c-shadow: rgba(15, 23, 42, 0.12);
+}
+
+html[data-theme="dark"] {
+  color-scheme: dark;
+
+  --c-app: #020617;
+  --c-surface: #0f172a;
+  --c-raised: #1e293b;
+  --c-hover: #334155;
+  --c-line: #334155;
+  --c-line-soft: #1e293b;
+  --c-line-strong: #475569;
+  --c-ink: #e2e8f0;
+  --c-ink-2: #cbd5e1;
+  --c-ink-3: #94a3b8;
+  --c-ink-4: #64748b;
+  --c-ink-5: #475569;
+
+  --c-accent: #a78bfa;
+  --c-accent-solid: #7c3aed;
+  --c-accent-deep: #2e1065;
+
+  --c-info: #38bdf8;
+  --c-info-solid: #0ea5e9;
+
+  --c-success: #34d399;
+  --c-success-solid: #059669;
+  --c-success-deep: #022c22;
+
+  --c-warn: #fbbf24;
+  --c-warn-solid: #f59e0b;
+  --c-warn-deep: #451a03;
+
+  --c-danger: #f87171;
+  --c-danger-solid: #dc2626;
+  --c-danger-deep: #450a0a;
+
+  --c-edge-selected: #22d3ee;
+  --c-shadow: rgba(0, 0, 0, 0.4);
+}
+
+/* 语义变量 → Tailwind 颜色工具类（inline：工具类直接引用 --c-*，随主题即时切换） */
+@theme inline {
+  --color-app: var(--c-app);
+  --color-surface: var(--c-surface);
+  --color-raised: var(--c-raised);
+  --color-hover: var(--c-hover);
+  --color-line: var(--c-line);
+  --color-line-soft: var(--c-line-soft);
+  --color-line-strong: var(--c-line-strong);
+  --color-ink: var(--c-ink);
+  --color-ink-2: var(--c-ink-2);
+  --color-ink-3: var(--c-ink-3);
+  --color-ink-4: var(--c-ink-4);
+  --color-ink-5: var(--c-ink-5);
+  --color-accent: var(--c-accent);
+  --color-accent-solid: var(--c-accent-solid);
+  --color-accent-deep: var(--c-accent-deep);
+  --color-info: var(--c-info);
+  --color-info-solid: var(--c-info-solid);
+  --color-success: var(--c-success);
+  --color-success-solid: var(--c-success-solid);
+  --color-success-deep: var(--c-success-deep);
+  --color-warn: var(--c-warn);
+  --color-warn-solid: var(--c-warn-solid);
+  --color-warn-deep: var(--c-warn-deep);
+  --color-danger: var(--c-danger);
+  --color-danger-solid: var(--c-danger-solid);
+  --color-danger-deep: var(--c-danger-deep);
 }
 
 body {
-  @apply m-0 overflow-hidden bg-slate-950 text-slate-100 antialiased;
+  @apply m-0 overflow-hidden antialiased;
+  background-color: var(--c-app);
+  color: var(--c-ink);
   font-family: "Inter", system-ui, -apple-system, sans-serif;
   /* 跟随根字号缩放（原为固定 14px，不参与整体缩放） */
   font-size: 0.875rem;
@@ -26,49 +140,49 @@ body {
 }
 
 .react-flow__edge-path {
-  stroke: #475569 !important;
+  stroke: var(--c-line-strong) !important;
   stroke-width: 1.5px;
 }
 
 .react-flow__edge.selected .react-flow__edge-path {
-  stroke: #22d3ee !important;
+  stroke: var(--c-edge-selected) !important;
   stroke-width: 2px;
 }
 
 
-/* ── Canvas dark background ──────────────────────────────────────────── */
+/* ── Canvas background ──────────────────────────────────────────────── */
 
 .react-flow {
-  background-color: #020617 !important;
+  background-color: var(--c-app) !important;
 }
 
-/* ── Controls toolbar contrast on dark canvas ──────────────────────────────── */
+/* ── Controls toolbar contrast ──────────────────────────────── */
 .react-flow__controls .react-flow__controls-button,
 .controls .react-flow__controls-button {
-  background-color: rgba(15, 23, 42, 0.95) !important;
-  color: #e2e8f0 !important;
-  border-color: rgba(71, 85, 105, 0.8) !important;
-  border: 1px solid rgba(71, 85, 105, 0.8) !important;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4) !important;
+  background-color: var(--c-surface) !important;
+  color: var(--c-ink) !important;
+  border-color: var(--c-line-strong) !important;
+  border: 1px solid var(--c-line-strong) !important;
+  box-shadow: 0 4px 12px var(--c-shadow) !important;
 }
 .react-flow__controls .react-flow__controls-button:hover,
 .controls .react-flow__controls-button:hover {
-  background-color: rgba(30, 41, 59, 0.98) !important;
-  color: #ffffff !important;
+  background-color: var(--c-raised) !important;
+  color: var(--c-ink) !important;
 }
-/* ── MiniMap dark background ────────────────────────────────────────────── */
+/* ── MiniMap background ────────────────────────────────────────────── */
 .react-flow__minimap {
-  background-color: rgba(15, 23, 42, 0.95) !important;
-  border: 1px solid rgba(71, 85, 105, 0.8) !important;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4) !important;
+  background-color: var(--c-surface) !important;
+  border: 1px solid var(--c-line-strong) !important;
+  box-shadow: 0 4px 12px var(--c-shadow) !important;
   border-radius: 8px !important;
 }
 
 .react-flow__controls .react-flow__controls-button svg {
-  fill: #e2e8f0 !important;
+  fill: var(--c-ink) !important;
 }
 .react-flow__handle {
-  @apply !border-2 !border-slate-900;
+  border: 2px solid var(--c-surface) !important;
 }
 
 .react-flow__node {
@@ -97,9 +211,10 @@ input[type="number"] {
 }
 
 ::-webkit-scrollbar-thumb {
-  @apply rounded-full bg-slate-700;
+  border-radius: 9999px;
+  background-color: var(--c-hover);
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  @apply bg-slate-600;
+  background-color: var(--c-line-strong);
 }

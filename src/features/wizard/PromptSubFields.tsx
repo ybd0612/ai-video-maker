@@ -42,7 +42,7 @@ export function PromptSubFields({
       {/* Text-to-Image sub-elements */}
       {sections.includes("image") && (
         <div className="space-y-2">
-          <div className="flex items-center gap-1.5 text-[0.6875rem] font-semibold text-violet-400">
+          <div className="flex items-center gap-1.5 text-[0.6875rem] font-semibold text-accent">
             <Image size={11} />
             {t("wizard.sectionImage")}
           </div>
@@ -97,7 +97,7 @@ export function PromptSubFields({
       {/* Image-to-Video sub-elements */}
       {sections.includes("motion") && (
         <div className="space-y-2">
-          <div className="flex items-center gap-1.5 text-[0.6875rem] font-semibold text-amber-400">
+          <div className="flex items-center gap-1.5 text-[0.6875rem] font-semibold text-warn">
             <Video size={11} />
             {t("wizard.sectionVideo")}
           </div>

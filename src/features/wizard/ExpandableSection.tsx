@@ -23,15 +23,15 @@ export function ExpandableSection({
   const [expanded, setExpanded] = useState(defaultExpanded);
 
   return (
-    <div className="rounded-md border border-slate-700/50 bg-slate-900/30">
+    <div className="rounded-md border border-line/50 bg-surface/30">
       <button
         onClick={() => setExpanded(!expanded)}
         className="flex w-full items-center justify-between px-3 py-2 text-left"
       >
         <div className="flex items-center gap-2">
-          <span className="text-xs font-medium text-slate-300">{title}</span>
+          <span className="text-xs font-medium text-ink-2">{title}</span>
           {!expanded && summary && (
-            <span className="truncate text-[0.625rem] text-slate-500 max-w-[200px]">
+            <span className="truncate text-[0.625rem] text-ink-4 max-w-[200px]">
               {summary}
             </span>
           )}
@@ -40,7 +40,7 @@ export function ExpandableSection({
           animate={{ rotate: expanded ? 180 : 0 }}
           transition={{ duration: 0.2 }}
         >
-          <ChevronDown size={14} className="text-slate-500" />
+          <ChevronDown size={14} className="text-ink-4" />
         </motion.div>
       </button>
 
@@ -53,7 +53,7 @@ export function ExpandableSection({
             transition={{ duration: 0.2, ease: "easeInOut" }}
             className="overflow-hidden"
           >
-            <div className="border-t border-slate-700/30 px-3 py-2">
+            <div className="border-t border-line/30 px-3 py-2">
               {children}
             </div>
           </motion.div>

@@ -16,6 +16,7 @@ import { HistoryPanel } from "@/features/history/HistoryPanel";
 import {
   Settings, Trash2,
   FolderOpen, Clock, Layers,
+  Moon, Sun,
 } from "lucide-react";
 import { ApiKeyBanner } from "@/components/ApiKeyBanner";
 import { confirmDialog } from "@/components/ui/ConfirmDialog";
@@ -32,6 +33,8 @@ export function ProjectWorkspace() {
   const updateProject = useProjectStore((s) => s.updateProject);
   const clearProject = useProjectStore((s) => s.clearProject);
   const openSettings = useSettingsStore((s) => s.setSettingsDialogOpen);
+  const theme = useSettingsStore((s) => s.theme);
+  const setTheme = useSettingsStore((s) => s.setTheme);
   const { rerollImage, rerollVideo } = useWizardActions();
 
   const [selectedShotId, setSelectedShotId] = useState<string | null>(null);
@@ -63,26 +66,35 @@ export function ProjectWorkspace() {
   const shots = project?.shots ?? [];
 
   return (
-    <div className="flex h-screen w-screen flex-col overflow-hidden bg-slate-950">
+    <div className="flex h-screen w-screen flex-col overflow-hidden bg-app">
       {/* Top bar */}
-      <header className="flex items-center justify-between border-b border-slate-800 px-4 py-2">
+      <header className="flex items-center justify-between border-b border-line-soft px-4 py-2">
         <div className="flex items-center gap-3">
-          <h1 className="text-sm font-bold text-slate-100">
+          <h1 className="text-sm font-bold text-ink">
             {t("pipeline.title")}
           </h1>
           {project && (
-            <span className="text-xs text-slate-500">
+            <span className="text-xs text-ink-4">
               {project.title}
             </span>
           )}
           {projects.length > 1 && (
-            <span className="rounded bg-slate-800 px-1.5 py-0.5 text-[0.625rem] text-slate-500">
+            <span className="rounded bg-raised px-1.5 py-0.5 text-[0.625rem] text-ink-4">
               {projects.length} {t("pipeline.projectCount")}
             </span>
           )}
         </div>
 
         <div className="flex items-center gap-2">
+          {/* Theme toggle: light / dark */}
+          <button
+            onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+            className="rounded-md p-1.5 text-ink-4 hover:bg-raised hover:text-ink-2"
+            title={t("sidebar.theme")}
+          >
+            {theme === "dark" ? <Sun size={14} /> : <Moon size={14} />}
+          </button>
+
           {/* Aspect ratio selector */}
           {project && (
             <select
@@ -103,7 +115,7 @@ export function ProjectWorkspace() {
                 }
                 updateProject({ aspectRatio: next });
               }}
-              className="rounded border border-slate-700 bg-slate-800 px-2 py-1 text-xs text-slate-300 focus:outline-none"
+              className="rounded border border-line bg-raised px-2 py-1 text-xs text-ink-2 focus:outline-none"
             >
               <option value="16:9">16:9</option>
               <option value="9:16">9:16</option>
@@ -114,7 +126,7 @@ export function ProjectWorkspace() {
           {/* Settings */}
           <button
             onClick={() => openSettings(true)}
-            className="rounded-md p-1.5 text-slate-500 hover:bg-slate-800 hover:text-slate-200"
+            className="rounded-md p-1.5 text-ink-4 hover:bg-raised hover:text-ink"
             title={t("sidebar.settings")}
           >
             <Settings size={14} />
@@ -124,7 +136,7 @@ export function ProjectWorkspace() {
           {project && (
             <button
               onClick={handleClear}
-              className="rounded-md p-1.5 text-slate-500 hover:bg-red-950 hover:text-red-400"
+              className="rounded-md p-1.5 text-ink-4 hover:bg-danger-deep hover:text-danger"
               title={t("pipeline.deleteProject")}
             >
               <Trash2 size={14} />
@@ -138,15 +150,15 @@ export function ProjectWorkspace() {
       {/* Main content */}
       <div className="flex flex-1 overflow-hidden">
         {/* Left panel: tabs for projects / shots / history */}
-        <aside className="flex w-60 flex-col border-r border-slate-800 bg-slate-950">
+        <aside className="flex w-60 flex-col border-r border-line-soft bg-app">
           {/* Tab bar */}
-          <div className="flex border-b border-slate-800">
+          <div className="flex border-b border-line-soft">
             <button
               onClick={() => setLeftTab("projects")}
               className={`flex flex-1 items-center justify-center gap-1 py-2 text-[0.625rem] font-medium transition ${
                 leftTab === "projects"
-                  ? "border-b-2 border-emerald-500 text-emerald-400"
-                  : "text-slate-600 hover:text-slate-400"
+                  ? "border-b-2 border-success text-success"
+                  : "text-ink-5 hover:text-ink-3"
               }`}
             >
               <FolderOpen size={10} />
@@ -156,8 +168,8 @@ export function ProjectWorkspace() {
               onClick={() => setLeftTab("shots")}
               className={`flex flex-1 items-center justify-center gap-1 py-2 text-[0.625rem] font-medium transition ${
                 leftTab === "shots"
-                  ? "border-b-2 border-emerald-500 text-emerald-400"
-                  : "text-slate-600 hover:text-slate-400"
+                  ? "border-b-2 border-success text-success"
+                  : "text-ink-5 hover:text-ink-3"
               }`}
             >
               <Layers size={10} />
@@ -167,8 +179,8 @@ export function ProjectWorkspace() {
               onClick={() => setLeftTab("characters")}
               className={`flex flex-1 items-center justify-center gap-1 py-2 text-[0.625rem] font-medium transition ${
                 leftTab === "characters"
-                  ? "border-b-2 border-emerald-500 text-emerald-400"
-                  : "text-slate-600 hover:text-slate-400"
+                  ? "border-b-2 border-success text-success"
+                  : "text-ink-5 hover:text-ink-3"
               }`}
             >
               🎭
@@ -178,8 +190,8 @@ export function ProjectWorkspace() {
               onClick={() => setLeftTab("history")}
               className={`flex flex-1 items-center justify-center gap-1 py-2 text-[0.625rem] font-medium transition ${
                 leftTab === "history"
-                  ? "border-b-2 border-emerald-500 text-emerald-400"
-                  : "text-slate-600 hover:text-slate-400"
+                  ? "border-b-2 border-success text-success"
+                  : "text-ink-5 hover:text-ink-3"
               }`}
             >
               <Clock size={10} />
@@ -206,7 +218,7 @@ export function ProjectWorkspace() {
 
         {/* Right panel: shot editor */}
         {shots.length > 0 && (
-          <aside className="w-72 border-l border-slate-800 bg-slate-950">
+          <aside className="w-72 border-l border-line-soft bg-app">
             <ShotEditor
               shot={selectedShot}
               onClose={() => setSelectedShotId(null)}
