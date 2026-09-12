@@ -59,6 +59,9 @@ coverage/
 .qoder/
 .claude/
 
+# 本地调试快照（debugDumpPlugin 写入，含真实项目数据）
+debug-dump/
+
 # Windows 系统文件
 Thumbs.db
 Desktop.ini

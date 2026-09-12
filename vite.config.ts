@@ -2,12 +2,15 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import path from "node:path";
+import { debugDumpPlugin } from "./vite-plugins/debugDumpPlugin";
 
 export default defineConfig({
   // 相对路径 base：兼容 GitHub Pages 子路径（https://<user>.github.io/<repo>/）
   // 与自定义域名；构建产物资源引用变为 ./assets/...
   base: "./",
-  plugins: [react(), tailwindcss()],
+  // debugDumpPlugin：仅 dev server 生效（apply:"serve"），接收脱敏后的 store
+  // 快照写入 debug-dump/state.json，供 AI 助手本地调试读取真实浏览器数据。
+  plugins: [react(), tailwindcss(), debugDumpPlugin()],
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
