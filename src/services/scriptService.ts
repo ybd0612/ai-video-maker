@@ -207,7 +207,7 @@ ${charSection}${sceneSection}${productSection}
 重要规则：
 - characters 数组：涵盖故事中的**一切角色主体**——人物、动物（如小兔子、小猫）、拟人化角色、机器人等，只要是故事的主角/配角就必须填入；仅纯风景内容才返回空数组 []
 - products 数组：仅当某个实物是内容的**核心展示主体**（如带货商品、产品广告的主角）时才填写；角色手中/身边的普通道具（如小兔子抱着的胡萝卜）不要填入
-- scenes 数组：仅当内容涉及具体场景（室内/室外/城市/自然等）时才填写，纯抽象内容返回空数组 []
+- scenes 数组：故事提到任何环境/地点（森林、城市、室内、梦境空间等）就必须至少提取一个场景；仅纯抽象内容才返回空数组 []
 - 如有已有角色，复用其 ID（不要重复创建）；如是新角色，生成新的 ID
 - visualPrompt 和 motionPrompt 必须用英文（直接用于 AI API）
 - 如有角色出场，visualPrompt 必须包含角色完整外貌描述
@@ -317,7 +317,7 @@ Return strictly in this JSON format, no other text:
 Important rules:
 - characters array: include ANY story character/subject — humans, animals (e.g. a little rabbit), anthropomorphic or fantasy creatures, robots. Every protagonist/side character MUST be listed; only return [] for pure landscape content
 - products array: ONLY fill when a physical item is the CORE subject being showcased (e.g. a product for an ad). Everyday props held by characters (e.g. a carrot a rabbit hugs) do NOT belong here
-- scenes array: ONLY fill if content involves concrete scenes (indoor/outdoor/city/nature etc.). For abstract content, return empty array []
+- scenes array: if the story mentions ANY environment/setting (forest, city, indoor, dream space, etc.), extract at least one scene; only return [] for purely abstract content
 - Reuse existing character IDs if applicable; generate new IDs for new characters
 - visualPrompt and motionPrompt MUST be in English (sent directly to AI APIs)
 - If characters appear, visualPrompt MUST include their full appearance

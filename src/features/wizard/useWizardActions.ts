@@ -237,11 +237,15 @@ export function useWizardActions() {
         wizardStep: 2,
       }));
 
-      // 自动生成风格参考图（后台执行，不阻塞进入资产步骤）：
-      // 角色/场景/产品定妆照与分镜图都会以它为风格锚点，
-      // 必须先于资产生成就绪才能让资产图带上故事风格。
-      // 失败不阻塞流程，错误写入 styleReferenceError 在资产页展示。
-      void generateStyleReference(targetProjectId);
+      // 全自动资产生成（后台执行，不阻塞进入资产步骤）：
+      // 先生成风格参考图（generateAssetImages 阶段 1 也会幂等兜底），
+      // 随后自动生成角色定妆照 / 场景 / 产品图——全部参考风格图。
+      // semi-auto 模式的确认点是「资产就绪 → 进入分镜」，步骤内自动完成不违背其语义；
+      // 部分资产失败会在资产页就地显示重试入口。
+      void (async () => {
+        await generateStyleReference(targetProjectId);
+        await generateAssetImages(undefined, targetProjectId);
+      })();
       return true;
     } catch (err) {
       // 失败时将发起项目复位为 failed，避免其状态永远停留在 scripting
@@ -435,12 +439,15 @@ export function useWizardActions() {
     generateScenes?: boolean;
     generateProducts?: boolean;
     generateStyle?: boolean;
-  }) => {
+  }, projectIdOverride?: string) => {
     const { providerConfig } = useSettingsStore.getState();
     if (!providerConfig.apiKey || !providerConfig.baseUrl) return;
 
     const store = useProjectStore.getState();
-    const project = selectActiveProject(store);
+    // 支持指定项目：想法步骤自动触发时写回发起项目，防用户中途切换/新建项目导致串写
+    const project = projectIdOverride
+      ? store.projects.find((p) => p.id === projectIdOverride)
+      : selectActiveProject(store);
     if (!project) return;
     const targetProjectId = project.id;
 
@@ -567,7 +574,7 @@ export function useWizardActions() {
     // 无论成功与否都清除标记：部分失败时若保留 true，步骤 2 的“生成全部”按钮
     // 会永久转圈禁用（此前仅在全成功时清除，失败即卡死）
     useProjectStore.getState().setAssetGenerationStartedByProjectId(targetProjectId, false);
-  }, []);
+  }, [generateStyleReference]);
 
   /** Step 4: Generate images for all shots (with img2img from scene/style references) */
   const generateImagesForStep = useCallback(async () => {
