@@ -226,7 +226,9 @@ export async function generateScript(
         { role: "user", content: opts.prompt },
       ],
       temperature: 0.7,
-      maxTokens: 8192,
+      // 8 镜头 ×（双提示词 + 10 个中文字段 + 对白）+ 9 行角色描述，实测峰值逼近 8K；
+      // 3.0 Flash 输出上限 65,536，给足余量避免触顶截断进入全量重试
+      maxTokens: 16384,
       enableThinking: false,
     });
     const content = result.content;
@@ -431,7 +433,9 @@ export async function extractAssetsFromIdea(
       { role: "user", content: opts.prompt },
     ],
     temperature: 0.3,
-    maxTokens: 1024,
+    // 角色 description 升级为 9 行（总述 + 8 要素）后输出翻倍，1024 已逼近触顶；
+    // 2K 预算覆盖 4 角色 + 多场景 + 风格的 JSON 全量输出
+    maxTokens: 2048,
     enableThinking: false,
   });
 
@@ -441,7 +445,14 @@ export async function extractAssetsFromIdea(
   // 用于事后分析 LLM 间歇性异常输出（如某次提取缺失角色）。best-effort 不影响主流程。
   if (import.meta.env.DEV) {
     void import("@/lib/devDump").then((m) =>
-      m.dumpExtractLog({ idea: opts.prompt.slice(0, 400), raw: content }),
+      m.dumpExtractLog({
+        idea: opts.prompt.slice(0, 400),
+        raw: content,
+        usage: {
+          promptTokens: result.usage?.promptTokens,
+          completionTokens: result.usage?.completionTokens,
+        },
+      }),
     );
   }
 

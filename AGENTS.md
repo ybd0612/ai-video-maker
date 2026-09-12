@@ -152,7 +152,7 @@ src/
 - 分镜阶段 `generateScript` 已产出完整英文双提示词，**禁止二次翻译覆盖**（translateToMotion 已移除）。
 - 分镜生成后必须**回填角色 ID 引用**：模型返回的 `activeCharacterIds` / `dialogues.characterId` 可能是自编 ID，需按「角色名 → store 角色 ID」映射统一回填（新资产由 `extractNewAssets` 建映射），匹配不到的对白置 `null`（归旁白），否则角色一致性（图片注入/定妆照参考）与对白归属会失效。
 - 单镜头重roll（`rerollShot`）同样必须**回填对白/角色引用**（映射 + 无效清理），并把 `dialogues` / `activeCharacterIds` 一并写回，否则重roll后对白与脚本脱节。
-- 步骤 1 资产提取走**轻量接口** `extractAssetsFromIdea`（只返回 characters/products/scenes JSON，maxTokens 1024，不生成分镜）；完整分镜生成仅在步骤 3 调用 `generateScript`，禁止用完整分镜生成做资产提取（token 浪费）。
+- 步骤 1 资产提取走**轻量接口** `extractAssetsFromIdea`（只返回 characters/products/scenes/styles JSON，maxTokens 2048，不生成分镜）；完整分镜生成仅在步骤 3 调用 `generateScript`（maxTokens 16384），禁止用完整分镜生成做资产提取（token 浪费）。
 
 ## 双提示词系统
 

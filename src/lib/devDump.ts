@@ -81,6 +81,8 @@ export function setupDevDump(): void {
 export async function dumpExtractLog(payload: {
   idea: string;
   raw: string;
+  /** 模型返回的 token 用量（观察 max_tokens 边界用） */
+  usage?: { promptTokens?: number; completionTokens?: number };
 }): Promise<void> {
   if (!import.meta.env.DEV) return;
   try {
