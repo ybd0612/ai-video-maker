@@ -6,6 +6,7 @@
 import { useProjectStore, selectActiveProject, type Shot } from "@/stores/projectStore";
 import { useT } from "@/i18n";
 import { Film } from "lucide-react";
+import { Lightbox } from "@/components/ui/Lightbox";
 
 interface DualFrameToggleProps {
   shot: Shot;
@@ -87,14 +88,16 @@ export function DualFrameToggle({ shot }: DualFrameToggleProps) {
             placeholder={t("wizard.lastFrameUrlPlaceholder")}
             className="w-full rounded-md border border-slate-700 bg-slate-800 p-2 text-xs text-slate-100 placeholder:text-slate-600 focus:border-amber-500 focus:outline-none"
           />
-          {/* 尾帧预览 */}
+          {/* 尾帧预览（点击放大查看） */}
           {shot.lastFrameUrl && (
             <div className="mt-1 overflow-hidden rounded border border-slate-700 w-20 h-14">
-              <img
-                src={shot.lastFrameUrl}
-                alt="Last frame preview"
-                className="h-full w-full object-cover"
-              />
+              <Lightbox src={shot.lastFrameUrl} alt="Last frame preview">
+                <img
+                  src={shot.lastFrameUrl}
+                  alt="Last frame preview"
+                  className="h-full w-full object-cover"
+                />
+              </Lightbox>
             </div>
           )}
         </div>

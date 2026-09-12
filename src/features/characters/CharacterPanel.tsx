@@ -8,6 +8,7 @@ import { useProjectStore, selectActiveProject, type Asset } from "@/stores/proje
 import { useT } from "@/i18n";
 import { UserPlus, Trash2 } from "lucide-react";
 import { CharacterEditor } from "./CharacterEditor";
+import { Lightbox } from "@/components/ui/Lightbox";
 
 export function CharacterPanel() {
   const t = useT();
@@ -80,14 +81,16 @@ export function CharacterPanel() {
               title={t("characters.edit")}
               className="group flex cursor-pointer items-start gap-2 rounded-md border border-slate-800 bg-slate-900/50 p-2 transition hover:border-slate-700 focus:border-emerald-500 focus:outline-none"
             >
-              {/* Avatar */}
+              {/* Avatar（点击放大查看） */}
               <div className="h-8 w-8 shrink-0 overflow-hidden rounded-full border border-slate-700 bg-slate-800">
                 {(char.imageUrl || char.avatarUrl) ? (
-                  <img
-                    src={char.imageUrl || char.avatarUrl}
-                    alt={char.name}
-                    className="h-full w-full object-cover"
-                  />
+                  <Lightbox src={char.imageUrl || char.avatarUrl} alt={char.name}>
+                    <img
+                      src={char.imageUrl || char.avatarUrl}
+                      alt={char.name}
+                      className="h-full w-full object-cover"
+                    />
+                  </Lightbox>
                 ) : (
                   <div className="flex h-full w-full items-center justify-center text-[0.625rem] text-slate-500">
                     {char.name.charAt(0).toUpperCase()}

@@ -33,6 +33,11 @@ interface GenerateImageOptions {
   ratio?: string;
   /** 参考图 URL 列表（图生图 / 多图合成模式，官方要求放 extra_body.image） */
   referenceImageUrls?: string[];
+  /**
+   * 随机种子（实测放 extra_body.seed 或顶层均生效；同 seed 同 prompt 输出字节级一致）。
+   * 「重新生成」类入口应传随机值以破除重复生成的结果趋同。
+   */
+  seed?: number;
 }
 
 /**
@@ -54,6 +59,7 @@ export async function generateImage(opts: GenerateImageOptions): Promise<string>
     ...(opts.referenceImageUrls && opts.referenceImageUrls.length > 0
       ? { referenceImageUrls: opts.referenceImageUrls }
       : {}),
+    ...(typeof opts.seed === "number" && Number.isFinite(opts.seed) ? { seed: opts.seed } : {}),
   });
   return result.url;
 }

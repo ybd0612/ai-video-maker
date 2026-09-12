@@ -91,4 +91,25 @@ describe("OpenAIService.generateImage 请求体结构", () => {
     expect("image" in extra).toBe(false);
     expect(body.ratio).toBe("1:1");
   });
+
+  it("seed 传入：写入 extra_body.seed（实测同 seed 同 prompt 输出字节级一致）", async () => {
+    await svc.generateImage({ prompt: "seeded", size: "1K", seed: 42 });
+
+    const body = getLastRequestBody();
+    const extra = body.extra_body as Record<string, unknown>;
+    expect(extra.seed).toBe(42);
+  });
+
+  it("seed 缺省 / 非有限值：不设置 extra_body.seed", async () => {
+    await svc.generateImage({ prompt: "no seed", size: "1K" });
+
+    const body = getLastRequestBody();
+    const extra = body.extra_body as Record<string, unknown>;
+    expect("seed" in extra).toBe(false);
+
+    await svc.generateImage({ prompt: "bad seed", size: "1K", seed: Number.NaN });
+    const body2 = getLastRequestBody();
+    const extra2 = body2.extra_body as Record<string, unknown>;
+    expect("seed" in extra2).toBe(false);
+  });
 });

@@ -88,6 +88,7 @@ describe("BUILTIN_RULES 默认渲染回归锁", () => {
       "polish.main-prompt",
       "polish.motion-prompt",
       "polish.description-zh",
+      "polish.character-description",
       "polish.negative-prompt",
       "polish.character",
       "polish.dialogue",

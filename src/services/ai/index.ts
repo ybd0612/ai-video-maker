@@ -29,6 +29,11 @@ export interface ImageParams {
   negativePrompt?: string;
   /** 参考图 URL 列表（图生图 / 多图合成模式，官方要求放 extra_body.image） */
   referenceImageUrls?: string[];
+  /**
+   * 随机种子（实测 extra_body.seed 生效：同 seed 同 prompt 输出字节级一致）。
+   * 「重新生成」类入口传随机值可破除结果趋同。
+   */
+  seed?: number;
 }
 
 export interface ImageResult {

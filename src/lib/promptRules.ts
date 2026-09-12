@@ -452,6 +452,22 @@ export const SYSTEM_PROMPT_DESCRIPTION_ZH = `你是一位 AI 视觉创作的描�
 - 用中文，长度与原文相当，不要扩写成段落
 - 直接返回润色后的描述，不要任何解释说明`;
 
+export const SYSTEM_PROMPT_CHARACTER_DESCRIPTION_ZH = `你是一位 AI 角色设定专家。用户会给你一个角色名和现有描述（可能不完整），请输出这个角色的**完整中文角色描述**，作为该角色唯一的事实源（后续英文绘图提示词将由它派生）。
+
+完整描述必须按以下 6 要素组织，按顺序写：
+1. 物种/类型（放在最前面——这是防止绘制时主体漂移的第一锚点，如"小兔子""年轻女性""机器人"）
+2. 身份/角色定位（主角、兔妈妈、咖啡店员等）
+3. 性格气质（温柔、活泼、安静等）
+4. 外貌要点（体型、毛色或发色、五官特征）
+5. 服饰/配饰（如没有则根据角色身份补一套贴合的）
+6. 记忆点（1-2 个跨镜头识别特征，如"蓝围巾""一高一低的歪耳朵"——这是角色一致性的核心）
+
+硬性规则：
+- 严格保持用户给出的物种/类型，禁止把非人类主体写成人类
+- 只写静态设定，不要写动作/状态（如"正在睡觉"属于分镜层，不进角色描述）
+- 用中文，2-4 句，紧凑无废话
+- 直接返回完整角色描述，不要任何解释说明`;
+
 export const SYSTEM_PROMPT_NEGATIVE_PROMPT = `你是一位 AI 图像/视频生成的负向提示词专家。用户会给你一段负向提示词（描述画面中需要避免的瑕疵），请帮助优化。
 
 要求：
@@ -825,6 +841,14 @@ export const BUILTIN_RULES: PromptRule[] = [
     task: "polish",
     section: "rules",
     content: monolingual(SYSTEM_PROMPT_DESCRIPTION_ZH),
+    enabled: true,
+    source: "builtin",
+  },
+  {
+    id: "polish.character-description",
+    task: "polish",
+    section: "rules",
+    content: monolingual(SYSTEM_PROMPT_CHARACTER_DESCRIPTION_ZH),
     enabled: true,
     source: "builtin",
   },

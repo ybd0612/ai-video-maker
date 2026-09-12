@@ -17,6 +17,7 @@ import {
 import { CharacterEditor } from "@/features/characters/CharacterEditor";
 import { useWizardActions, hasActiveAssetTask } from "./useWizardActions";
 import { generateImage, aspectRatioToImageParams } from "@/services/imageService";
+import { Lightbox } from "@/components/ui/Lightbox";
 import { getStyleReferenceUrl } from "@/lib/promptComposer";
 import { AiPolishField } from "@/components/ui/AiPolishField";
 import {
@@ -254,11 +255,13 @@ export function StepAssets() {
               >
                 <div className="h-12 w-12 shrink-0 overflow-hidden rounded-full border border-slate-700 bg-slate-800">
                   {(char.imageUrl || char.avatarUrl) ? (
-                    <img
-                      src={char.imageUrl || char.avatarUrl}
-                      alt={char.name}
-                      className="h-full w-full object-cover"
-                    />
+                    <Lightbox src={char.imageUrl || char.avatarUrl} alt={char.name}>
+                      <img
+                        src={char.imageUrl || char.avatarUrl}
+                        alt={char.name}
+                        className="h-full w-full object-cover"
+                      />
+                    </Lightbox>
                   ) : (
                     <div className="flex h-full w-full items-center justify-center text-sm text-slate-500">
                       {char.name.charAt(0).toUpperCase()}
@@ -336,14 +339,16 @@ export function StepAssets() {
             key={scene.id}
             className="group flex items-start gap-3 rounded-xl border border-slate-700 bg-slate-800/50 p-3 transition hover:border-slate-600"
           >
-            {/* Scene image preview */}
+            {/* Scene image preview（点击放大查看） */}
             <div className="h-16 w-24 shrink-0 overflow-hidden rounded-lg border border-slate-700 bg-slate-800">
               {scene.imageUrl ? (
-                <img
-                  src={scene.imageUrl}
-                  alt={scene.name}
-                  className="h-full w-full object-cover"
-                />
+                <Lightbox src={scene.imageUrl} alt={scene.name}>
+                  <img
+                    src={scene.imageUrl}
+                    alt={scene.name}
+                    className="h-full w-full object-cover"
+                  />
+                </Lightbox>
               ) : (
                 <div className="flex h-full w-full items-center justify-center text-slate-600">
                   <ImageIcon size={16} />
@@ -449,14 +454,16 @@ export function StepAssets() {
             key={product.id}
             className="group flex items-start gap-3 rounded-xl border border-slate-700 bg-slate-800/50 p-3 transition hover:border-slate-600"
           >
-            {/* Product image preview */}
+            {/* Product image preview（点击放大查看） */}
             <div className="h-16 w-24 shrink-0 overflow-hidden rounded-lg border border-slate-700 bg-slate-800">
               {product.imageUrl ? (
-                <img
-                  src={product.imageUrl}
-                  alt={product.name}
-                  className="h-full w-full object-cover"
-                />
+                <Lightbox src={product.imageUrl} alt={product.name}>
+                  <img
+                    src={product.imageUrl}
+                    alt={product.name}
+                    className="h-full w-full object-cover"
+                  />
+                </Lightbox>
               ) : (
                 <div className="flex h-full w-full items-center justify-center text-slate-600">
                   <ImageIcon size={16} />
@@ -548,11 +555,13 @@ export function StepAssets() {
         <div className="flex items-start gap-3 rounded-xl border border-slate-700 bg-slate-800/50 p-3">
           <div className="h-20 w-32 shrink-0 overflow-hidden rounded-lg border border-slate-700 bg-slate-800">
             {styleReferenceUrl ? (
-              <img
-                src={styleReferenceUrl}
-                alt="Style reference"
-                className="h-full w-full object-cover"
-              />
+              <Lightbox src={styleReferenceUrl} alt="Style reference">
+                <img
+                  src={styleReferenceUrl}
+                  alt="Style reference"
+                  className="h-full w-full object-cover"
+                />
+              </Lightbox>
             ) : (
               <div className="flex h-full w-full items-center justify-center text-slate-600">
                 <ImageIcon size={20} />

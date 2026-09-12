@@ -8,6 +8,7 @@ import type { Shot } from "@/stores/projectStore";
 import { useT } from "@/i18n";
 import { ChevronDown, RefreshCw, Trash2, Loader2, Check, AlertCircle } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import { Lightbox } from "@/components/ui/Lightbox";
 
 type ShotCardMode = "storyboard" | "image" | "video";
 
@@ -76,14 +77,16 @@ export function ShotCard({
           {summary}
         </span>
 
-        {/* Image thumbnail for image/video modes */}
+        {/* Image thumbnail for image/video modes（点击放大查看） */}
         {(mode === "image" || mode === "video") && shot.imageUrl && (
           <div className="h-8 w-8 shrink-0 overflow-hidden rounded border border-slate-700">
-            <img
-              src={shot.imageUrl}
-              alt=""
-              className="h-full w-full object-cover"
-            />
+            <Lightbox src={shot.imageUrl} alt={`Shot ${shot.index + 1}`}>
+              <img
+                src={shot.imageUrl}
+                alt=""
+                className="h-full w-full object-cover"
+              />
+            </Lightbox>
           </div>
         )}
 

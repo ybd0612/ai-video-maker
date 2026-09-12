@@ -121,6 +121,10 @@ export class OpenAIService implements AIService {
     if (params.referenceImageUrls && params.referenceImageUrls.length > 0) {
       extraBody.image = params.referenceImageUrls;
     }
+    // 随机种子（实测 extra_body.seed 生效：同 seed 同 prompt 输出字节级一致）
+    if (typeof params.seed === "number" && Number.isFinite(params.seed)) {
+      extraBody.seed = params.seed;
+    }
 
     const body: Record<string, unknown> = {
       model: MODELS.image,
