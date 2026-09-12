@@ -12,7 +12,7 @@ import {
 import { useSettingsStore } from "@/stores/settingsStore";
 import { useT } from "@/i18n";
 import {
-  UserPlus, Pencil, Trash2, ImageIcon, Loader2, Plus, Wand2,
+  UserPlus, Trash2, ImageIcon, Loader2, Plus, Wand2,
 } from "lucide-react";
 import { CharacterEditor } from "@/features/characters/CharacterEditor";
 import { useWizardActions, hasActiveAssetTask } from "./useWizardActions";
@@ -238,7 +238,17 @@ export function StepAssets() {
             {characters.map((char) => (
               <div
                 key={char.id}
-                className="group flex items-start gap-3 rounded-xl border border-slate-700 bg-slate-800/50 p-3 transition hover:border-slate-600"
+                role="button"
+                tabIndex={0}
+                onClick={() => handleEdit(char)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    handleEdit(char);
+                  }
+                }}
+                title={t("characters.edit")}
+                className="group flex cursor-pointer items-start gap-3 rounded-xl border border-slate-700 bg-slate-800/50 p-3 transition hover:border-slate-600 focus:border-emerald-500 focus:outline-none"
               >
                 <div className="h-12 w-12 shrink-0 overflow-hidden rounded-full border border-slate-700 bg-slate-800">
                   {(char.imageUrl || char.avatarUrl) ? (
@@ -266,14 +276,11 @@ export function StepAssets() {
                 </div>
                 <div className="flex shrink-0 gap-1 opacity-0 transition group-hover:opacity-100">
                   <button
-                    onClick={() => handleEdit(char)}
-                    className="rounded p-1.5 text-slate-500 hover:bg-slate-700 hover:text-slate-300"
-                    title={t("characters.edit")}
-                  >
-                    <Pencil size={12} />
-                  </button>
-                  <button
-                    onClick={() => handleDelete(char)}
+                    onClick={(e) => {
+                      // 阻止冒泡，避免点删除时同时触发卡片的「进入编辑」
+                      e.stopPropagation();
+                      handleDelete(char);
+                    }}
                     className="rounded p-1.5 text-slate-500 hover:bg-red-950 hover:text-red-400"
                     title={t("characters.delete")}
                   >

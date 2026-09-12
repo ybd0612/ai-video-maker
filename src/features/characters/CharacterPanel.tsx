@@ -6,7 +6,7 @@
 import { useState } from "react";
 import { useProjectStore, selectActiveProject, type Asset } from "@/stores/projectStore";
 import { useT } from "@/i18n";
-import { UserPlus, Pencil, Trash2 } from "lucide-react";
+import { UserPlus, Trash2 } from "lucide-react";
 import { CharacterEditor } from "./CharacterEditor";
 
 export function CharacterPanel() {
@@ -68,7 +68,17 @@ export function CharacterPanel() {
           {characters.map((char) => (
             <div
               key={char.id}
-              className="group flex items-start gap-2 rounded-md border border-slate-800 bg-slate-900/50 p-2 transition hover:border-slate-700"
+              role="button"
+              tabIndex={0}
+              onClick={() => handleEdit(char)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  handleEdit(char);
+                }
+              }}
+              title={t("characters.edit")}
+              className="group flex cursor-pointer items-start gap-2 rounded-md border border-slate-800 bg-slate-900/50 p-2 transition hover:border-slate-700 focus:border-emerald-500 focus:outline-none"
             >
               {/* Avatar */}
               <div className="h-8 w-8 shrink-0 overflow-hidden rounded-full border border-slate-700 bg-slate-800">
@@ -98,14 +108,11 @@ export function CharacterPanel() {
               {/* Actions */}
               <div className="flex shrink-0 gap-0.5 opacity-0 transition group-hover:opacity-100">
                 <button
-                  onClick={() => handleEdit(char)}
-                  className="rounded p-1 text-slate-500 hover:bg-slate-800 hover:text-slate-300"
-                  title={t("characters.edit")}
-                >
-                  <Pencil size={10} />
-                </button>
-                <button
-                  onClick={() => handleDelete(char)}
+                  onClick={(e) => {
+                    // 阻止冒泡，避免点删除时同时触发卡片的「进入编辑」
+                    e.stopPropagation();
+                    handleDelete(char);
+                  }}
                   className="rounded p-1 text-slate-500 hover:bg-red-950 hover:text-red-400"
                   title={t("characters.delete")}
                 >
