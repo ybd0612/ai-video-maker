@@ -98,7 +98,8 @@ export function StepIdea({ onGenerated }: StepIdeaProps) {
         });
       }
       targetId = currentProject.id;
-      await extractCharactersFromIdea(prompt.trim());
+      const done = await extractCharactersFromIdea(prompt.trim());
+      if (!done) return; // 用户在确认弹窗中取消了重新提取，停留在想法步骤
       onGenerated?.();
     } catch (err) {
       // 仅当仍停留在发起项目时才展示错误，避免旧项目的错误污染已切换到的新项目

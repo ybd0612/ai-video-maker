@@ -6,6 +6,8 @@
 import { useCallback } from "react";
 import { useProjectStore, selectActiveProject, newId, type Shot, type Asset, type Project } from "@/stores/projectStore";
 import { useSettingsStore } from "@/stores/settingsStore";
+import { useT } from "@/i18n";
+import { confirmDialog } from "@/components/ui/ConfirmDialog";
 import { resolvePlan, type PlanId } from "@/lib/plans";
 import { generateScript, extractAssetsFromIdea } from "@/services/scriptService";
 import { generateImage, aspectRatioToImageSize } from "@/services/imageService";
@@ -65,6 +67,7 @@ function extractNewAssets(
     const record: Asset = {
       id: newId("asset"),
       type,
+      source: "extracted",
       name: item.name,
       description: item.description,
       prompt: item.appearancePrompt,
@@ -100,6 +103,7 @@ function buildImageGenerationInput(
 }
 
 export function useWizardActions() {
+  const t = useT();
 
   /**
    * 生成风格参考图（项目级风格锚点）。
@@ -160,8 +164,16 @@ export function useWizardActions() {
     }
   }, []);
 
-  /** Step 1→2: Extract characters from idea, advance to assets step */
-  const extractCharactersFromIdea = useCallback(async (prompt: string) => {
+  /**
+   * Step 1→2: Extract characters from idea, advance to assets step.
+   * 返回 false 表示用户在确认弹窗中取消了重新提取。
+   *
+   * 防重复（2026-09-12）：模型对同一故事的命名不稳定（「小兔子」/「小白兔」），
+   * 旧的纯追加式只按名字精确去重，改几次想法就会积累重复资产。
+   * 现改为「替换式」：带 source="extracted" 的旧资产被新提取结果整体取代，
+   * 手动添加的（source="manual"）保留，与新结果重名时以手动版本为准。
+   */
+  const extractCharactersFromIdea = useCallback(async (prompt: string): Promise<boolean> => {
     const { providerConfig } = useSettingsStore.getState();
     if (!providerConfig.apiKey || !providerConfig.baseUrl) {
       throw new Error("API key is not configured.");
@@ -174,6 +186,21 @@ export function useWizardActions() {
     // 捕获发起项目的 ID：异步完成后结果必须写回该项目，
     // 即使用户在生成期间切换/创建了新项目，也不会污染其他项目。
     const targetProjectId = project.id;
+
+    // ── 防重复：已有自动提取资产时，先确认「替换式」重新提取 ──
+    const manualAssets = project.assets.filter((a) => a.source === "manual");
+    const autoAssets = project.assets.filter((a) => a.source !== "manual");
+    if (autoAssets.length > 0) {
+      const ok = await confirmDialog({
+        title: t("wizard.reextractTitle"),
+        message: t("wizard.reextractMessage", {
+          auto: autoAssets.length,
+          manual: manualAssets.length,
+          names: autoAssets.map((a) => a.name).join("、"),
+        }),
+      });
+      if (!ok) return false;
+    }
 
     store.setProjectStatus("scripting");
 
@@ -188,16 +215,23 @@ export function useWizardActions() {
         assets: project.assets,
       });
 
-      // 统一提取角色/产品/场景资产（去重后追加到发起项目）
+      // 统一提取角色/产品/场景资产（与手动资产重名的会被下方过滤）
       const newCharacters = extractNewAssets(project.assets, result.characters, "character");
       const newProducts = extractNewAssets(project.assets, result.products, "product");
       const newScenes = extractNewAssets(project.assets, result.scenes, "scene");
       const newAssets = [...newCharacters.assets, ...newProducts.assets, ...newScenes.assets];
 
-      // 原子地写回发起项目：追加新资产 + 复位状态 + 推进到资产步骤
+      // 替换式写回：手动添加的资产保留在前；新提取项与手动资产重名时跳过
+      // （保留手动版本，避免把用户精心润色过的资产冲掉）
+      const manualNames = new Set(manualAssets.map((a) => a.name.trim().toLocaleLowerCase()));
+      const dedupedNew = newAssets.filter(
+        (a) => !manualNames.has(a.name.trim().toLocaleLowerCase()),
+      );
+
+      // 原子地写回发起项目：替换式资产 + 复位状态 + 推进到资产步骤
       useProjectStore.getState().updateProjectById(targetProjectId, (p) => ({
         ...p,
-        assets: [...p.assets, ...newAssets],
+        assets: [...manualAssets, ...dedupedNew],
         status: "idle",
         error: undefined,
         wizardStep: 2,
@@ -208,6 +242,7 @@ export function useWizardActions() {
       // 必须先于资产生成就绪才能让资产图带上故事风格。
       // 失败不阻塞流程，错误写入 styleReferenceError 在资产页展示。
       void generateStyleReference(targetProjectId);
+      return true;
     } catch (err) {
       // 失败时将发起项目复位为 failed，避免其状态永远停留在 scripting
       useProjectStore.getState().updateProjectById(targetProjectId, (p) => ({
@@ -217,7 +252,7 @@ export function useWizardActions() {
       }));
       throw err;
     }
-  }, [generateStyleReference]);
+  }, [generateStyleReference, t]);
 
   /** Step 3: Generate storyboard shots using asset context */
   const generateStoryboard = useCallback(async (prompt: string) => {

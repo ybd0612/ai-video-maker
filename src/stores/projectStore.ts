@@ -59,6 +59,11 @@ export interface Asset {
   avatarUrl?: string;
   /** 多视角矩阵图 */
   multiViewUrl?: string;
+  /**
+   * 资产来源：extracted = AI 自动提取（重新提取时会被替换）；manual = 手动添加（重新提取时保留）。
+   * 缺省视为 extracted（兼容历史数据）。
+   */
+  source?: "extracted" | "manual";
 }
 
 export interface DialogueLine {
@@ -495,7 +500,8 @@ export const useProjectStore = create<ProjectState>()(
       /* ── Asset actions（角色/场景/产品统一资产） ─────────────────────── */
 
       addAsset: (asset) => {
-        const newAsset: Asset = { ...asset, id: newId("asset") };
+        // 手动添加的资产标记来源；重新提取（extractCharactersFromIdea）时会保留 manual 资产
+        const newAsset: Asset = { source: "manual", ...asset, id: newId("asset") };
         set((s) => ({
           projects: updateActive(s.projects, s.activeProjectId, (p) => ({
             ...p,
