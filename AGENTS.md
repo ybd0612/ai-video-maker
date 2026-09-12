@@ -145,6 +145,7 @@ src/
 - 视频完成响应解析链：`url`（顶层）→ `metadata.url` → `video_url` → `output.url` → `output.video_url` → `remixed_from_video_id`。
 - **风格参考图必须先于资产图生成**（2026-09-12）：`generateAssetImages` 分两阶段——阶段 1 串行生成风格图（`generateStyleReference`，幂等 + activeAssetTasks 互斥），阶段 2 的角色/场景/产品任务把风格图作为 `inputImageUrl` 传入，并在 prompt 前缀加"参考图只用于画风/色调/光照，勿复制内容构图"指令；风格图失败不阻塞资产生成（退化为文生图）。角色定妆照 prompt 已移除 `photorealistic` 硬编码（它是"动画故事出写实图"的推手之一）。
 - `extractCharactersFromIdea` 成功写回后自动 `void generateStyleReference(targetProjectId)` 后台生成风格图（不阻塞进入步骤 2）；风格提示词**从 `project.ideaPrompt` 派生**（保证风格贴合故事，如动画故事出动画风格）。分镜图经 `findBestReference` 兜底使用风格图；StepAssets 手动「重新生成风格图」传 `force=true` 覆盖已有图。
+- **资产防重复（2026-09-12）**：`Asset.source` 标记来源（`extracted`=AI 提取 / `manual`=手动添加，缺省视为 extracted 兼容旧数据；`addAsset` 默认 manual）。重新提取是**替换式**：旧的 extracted 资产整体被新结果取代、manual 保留且与新结果重名时以手动版为准；有 extracted 资产时先弹 `confirmDialog`（列出将替换的名字）确认，取消则返回 `false` 不推进向导。模型对同一故事命名不稳定（「小兔子」/「小白兔」），**禁止改回纯追加式**。
 - 分镜阶段 `generateScript` 已产出完整英文双提示词，**禁止二次翻译覆盖**（translateToMotion 已移除）。
 - 分镜生成后必须**回填角色 ID 引用**：模型返回的 `activeCharacterIds` / `dialogues.characterId` 可能是自编 ID，需按「角色名 → store 角色 ID」映射统一回填（新资产由 `extractNewAssets` 建映射），匹配不到的对白置 `null`（归旁白），否则角色一致性（图片注入/定妆照参考）与对白归属会失效。
 - 单镜头重roll（`rerollShot`）同样必须**回填对白/角色引用**（映射 + 无效清理），并把 `dialogues` / `activeCharacterIds` 一并写回，否则重roll后对白与脚本脱节。
