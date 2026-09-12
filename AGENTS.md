@@ -106,7 +106,7 @@ src/
 
 1. **脚本阶段** — 调用文本模型生成 4-6 个结构化分镜（scriptText + visualPrompt + motionPrompt + duration）
 2. **图片阶段** — 为每个分镜生成参考图（使用 visualPrompt，并发度 3）
-3. **视频阶段** — 为每个分镜生成视频（使用 motionPrompt，按套餐并发：免费档 1，企业 2，Token Plan 3；异步创建 + 5 秒轮询，单任务 30 分钟超时，任务注册等待 2 分钟）
+3. **视频阶段** — 为每个分镜生成视频（使用 motionPrompt，按套餐并发：免费档 1，企业 2，Token Plan 3；异步创建 + 5 秒轮询，单任务 30 分钟超时，任务注册等待 2 分钟）。请求参数：`mode=keyframe`（有首帧/尾帧时，字段为 `first_frame` / `last_frame`）或 `text`，`size` 固定 `"720P"`，画幅用 `aspect_ratio`，时长用 `seconds`（4-12 秒字符串）；轮询必须带 `model_name`
 4. **拼接阶段** — FFmpeg.wasm concat demuxer 拼接所有视频为最终 MP4（支持 AbortSignal 取消：下载阶段中止 fetch，FFmpeg 阶段 terminate 进程）
 
 - 并发控制使用 `Promise.allSettled`，确保所有 worker 完成后再检查状态
@@ -152,7 +152,11 @@ src/
 - 模型标识符集中定义在 `src/lib/models.ts` 的 `MODELS` 常量中
 - 服务层（scriptService / imageService / videoService）通过 `MODELS` 引用模型名
 - 替换模型只需修改 `MODELS` 常量
-- 当前文本模型：`agnes-3.0-flash`（512K 上下文 / 最大输出 65,536 Token，支持文本与图像 URL 输入，`chat_template_kwargs.enable_thinking` 控制 Thinking 模式）
+- 当前模型（2026-09-12 升级至 2.5/3.0 世代，官方文档 https://wiki.agnes-ai.cn）：
+  - 文本 `agnes-3.0-flash` — 512K 上下文 / 最大输出 65,536 Token，支持文本与图像 URL 输入，`chat_template_kwargs.enable_thinking` 控制 Thinking（默认关闭）
+  - 图像 `agnes-image-2.5-flash` — 请求/响应参数与 2.1 完全一致，结果取 `data[0].url`；支持文生图 / 图生图 / 多图合成
+  - 视频 `agnes-video-2.5-flash` — 仅支持 `size="720P"`，画幅用 `aspect_ratio`（16:9 → 1280x704），时长用 `seconds`（"4"~"12"），有首帧/尾帧时 `mode="keyframe"`（`first_frame` / `last_frame`），无图时 `mode="text"`；轮询必须带 `model_name`，成片 URL 在响应顶层 `url`
+- ⚠️ 视频 2.5 Flash 与旧版 `agnes-video-v2.0` 参数体系不同（旧版 `num_frames`（8n+1、≤441）/ `frame_rate` / `width` / `height` / `image` / `last_image` 均已废弃，`calcNumFrames` 已无调用方），修改 `videoService.ts` 时勿混用两套参数
 - API Key 和 Base URL 由用户在设置对话框中配置，存储在浏览器本地
 
 ## 用量限制与套餐（Rate Limit / Plan）

@@ -10,7 +10,7 @@ import { resolvePlan, type PlanId } from "@/lib/plans";
 import { generateScript, extractAssetsFromIdea } from "@/services/scriptService";
 import { generateImage, aspectRatioToImageSize } from "@/services/imageService";
 import { generateAssetNamespace } from "@/lib/assetNamespace";
-import { generateVideo, aspectRatioToVideoSize, VideoTaskCreatedError } from "@/services/videoService";
+import { generateVideo, aspectRatioToVideoAspect, VideoTaskCreatedError } from "@/services/videoService";
 import { injectCharacterDescriptions } from "@/lib/characterUtils";
 import { composeVisualPrompt, composeMotionPrompt, generateFullPrompt } from "@/lib/promptUtils";
 
@@ -647,7 +647,7 @@ export function useWizardActions() {
 
     store.setVideoGenerationStartedByProjectId(targetProjectId, true);
     store.setProjectStatusById(targetProjectId, "videoing");
-    const videoSize = aspectRatioToVideoSize(latestProject?.aspectRatio ?? project.aspectRatio);
+    const videoAspect = aspectRatioToVideoAspect(latestProject?.aspectRatio ?? project.aspectRatio);
 
     const tasks = shotsNeedingVideos.map((shot) => async () => {
       if (signal?.aborted) return;
@@ -671,7 +671,7 @@ export function useWizardActions() {
               imageUrl: shot.imageUrl!,
               // 双图流：同时传入首帧和尾帧
               ...(shot.useDualFrame && shot.lastFrameUrl ? { lastFrameUrl: shot.lastFrameUrl } : {}),
-              size: videoSize,
+              aspectRatio: videoAspect,
               duration: shot.duration,
             },
             (progress) => {
@@ -770,7 +770,7 @@ export function useWizardActions() {
           imageUrl: shot.imageUrl,
           // 双图流：同时传入首帧和尾帧
           ...(shot.useDualFrame && shot.lastFrameUrl ? { lastFrameUrl: shot.lastFrameUrl } : {}),
-          size: aspectRatioToVideoSize(project.aspectRatio),
+          aspectRatio: aspectRatioToVideoAspect(project.aspectRatio),
           duration: shot.duration,
         },
         (progress) => {

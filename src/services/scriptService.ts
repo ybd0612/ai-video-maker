@@ -214,7 +214,7 @@ ${charSection}${sceneSection}${productSection}
 - 如有产品主体，visualPrompt 必须包含产品完整外观描述（款式、颜色、材质）
 - 中文子字段给用户在界面上看，用中文填写
 - dialogues：characterId 为 null 表示旁白
-- 每镜头 duration 为 3、5 或 8 秒
+- 每镜头 duration 为 4、5 或 8 秒（视频模型支持 4-12 秒）
 - 总镜头数 4-8 个，节奏有起承转合
 
 ⚠️ 内容安全要求：
@@ -324,7 +324,7 @@ Important rules:
 - If a product subject appears, visualPrompt MUST include its full appearance (style, color, material)
 - Sub-fields (subjectDesc etc.) are shown to users in their language
 - dialogues: characterId null = narrator
-- Each shot duration: 3, 5, or 8 seconds
+- Each shot duration: 4, 5, or 8 seconds (the video model supports 4-12s)
 - 4-8 shots total, with narrative pacing
 
 Content safety:
@@ -412,7 +412,7 @@ export async function generateScript(
         envChangeDesc: s.envChangeDesc ?? "",
         motionSpeedDesc: s.motionSpeedDesc ?? "",
         negativeMotionPrompt: s.negativeMotionPrompt ?? "",
-        duration: [3, 5, 8].includes(s.duration) ? s.duration : 5,
+        duration: [4, 5, 8].includes(s.duration) ? s.duration : 5,
         useDualFrame: s.useDualFrame ?? false,
       }));
 

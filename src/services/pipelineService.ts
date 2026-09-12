@@ -7,7 +7,7 @@ import { useProjectStore, selectActiveProject, type Shot } from "@/stores/projec
 import { useSettingsStore } from "@/stores/settingsStore";
 import { generateScript } from "./scriptService";
 import { generateImage, aspectRatioToImageSize } from "./imageService";
-import { generateVideo, aspectRatioToVideoSize, VideoTaskCreatedError } from "./videoService";
+import { generateVideo, aspectRatioToVideoAspect, VideoTaskCreatedError } from "./videoService";
 import { injectCharacterDescriptions } from "@/lib/characterUtils";
 
 type PipelinePhase = "script" | "image" | "video" | "render";
@@ -37,7 +37,7 @@ export async function runPipeline(prompt: string, opts: RunOptions = {}) {
   if (!project) throw new Error("No active project.");
 
   const imageSize = aspectRatioToImageSize(project.aspectRatio);
-  const videoSize = aspectRatioToVideoSize(project.aspectRatio);
+  const videoAspect = aspectRatioToVideoAspect(project.aspectRatio);
 
   // ── Phase 1: Script (skip if prompt is empty and shots already exist) ──
   const shouldGenerateScript = prompt.trim().length > 0;
@@ -161,7 +161,7 @@ export async function runPipeline(prompt: string, opts: RunOptions = {}) {
             imageUrl: shot.imageUrl,
             // 双图流：同时传入首帧和尾帧
             ...(shot.useDualFrame && shot.lastFrameUrl ? { lastFrameUrl: shot.lastFrameUrl } : {}),
-            size: videoSize,
+            aspectRatio: videoAspect,
             duration: shot.duration,
           },
           opts.signal,
@@ -198,7 +198,7 @@ export async function runSingleShot(shotId: string, opts: RunOptions = {}) {
   if (!shot.visualPrompt?.trim()) throw new Error("镜头画面描述为空，无法生成。");
 
   const imageSize = aspectRatioToImageSize(project.aspectRatio);
-  const videoSize = aspectRatioToVideoSize(project.aspectRatio);
+  const videoAspect = aspectRatioToVideoAspect(project.aspectRatio);
 
   // Image
   let imageUrl: string;
@@ -243,7 +243,7 @@ export async function runSingleShot(shotId: string, opts: RunOptions = {}) {
         imageUrl,
         // 双图流：同时传入首帧和尾帧
         ...(shot.useDualFrame && shot.lastFrameUrl ? { lastFrameUrl: shot.lastFrameUrl } : {}),
-        size: videoSize,
+        aspectRatio: videoAspect,
         duration: shot.duration,
       },
       opts.signal,
@@ -274,7 +274,7 @@ export async function retryFailedVideos(opts: RunOptions = {}) {
   );
   if (failedVideoShots.length === 0) return;
 
-  const videoSize = aspectRatioToVideoSize(project.aspectRatio);
+  const videoAspect = aspectRatioToVideoAspect(project.aspectRatio);
   store.setProjectStatus("videoing");
 
   try {
@@ -291,7 +291,7 @@ export async function retryFailedVideos(opts: RunOptions = {}) {
           imageUrl: shot.imageUrl!,
           // 双图流：同时传入首帧和尾帧
           ...(shot.useDualFrame && shot.lastFrameUrl ? { lastFrameUrl: shot.lastFrameUrl } : {}),
-          size: videoSize,
+          aspectRatio: videoAspect,
           duration: shot.duration,
         },
         opts.signal,
@@ -324,7 +324,8 @@ async function generateVideoWithRetry(
     imageUrl: string;
     /** 尾帧图片 URL（双图流模式下使用） */
     lastFrameUrl?: string;
-    size: string;
+    /** 画幅比例（官方 aspect_ratio） */
+    aspectRatio: string;
     duration: number;
   },
   signal?: AbortSignal,

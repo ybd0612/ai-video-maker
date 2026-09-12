@@ -170,7 +170,7 @@ export function ShotEditor({
           onChange={(e) => updateShot(shot.id, { duration: parseInt(e.target.value) })}
           className="w-full rounded-md border border-slate-700 bg-slate-800 px-2 py-1.5 text-xs text-slate-300 focus:border-amber-500 focus:outline-none"
         >
-          <option value={3}>3s</option>
+          <option value={4}>4s</option>
           <option value={5}>5s</option>
           <option value={8}>8s</option>
         </select>

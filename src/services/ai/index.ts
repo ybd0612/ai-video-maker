@@ -37,7 +37,8 @@ export interface VideoParams {
   lastFrameUrl?: string;
   prompt: string;
   duration: number;
-  size?: string;
+  /** 画幅比例（官方 aspect_ratio），如 "16:9" / "9:16" / "1:1" */
+  aspectRatio?: string;
 }
 
 export interface VideoResult {

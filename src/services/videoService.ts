@@ -2,14 +2,22 @@
 // src/services/videoService.ts
 // Generates videos for shots using the Agnes Video API (async + polling).
 //
-// API 规格：
+// API 规格（agnes-video-2.5-flash）：
 //   创建任务：POST {baseUrl}/videos → 返回 { video_id }
-//   查询结果：GET {origin}/agnesapi?video_id=<VIDEO_ID>
+//   查询结果：GET {origin}/agnesapi?video_id=<VIDEO_ID>&model_name=agnes-video-2.5-flash
+//
+// 与旧版 agnes-video-v2.0 的参数差异（2.5 Flash 为不同参数体系，改动时务必注意）：
+//   - size 固定为字符串 "720P"（传其他值直接 HTTP 400），画幅改由 aspect_ratio 控制
+//   - 时长用 seconds 字符串 "4"~"12"，不再使用 num_frames(8n+1) + frame_rate
+//   - 首帧 / 尾帧字段为 first_frame / last_frame（旧版为 image / last_image），
+//     有首帧时 mode="keyframe"，无图时 mode="text"
+//   - 轮询需带 model_name，keyframe 模式不带会查不到任务
+//   - Flash 限制：参考图 ≤5 张、参考音频 ≤3 段、不支持参考视频（本项目均未使用）
 // ────────────────────────────────────────────────────────────────────────────
 
 import { MODELS } from "@/lib/models";
 import { fetchWithRetry } from "@/lib/fetchWithRetry";
-import { calcNumFrames } from "@/lib/validation";
+import { clampNumber } from "@/lib/validation";
 import { rateLimiter } from "@/services/rateLimit";
 
 const VIDEO_POLL_INTERVAL_MS = 5_000;
@@ -41,12 +49,14 @@ interface CreateVideoOptions {
   apiKey: string;
   baseUrl: string;
   prompt: string;
+  /** 首帧图片 URL（提供时使用 keyframe 模式） */
   imageUrl?: string;
-  /** 尾帧图片 URL（双图流模式下使用） */
+  /** 尾帧图片 URL（双图流模式下使用，需同时提供首帧） */
   lastFrameUrl?: string;
-  size: string;
+  /** 画幅比例，如 "16:9" / "9:16" / "1:1" */
+  aspectRatio: string;
+  /** 视频时长（秒），发送前会收敛到官方支持的 4~12 秒 */
   duration: number;
-  fps?: number;
 }
 
 interface VideoResult {
@@ -55,20 +65,33 @@ interface VideoResult {
   duration?: number;
 }
 
+/** Agnes Video 2.5 Flash 固定输出 720P，画幅由 aspect_ratio 决定。 */
+export const VIDEO_SIZE = "720P";
+
+/** 官方支持的 aspect_ratio 取值。 */
+const SUPPORTED_VIDEO_ASPECTS = [
+  "1:1",
+  "3:4",
+  "4:3",
+  "16:9",
+  "9:16",
+  "2:3",
+  "3:2",
+  "21:9",
+] as const;
+
+/** 官方支持的时长区间（秒）。 */
+const VIDEO_MIN_SECONDS = 4;
+const VIDEO_MAX_SECONDS = 12;
+/** 时长缺失时的默认值（秒）。 */
+const DEFAULT_SECONDS = 5;
+
 /**
- * Map aspect ratio to video size.
+ * Map project aspect ratio to the official `aspect_ratio` value.
+ * 非法值回退 16:9（横屏）。
  */
-export function aspectRatioToVideoSize(ratio: string): string {
-  switch (ratio) {
-    case "9:16":
-      return "720x1280";
-    case "16:9":
-      return "1280x720";
-    case "1:1":
-      return "1024x1024";
-    default:
-      return "1280x720";
-  }
+export function aspectRatioToVideoAspect(ratio: string): string {
+  return (SUPPORTED_VIDEO_ASPECTS as readonly string[]).includes(ratio) ? ratio : "16:9";
 }
 
 /**
@@ -90,11 +113,12 @@ function sanitizePrompt(prompt: string): string {
  * Returns the final video URL.
  *
  * 创建端点：POST {baseUrl}/videos
- * 查询端点：GET {origin}/agnesapi?video_id={videoId}
+ * 查询端点：GET {origin}/agnesapi?video_id={videoId}&model_name={model}
  *
- * 注意：轮询端点与创建端点使用不同的路径。
- * 创建用 {baseUrl}/videos，轮询用 {origin}/agnesapi。
- * 参考官方文档 https://agnes-ai.cn/zh-Hans/docs/agnes-video-v20
+ * 注意：轮询端点与创建端点使用不同的路径与查询参数。
+ * 创建用 {baseUrl}/videos，轮询用 {origin}/agnesapi 且必须带 model_name
+ * （keyframe 模式不带 model_name 会查不到任务）。
+ * 参考官方文档 https://agnes-ai.cn/zh-Hans/docs/agnes-video-25-flash
  */
 export async function generateVideo(
   opts: CreateVideoOptions,
@@ -102,34 +126,37 @@ export async function generateVideo(
   signal?: AbortSignal,
 ): Promise<VideoResult> {
   const baseUrl = opts.baseUrl.replace(/\/+$/, "");
-  const fps = opts.fps ?? 24;
-  const numFrames = calcNumFrames(opts.duration, fps);
 
   // ── Create task (with 429 retry) ──────────────────────────────────────
   // 用量控制：视频 RPM（默认档仅 1 RPM，会把并发串行化到约 1 次/分钟）
   // + Token Plan 每日秒数配额（cost = 请求时长秒数）
   await rateLimiter.acquire("video", { cost: opts.duration || 1, signal });
 
+  const hasFirstFrame = !!opts.imageUrl;
+  const hasLastFrame = !!opts.lastFrameUrl;
+  const seconds = clampNumber(
+    Math.round(opts.duration) || DEFAULT_SECONDS,
+    VIDEO_MIN_SECONDS,
+    VIDEO_MAX_SECONDS,
+  );
+
   const body: Record<string, unknown> = {
     model: MODELS.video,
     prompt: sanitizePrompt(opts.prompt),
-    num_frames: numFrames,
-    frame_rate: fps,
+    // 有首帧/尾帧走 keyframe（首尾帧控制），纯文本走 text
+    mode: hasFirstFrame || hasLastFrame ? "keyframe" : "text",
+    size: VIDEO_SIZE,
+    aspect_ratio: aspectRatioToVideoAspect(opts.aspectRatio),
+    seconds: String(seconds),
+    n: 1,
   };
 
-  const [w, h] = opts.size.split("x").map(Number);
-  if (w && h) {
-    body.width = w;
-    body.height = h;
-  }
-
+  // keyframe 模式：first_frame / last_frame 至少提供一个
   if (opts.imageUrl) {
-    body.image = opts.imageUrl;
+    body.first_frame = opts.imageUrl;
   }
-
-  // 双图流：传入尾帧让模型同时感知首尾帧
   if (opts.lastFrameUrl) {
-    body.last_image = opts.lastFrameUrl;
+    body.last_frame = opts.lastFrameUrl;
   }
 
   let createJson: Record<string, unknown> = {};
@@ -179,9 +206,10 @@ export async function generateVideo(
   }
 
   // ── Poll for result ────────────────────────────────────────────────────
-  // 轮询端点：GET {origin}/agnesapi?video_id={videoId}
+  // 轮询端点：GET {origin}/agnesapi?video_id={videoId}&model_name={model}
+  // model_name 必带：2.5 Flash 的 keyframe / reference 模式不带会查不到任务。
   const origin = new URL(baseUrl).origin;
-  const pollUrl = `${origin}/agnesapi?video_id=${encodeURIComponent(videoId)}`;
+  const pollUrl = `${origin}/agnesapi?video_id=${encodeURIComponent(videoId)}&model_name=${encodeURIComponent(MODELS.video)}`;
   const deadline = Date.now() + VIDEO_POLL_TIMEOUT_MS;
   let videoUrl = "";
   let coverImageUrl: string | undefined;

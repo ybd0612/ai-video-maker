@@ -193,8 +193,9 @@ export class OpenAIService implements AIService {
         imageUrl: params.imageUrl,
         // 双图流：传递尾帧 URL
         ...(params.lastFrameUrl ? { lastFrameUrl: params.lastFrameUrl } : {}),
-        // 使用调用方指定尺寸，未提供时默认 16:9
-        size: params.size ?? "1280x720",
+        // 使用调用方指定画幅，未提供时默认 16:9
+        // （agnes-video-2.5-flash 输出固定 720P，画幅由 aspect_ratio 决定）
+        aspectRatio: params.aspectRatio ?? "16:9",
         duration: params.duration,
       },
       callbacks?.onProgress,

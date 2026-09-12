@@ -26,8 +26,8 @@
 | 🧭 **6 步向导** | 想法 → 资产（角色/场景/产品） → 分镜 → 图片 → 视频 → 成片，每步可控、可单独重试 |
 | 🎬 **一键成片** | 全自动模式：输入主题后流水线直出成片（脚本 → 图片 → 视频 → 拼接） |
 | 🤖 **智能分镜** | `agnes-3.0-flash` — 生成 4-6 个分镜，同时产出文生图 + 图生视频两套提示词 |
-| 🎨 **图像生成** | `agnes-image-2.1-flash` — 按画面描述生成参考图（并发 3） |
-| 🎥 **视频生成** | `agnes-video-v2.0` — 异步任务 + 轮询，按套餐自动限速，失败自动重试与恢复 |
+| 🎨 **图像生成** | `agnes-image-2.5-flash` — 按画面描述生成参考图（并发 3） |
+| 🎥 **视频生成** | `agnes-video-2.5-flash` — 720P / 4-12 秒，异步任务 + 轮询（带 model_name），按套餐自动限速，失败自动重试与恢复 |
 | 🎞️ **首尾帧控制** | 分镜可选双图流（首帧 + 尾帧）生成，运动一致性更好 |
 | ✂️ **视频拼接** | FFmpeg.wasm 客户端 concat demuxer 拼接为最终 MP4 |
 | ✨ **AI 辅助优化** | 每个输入框旁可调用 AI 多轮对话优化提示词 |
@@ -196,8 +196,8 @@ src/
 ```typescript
 export const MODELS = {
   text: "agnes-3.0-flash",
-  image: "agnes-image-2.1-flash",
-  video: "agnes-video-v2.0",
+  image: "agnes-image-2.5-flash",
+  video: "agnes-video-2.5-flash",
 } as const;
 ```
 

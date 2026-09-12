@@ -82,6 +82,10 @@ export function sanitizePrompt(value: string): string {
 /**
  * Calculate valid num_frames from duration (seconds) and fps.
  * Enforces: num_frames = 8n + 1, max 441.
+ *
+ * ⚠️ 遗留规则：属于 agnes-video-v2.0 时代的参数体系。
+ * 现役模型 agnes-video-2.5-flash 改用 `seconds`（4~12 秒字符串）表达时长，
+ * 不再需要帧数换算，因此当前无调用方；保留以便将来回退旧模型。
  */
 export function calcNumFrames(durationSec: number, fps: number): number {
   const raw = Math.round(durationSec * fps);

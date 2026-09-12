@@ -5,6 +5,6 @@
 
 export const MODELS = {
   text: "agnes-3.0-flash",
-  image: "agnes-image-2.1-flash",
-  video: "agnes-video-v2.0",
+  image: "agnes-image-2.5-flash",
+  video: "agnes-video-2.5-flash",
 } as const;
