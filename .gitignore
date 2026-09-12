@@ -40,3 +40,12 @@ dist/
 .env
 .env.local
 .env.*.local
+
+# Playwright 测试产物
+playwright-report/
+test-results/
+
+# 工具数据（AGENTS.md 约定：不入库）
+.workbuddy/
+.neuralmemory/
+.superpowers/
