@@ -100,7 +100,7 @@ describe("BUILTIN_RULES 默认渲染回归锁", () => {
   it("polish 条目为单语原文（zh=en），内容与迁移前的 chatService 常量逐字一致", () => {
     const scriptText = BUILTIN_RULES.find((r) => r.id === "polish.script-text")!;
     expect(scriptText.content.zh).toBe(scriptText.content.en);
-    expect(scriptText.content.zh).toContain("短视频文案优化专家");
+    expect(scriptText.content.zh).toContain("视频文案优化专家");
 
     const character = BUILTIN_RULES.find((r) => r.id === "polish.character")!;
     expect(character.content.zh).toBe(character.content.en);
@@ -211,6 +211,6 @@ describe("buildSystemPrompt", () => {
 
   it("条目不串任务：polish 条目不会出现在 storyboard 渲染中", () => {
     const rendered = buildSystemPrompt("storyboard", "zh", BUILTIN_RULES);
-    expect(rendered).not.toContain("短视频文案优化专家");
+    expect(rendered).not.toContain("视频文案优化专家");
   });
 });
