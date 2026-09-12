@@ -125,7 +125,9 @@ export function StepAssets() {
         baseUrl: providerConfig.baseUrl,
         prompt: `${styleInstruction}${scene.prompt}`,
         size,
-        ...(styleRef ? { inputImageUrl: styleRef } : {}),
+        ...(styleRef
+          ? { inputImageUrl: styleRef, fallbackPrompt: scene.prompt }
+          : {}),
       });
       updateAsset(scene.id, { imageUrl: url, error: undefined });
     } catch (err) {
@@ -160,7 +162,9 @@ export function StepAssets() {
         baseUrl: providerConfig.baseUrl,
         prompt: `${styleInstruction}${product.prompt}`,
         size,
-        ...(styleRef ? { inputImageUrl: styleRef } : {}),
+        ...(styleRef
+          ? { inputImageUrl: styleRef, fallbackPrompt: product.prompt }
+          : {}),
       });
       updateAsset(product.id, { imageUrl: url, error: undefined });
     } catch (err) {

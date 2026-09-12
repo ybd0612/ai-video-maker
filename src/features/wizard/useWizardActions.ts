@@ -489,7 +489,13 @@ export function useWizardActions() {
               baseUrl: providerConfig.baseUrl,
               prompt: portraitPrompt,
               size: imageSize,
-              ...(styleReferenceUrl ? { inputImageUrl: styleReferenceUrl } : {}),
+              // 图生图被 team 权限拒绝时退化为纯文生图：原文自带风格关键词（如 hand-drawn animation style）
+              ...(styleReferenceUrl
+                ? {
+                    inputImageUrl: styleReferenceUrl,
+                    fallbackPrompt: `Portrait of ${char.prompt}, head and shoulders, looking at camera, high detail`,
+                  }
+                : {}),
             });
             useProjectStore.getState().updateAssetByProjectId(targetProjectId, char.id, { imageUrl: url, error: undefined });
           } catch (err) {
@@ -515,7 +521,9 @@ export function useWizardActions() {
               baseUrl: providerConfig.baseUrl,
               prompt: `${styleInstruction}${scene.prompt}`,
               size: imageSize,
-              ...(styleReferenceUrl ? { inputImageUrl: styleReferenceUrl } : {}),
+              ...(styleReferenceUrl
+                ? { inputImageUrl: styleReferenceUrl, fallbackPrompt: scene.prompt }
+                : {}),
             });
             useProjectStore.getState().updateAssetByProjectId(targetProjectId, scene.id, { imageUrl: url, error: undefined });
           } catch (err) {
@@ -540,7 +548,9 @@ export function useWizardActions() {
               baseUrl: providerConfig.baseUrl,
               prompt: `${styleInstruction}${product.prompt}`,
               size: imageSize,
-              ...(styleReferenceUrl ? { inputImageUrl: styleReferenceUrl } : {}),
+              ...(styleReferenceUrl
+                ? { inputImageUrl: styleReferenceUrl, fallbackPrompt: product.prompt }
+                : {}),
             });
             useProjectStore.getState().updateAssetByProjectId(targetProjectId, product.id, { imageUrl: url, error: undefined });
           } catch (err) {
