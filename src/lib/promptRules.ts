@@ -57,7 +57,7 @@ export const SKELETONS: Record<PromptTask, { zh: string; en: string }> = {
     zh: `你是一位专业的短视频资产提取助手。用户会给你一个视频主题或想法，请提取其中的资产信息，严格按以下 JSON 格式返回，不要包含任何其他文字：
 {
   "characters": [
-    { "name": "角色名", "description": "角色简介（性格、身份）", "appearancePrompt": "外貌描述（英文，用于 AI 绘图）" }
+    { "name": "角色名", "description": "完整角色描述（中文，按顺序：物种/类型 → 身份定位 → 性格气质 → 外貌要点 → 服饰配饰 → 记忆点，2-4 句）", "appearancePrompt": "外貌描述（英文，用于 AI 绘图）" }
   ],
   "products": [
     { "name": "产品名", "description": "产品简介（类型、用途）", "appearancePrompt": "外观描述（英文，用于 AI 绘图，包含款式、颜色、材质、logo 等）" }
@@ -85,7 +85,7 @@ export const SKELETONS: Record<PromptTask, { zh: string; en: string }> = {
     en: `You are a professional short-video asset extraction assistant. The user will give you a video topic or idea. Extract asset info and return strictly in this JSON format, no other text:
 {
   "characters": [
-    { "name": "Character name", "description": "Brief description", "appearancePrompt": "Appearance description in English (for AI image generation)" }
+    { "name": "Character name", "description": "Full character description in Chinese (in order: species/type → role → personality → looks → outfit → signature traits, 2-4 sentences)", "appearancePrompt": "Appearance description in English (for AI image generation)" }
   ],
   "products": [
     { "name": "Product name", "description": "Brief description", "appearancePrompt": "Appearance description in English (style, color, material, logo, etc.)" }
@@ -125,7 +125,7 @@ Examples:
   "characters": [
     {
       "name": "角色名",
-      "description": "角色简介（性格、身份；动物/拟人角色同样适用）",
+      "description": "完整角色描述（中文，按顺序：物种/类型 → 身份定位 → 性格气质 → 外貌要点 → 服饰配饰 → 记忆点，2-4 句；动物/拟人角色同样适用）",
       "appearancePrompt": "外貌描述（英文，用于 AI 绘图；人物写年龄体型发型服饰，动物写物种体型毛色特征等）"
     }
   ],
@@ -195,7 +195,7 @@ Return strictly in this JSON format, no other text:
   "characters": [
     {
       "name": "Character name",
-      "description": "Brief description (personality, role; applies to animals/anthropomorphic subjects too)",
+      "description": "Full character description in Chinese (species/type → role → personality → looks → outfit → signature traits, 2-4 sentences; applies to animals/anthropomorphic subjects too)",
       "appearancePrompt": "Appearance description in English (humans: age, build, hair, clothing; animals: species, body shape, fur color, features, etc.)"
     }
   ],

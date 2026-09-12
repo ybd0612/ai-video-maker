@@ -14,7 +14,6 @@ import {
   SYSTEM_PROMPT_CHARACTER_DESCRIPTION_ZH,
   buildCharacterAppearancePrompt,
 } from "@/lib/promptRules";
-import { AiPolishField } from "@/components/ui/AiPolishField";
 import { Lightbox } from "@/components/ui/Lightbox";
 import { generateImage, aspectRatioToImageParams } from "@/services/imageService";
 import { generateAssetNamespace, generateFullPrompt } from "@/lib/assetNamespace";
@@ -40,6 +39,10 @@ export function CharacterEditor({ character, onClose }: CharacterEditorProps) {
   const [description, setDescription] = useState(character?.description ?? "");
   // 英文外貌提示词是「角色描述」的派生物：保存时若描述有变则自动重派生，用户不可编辑
   const [appearancePrompt, setAppearancePrompt] = useState(character?.appearancePrompt ?? "");
+  // 描述由 AI 维护（只读）：用户经指令输入框让 AI 修改；快照栈支持逐级撤销
+  const [instruction, setInstruction] = useState("");
+  const [descHistory, setDescHistory] = useState<string[]>([]);
+  const [isApplyingInstruction, setIsApplyingInstruction] = useState(false);
   const [portraitUrl, setPortraitUrl] = useState(character?.imageUrl ?? "");
   const [isGeneratingDescription, setIsGeneratingDescription] = useState(false);
   const [isGeneratingPortrait, setIsGeneratingPortrait] = useState(false);
@@ -74,6 +77,56 @@ export function CharacterEditor({ character, onClose }: CharacterEditorProps) {
       setIsGeneratingDescription(false);
     }
   }, [providerConfig, name, description]);
+
+  /** 按用户指令修改描述：AI 把要求融合进当前描述（描述本身只读，由 AI 维护） */
+  const handleApplyInstruction = useCallback(async () => {
+    const requirement = instruction.trim();
+    if (!requirement || isApplyingInstruction || !providerConfig.apiKey || !providerConfig.baseUrl) return;
+    setIsApplyingInstruction(true);
+    setError(null);
+    setNotice(null);
+    try {
+      const result = await chatCompletion({
+        apiKey: providerConfig.apiKey,
+        baseUrl: providerConfig.baseUrl,
+        messages: [
+          { role: "system", content: SYSTEM_PROMPT_CHARACTER_DESCRIPTION_ZH },
+          {
+            role: "user",
+            content: [
+              `角色名：${name.trim() || "（未命名）"}`,
+              `当前描述：${description.trim() || "（暂无）"}`,
+              `修改要求：${requirement}`,
+              "",
+              "请把修改要求融合进当前描述，输出修改后的完整角色描述（保持 6 要素结构与既有内容，仅做要求涉及的改变）。",
+            ].join("\n"),
+          },
+        ],
+      });
+      const next = result.content.trim();
+      if (next && next !== description.trim()) {
+        setDescHistory((h) => [...h, description]);
+        setDescription(next);
+        setInstruction("");
+      } else {
+        setNotice(t("characters.instructionNoChange"));
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setIsApplyingInstruction(false);
+    }
+  }, [instruction, isApplyingInstruction, providerConfig, name, description, t]);
+
+  /** 撤销最近一次 AI 描述修改（逐级回退快照栈） */
+  const handleUndoDescription = useCallback(() => {
+    setDescHistory((h) => {
+      if (h.length === 0) return h;
+      const prev = h[h.length - 1];
+      setDescription(prev);
+      return h.slice(0, -1);
+    });
+  }, []);
 
   /** Generate a portrait image from the derived appearance prompt（手动按钮，非自动） */
   const handleGeneratePortrait = useCallback(async () => {
@@ -180,18 +233,18 @@ export function CharacterEditor({ character, onClose }: CharacterEditorProps) {
       <div className="flex items-center gap-2">
         <button
           onClick={onClose}
-          className="rounded p-1 text-slate-500 hover:bg-slate-800 hover:text-slate-300"
+          className="rounded p-1 text-ink-4 hover:bg-raised hover:text-ink-2"
         >
           <ArrowLeft size={14} />
         </button>
-        <span className="text-xs font-medium text-slate-300">
+        <span className="text-xs font-medium text-ink-2">
           {character ? t("characters.edit") : t("characters.add")}
         </span>
       </div>
 
       {/* Name（可编辑） */}
       <div className="space-y-1">
-        <label className="text-[0.6875rem] font-medium text-slate-500">
+        <label className="text-[0.6875rem] font-medium text-ink-4">
           {t("characters.name")}
         </label>
         <input
@@ -199,20 +252,20 @@ export function CharacterEditor({ character, onClose }: CharacterEditorProps) {
           value={name}
           onChange={(e) => setName(e.target.value)}
           placeholder={t("characters.namePlaceholder")}
-          className="w-full rounded-md border border-slate-700 bg-slate-800 px-2 py-1.5 text-xs text-slate-100 placeholder:text-slate-600 focus:border-emerald-500 focus:outline-none"
+          className="w-full rounded-md border border-line bg-raised px-2 py-1.5 text-xs text-ink placeholder:text-ink-5 focus:border-success focus:outline-none"
         />
       </div>
 
-      {/* Description（可编辑 + AI 生成完整描述） */}
+      {/* Description（只读：由 AI 维护；用户经指令输入框让 AI 修改） */}
       <div className="space-y-1">
         <div className="flex items-center justify-between">
-          <label className="text-[0.6875rem] font-medium text-slate-500">
+          <label className="text-[0.6875rem] font-medium text-ink-4">
             {t("characters.description")}
           </label>
           <button
             onClick={handleAiGenerateDescription}
             disabled={isGeneratingDescription || !providerConfig.apiKey || !name.trim()}
-            className="flex items-center gap-1 rounded px-1.5 py-0.5 text-[0.625rem] text-emerald-400 hover:bg-emerald-950/30 transition disabled:opacity-50"
+            className="flex items-center gap-1 rounded px-1.5 py-0.5 text-[0.625rem] text-success hover:bg-success-deep/30 transition disabled:opacity-50"
             title={t("characters.aiGenerateDescription")}
           >
             {isGeneratingDescription ? (
@@ -223,41 +276,86 @@ export function CharacterEditor({ character, onClose }: CharacterEditorProps) {
             {t("characters.aiGenerateDescription")}
           </button>
         </div>
-        <AiPolishField
-          value={description}
-          onChange={setDescription}
-          systemPrompt={SYSTEM_PROMPT_CHARACTER_DESCRIPTION_ZH}
-          resetKey={character?.id ?? "new"}
-          placeholder={t("characters.descriptionPlaceholder")}
-          rows={3}
-        />
-        <p className="text-[0.625rem] text-slate-600">{t("characters.descriptionHint")}</p>
+        {/* 完整中文角色描述（唯一事实源，只读展示） */}
+        <div
+          className="w-full whitespace-pre-wrap rounded-md border border-line bg-raised px-2 py-1.5 text-xs leading-relaxed text-ink select-text"
+          title={t("characters.descriptionReadonlyHint")}
+        >
+          {description.trim() || (
+            <span className="text-ink-5">{t("characters.appearanceEmpty")}</span>
+          )}
+        </div>
+        <p className="text-[0.625rem] text-ink-5">{t("characters.descriptionReadonlyHint")}</p>
+
+        {/* 指令输入框 + 修改描述（AI 融合要求） + 撤销 */}
+        <div className="flex items-center gap-1.5">
+          <input
+            type="text"
+            value={instruction}
+            onChange={(e) => setInstruction(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.nativeEvent.isComposing) {
+                e.preventDefault();
+                void handleApplyInstruction();
+              }
+            }}
+            placeholder={t("characters.instructionPlaceholder")}
+            className="min-w-0 flex-1 rounded-md border border-line bg-raised px-2 py-1.5 text-xs text-ink placeholder:text-ink-5 focus:border-success focus:outline-none"
+          />
+          <button
+            onClick={handleApplyInstruction}
+            disabled={
+              isApplyingInstruction ||
+              !instruction.trim() ||
+              !providerConfig.apiKey ||
+              !providerConfig.baseUrl
+            }
+            className="flex shrink-0 items-center gap-1 rounded-md bg-success px-2 py-1.5 text-[0.6875rem] font-medium text-white transition hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
+            title={t("characters.applyInstruction")}
+          >
+            {isApplyingInstruction ? (
+              <Loader2 size={10} className="animate-spin" />
+            ) : (
+              <Sparkles size={10} />
+            )}
+            {isApplyingInstruction ? t("characters.applying") : t("characters.applyInstruction")}
+          </button>
+          {descHistory.length > 0 && (
+            <button
+              onClick={handleUndoDescription}
+              className="shrink-0 rounded-md border border-line px-2 py-1.5 text-[0.6875rem] text-ink-3 transition hover:bg-raised"
+              title={t("characters.undoDescription")}
+            >
+              {t("characters.undoDescription")}
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Appearance prompt（只读展示：由角色描述自动派生） */}
       <div className="space-y-1">
-        <label className="text-[0.6875rem] font-medium text-slate-500">
+        <label className="text-[0.6875rem] font-medium text-ink-4">
           {t("characters.appearance")}
         </label>
         <div
-          className="w-full rounded-md border border-slate-700/60 bg-slate-800/50 px-2 py-1.5 text-xs text-slate-400 select-text"
+          className="w-full rounded-md border border-line/60 bg-raised/50 px-2 py-1.5 text-xs text-ink-3 select-text"
           title={t("characters.appearanceReadonly")}
         >
           {appearancePrompt.trim() || t("characters.appearanceEmpty")}
         </div>
-        <p className="text-[0.625rem] text-slate-600">{t("characters.appearanceReadonly")}</p>
+        <p className="text-[0.625rem] text-ink-5">{t("characters.appearanceReadonly")}</p>
       </div>
 
       {/* Portrait Preview + Generate（手动按钮；图片可点击放大） */}
       <div className="space-y-1">
         <div className="flex items-center justify-between">
-          <label className="text-[0.6875rem] font-medium text-slate-500">
+          <label className="text-[0.6875rem] font-medium text-ink-4">
             {t("characters.portrait")}
           </label>
           <button
             onClick={handleGeneratePortrait}
             disabled={isGeneratingPortrait || !appearancePrompt.trim() || !providerConfig.apiKey}
-            className="flex items-center gap-1 rounded px-1.5 py-0.5 text-[0.625rem] text-violet-400 hover:bg-violet-950/30 transition disabled:opacity-50"
+            className="flex items-center gap-1 rounded px-1.5 py-0.5 text-[0.625rem] text-accent hover:bg-accent-deep/30 transition disabled:opacity-50"
             title={t("characters.generatePortrait")}
           >
             {isGeneratingPortrait ? (
@@ -272,7 +370,7 @@ export function CharacterEditor({ character, onClose }: CharacterEditorProps) {
         </div>
         {portraitUrl ? (
           <Lightbox src={portraitUrl} alt={t("characters.portrait")}>
-            <div className="relative h-20 w-20 overflow-hidden rounded-lg border border-slate-700">
+            <div className="relative h-20 w-20 overflow-hidden rounded-lg border border-line">
               <img
                 src={portraitUrl}
                 alt={t("characters.portrait")}
@@ -281,12 +379,12 @@ export function CharacterEditor({ character, onClose }: CharacterEditorProps) {
             </div>
           </Lightbox>
         ) : (
-          <div className="flex h-20 w-20 items-center justify-center rounded-lg border border-dashed border-slate-700 text-slate-600">
+          <div className="flex h-20 w-20 items-center justify-center rounded-lg border border-dashed border-line text-ink-5">
             <ImageIcon size={20} />
           </div>
         )}
         {isGeneratingPortrait && (
-          <p className="text-[0.625rem] text-emerald-400 animate-pulse">
+          <p className="text-[0.625rem] text-success animate-pulse">
             {t("wizard.generating") || "生成中..."}
           </p>
         )}
@@ -296,21 +394,21 @@ export function CharacterEditor({ character, onClose }: CharacterEditorProps) {
       <button
         onClick={handleSave}
         disabled={!name.trim() || isSaving}
-        className="mt-2 rounded-md bg-emerald-600 px-4 py-2 text-xs font-medium text-white transition hover:bg-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed"
+        className="mt-2 rounded-md bg-success-solid px-4 py-2 text-xs font-medium text-white transition hover:bg-success-solid disabled:opacity-50 disabled:cursor-not-allowed"
       >
         {isSaving ? t("characters.saving") : character ? t("characters.edit") : t("characters.add")}
       </button>
 
       {/* Notice（非阻断提示，如派生失败保留原值） */}
       {notice && (
-        <div className="rounded-md border border-amber-800 bg-amber-950/30 p-2 text-[0.6875rem] text-amber-300">
+        <div className="rounded-md border border-warn bg-warn-deep/30 p-2 text-[0.6875rem] text-warn">
           {notice}
         </div>
       )}
 
       {/* Error */}
       {error && (
-        <div className="rounded-md border border-red-800 bg-red-950/30 p-2 text-[0.6875rem] text-red-300">
+        <div className="rounded-md border border-danger bg-danger-deep/30 p-2 text-[0.6875rem] text-danger">
           {error}
         </div>
       )}
