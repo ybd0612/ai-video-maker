@@ -9,6 +9,7 @@ import { resolveBaseUrl } from "@/lib/resolveBaseUrl";
 import { fetchWithRetry } from "@/lib/fetchWithRetry";
 import { rateLimiter, imageSizeToTier } from "@/services/rateLimit";
 import { generateVideo as rawGenerateVideo } from "@/services/videoService";
+import { getTranslation } from "@/i18n";
 import type {
   AIService,
   ChatParams,
@@ -68,8 +69,12 @@ export class OpenAIService implements AIService {
     const contentType = resp.headers.get("content-type") ?? "";
     if (!contentType.includes("application/json")) {
       const body = await resp.text().catch(() => "");
+      // 非 React 上下文的瞬时错误：经 getTranslation 定格当前语言（可接受）
       throw new Error(
-        `Chat API 返回了非 JSON 响应 (Content-Type: ${contentType})。响应前 200 字符：${body.slice(0, 200)}`,
+        getTranslation("error.chatNonJson", {
+          contentType,
+          body: body.slice(0, 200),
+        }),
       );
     }
 
@@ -90,11 +95,13 @@ export class OpenAIService implements AIService {
       const finishReason: string = choice?.finish_reason ?? "";
       const hasReasoning = !!choice?.message?.reasoning_content;
       if (finishReason === "length" && hasReasoning) {
-        throw new Error(
-          "推理模型的思考过程耗尽了 token 预算，没有剩余空间输出回答。请重试；若持续出现，需调大 max_tokens。",
-        );
+        throw new Error(getTranslation("error.chatReasoningBudget"));
       }
-      throw new Error(`Chat API 返回了空内容（finish_reason: ${finishReason || "未知"}）。`);
+      throw new Error(
+        getTranslation("error.chatEmptyContent", {
+          finishReason: finishReason || "未知",
+        }),
+      );
     }
 
     return {

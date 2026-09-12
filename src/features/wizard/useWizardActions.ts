@@ -14,6 +14,8 @@ import { generateImage, aspectRatioToImageParams } from "@/services/imageService
 import { generateVideo, aspectRatioToVideoAspect, VideoTaskCreatedError } from "@/services/videoService";
 import { injectCharacterDescriptions } from "@/lib/characterUtils";
 import { composeVisualPrompt, composeMotionPrompt } from "@/lib/promptUtils";
+import { createBatchRunner, hasActiveTask } from "@/lib/batchRunner";
+import { pickShotFields } from "@/lib/shotFields";
 import {
   composeTextToImagePrompt,
   composeImageToImagePrompt,
@@ -43,8 +45,201 @@ const activeAssetTasks = new Map<string, AbortController>();
 
 /** 查询某项目是否仍有存活的资产生成任务（供 UI 判断是否可安全重置生成标记） */
 export function hasActiveAssetTask(projectId: string): boolean {
-  return activeAssetTasks.has(projectId);
+  return hasActiveTask(activeAssetTasks, projectId);
 }
+
+/* ── 图片批量生成执行器（generateImagesForStep 专用） ─────────────────────
+ * 执行序与原实现逐行对齐：幂等守卫 → recoverStuck（imaging 残留复位 scripted）
+ * → 独立 AbortController → 建任务 → 注册 → onBeforeRun（置生成标记 + imaging 状态）
+ * → 受控并发执行 → finally 注销 → onFinally（复位生成标记与项目状态）。
+ */
+const runImageBatch = createBatchRunner({
+  registry: activeImageTasks,
+  recoverStuck: (pid) => {
+    // 刷新/新会话恢复：残留 imaging 状态没有存活任务 → 重置为 scripted 重新生成
+    const latestProject = useProjectStore.getState().projects.find((p) => p.id === pid);
+    const stuckImaging = (latestProject?.shots ?? []).filter((s) => s.status === "imaging");
+    for (const s of stuckImaging) {
+      useProjectStore.getState().updateShotByProjectId(pid, s.id, {
+        status: "scripted",
+        error: undefined,
+      });
+    }
+  },
+  buildTasks: (pid, signal) => {
+    const { providerConfig } = useSettingsStore.getState();
+    const latestProject = useProjectStore.getState().projects.find((p) => p.id === pid);
+    if (!latestProject) return [];
+    // 跳过已在生成中的 shot（status="imaging"），防止导航切换后重复提交
+    const shotsNeedingImages = latestProject.shots.filter(
+      (s) => !s.imageUrl && s.status !== "imaging" && s.visualPrompt.trim(),
+    );
+    const { size: imageSize, ratio: imageRatio } = aspectRatioToImageParams(latestProject.aspectRatio);
+
+    return shotsNeedingImages.map((shot) => async () => {
+      if (signal.aborted) return;
+      useProjectStore.getState().setShotStatusByProjectId(pid, shot.id, "imaging");
+
+      try {
+        const { prompt: enrichedPrompt, referenceImageUrls } = buildImageGenerationInput(shot, latestProject);
+
+        const imageUrl = await generateImage({
+          apiKey: providerConfig.apiKey,
+          baseUrl: providerConfig.baseUrl,
+          prompt: enrichedPrompt,
+          size: imageSize,
+          ratio: imageRatio,
+          ...(referenceImageUrls.length > 0 ? { referenceImageUrls } : {}),
+        });
+
+        useProjectStore.getState().updateShotByProjectId(pid, shot.id, { imageUrl, status: "imaged" });
+      } catch (err) {
+        useProjectStore.getState().setShotStatusByProjectId(pid, shot.id, "failed", err instanceof Error ? err.message : String(err));
+      }
+    });
+  },
+  onBeforeRun: (pid) => {
+    useProjectStore.getState().setImageGenerationStartedByProjectId(pid, true);
+    useProjectStore.getState().setProjectStatusById(pid, "imaging");
+  },
+  onFinally: (pid) => {
+    // 无论成功与否都清除标记，再按结果复位项目状态
+    useProjectStore.getState().setImageGenerationStartedByProjectId(pid, false);
+    const updatedProject = useProjectStore.getState().projects.find((p) => p.id === pid);
+    const allImaged = updatedProject?.shots.every((s) => !!s.imageUrl);
+    if (allImaged) {
+      // 图片全部完成 ≠ 项目完成（视频/成片尚未生成），置 idle 避免侧边栏误显“已完成”
+      useProjectStore.getState().setProjectStatusById(pid, "idle");
+    } else {
+      // 部分失败：复位状态，避免项目永久停留在 imaging（侧边栏一直转圈）
+      const failedCount = (updatedProject?.shots ?? []).filter((s) => s.status === "failed").length;
+      useProjectStore.getState().setProjectStatusById(
+        pid,
+        "failed",
+        `图片生成失败 ${failedCount} 个镜头，请重试失败项。`,
+      );
+    }
+  },
+});
+
+/* ── 视频批量生成执行器（generateVideosForStep 专用） ─────────────────────
+ * videoRetry / VideoTaskCreatedError 特殊逻辑留在任务函数内（不进执行器）。
+ */
+const runVideoBatch = createBatchRunner({
+  registry: activeVideoTasks,
+  recoverStuck: (pid) => {
+    // 刷新/新会话恢复：videoing 状态没有对应的存活任务（注册表为空）→ 重置为 imaged，
+    // 让 buildTasks 重新接管这些 shot，避免“永久加载中”卡死。
+    const latestProject = useProjectStore.getState().projects.find((p) => p.id === pid);
+    const stuckVideoing = (latestProject?.shots ?? []).filter((s) => s.status === "videoing");
+    for (const s of stuckVideoing) {
+      useProjectStore.getState().updateShotByProjectId(pid, s.id, {
+        status: "imaged",
+        videoProgress: 0,
+        error: undefined,
+      });
+    }
+  },
+  buildTasks: (pid, signal) => {
+    const { providerConfig } = useSettingsStore.getState();
+    const latestProject = useProjectStore.getState().projects.find((p) => p.id === pid);
+    if (!latestProject) return [];
+    // 跳过已在生成中的 shot（status="videoing"），防止导航切换后重复提交
+    const shotsNeedingVideos = latestProject.shots.filter(
+      (s) => !s.videoUrl && s.imageUrl && s.status !== "videoing" && (s.motionPrompt.trim() || s.actionDesc?.trim()),
+    );
+    const videoAspect = aspectRatioToVideoAspect(latestProject.aspectRatio);
+
+    return shotsNeedingVideos.map((shot) => async () => {
+      if (signal.aborted) return;
+      useProjectStore.getState().setShotStatusByProjectId(pid, shot.id, "videoing");
+      useProjectStore.getState().updateShotByProjectId(pid, shot.id, { videoProgress: 0 });
+
+      // 任务已创建但轮询超时/异常时，不再创建重复任务；继续等待同一个任务。
+      const MAX_TASK_RETRIES = 2;
+      const RETRY_DELAY_MS = 8_000;
+
+      for (let attempt = 0; attempt <= MAX_TASK_RETRIES; attempt++) {
+        if (signal.aborted) return;
+
+        try {
+          const motionPrompt = composeMotionPrompt(shot);
+          const result = await generateVideo(
+            {
+              apiKey: providerConfig.apiKey,
+              baseUrl: providerConfig.baseUrl,
+              prompt: motionPrompt,
+              imageUrl: shot.imageUrl!,
+              // 双图流：同时传入首帧和尾帧
+              ...(shot.useDualFrame && shot.lastFrameUrl ? { lastFrameUrl: shot.lastFrameUrl } : {}),
+              aspectRatio: videoAspect,
+              duration: shot.duration,
+            },
+            (progress) => {
+              useProjectStore.getState().updateShotByProjectId(pid, shot.id, { videoProgress: progress });
+            },
+            signal,
+          );
+
+          useProjectStore.getState().updateShotByProjectId(pid, shot.id, { videoUrl: result.videoUrl, status: "videoed" });
+          return; // Success — exit retry loop
+        } catch (err) {
+          // 任务已在服务端创建：继续等待同一个任务，不创建重复任务。
+          // generateVideo 的轮询已延长到 30 分钟；若仍超时则保留 videoing 状态，允许用户稍后继续等待/刷新恢复。
+          if (err instanceof VideoTaskCreatedError) {
+            if (!err.stillRunning) {
+              useProjectStore.getState().setShotStatusByProjectId(pid, shot.id, "failed", err.message);
+            } else {
+              useProjectStore.getState().updateShotByProjectId(pid, shot.id, {
+                videoProgress: 0,
+                videoRetryCount: attempt + 1,
+                error: `${err.message} 已保留服务端任务，不重复创建。`,
+              });
+            }
+            return;
+          }
+
+          const isLastAttempt = attempt >= MAX_TASK_RETRIES;
+          if (isLastAttempt) {
+            useProjectStore.getState().setShotStatusByProjectId(pid, shot.id, "failed", err instanceof Error ? err.message : String(err));
+          } else {
+            // Wait before retrying
+            useProjectStore.getState().updateShotByProjectId(pid, shot.id, {
+              videoProgress: 0,
+              videoRetryCount: attempt + 1,
+            });
+            await new Promise<void>((r) => setTimeout(r, RETRY_DELAY_MS * (attempt + 1)));
+          }
+        }
+      }
+    });
+  },
+  onBeforeRun: (pid) => {
+    useProjectStore.getState().setVideoGenerationStartedByProjectId(pid, true);
+    useProjectStore.getState().setProjectStatusById(pid, "videoing");
+  },
+  onFinally: (pid) => {
+    // 只有全部成功或明确失败后才清除标记；仍在服务端运行的任务继续保留“生成中”。
+    const updatedProject = useProjectStore.getState().projects.find((p) => p.id === pid);
+    const allVideoed = updatedProject?.shots.every((s) => !!s.videoUrl);
+    const allSettled = updatedProject?.shots.every((s) => !!s.videoUrl || s.status === "failed");
+    if (allSettled) {
+      useProjectStore.getState().setVideoGenerationStartedByProjectId(pid, false);
+    }
+    // 复位项目状态，避免视频完成后侧边栏永久显示“生成中”：
+    // 全部成功 → idle（成片拼接完成时才置 done）；存在失败 → failed + 摘要
+    if (allVideoed) {
+      useProjectStore.getState().setProjectStatusById(pid, "idle");
+    } else if (allSettled) {
+      const failedCount = (updatedProject?.shots ?? []).filter((s) => s.status === "failed").length;
+      useProjectStore.getState().setProjectStatusById(
+        pid,
+        "failed",
+        `视频生成失败 ${failedCount} 个镜头，请重试失败项。`,
+      );
+    }
+  },
+});
 
 /** 模型提取的资产原始格式（style 仅 name+description，无 appearancePrompt） */
 import { extractNewAssets } from "@/lib/extractAssets";
@@ -204,7 +399,7 @@ export function useWizardActions() {
     if (getStyleReferenceUrl(project) && !force) return;
 
     // 与资产生成共用注册表互斥：风格图不与资产图并行（资产图要参考风格图）
-    if (activeAssetTasks.has(pid)) return;
+    if (hasActiveTask(activeAssetTasks, pid)) return;
 
     const controller = new AbortController();
     activeAssetTasks.set(pid, controller);
@@ -269,7 +464,7 @@ export function useWizardActions() {
         imageUrl: url,
         error: undefined,
       });
-      useProjectStore.getState().addHistory("style_generated", "生成风格参考图", pid);
+      useProjectStore.getState().addHistory("style_generated", { key: "history.styleGenerated" }, pid);
     } catch (err) {
       // 失败写入 styleReferenceError，资产页会就地展示；不阻塞后续资产生成
       useProjectStore.getState().updateProjectById(pid, (p) => ({
@@ -462,7 +657,7 @@ export function useWizardActions() {
       }
 
       useProjectStore.getState().setProjectStatusById(targetProjectId, "idle");
-      useProjectStore.getState().addHistory("script_generated", `生成分镜（${shots.length} 个镜头）`, targetProjectId);
+      useProjectStore.getState().addHistory("script_generated", { key: "history.scriptGenerated", params: { count: shots.length } }, targetProjectId);
     } catch (err) {
       // 失败时复位发起项目的状态，避免永久停留在 scripting（侧边栏一直转圈）
       useProjectStore.getState().updateProjectById(targetProjectId, (p) => ({
@@ -523,22 +718,10 @@ export function useWizardActions() {
           if (matched) return matched;
           return existingCharacters.some((c) => c.id === ref) ? ref : null;
         };
+        // 内容字段批量拷贝（排除 id/状态/生成产物/运行时配置）；
+        // 对白与角色引用需按项目角色 ID 重映射后单独写回
         store.updateShotByProjectId(targetProjectId, shotId, {
-          scriptText: newShot.scriptText,
-          visualPrompt: newShot.visualPrompt,
-          motionPrompt: newShot.motionPrompt,
-          subjectDesc: newShot.subjectDesc,
-          sceneDesc: newShot.sceneDesc,
-          detailDesc: newShot.detailDesc,
-          lightingDesc: newShot.lightingDesc,
-          styleDesc: newShot.styleDesc,
-          negativePrompt: newShot.negativePrompt,
-          actionDesc: newShot.actionDesc,
-          cameraDesc: newShot.cameraDesc,
-          envChangeDesc: newShot.envChangeDesc,
-          motionSpeedDesc: newShot.motionSpeedDesc,
-          negativeMotionPrompt: newShot.negativeMotionPrompt,
-          duration: newShot.duration,
+          ...pickShotFields(newShot),
           dialogues: (newShot.dialogues ?? []).map((d) => ({
             ...d,
             characterId: d.characterId ? resolveCharacterId(d.characterId) : null,
@@ -553,7 +736,7 @@ export function useWizardActions() {
         restoreProjectStatusIfReady(targetProjectId, (p) => p.shots.every((s) => s.status !== "failed"));
         useProjectStore.getState().addHistory(
           "shot_regenerated",
-          `重新生成镜头 ${shot.index + 1}`,
+          { key: "history.shotRerolled", params: { index: shot.index + 1 } },
           targetProjectId,
         );
       }
@@ -581,30 +764,36 @@ export function useWizardActions() {
     const targetProjectId = project.id;
 
     // 幂等守卫：同一项目已有资产生成任务在跑时不重复启动
-    if (activeAssetTasks.has(targetProjectId)) return;
+    if (hasActiveTask(activeAssetTasks, targetProjectId)) return;
 
-    const { size: imageSize, ratio: imageRatio } = aspectRatioToImageParams(project.aspectRatio);
     const generatePortraits = opts?.generatePortraits !== false;
     const generateScenes = opts?.generateScenes !== false;
     const generateProducts = opts?.generateProducts !== false;
     const generateStyle = opts?.generateStyle !== false;
 
-    // ── 阶段 1：风格参考图先行 ──
+    // ── 阶段 1：风格参考图先行（runner 调用前的显式 await，不进执行器） ──
     // 角色/场景/产品定妆照都要参考风格图（否则动画故事会生成写实照片），
     // 必须等它就绪再生成资产图；风格图失败不阻塞（资产图退化为纯文生图，
     // 错误已写入 styleReferenceError 在资产页展示）。
     if (generateStyle && !getStyleReferenceUrl(project)) {
       await generateStyleReference(targetProjectId);
     }
-    const latestProject = useProjectStore.getState().projects.find((p) => p.id === targetProjectId);
-    const styleReferenceUrl = latestProject ? getStyleReferenceUrl(latestProject) : undefined;
-    const stylePrompt = latestProject ? getStylePrompt(latestProject) : undefined;
-    // 风格指令：参考图只用于画风/色调/光照，主体与构图仍以文本描述为准
-    const styleInstruction = styleReferenceUrl
-      ? "Match the art style, color palette and lighting mood of the reference image; do not copy its content or composition. "
-      : "";
 
-    const tasks: Array<() => Promise<void>> = [];
+    // ── 阶段 2：资产图批量生成（走执行器；与风格图共用 activeAssetTasks 互斥） ──
+    const runAssetBatch = createBatchRunner({
+      registry: activeAssetTasks,
+      buildTasks: (_pid, signal) => {
+        // 阶段 1 可能已写入风格数据：以最新项目状态为准
+        const latestProject = useProjectStore.getState().projects.find((p) => p.id === targetProjectId);
+        const styleReferenceUrl = latestProject ? getStyleReferenceUrl(latestProject) : undefined;
+        const stylePrompt = latestProject ? getStylePrompt(latestProject) : undefined;
+        // 风格指令：参考图只用于画风/色调/光照，主体与构图仍以文本描述为准
+        const styleInstruction = styleReferenceUrl
+          ? "Match the art style, color palette and lighting mood of the reference image; do not copy its content or composition. "
+          : "";
+        const { size: imageSize, ratio: imageRatio } = aspectRatioToImageParams(project.aspectRatio);
+
+        const tasks: Array<() => Promise<void>> = [];
 
     // Character portrait tasks（角色定妆照：物种锁定 + 全身设定，禁止半身像模板）
     if (generatePortraits) {
@@ -701,27 +890,23 @@ export function useWizardActions() {
       }
     }
 
-    if (tasks.length === 0) {
-      // 没有可生成的任务：清除可能卡住的生成标记
-      useProjectStore.getState().setAssetGenerationStartedByProjectId(targetProjectId, false);
-      return;
-    }
+        return tasks;
+      },
+      onBeforeRun: (pid) => {
+        useProjectStore.getState().setAssetGenerationStartedByProjectId(pid, true);
+      },
+      onEmpty: (pid) => {
+        // 没有可生成的任务：清除可能卡住的生成标记
+        useProjectStore.getState().setAssetGenerationStartedByProjectId(pid, false);
+      },
+      onFinally: (pid) => {
+        // 无论成功与否都清除标记：部分失败时若保留 true，步骤 2 的“生成全部”按钮
+        // 会永久转圈禁用（此前仅在全成功时清除，失败即卡死）
+        useProjectStore.getState().setAssetGenerationStartedByProjectId(pid, false);
+      },
+    });
 
-    // 独立 AbortController：不误杀其他正在运行的任务
-    const controller = new AbortController();
-    const signal = controller.signal;
-    activeAssetTasks.set(targetProjectId, controller);
-
-    store.setAssetGenerationStartedByProjectId(targetProjectId, true);
-    try {
-      await runWithConcurrency(tasks, 3, signal);
-    } finally {
-      activeAssetTasks.delete(targetProjectId);
-    }
-
-    // 无论成功与否都清除标记：部分失败时若保留 true，步骤 2 的“生成全部”按钮
-    // 会永久转圈禁用（此前仅在全成功时清除，失败即卡死）
-    useProjectStore.getState().setAssetGenerationStartedByProjectId(targetProjectId, false);
+    await runAssetBatch({ projectId: targetProjectId, concurrency: 3 });
   }, [generateStyleReference]);
 
   /** Step 4: Generate images for all shots (with img2img from scene/style references) */
@@ -732,87 +917,10 @@ export function useWizardActions() {
     const store = useProjectStore.getState();
     const project = selectActiveProject(store);
     if (!project) return;
-    const targetProjectId = project.id;
 
-    // 幂等守卫：同一项目已有图片任务在跑时不重复启动
-    if (activeImageTasks.has(targetProjectId)) return;
-
-    // 刷新/新会话恢复：残留 imaging 状态没有存活任务 → 重置为 scripted 重新生成
-    const latestProject = useProjectStore.getState().projects.find((p) => p.id === targetProjectId);
-    const stuckImaging = (latestProject?.shots ?? []).filter((s) => s.status === "imaging");
-    if (stuckImaging.length > 0) {
-      for (const s of stuckImaging) {
-        useProjectStore.getState().updateShotByProjectId(targetProjectId, s.id, {
-          status: "scripted",
-          error: undefined,
-        });
-      }
-    }
-
-    // 跳过已在生成中的 shot（status="imaging"），防止导航切换后重复提交
-    const shotsNeedingImages = (latestProject?.shots ?? []).filter(
-      (s) => !s.imageUrl && s.status !== "imaging" && s.visualPrompt.trim(),
-    );
-    if (shotsNeedingImages.length === 0) return;
-
-    // 独立 AbortController：不误杀其他正在运行的任务
-    const controller = new AbortController();
-    const signal = controller.signal;
-    activeImageTasks.set(targetProjectId, controller);
-
-    store.setImageGenerationStartedByProjectId(targetProjectId, true);
-    store.setProjectStatusById(targetProjectId, "imaging");
-    const { size: imageSize, ratio: imageRatio } = aspectRatioToImageParams(
-      latestProject?.aspectRatio ?? project.aspectRatio,
-    );
-
-    // Generate images with concurrency 3
-    const tasks = shotsNeedingImages.map((shot) => async () => {
-      if (signal?.aborted) return;
-      useProjectStore.getState().setShotStatusByProjectId(targetProjectId, shot.id, "imaging");
-
-      try {
-        const { prompt: enrichedPrompt, referenceImageUrls } = buildImageGenerationInput(shot, project);
-
-        const imageUrl = await generateImage({
-          apiKey: providerConfig.apiKey,
-          baseUrl: providerConfig.baseUrl,
-          prompt: enrichedPrompt,
-          size: imageSize,
-          ratio: imageRatio,
-          ...(referenceImageUrls.length > 0 ? { referenceImageUrls } : {}),
-        });
-
-        useProjectStore.getState().updateShotByProjectId(targetProjectId, shot.id, { imageUrl, status: "imaged" });
-      } catch (err) {
-        useProjectStore.getState().setShotStatusByProjectId(targetProjectId, shot.id, "failed", err instanceof Error ? err.message : String(err));
-      }
-    });
-
-    // Simple concurrency control
-    try {
-      await runWithConcurrency(tasks, 3, signal);
-    } finally {
-      activeImageTasks.delete(targetProjectId);
-    }
-
-    // Check if all images are ready
-    const updatedProject = useProjectStore.getState().projects.find((p) => p.id === targetProjectId);
-    const allImaged = updatedProject?.shots.every((s) => !!s.imageUrl);
-    if (allImaged) {
-      useProjectStore.getState().setImageGenerationStartedByProjectId(targetProjectId, false);
-      // 图片全部完成 ≠ 项目完成（视频/成片尚未生成），置 idle 避免侧边栏误显“已完成”
-      useProjectStore.getState().setProjectStatusById(targetProjectId, "idle");
-    } else {
-      // 部分失败：清除标记并复位状态，避免项目永久停留在 imaging（侧边栏一直转圈）
-      useProjectStore.getState().setImageGenerationStartedByProjectId(targetProjectId, false);
-      const failedCount = (updatedProject?.shots ?? []).filter((s) => s.status === "failed").length;
-      useProjectStore.getState().setProjectStatusById(
-        targetProjectId,
-        "failed",
-        `图片生成失败 ${failedCount} 个镜头，请重试失败项。`,
-      );
-    }
+    // 幂等守卫 / imaging 残留复位 / 建任务 / 注册 / 生成标记 / 并发 / 收尾
+    // 全部收敛在模块级 runImageBatch（执行序与原实现逐行对齐）
+    await runImageBatch({ projectId: project.id, concurrency: 3 });
   }, []);
 
   /** Re-roll a single shot's image */
@@ -846,7 +954,7 @@ export function useWizardActions() {
       store.updateShotByProjectId(targetProjectId, shotId, { imageUrl, status: "imaged" });
       // 此前可能因部分失败置为 failed；全部镜头图片就绪后复位项目状态
       restoreProjectStatusIfReady(targetProjectId, (p) => p.shots.every((s) => !!s.imageUrl));
-      useProjectStore.getState().addHistory("shot_regenerated", `重新生成镜头图片 ${shot.index + 1}`, targetProjectId);
+      useProjectStore.getState().addHistory("shot_regenerated", { key: "history.shotImageRerolled", params: { index: shot.index + 1 } }, targetProjectId);
     } catch (err) {
       store.setShotStatusByProjectId(targetProjectId, shotId, "failed", err instanceof Error ? err.message : String(err));
     }
@@ -860,11 +968,6 @@ export function useWizardActions() {
     const store = useProjectStore.getState();
     const project = selectActiveProject(store);
     if (!project) return;
-    const targetProjectId = project.id;
-
-    // 幂等守卫：同一项目已有视频任务在跑时不重复启动，
-    // 避免 effect 重入 / 导航切换导致重复创建服务端视频任务。
-    if (activeVideoTasks.has(targetProjectId)) return;
 
     const plan = resolvePlan(providerConfig.plan as PlanId | undefined);
     // 视频并发与套餐同步：免费档 RPM=1 串行；企业 2；Token Plan 保守取 3（RPM=5，
@@ -872,124 +975,10 @@ export function useWizardActions() {
     const videoConcurrency =
       plan.accessType === "tokenplan" ? 3 : plan.rpm.video <= 1 ? 1 : 2;
 
-    // 刷新/新会话恢复：videoing 状态没有对应的存活任务（注册表为空）→ 重置为 imaged，
-    // 让下面重新接管这些 shot，避免“永久加载中”卡死。
-    const latestProject = useProjectStore.getState().projects.find((p) => p.id === targetProjectId);
-    const stuckVideoing = (latestProject?.shots ?? []).filter((s) => s.status === "videoing");
-    if (stuckVideoing.length > 0) {
-      for (const s of stuckVideoing) {
-        useProjectStore.getState().updateShotByProjectId(targetProjectId, s.id, {
-          status: "imaged",
-          videoProgress: 0,
-          error: undefined,
-        });
-      }
-    }
-
-    // 跳过已在生成中的 shot（status="videoing"），防止导航切换后重复提交
-    const shotsNeedingVideos = (latestProject?.shots ?? []).filter(
-      (s) => !s.videoUrl && s.imageUrl && s.status !== "videoing" && (s.motionPrompt.trim() || s.actionDesc?.trim()),
-    );
-    if (shotsNeedingVideos.length === 0) return;
-
-    // 独立 AbortController：只取消本轮任务，不误杀其他仍在运行的任务。
-    const controller = new AbortController();
-    const signal = controller.signal;
-    activeVideoTasks.set(targetProjectId, controller);
-
-    store.setVideoGenerationStartedByProjectId(targetProjectId, true);
-    store.setProjectStatusById(targetProjectId, "videoing");
-    const videoAspect = aspectRatioToVideoAspect(latestProject?.aspectRatio ?? project.aspectRatio);
-
-    const tasks = shotsNeedingVideos.map((shot) => async () => {
-      if (signal?.aborted) return;
-      useProjectStore.getState().setShotStatusByProjectId(targetProjectId, shot.id, "videoing");
-      useProjectStore.getState().updateShotByProjectId(targetProjectId, shot.id, { videoProgress: 0 });
-
-      // 任务已创建但轮询超时/异常时，不再创建重复任务；继续等待同一个任务。
-      const MAX_TASK_RETRIES = 2;
-      const RETRY_DELAY_MS = 8_000;
-
-      for (let attempt = 0; attempt <= MAX_TASK_RETRIES; attempt++) {
-        if (signal?.aborted) return;
-
-        try {
-          const motionPrompt = composeMotionPrompt(shot);
-          const result = await generateVideo(
-            {
-              apiKey: providerConfig.apiKey,
-              baseUrl: providerConfig.baseUrl,
-              prompt: motionPrompt,
-              imageUrl: shot.imageUrl!,
-              // 双图流：同时传入首帧和尾帧
-              ...(shot.useDualFrame && shot.lastFrameUrl ? { lastFrameUrl: shot.lastFrameUrl } : {}),
-              aspectRatio: videoAspect,
-              duration: shot.duration,
-            },
-            (progress) => {
-              useProjectStore.getState().updateShotByProjectId(targetProjectId, shot.id, { videoProgress: progress });
-            },
-            signal,
-          );
-
-          useProjectStore.getState().updateShotByProjectId(targetProjectId, shot.id, { videoUrl: result.videoUrl, status: "videoed" });
-          return; // Success — exit retry loop
-        } catch (err) {
-          // 任务已在服务端创建：继续等待同一个任务，不创建重复任务。
-          // generateVideo 的轮询已延长到 30 分钟；若仍超时则保留 videoing 状态，允许用户稍后继续等待/刷新恢复。
-          if (err instanceof VideoTaskCreatedError) {
-            if (!err.stillRunning) {
-              useProjectStore.getState().setShotStatusByProjectId(targetProjectId, shot.id, "failed", err.message);
-            } else {
-              useProjectStore.getState().updateShotByProjectId(targetProjectId, shot.id, {
-                videoProgress: 0,
-                videoRetryCount: attempt + 1,
-                error: `${err.message} 已保留服务端任务，不重复创建。`,
-              });
-            }
-            return;
-          }
-
-          const isLastAttempt = attempt >= MAX_TASK_RETRIES;
-          if (isLastAttempt) {
-            useProjectStore.getState().setShotStatusByProjectId(targetProjectId, shot.id, "failed", err instanceof Error ? err.message : String(err));
-          } else {
-            // Wait before retrying
-            useProjectStore.getState().updateShotByProjectId(targetProjectId, shot.id, {
-              videoProgress: 0,
-              videoRetryCount: attempt + 1,
-            });
-            await new Promise<void>((r) => setTimeout(r, RETRY_DELAY_MS * (attempt + 1)));
-          }
-        }
-      }
-    });
-
-    try {
-      await runWithConcurrency(tasks, videoConcurrency, signal);
-    } finally {
-      activeVideoTasks.delete(targetProjectId);
-    }
-
-    // 只有全部成功或明确失败后才清除标记；仍在服务端运行的任务继续保留“生成中”。
-    const updatedProject = useProjectStore.getState().projects.find((p) => p.id === targetProjectId);
-    const allVideoed = updatedProject?.shots.every((s) => !!s.videoUrl);
-    const allSettled = updatedProject?.shots.every((s) => !!s.videoUrl || s.status === "failed");
-    if (allSettled) {
-      useProjectStore.getState().setVideoGenerationStartedByProjectId(targetProjectId, false);
-    }
-    // 复位项目状态，避免视频完成后侧边栏永久显示“生成中”：
-    // 全部成功 → idle（成片拼接完成时才置 done）；存在失败 → failed + 摘要
-    if (allVideoed) {
-      useProjectStore.getState().setProjectStatusById(targetProjectId, "idle");
-    } else if (allSettled) {
-      const failedCount = (updatedProject?.shots ?? []).filter((s) => s.status === "failed").length;
-      useProjectStore.getState().setProjectStatusById(
-        targetProjectId,
-        "failed",
-        `视频生成失败 ${failedCount} 个镜头，请重试失败项。`,
-      );
-    }
+    // 幂等守卫 / videoing 残留复位 / 建任务 / 注册 / 生成标记 / 并发 / 收尾
+    // 全部收敛在模块级 runVideoBatch（videoRetry / VideoTaskCreatedError 特殊逻辑
+    // 留在任务函数内，执行序与原实现逐行对齐）
+    await runVideoBatch({ projectId: project.id, concurrency: videoConcurrency });
   }, []);
 
   /** Re-roll a single shot's video */
@@ -1034,7 +1023,7 @@ export function useWizardActions() {
       useProjectStore.getState().updateShotByProjectId(targetProjectId, shotId, { videoUrl: result.videoUrl, status: "videoed" });
       // 此前可能因部分失败置为 failed；全部镜头视频就绪后复位项目状态
       restoreProjectStatusIfReady(targetProjectId, (p) => p.shots.every((s) => !!s.videoUrl));
-      useProjectStore.getState().addHistory("shot_regenerated", `重新生成镜头视频 ${shot.index + 1}`, targetProjectId);
+      useProjectStore.getState().addHistory("shot_regenerated", { key: "history.shotVideoRerolled", params: { index: shot.index + 1 } }, targetProjectId);
     } catch (err) {
       if (err instanceof VideoTaskCreatedError) {
         if (!err.stillRunning) {
@@ -1081,26 +1070,4 @@ function restoreProjectStatusIfReady(projectId: string, ready: (p: Project) => b
   if (project && project.status === "failed" && ready(project)) {
     useProjectStore.getState().setProjectStatusById(projectId, "idle");
   }
-}
-
-async function runWithConcurrency(
-  tasks: Array<() => Promise<void>>,
-  concurrency: number,
-  signal?: AbortSignal,
-): Promise<void> {
-  let index = 0;
-
-  async function worker() {
-    while (index < tasks.length) {
-      if (signal?.aborted) return;
-      const current = index++;
-      await tasks[current]();
-    }
-  }
-
-  const workers = Array.from(
-    { length: Math.min(concurrency, tasks.length) },
-    () => worker(),
-  );
-  await Promise.allSettled(workers);
 }

@@ -4,7 +4,7 @@
 // ────────────────────────────────────────────────────────────────────────────
 
 import { useProjectStore, type HistoryAction } from "@/stores/projectStore";
-import { useT } from "@/i18n";
+import { useT, translateL10n } from "@/i18n";
 import {
   FolderPlus, FolderMinus, ArrowRightLeft,
   FileText, Play, CheckCircle2, XCircle,
@@ -110,7 +110,8 @@ export function HistoryPanel() {
                     <Icon size={10} className={`mt-0.5 flex-shrink-0 ${color}`} />
                     <div className="flex-1 min-w-0">
                       <p className="truncate text-[0.625rem] text-ink-2">
-                        {entry.description}
+                        {/* 旧数据为纯字符串（原样返回），新数据为 L10nText（按当前语言翻译） */}
+                        {translateL10n(entry.description, t)}
                       </p>
                       <div className="flex items-center gap-1.5">
                         <span className="text-[0.5625rem] text-ink-5">

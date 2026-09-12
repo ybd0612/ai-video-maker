@@ -6,6 +6,8 @@
 
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+// 仅类型导入（verbatimModuleSyntax 下运行时零依赖，无循环加载风险）
+import type { L10nText } from "@/i18n";
 
 /* ── Status enums ───────────────────────────────────────────────────────── */
 
@@ -178,7 +180,12 @@ export interface HistoryEntry {
   id: string;
   projectId: string;
   action: HistoryAction;
-  description: string;
+  /**
+   * 描述文案：旧持久化数据为纯字符串（渲染时原样返回）；
+   * 新数据为 L10nText（key+params），渲染时经 translateL10n 按当前语言翻译。
+   * 不做 persist 迁移，纯字符串天然兼容 union。
+   */
+  description: string | L10nText;
   timestamp: number;
 }
 
@@ -252,7 +259,7 @@ interface ProjectState {
   setVideoGenerationStartedByProjectId: (projectId: string, v: boolean) => void;
 
   /* History actions */
-  addHistory: (action: HistoryAction, description: string, projectId?: string) => void;
+  addHistory: (action: HistoryAction, description: string | L10nText, projectId?: string) => void;
   clearHistory: () => void;
 }
 
@@ -480,7 +487,7 @@ export const useProjectStore = create<ProjectState>()(
           projects: [...s.projects, project],
           activeProjectId: project.id,
         }));
-        get().addHistory("project_created", `创建项目「${title}」`);
+        get().addHistory("project_created", { key: "history.projectCreated", params: { title } });
         return project;
       },
 
@@ -488,7 +495,7 @@ export const useProjectStore = create<ProjectState>()(
         const project = get().projects.find((p) => p.id === id);
         if (!project) return;
         set({ activeProjectId: id });
-        get().addHistory("project_switched", `切换到项目「${project.title}」`);
+        get().addHistory("project_switched", { key: "history.projectSwitched", params: { title: project.title } });
       },
 
       updateProject: (updates) =>
@@ -520,7 +527,7 @@ export const useProjectStore = create<ProjectState>()(
               : s.activeProjectId;
           return { projects: remaining, activeProjectId: newActiveId };
         });
-        get().addHistory("project_deleted", `删除项目「${project.title}」`);
+        get().addHistory("project_deleted", { key: "history.projectDeleted", params: { title: project.title } });
       },
 
       duplicateProject: (id) => {
@@ -554,7 +561,7 @@ export const useProjectStore = create<ProjectState>()(
           projects: [...s.projects, dup],
           activeProjectId: dup.id,
         }));
-        get().addHistory("project_created", `复制项目「${source.title}」`);
+        get().addHistory("project_created", { key: "history.projectDuplicated", params: { title: source.title } });
         return dup;
       },
 
@@ -585,7 +592,7 @@ export const useProjectStore = create<ProjectState>()(
               ? s.projects.find((p) => p.id !== activeProjectId)?.id ?? null
               : null,
         }));
-        get().addHistory("project_deleted", "清空当前项目");
+        get().addHistory("project_deleted", { key: "history.projectCleared" });
       },
 
       /* ── Shot actions ───────────────────────────────────────────────── */

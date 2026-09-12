@@ -5,6 +5,7 @@
 // ────────────────────────────────────────────────────────────────────────────
 
 import { createAIService } from "@/services/ai/factory";
+import { getTranslation } from "@/i18n";
 
 /* ── Types ──────────────────────────────────────────────────────────────── */
 
@@ -89,7 +90,8 @@ const POLISH_INSTRUCTION_EN =
  */
 export async function polishText(opts: PolishOptions): Promise<string> {
   const content = opts.value.trim();
-  if (!content) throw new Error("内容为空，无法润色。");
+  // 非 React 上下文的瞬时错误：经 getTranslation 定格当前语言（可接受）
+  if (!content) throw new Error(getTranslation("error.polishEmpty"));
 
   const instruction =
     opts.language === "en" ? POLISH_INSTRUCTION_EN : POLISH_INSTRUCTION_ZH;
@@ -104,6 +106,6 @@ export async function polishText(opts: PolishOptions): Promise<string> {
   });
 
   const polished = result.content.trim();
-  if (!polished) throw new Error("AI 返回了空内容，请重试。");
+  if (!polished) throw new Error(getTranslation("error.polishEmptyResult"));
   return polished;
 }

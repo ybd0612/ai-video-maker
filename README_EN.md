@@ -165,7 +165,6 @@ src/
 │   ├── videoService.ts            # Video generation (async create + polling + result parsing)
 │   ├── chatService.ts             # Multi-turn chat API (AI prompt optimization)
 │   ├── renderService.ts           # FFmpeg.wasm video concatenation
-│   ├── pipelineService.ts         # Legacy one-click pipeline (kept for compatibility)
 │   └── ai/                        # Unified AI entry (OpenAI-compatible)
 │       ├── factory.ts             # Service factory
 │       ├── openai.ts              # chatCompletion / generateImage implementations

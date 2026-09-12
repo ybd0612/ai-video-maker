@@ -42,7 +42,6 @@ src/
 │   ├── videoService.ts            # 视频生成（异步创建 + 轮询 + 完成响应解析，使用 motionPrompt）
 │   ├── chatService.ts             # AI 辅助：字段专家提示词 + 一键润色（polishText）
 │   ├── renderService.ts           # FFmpeg.wasm 视频拼接
-│   ├── pipelineService.ts         # 旧版一键流水线（兼容保留，非主流程）
 │   └── ai/                        # AI 服务统一入口（OpenAI 兼容）
 │       ├── factory.ts             # 服务工厂
 │       ├── openai.ts              # chatCompletion / generateImage 实现
@@ -71,8 +70,7 @@ src/
 │       ├── Lightbox.tsx           # 图片灯箱
 │       ├── NumberInput.tsx        # 数字输入框
 │       ├── IMEAwareTextarea.tsx   # 输入法兼容文本框
-│       ├── AiPolishField.tsx      # 输入框 + 内嵌「润色 / 撤销」按钮（所有 AI 输入入口）
-│       └── AiAssistDrawer.tsx     # 【已弃用】旧的多轮对话抽屉（无引用，保留参考）
+│       └── AiPolishField.tsx      # 输入框 + 内嵌「润色 / 撤销」按钮（所有 AI 输入入口）
 ├── styles/
 │   └── globals.css                # 全局样式
 ├── App.tsx                        # 根组件
@@ -122,9 +120,9 @@ src/
 
 ## Pipeline 架构
 
-> 主流程已改为 6 步向导（`features/wizard/`），`pipelineService.ts` 为旧版一键流水线（兼容保留）。本节描述底层编排逻辑。
+> 主流程已改为 6 步向导（`features/wizard/`）。旧版一键流水线 `pipelineService.ts` 已于 2026-09 结构收敛重构中删除（零引用死代码）；本节保留描述底层编排逻辑的通用规则（提示词/参数/轮询约定现由 `services/` 各服务与 `features/wizard/` 承接）。
 
-四阶段流水线，编排在 `src/services/pipelineService.ts`：
+四阶段流水线（脚本 → 图片 → 视频 → 拼接，原编排在 `src/services/pipelineService.ts`，现已移除）：
 
 1. **脚本阶段** — 调用文本模型生成 4-6 个结构化分镜（scriptText + visualPrompt + motionPrompt + duration）
 2. **图片阶段** — 为每个分镜生成参考图（使用 visualPrompt，并发度 3）
@@ -173,7 +171,7 @@ src/
 - 字段与专家系统提示词统一由**规则条目注册表** `lib/promptRules.ts` 管理（2026-09-12 B 方案）：`chatService.ts` 的 8 个 `SYSTEM_PROMPT_*` 常量已整体搬迁为注册表内置条目（polish 任务），`AiPolishField` 经 `resolvePolishSystemPrompt` 取生效版；用户可在设置对话框「提示词规则」Tab 查看/编辑/开关/新增/导入导出（存 `settingsStore.promptRules`，persist v2，同 id 覆盖内置，改规则即时生效零构建）；`scriptService` 的分镜/抽资产系统提示词同样走骨架（SKELETONS）+ 生效条目（`buildSystemPrompt`）拼装，动态 assets 上下文段在函数内拼装不入条目。**修改提示词规则优先改条目，不改代码**
 - 边界行为：内容为空 / 无 API Key / 请求进行中时按钮自动禁用；失败就地显示原因（不弹窗）；润色结果与原文相同则不入撤销栈
 - 按钮样式（用户两次微调后的定稿）：**只用图标不显示文字**（`h-5 w-5` 方形 + 图标 `size={12}`，含义靠 `title` 提示）；**不得紧贴输入框边框**——多行贴右下角留距（`bottom-2.5 right-2.5`，输入框配 `pb-9`），单行垂直居中（`top-1/2 -translate-y-1/2 right-2`，输入框配 `pr-16`）
-- 旧的多轮对话抽屉 `AiAssistDrawer.tsx` **已弃用**（无任何引用，保留仅作历史参考）
+- 旧的多轮对话抽屉 `AiAssistDrawer.tsx` 已于 2026-09 结构收敛重构中删除（零引用死代码）；**禁止再引入旁挂式 AI 入口**
 
 ## UI 交互约定
 
@@ -207,7 +205,7 @@ src/
   - 图片 — `openai.ts` 的 `generateImage`（按 `imageSizeToTier(size)` 区分 1K/2K/3K/4K 档位）
   - 视频 — `src/services/videoService.ts` 的 `generateVideo`（cost = 请求时长秒数）
 - **RPM 节流**：按模型种类（图片再按尺寸档位）做 60s 滑动窗口；达到上限即等待到最早一条滑出窗口。以官方「实际 RPM」作安全上限（更保守）。默认档视频 RPM=1，向导已按套餐同步并发（免费档 1、企业 2、Token Plan 3），不会同时显示多个“生成中”。
-- **订阅配额（仅 Token Plan）**：文本（每 5h / 每周）、图片（每日张数）、视频（每日秒数）计数并持久化到 localStorage（key `wxhb-usage`），刷新不丢失。用尽抛出 `RateLimitError`（reason=`quota`），由 `pipelineService.isRetriableError` 识别为终态错误（消息不含瞬时关键字），不会进入视频自动重试。
+- **订阅配额（仅 Token Plan）**：文本（每 5h / 每周）、图片（每日张数）、视频（每日秒数）计数并持久化到 localStorage（key `wxhb-usage`），刷新不丢失。用尽抛出 `RateLimitError`（reason=`quota`，定义于 `services/rateLimit.ts`），按终态错误处理（不进入视频自动重试）。
 - **取消**：`acquire` 支持 `AbortSignal`，取消时抛 `RateLimitError`（reason=`aborted`）。
 - **套餐升级即生效**：用户切换套餐后，限流器实时读取 `providerConfig.plan`，无需刷新页面。
 

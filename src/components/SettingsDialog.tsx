@@ -369,7 +369,7 @@ export function SettingsDialog() {
       return;
     }
     setProviderConfig({ apiKey, baseUrl, plan });
-    useProjectStore.getState().addHistory("settings_changed", "更新设置（API Key / 套餐）");
+    useProjectStore.getState().addHistory("settings_changed", { key: "history.settingsChanged" });
     showToast("success", t("settings.saved"));
     setOpen(false);
   };

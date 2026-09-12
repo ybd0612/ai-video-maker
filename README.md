@@ -165,7 +165,6 @@ src/
 │   ├── videoService.ts            # 视频生成（异步创建 + 轮询 + 完成响应解析）
 │   ├── chatService.ts             # 多轮对话 API（AI 辅助提示词优化）
 │   ├── renderService.ts           # FFmpeg.wasm 视频拼接
-│   ├── pipelineService.ts         # 旧版一键流水线（兼容保留）
 │   └── ai/                        # AI 服务统一入口（openai 兼容）
 │       ├── factory.ts             # 服务工厂
 │       ├── openai.ts              # chatCompletion / generateImage 实现
