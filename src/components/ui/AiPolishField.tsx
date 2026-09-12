@@ -44,8 +44,9 @@ const BOXED_APPEARANCE =
 const BARE_APPEARANCE =
   "bg-transparent text-xs text-slate-300 placeholder:text-slate-600";
 
+/** 内嵌操作按钮：纯图标 + 固定方形尺寸（不显示文字，含义靠 title 提示） */
 const ACTION_BUTTON =
-  "pointer-events-auto flex items-center gap-0.5 rounded border border-slate-600/70 bg-slate-900/85 px-1.5 py-0.5 text-[0.625rem] text-slate-400 backdrop-blur-sm transition disabled:cursor-not-allowed disabled:opacity-40";
+  "pointer-events-auto flex h-5 w-5 items-center justify-center rounded border border-slate-600/70 bg-slate-900/85 text-slate-400 backdrop-blur-sm transition disabled:cursor-not-allowed disabled:opacity-40";
 
 export function AiPolishField({
   value,
@@ -127,9 +128,10 @@ export function AiPolishField({
   }, [history, onChange]);
 
   // 布局类统一由组件控制，避免与调用方传入外观类发生 padding 冲突
+  // 多行：底部留出 pb-9 给图标按钮 + 与下边框的间距；单行：右侧留出 pr-16
   const layoutClass = singleLine
-    ? "w-full py-1.5 pl-2 pr-24"
-    : "w-full resize-none px-2 pt-2 pb-8";
+    ? "w-full py-1.5 pl-2 pr-16"
+    : "w-full resize-none px-2 pt-2 pb-9";
   const inputClass = `${appearanceClass ?? (bare ? BARE_APPEARANCE : BOXED_APPEARANCE)} ${layoutClass} ${
     disabled ? "opacity-50" : ""
   } focus:outline-none ${focusClass}`;
@@ -152,9 +154,13 @@ export function AiPolishField({
         <textarea rows={rows} {...commonProps} />
       )}
 
-      {/* 内嵌操作区（右下角） */}
+      {/* 内嵌操作区：纯图标。多行贴右下角（与下边框留出间距），单行垂直居中 */}
       {(systemPrompt || history.length > 0) && (
-        <div className="pointer-events-none absolute bottom-1 right-1 flex items-center gap-0.5">
+        <div
+          className={`pointer-events-none absolute flex items-center gap-1 ${
+            singleLine ? "right-2 top-1/2 -translate-y-1/2" : "bottom-2.5 right-2.5"
+          }`}
+        >
           {history.length > 0 && (
             <button
               type="button"
@@ -163,8 +169,7 @@ export function AiPolishField({
               className={`${ACTION_BUTTON} hover:border-amber-600/70 hover:text-amber-300`}
               title={t("polish.undo")}
             >
-              <Undo2 size={10} />
-              {t("polish.undo")}
+              <Undo2 size={12} />
             </button>
           )}
           {systemPrompt && (
@@ -175,18 +180,18 @@ export function AiPolishField({
               className={`${ACTION_BUTTON} ${
                 canPolish ? "hover:border-emerald-600/70 hover:text-emerald-300" : ""
               }`}
-              title={apiKey ? t("polish.action") : t("polish.needApiKey")}
+              title={
+                apiKey
+                  ? polishing
+                    ? t("polish.running")
+                    : t("polish.action")
+                  : t("polish.needApiKey")
+              }
             >
               {polishing ? (
-                <>
-                  <Loader2 size={10} className="animate-spin" />
-                  {t("polish.running")}
-                </>
+                <Loader2 size={12} className="animate-spin" />
               ) : (
-                <>
-                  <Sparkles size={10} />
-                  {t("polish.action")}
-                </>
+                <Sparkles size={12} />
               )}
             </button>
           )}
