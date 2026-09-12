@@ -44,8 +44,21 @@ dist/
 # Playwright 测试产物
 playwright-report/
 test-results/
+blob-report/
+.playwright/
+
+# 构建 / 编译器缓存
+*.tsbuildinfo
+.vite/
+coverage/
 
 # 工具数据（AGENTS.md 约定：不入库）
 .workbuddy/
 .neuralmemory/
 .superpowers/
+.qoder/
+.claude/
+
+# Windows 系统文件
+Thumbs.db
+Desktop.ini

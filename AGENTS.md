@@ -204,7 +204,6 @@ src/
 ## 注意事项
 
 - 本项目无测试套件，无需运行测试；验证用 `npx tsc --noEmit` + `git diff --check` + `npm run build`（dist 被占用时先 `rm -rf dist`）
-- `server.cjs` / `server2.cjs` 是独立的 Node.js 静态文件服务器脚本，用于在非开发环境提供 dist 目录
 - `.env.example` 中的 `VITE_*` 环境变量仅作参考，实际配置通过应用内设置对话框完成
-- `providers/` 目录保留了 ModelProvider 抽象接口，但当前服务层直接调用 API（未经过 adapter）
+- 模型调用无抽象层：`src/services/` 直接调用 Agnes API，不存在 adapter 中间层（旧 `src/providers/` 已在前一轮重构中移除，勿再引用）
 - 视频/图片等外部 API 响应字段以**用户实测为准**，不要仅凭官方文档推断（实测：Agnes 视频成片地址在响应顶层 `url` 字段，非文档示例的 `metadata.url`）
