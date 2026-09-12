@@ -152,6 +152,7 @@ src/
 - 模型标识符集中定义在 `src/lib/models.ts` 的 `MODELS` 常量中
 - 服务层（scriptService / imageService / videoService）通过 `MODELS` 引用模型名
 - 替换模型只需修改 `MODELS` 常量
+- 当前文本模型：`agnes-3.0-flash`（512K 上下文 / 最大输出 65,536 Token，支持文本与图像 URL 输入，`chat_template_kwargs.enable_thinking` 控制 Thinking 模式）
 - API Key 和 Base URL 由用户在设置对话框中配置，存储在浏览器本地
 
 ## 用量限制与套餐（Rate Limit / Plan）

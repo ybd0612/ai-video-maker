@@ -25,7 +25,7 @@ A wizard-based short video production tool: enter a topic, and the AI automatica
 |---------|-------------|
 | 🧭 **6-Step Wizard** | Idea → Assets (characters/scenes/products) → Storyboard → Images → Videos → Assembly, each step controllable and independently retryable |
 | 🎬 **Auto Pipeline** | Auto mode: from topic to final video in one run (script → image → video → concat) |
-| 🤖 **Smart Storyboard** | `agnes-2.5-flash` — generates 4-6 shots with dual prompts (text-to-image + image-to-video) |
+| 🤖 **Smart Storyboard** | `agnes-3.0-flash` — generates 4-6 shots with dual prompts (text-to-image + image-to-video) |
 | 🎨 **Image Generation** | `agnes-image-2.1-flash` — reference images from visual prompts (concurrency: 3) |
 | 🎥 **Video Generation** | `agnes-video-v2.0` — async task + polling, rate-limited by plan, auto-retry & recovery |
 | 🎞️ **Dual-Frame Control** | Optional first-frame + last-frame (image-to-video) for better motion consistency |
@@ -195,7 +195,7 @@ Model identifiers are centralized in `src/lib/models.ts`:
 
 ```typescript
 export const MODELS = {
-  text: "agnes-2.5-flash",
+  text: "agnes-3.0-flash",
   image: "agnes-image-2.1-flash",
   video: "agnes-video-v2.0",
 } as const;
