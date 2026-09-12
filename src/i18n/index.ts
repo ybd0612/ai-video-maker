@@ -307,6 +307,10 @@ const zh = {
   "aiAssist.optimizeMotionPrompt": "AI 优化动态描述",
   "aiAssist.optimizeMainPrompt": "AI 优化主题",
   "aiAssist.emptyField": "当前字段为空",
+  "polish.action": "润色",
+  "polish.undo": "撤销",
+  "polish.running": "润色中",
+  "polish.needApiKey": "请先在设置中填写 API Key",
 
   // Characters
   "characters.title": "角色",
@@ -760,6 +764,10 @@ const en = {
   "aiAssist.optimizeMotionPrompt": "AI Optimize Motion Prompt",
   "aiAssist.optimizeMainPrompt": "AI Optimize Topic",
   "aiAssist.emptyField": "Current field is empty",
+  "polish.action": "Polish",
+  "polish.undo": "Undo",
+  "polish.running": "Polishing",
+  "polish.needApiKey": "Set your API key in Settings first",
 
   // Characters
   "characters.title": "Characters",

@@ -6,6 +6,8 @@
 import { useProjectStore, selectActiveProject } from "@/stores/projectStore";
 import { useT } from "@/i18n";
 import { Plus, Trash2, MessageSquare } from "lucide-react";
+import { AiPolishField } from "@/components/ui/AiPolishField";
+import { SYSTEM_PROMPT_DIALOGUE } from "@/services/chatService";
 
 interface DialogueEditorProps {
   shotId: string;
@@ -85,16 +87,19 @@ export function DialogueEditor({ shotId }: DialogueEditorProps) {
               </button>
             </div>
 
-            {/* Dialogue text */}
-            <input
-              type="text"
-              value={line.text}
-              onChange={(e) =>
-                updateDialogueLine(shotId, line.id, { text: e.target.value })
-              }
-              placeholder={t("dialogue.textPlaceholder")}
-              className="mb-1 w-full rounded border border-slate-700/50 bg-slate-900/50 px-2 py-1 text-[11px] text-slate-200 placeholder:text-slate-600 focus:border-sky-500 focus:outline-none"
-            />
+            {/* Dialogue text（框内润色 / 撤销） */}
+            <div className="mb-1">
+              <AiPolishField
+                value={line.text}
+                onChange={(v) => updateDialogueLine(shotId, line.id, { text: v })}
+                systemPrompt={SYSTEM_PROMPT_DIALOGUE}
+                resetKey={`${shotId}:${line.id}`}
+                placeholder={t("dialogue.textPlaceholder")}
+                singleLine
+                appearanceClass="rounded border border-slate-700/50 bg-slate-900/50 text-[11px] text-slate-200 placeholder:text-slate-600"
+                focusClass="focus:border-sky-500"
+              />
+            </div>
 
             {/* Delivery hint */}
             <input

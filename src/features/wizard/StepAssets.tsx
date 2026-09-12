@@ -17,6 +17,11 @@ import {
 import { CharacterEditor } from "@/features/characters/CharacterEditor";
 import { useWizardActions, hasActiveAssetTask } from "./useWizardActions";
 import { generateImage, aspectRatioToImageSize } from "@/services/imageService";
+import { AiPolishField } from "@/components/ui/AiPolishField";
+import {
+  SYSTEM_PROMPT_DESCRIPTION_ZH,
+  SYSTEM_PROMPT_VISUAL_PROMPT,
+} from "@/services/chatService";
 
 export function StepAssets() {
   const t = useT();
@@ -346,19 +351,25 @@ export function StepAssets() {
                 placeholder="场景名称 (如: 城市街道)"
                 className="w-full bg-transparent text-sm font-medium text-slate-200 placeholder:text-slate-600 focus:outline-none"
               />
-              <input
-                type="text"
+              <AiPolishField
                 value={scene.description}
-                onChange={(e) => updateAsset(scene.id, { description: e.target.value })}
+                onChange={(v) => updateAsset(scene.id, { description: v })}
+                systemPrompt={SYSTEM_PROMPT_DESCRIPTION_ZH}
+                resetKey={scene.id}
                 placeholder="中文描述"
-                className="w-full bg-transparent text-xs text-slate-400 placeholder:text-slate-600 focus:outline-none"
+                singleLine
+                bare
+                appearanceClass="bg-transparent text-xs text-slate-400 placeholder:text-slate-600"
               />
-              <textarea
+              <AiPolishField
                 value={scene.prompt}
-                onChange={(e) => updateAsset(scene.id, { prompt: e.target.value })}
+                onChange={(v) => updateAsset(scene.id, { prompt: v })}
+                systemPrompt={SYSTEM_PROMPT_VISUAL_PROMPT}
+                resetKey={scene.id}
                 placeholder="English prompt for image generation..."
                 rows={2}
-                className="w-full resize-none bg-transparent text-xs text-slate-300 placeholder:text-slate-600 focus:outline-none"
+                bare
+                appearanceClass="bg-transparent text-xs text-slate-300 placeholder:text-slate-600"
               />
               {scene.error && (
                 <p className="truncate text-[10px] text-red-400" title={scene.error}>
@@ -453,19 +464,25 @@ export function StepAssets() {
                 placeholder="产品名称 (如: 白色羽绒服)"
                 className="w-full bg-transparent text-sm font-medium text-slate-200 placeholder:text-slate-600 focus:outline-none"
               />
-              <input
-                type="text"
+              <AiPolishField
                 value={product.description}
-                onChange={(e) => updateAsset(product.id, { description: e.target.value })}
+                onChange={(v) => updateAsset(product.id, { description: v })}
+                systemPrompt={SYSTEM_PROMPT_DESCRIPTION_ZH}
+                resetKey={product.id}
                 placeholder="中文描述"
-                className="w-full bg-transparent text-xs text-slate-400 placeholder:text-slate-600 focus:outline-none"
+                singleLine
+                bare
+                appearanceClass="bg-transparent text-xs text-slate-400 placeholder:text-slate-600"
               />
-              <textarea
+              <AiPolishField
                 value={product.prompt}
-                onChange={(e) => updateAsset(product.id, { prompt: e.target.value })}
+                onChange={(v) => updateAsset(product.id, { prompt: v })}
+                systemPrompt={SYSTEM_PROMPT_VISUAL_PROMPT}
+                resetKey={product.id}
                 placeholder="English prompt for image generation..."
                 rows={2}
-                className="w-full resize-none bg-transparent text-xs text-slate-300 placeholder:text-slate-600 focus:outline-none"
+                bare
+                appearanceClass="bg-transparent text-xs text-slate-300 placeholder:text-slate-600"
               />
               {product.error && (
                 <p className="truncate text-[10px] text-red-400" title={product.error}>

@@ -8,7 +8,8 @@ import { useProjectStore, type Asset } from "@/stores/projectStore";
 import { useSettingsStore } from "@/stores/settingsStore";
 import { useT } from "@/i18n";
 import { ArrowLeft, Sparkles, Loader2, RefreshCw, ImageIcon } from "lucide-react";
-import { chatCompletion, SYSTEM_PROMPT_CHARACTER } from "@/services/chatService";
+import { chatCompletion, SYSTEM_PROMPT_CHARACTER, SYSTEM_PROMPT_DESCRIPTION_ZH } from "@/services/chatService";
+import { AiPolishField } from "@/components/ui/AiPolishField";
 import { generateImage } from "@/services/imageService";
 import { generateAssetNamespace, generateFullPrompt } from "@/lib/assetNamespace";
 
@@ -147,12 +148,13 @@ export function CharacterEditor({ character, onClose }: CharacterEditorProps) {
         <label className="text-[11px] font-medium text-slate-500">
           {t("characters.description")}
         </label>
-        <textarea
+        <AiPolishField
           value={description}
-          onChange={(e) => setDescription(e.target.value)}
+          onChange={setDescription}
+          systemPrompt={SYSTEM_PROMPT_DESCRIPTION_ZH}
+          resetKey={character?.id ?? "new"}
           placeholder={t("characters.descriptionPlaceholder")}
           rows={2}
-          className="w-full resize-none rounded-md border border-slate-700 bg-slate-800 p-2 text-xs text-slate-100 placeholder:text-slate-600 focus:border-emerald-500 focus:outline-none"
         />
       </div>
 
@@ -176,12 +178,14 @@ export function CharacterEditor({ character, onClose }: CharacterEditorProps) {
             {t("characters.aiGenerate")}
           </button>
         </div>
-        <textarea
+        <AiPolishField
           value={appearancePrompt}
-          onChange={(e) => setAppearancePrompt(e.target.value)}
+          onChange={setAppearancePrompt}
+          systemPrompt={SYSTEM_PROMPT_CHARACTER}
+          resetKey={character?.id ?? "new"}
           placeholder={t("characters.appearancePlaceholder")}
           rows={3}
-          className="w-full resize-none rounded-md border border-slate-700 bg-slate-800 p-2 text-xs text-slate-100 placeholder:text-slate-600 focus:border-violet-500 focus:outline-none"
+          focusClass="focus:border-violet-500"
         />
       </div>
 

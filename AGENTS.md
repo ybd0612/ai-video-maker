@@ -69,7 +69,8 @@ src/
 │       ├── Lightbox.tsx           # 图片灯箱
 │       ├── NumberInput.tsx        # 数字输入框
 │       ├── IMEAwareTextarea.tsx   # 输入法兼容文本框
-│       └── AiAssistDrawer.tsx     # AI 辅助提示词优化对话抽屉
+│       ├── AiPolishField.tsx      # 输入框 + 内嵌「润色 / 撤销」按钮（所有 AI 输入入口）
+│       └── AiAssistDrawer.tsx     # 【已弃用】旧的多轮对话抽屉（无引用，保留参考）
 ├── styles/
 │   └── globals.css                # 全局样式
 ├── App.tsx                        # 根组件
@@ -138,14 +139,16 @@ src/
 
 脚本生成阶段同时产出两套提示词，分别用于图片和视频生成。
 
-## AI 辅助提示词优化
+## AI 辅助（内联润色 / 撤销）
 
 可选增强功能，不影响一键成片主流程：
 
-- 每个输入框旁有 ✨ 按钮，点击滑出 AI 对话抽屉
-- 多轮对话优化提示词，满意后点击“应用”替换
-- 不同字段使用不同的 AI 专家角色（文案/画面/动态/主题）
-- 实现在 `chatService.ts` + `AiAssistDrawer.tsx`
+- 所有 AI 可辅助的输入框右下角**内嵌「润色」按钮**：一键把当前内容交给该字段的专家角色优化，结果自动回填（用户无需输入额外指令）
+- 润色后可点「撤销」**逐步回退**到上一次润色前的内容；撤销栈为组件本地状态，随镜头 / 资产切换（`resetKey`）与刷新清空
+- 统一走 `components/ui/AiPolishField.tsx`（输入框 + 内嵌按钮），润色请求走 `chatService.polishText`；**禁止再引入旁挂式 AI 入口**（输入框外的 ✨ 按钮 / 抽屉）
+- 字段与专家系统提示词的对应关系集中在 `services/chatService.ts`：文案 `SYSTEM_PROMPT_SCRIPT_TEXT`、画面 `SYSTEM_PROMPT_VISUAL_PROMPT`、动态 `SYSTEM_PROMPT_MOTION_PROMPT`、负向 `SYSTEM_PROMPT_NEGATIVE_PROMPT`、对白 `SYSTEM_PROMPT_DIALOGUE`、角色外观 `SYSTEM_PROMPT_CHARACTER`、中文描述 `SYSTEM_PROMPT_DESCRIPTION_ZH`、主题 `SYSTEM_PROMPT_MAIN_PROMPT`
+- 边界行为：内容为空 / 无 API Key / 请求进行中时按钮自动禁用；失败就地显示原因（不弹窗）；润色结果与原文相同则不入撤销栈
+- 旧的多轮对话抽屉 `AiAssistDrawer.tsx` **已弃用**（无任何引用，保留仅作历史参考）
 
 ## 模型配置
 

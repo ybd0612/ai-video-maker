@@ -69,6 +69,24 @@ Requirements:
 
 If the user has specific requests, incorporate them. Always return the complete optimized motion prompt.`;
 
+export const SYSTEM_PROMPT_DESCRIPTION_ZH = `你是一位 AI 视觉创作的描述优化专家。用户会给你一段中文描述（场景 / 角色 / 产品等），请帮助润色。
+
+要求：
+- 保持原意，用更具体、更有画面感的表述
+- 突出可用于图像生成的关键视觉特征（形态、材质、色彩、光线、氛围）
+- 用中文，长度与原文相当，不要扩写成段落
+- 直接返回润色后的描述，不要任何解释说明`;
+
+export const SYSTEM_PROMPT_NEGATIVE_PROMPT = `你是一位 AI 图像/视频生成的负向提示词专家。用户会给你一段负向提示词（描述画面中需要避免的瑕疵），请帮助优化。
+
+要求：
+- 只保留与画面质量、解剖结构、伪影、变形相关的通用负面项
+- 用中文、逗号分隔的短语列表
+- 表达简洁，合并重复项，避免互相冲突的条目
+- 直接返回优化后的负向提示词，不要任何解释说明
+
+如果用户有特定要求，按照要求调整。`;
+
 export const SYSTEM_PROMPT_CHARACTER = `You are a professional character designer for short drama productions. Help the user create and refine character profiles.
 
 Requirements:
@@ -124,4 +142,47 @@ export async function chatCompletion(opts: ChatOptions): Promise<ChatResult> {
     baseUrl: opts.baseUrl,
   });
   return service.chatCompletion({ messages: trimmed });
+}
+
+/* ── One-click polish ───────────────────────────────────────────────────── */
+
+export interface PolishOptions {
+  apiKey: string;
+  baseUrl: string;
+  /** 待润色的原文（输入框当前内容） */
+  value: string;
+  /** 该字段对应的专家系统提示词（决定润色方向与输出语种） */
+  systemPrompt: string;
+  /** 界面语言，决定润色指令的措辞 */
+  language?: "zh" | "en";
+}
+
+const POLISH_INSTRUCTION_ZH =
+  "请润色并优化以下内容，保持原意、语种与范围不变，只返回润色后的内容，不要任何解释或额外说明：\n\n";
+const POLISH_INSTRUCTION_EN =
+  "Polish and improve the following content. Keep its original intent, language and scope. Return ONLY the improved content, with no explanations or extra commentary:\n\n";
+
+/**
+ * 一键润色：把字段当前内容交给对应专家角色优化，返回润色后的完整内容。
+ * 供输入框内嵌的「润色」按钮使用（用户无需额外输入指令）。
+ */
+export async function polishText(opts: PolishOptions): Promise<string> {
+  const content = opts.value.trim();
+  if (!content) throw new Error("内容为空，无法润色。");
+
+  const instruction =
+    opts.language === "en" ? POLISH_INSTRUCTION_EN : POLISH_INSTRUCTION_ZH;
+
+  const result = await chatCompletion({
+    apiKey: opts.apiKey,
+    baseUrl: opts.baseUrl,
+    messages: [
+      { role: "system", content: opts.systemPrompt },
+      { role: "user", content: `${instruction}${content}` },
+    ],
+  });
+
+  const polished = result.content.trim();
+  if (!polished) throw new Error("AI 返回了空内容，请重试。");
+  return polished;
 }

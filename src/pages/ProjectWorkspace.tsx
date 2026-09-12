@@ -10,8 +10,6 @@ import { useSettingsStore } from "@/stores/settingsStore";
 import { useT } from "@/i18n";
 import { ShotList } from "@/features/shots/ShotList";
 import { ShotEditor } from "@/features/shots/ShotEditor";
-import { SYSTEM_PROMPT_SCRIPT_TEXT, SYSTEM_PROMPT_VISUAL_PROMPT, SYSTEM_PROMPT_MOTION_PROMPT } from "@/services/chatService";
-import { AiAssistDrawer } from "@/components/ui/AiAssistDrawer";
 import { CharacterPanel } from "@/features/characters/CharacterPanel";
 import { ProjectSidebar } from "@/features/projects/ProjectSidebar";
 import { HistoryPanel } from "@/features/history/HistoryPanel";
@@ -33,55 +31,14 @@ export function ProjectWorkspace() {
   const projects = useProjectStore((s) => s.projects);
   const updateProject = useProjectStore((s) => s.updateProject);
   const clearProject = useProjectStore((s) => s.clearProject);
-  const updateShot = useProjectStore((s) => s.updateShot);
   const openSettings = useSettingsStore((s) => s.setSettingsDialogOpen);
   const { rerollImage, rerollVideo } = useWizardActions();
 
   const [selectedShotId, setSelectedShotId] = useState<string | null>(null);
   const [leftTab, setLeftTab] = useState<LeftTab>("shots");
 
-  // AI Assist drawer state
-  const [aiAssistTarget, setAiAssistTarget] = useState<{
-    field: "scriptText" | "visualPrompt" | "motionPrompt" | "mainPrompt";
-    shotId?: string;
-    currentValue: string;
-    fieldName: string;
-    systemPrompt: string;
-  } | null>(null);
-
   // 注：失败视频的自动重试已统一由向导视频步骤（StepVideos → generateVideosForStep）接管。
   // 此前此处存在 retryFailedVideos 入口，会与向导批量生成并行，重复创建服务端视频任务（token 双倍消耗）。
-  // AI Assist handlers
-  const handleOpenShotAiAssist = useCallback(
-    (field: "scriptText" | "visualPrompt" | "motionPrompt", currentValue: string) => {
-      const systemPrompt =
-        field === "scriptText" ? SYSTEM_PROMPT_SCRIPT_TEXT
-        : field === "visualPrompt" ? SYSTEM_PROMPT_VISUAL_PROMPT
-        : SYSTEM_PROMPT_MOTION_PROMPT;
-      const fieldName =
-        field === "scriptText" ? t("pipeline.scriptText")
-        : field === "visualPrompt" ? t("pipeline.visualPrompt")
-        : t("pipeline.motionPrompt");
-      setAiAssistTarget({
-        field,
-        shotId: selectedShotId ?? undefined,
-        currentValue,
-        fieldName,
-        systemPrompt,
-      });
-    },
-    [selectedShotId, t],
-  );
-
-  const handleAiAssistApply = useCallback(
-    (value: string) => {
-      if (!aiAssistTarget) return;
-      if (aiAssistTarget.shotId) {
-        updateShot(aiAssistTarget.shotId, { [aiAssistTarget.field]: value });
-      }
-    },
-    [aiAssistTarget, updateShot],
-  );
 
   // Run full pipeline
   // 注：旧版“一键成片”入口已从顶栏移除——它与 6 步向导主流程并存时
@@ -255,21 +212,10 @@ export function ProjectWorkspace() {
               onClose={() => setSelectedShotId(null)}
               onRegenerateImage={rerollImage}
               onRegenerateVideo={rerollVideo}
-              onOpenAiAssist={handleOpenShotAiAssist}
             />
           </aside>
         )}
       </div>
-
-      {/* AI Assist Drawer */}
-      <AiAssistDrawer
-        open={aiAssistTarget !== null}
-        onClose={() => setAiAssistTarget(null)}
-        currentValue={aiAssistTarget?.currentValue ?? ""}
-        fieldName={aiAssistTarget?.fieldName ?? ""}
-        systemPrompt={aiAssistTarget?.systemPrompt ?? ""}
-        onApply={handleAiAssistApply}
-      />
     </div>
   );
 }

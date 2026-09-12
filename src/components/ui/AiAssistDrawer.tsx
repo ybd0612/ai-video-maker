@@ -1,6 +1,10 @@
 // ────────────────────────────────────────────────────────────────────────────
 // src/components/ui/AiAssistDrawer.tsx
 // Slide-out drawer for AI-assisted prompt optimization via multi-turn chat.
+//
+// ⚠️ 已弃用（2026-09-12）：AI 辅助统一改为输入框内嵌「润色 / 撤销」
+// （见 components/ui/AiPolishField.tsx + services/chatService.ts 的 polishText）。
+// 本组件已无任何引用，保留仅作历史参考，确认无用后可直接删除。
 // ────────────────────────────────────────────────────────────────────────────
 
 import { useState, useEffect, useRef, useCallback } from "react";

@@ -1,20 +1,22 @@
 // ────────────────────────────────────────────────────────────────────────────
 // src/features/script/ScriptPanel.tsx
 // Input area for the user prompt + "generate" button + loading overlay.
+// 主题输入框带框内「润色 / 撤销」（AiPolishField）。
 // ────────────────────────────────────────────────────────────────────────────
 
 import { useState, useEffect } from "react";
-import { Sparkles, Loader2, Wand2 } from "lucide-react";
+import { Sparkles, Loader2 } from "lucide-react";
 import { useT } from "@/i18n";
+import { AiPolishField } from "@/components/ui/AiPolishField";
+import { SYSTEM_PROMPT_MAIN_PROMPT } from "@/services/chatService";
 
 interface ScriptPanelProps {
   onGenerate: (prompt: string) => void;
   isGenerating: boolean;
-  onOpenAiAssist: (currentValue: string) => void;
   promptOverride?: string;
 }
 
-export function ScriptPanel({ onGenerate, isGenerating, onOpenAiAssist, promptOverride }: ScriptPanelProps) {
+export function ScriptPanel({ onGenerate, isGenerating, promptOverride }: ScriptPanelProps) {
   const [prompt, setPrompt] = useState("");
   const t = useT();
 
@@ -33,31 +35,22 @@ export function ScriptPanel({ onGenerate, isGenerating, onOpenAiAssist, promptOv
 
   return (
     <div className="flex flex-col gap-3 p-4">
-      <div className="flex items-center justify-between">
-        <h2 className="text-sm font-semibold text-slate-200">
-          {t("pipeline.scriptPanelTitle")}
-        </h2>
-        {prompt.trim() && (
-          <button
-            onClick={() => onOpenAiAssist(prompt)}
-            className="rounded p-1 text-slate-600 transition hover:bg-slate-700 hover:text-emerald-400"
-            title={t("aiAssist.optimizeMainPrompt")}
-          >
-            <Wand2 size={13} />
-          </button>
-        )}
-      </div>
+      <h2 className="text-sm font-semibold text-slate-200">
+        {t("pipeline.scriptPanelTitle")}
+      </h2>
       <p className="text-xs text-slate-500">
         {t("pipeline.scriptPanelHint")}
       </p>
       <div className="relative">
-        <textarea
+        <AiPolishField
           value={prompt}
-          onChange={(e) => setPrompt(e.target.value)}
+          onChange={setPrompt}
+          systemPrompt={SYSTEM_PROMPT_MAIN_PROMPT}
+          resetKey={promptOverride}
           placeholder={t("pipeline.scriptPlaceholder")}
           rows={6}
           disabled={isGenerating}
-          className="w-full resize-none rounded-lg border border-slate-700 bg-slate-800 p-3 text-sm text-slate-100 placeholder:text-slate-600 focus:border-emerald-500 focus:outline-none disabled:opacity-50"
+          appearanceClass="rounded-lg border border-slate-700 bg-slate-800 text-sm text-slate-100 placeholder:text-slate-600"
         />
         {/* Loading overlay */}
         {isGenerating && (

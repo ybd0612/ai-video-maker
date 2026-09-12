@@ -5,15 +5,20 @@
 
 import { useProjectStore, selectActiveProject, type Shot } from "@/stores/projectStore";
 import { useT } from "@/i18n";
-import { RefreshCw, X, RotateCcw, Sparkles, Users } from "lucide-react";
+import { RefreshCw, X, RotateCcw, Users } from "lucide-react";
 import { DialogueEditor } from "./DialogueEditor";
+import { AiPolishField } from "@/components/ui/AiPolishField";
+import {
+  SYSTEM_PROMPT_SCRIPT_TEXT,
+  SYSTEM_PROMPT_VISUAL_PROMPT,
+  SYSTEM_PROMPT_MOTION_PROMPT,
+} from "@/services/chatService";
 
 interface ShotEditorProps {
   shot: Shot | null;
   onClose: () => void;
   onRegenerateImage: (shotId: string) => void;
   onRegenerateVideo: (shotId: string) => void;
-  onOpenAiAssist: (field: "scriptText" | "visualPrompt" | "motionPrompt", currentValue: string) => void;
 }
 
 export function ShotEditor({
@@ -21,7 +26,6 @@ export function ShotEditor({
   onClose,
   onRegenerateImage,
   onRegenerateVideo,
-  onOpenAiAssist,
 }: ShotEditorProps) {
   const updateShot = useProjectStore((s) => s.updateShot);
   const setActiveCharacters = useProjectStore((s) => s.setActiveCharacters);
@@ -91,67 +95,46 @@ export function ShotEditor({
 
       {/* Script text */}
       <div className="space-y-1">
-        <div className="flex items-center justify-between">
-          <label className="text-[11px] font-medium text-slate-500">
-            {t("pipeline.scriptText")}
-          </label>
-          <button
-            onClick={() => onOpenAiAssist("scriptText", shot.scriptText)}
-            className="rounded p-0.5 text-slate-600 transition hover:bg-slate-700 hover:text-emerald-400"
-            title={t("aiAssist.optimizeScriptText")}
-          >
-            <Sparkles size={11} />
-          </button>
-        </div>
-        <textarea
+        <label className="text-[11px] font-medium text-slate-500">
+          {t("pipeline.scriptText")}
+        </label>
+        <AiPolishField
           value={shot.scriptText}
-          onChange={(e) => updateShot(shot.id, { scriptText: e.target.value })}
+          onChange={(v) => updateShot(shot.id, { scriptText: v })}
+          systemPrompt={SYSTEM_PROMPT_SCRIPT_TEXT}
+          resetKey={shot.id}
           rows={3}
-          className="w-full resize-none rounded-md border border-slate-700 bg-slate-800 p-2 text-xs text-slate-100 focus:border-sky-500 focus:outline-none"
+          focusClass="focus:border-sky-500"
         />
       </div>
 
       {/* Visual prompt (text-to-image) */}
       <div className="space-y-1">
-        <div className="flex items-center justify-between">
-          <label className="text-[11px] font-medium text-slate-500">
-            {t("pipeline.visualPrompt")}
-          </label>
-          <button
-            onClick={() => onOpenAiAssist("visualPrompt", shot.visualPrompt)}
-            className="rounded p-0.5 text-slate-600 transition hover:bg-slate-700 hover:text-emerald-400"
-            title={t("aiAssist.optimizeVisualPrompt")}
-          >
-            <Sparkles size={11} />
-          </button>
-        </div>
-        <textarea
+        <label className="text-[11px] font-medium text-slate-500">
+          {t("pipeline.visualPrompt")}
+        </label>
+        <AiPolishField
           value={shot.visualPrompt}
-          onChange={(e) => updateShot(shot.id, { visualPrompt: e.target.value })}
+          onChange={(v) => updateShot(shot.id, { visualPrompt: v })}
+          systemPrompt={SYSTEM_PROMPT_VISUAL_PROMPT}
+          resetKey={shot.id}
           rows={3}
-          className="w-full resize-none rounded-md border border-slate-700 bg-slate-800 p-2 text-xs text-slate-100 focus:border-violet-500 focus:outline-none"
+          focusClass="focus:border-violet-500"
         />
       </div>
 
       {/* Motion prompt (image-to-video) */}
       <div className="space-y-1">
-        <div className="flex items-center justify-between">
-          <label className="text-[11px] font-medium text-slate-500">
-            {t("pipeline.motionPrompt")}
-          </label>
-          <button
-            onClick={() => onOpenAiAssist("motionPrompt", shot.motionPrompt)}
-            className="rounded p-0.5 text-slate-600 transition hover:bg-slate-700 hover:text-emerald-400"
-            title={t("aiAssist.optimizeMotionPrompt")}
-          >
-            <Sparkles size={11} />
-          </button>
-        </div>
-        <textarea
+        <label className="text-[11px] font-medium text-slate-500">
+          {t("pipeline.motionPrompt")}
+        </label>
+        <AiPolishField
           value={shot.motionPrompt}
-          onChange={(e) => updateShot(shot.id, { motionPrompt: e.target.value })}
+          onChange={(v) => updateShot(shot.id, { motionPrompt: v })}
+          systemPrompt={SYSTEM_PROMPT_MOTION_PROMPT}
+          resetKey={shot.id}
           rows={3}
-          className="w-full resize-none rounded-md border border-slate-700 bg-slate-800 p-2 text-xs text-slate-100 focus:border-amber-500 focus:outline-none"
+          focusClass="focus:border-amber-500"
         />
       </div>
 

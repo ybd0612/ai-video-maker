@@ -1,49 +1,31 @@
 // ────────────────────────────────────────────────────────────────────────────
 // src/features/wizard/StepIdea.tsx
-// Step 1: Multi-turn AI brainstorm + aspect ratio + extract characters.
+// Step 1: 输入视频想法（框内一键润色 / 撤销）+ 画幅比例 + 提取角色与资产。
 // ────────────────────────────────────────────────────────────────────────────
 
 import { useState, useRef, useEffect } from "react";
 import { useProjectStore, selectActiveProject } from "@/stores/projectStore";
-import type { AspectRatio, ChatTurn } from "@/stores/projectStore";
-import { useSettingsStore } from "@/stores/settingsStore";
+import type { AspectRatio } from "@/stores/projectStore";
 import { useT } from "@/i18n";
-import {
-  Sparkles, Loader2, Monitor, Smartphone, Square, Send, Bot, User,
-  History,
-} from "lucide-react";
+import { Sparkles, Loader2, Monitor, Smartphone, Square } from "lucide-react";
 import { useWizardActions } from "./useWizardActions";
-import { chatCompletion } from "@/services/chatService";
+import { AiPolishField } from "@/components/ui/AiPolishField";
 
-const IDEA_SYSTEM_PROMPT = `你是一位专业的短视频创意策划师。用户正在构思一个短视频的主题和想法，你需要帮助用户逐步完善。
+const IDEA_POLISH_PROMPT = `你是一位专业的短视频创意策划师。用户会给你一段视频想法，请在保持用户核心意图的前提下润色完善。
 
-核心规则：
-- 每次回复必须是一段完整的视频想法/描述，包含之前所有的修改和补充
-- 不要只回复增量改动，而是输出当前最新的完整版本
-- 用户可以直接复制你的回复作为最终想法
+要求：
+- 让主题更明确、更有画面感，点明情感基调与视觉风格
+- 补充可落地的场景与叙事方向，但不改变原意、不添加无关内容
+- 直接返回润色后的完整想法，不要任何解释说明
+- 控制在 200 字以内`;
 
-内容要求：
-- 帮助用户明确视频主题、情感基调、视觉风格
-- 提供具体的场景建议和叙事方向
-- 建议要具体、有画面感、可操作
-- 每次回复不超过 200 字
-- 如果用户的想法已经足够好，告诉他们可以点击"下一步"进入资产准备
-- 如果用户提出修改意见，在完整版本中体现修改`;
+const IDEA_POLISH_PROMPT_EN = `You are a professional short-video creative planner. The user gives you a video idea — polish and refine it while preserving the user's core intent.
 
-const IDEA_SYSTEM_PROMPT_EN = `You are a professional short-video creative planner. The user is brainstorming a short video topic and idea; help them refine it step by step.
-
-Core rules:
-- Every reply must be a COMPLETE video idea/description, incorporating all previous edits and additions
-- Do not reply with incremental changes only; output the current latest full version
-- The user can copy your reply directly as the final idea
-
-Content requirements:
-- Help clarify the video's theme, emotional tone, and visual style
-- Provide concrete scene suggestions and narrative direction
-- Be specific, visual, and actionable
-- Keep each reply under 200 characters
-- If the idea is already good enough, tell them they can click "Next" to proceed to asset preparation
-- If the user requests changes, reflect them in the full version`;
+Requirements:
+- Make the topic clearer and more visual; state the emotional tone and visual style
+- Add concrete scene and narrative direction without changing the original intent
+- Return ONLY the polished full idea, with no explanations
+- Keep it under 120 words`;
 
 interface StepIdeaProps {
   onGenerated?: () => void;
@@ -54,20 +36,15 @@ export function StepIdea({ onGenerated }: StepIdeaProps) {
   const project = useProjectStore(selectActiveProject);
   const createProject = useProjectStore((s) => s.createProject);
   const updateProject = useProjectStore((s) => s.updateProject);
-  const providerConfig = useSettingsStore((s) => s.providerConfig);
   const { extractCharactersFromIdea } = useWizardActions();
   const [isGenerating, setIsGenerating] = useState(false);
-  const [isRefining, setIsRefining] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // Initialize from project store, fallback to empty
   const [prompt, setPrompt] = useState(project?.ideaPrompt ?? "");
-  const [chatHistory, setChatHistory] = useState<ChatTurn[]>(project?.ideaChatHistory ?? []);
-  const [chatInput, setChatInput] = useState("");
-  const [showHistory, setShowHistory] = useState(false);
-  const [selectedAspectRatio, setSelectedAspectRatio] = useState<AspectRatio>(project?.aspectRatio ?? "16:9");
-  const chatEndRef = useRef<HTMLDivElement>(null);
-  const chatInputRef = useRef<HTMLInputElement>(null);
+  const [selectedAspectRatio, setSelectedAspectRatio] = useState<AspectRatio>(
+    project?.aspectRatio ?? "16:9",
+  );
 
   const aspectRatio = project?.aspectRatio ?? selectedAspectRatio;
 
@@ -78,15 +55,11 @@ export function StepIdea({ onGenerated }: StepIdeaProps) {
     if (project?.id !== prevProjectIdRef.current) {
       prevProjectIdRef.current = project?.id;
       setPrompt(project?.ideaPrompt ?? "");
-      setChatHistory(project?.ideaChatHistory ?? []);
-      setChatInput("");
-      setShowHistory(false);
       setSelectedAspectRatio(project?.aspectRatio ?? "16:9");
       setIsGenerating(false);
-      setIsRefining(false);
       setError(null);
     }
-  }, [project?.id, project?.ideaPrompt, project?.ideaChatHistory]);
+  }, [project?.id, project?.ideaPrompt, project?.aspectRatio]);
 
   // Persist prompt to store (debounced via useEffect)
   const promptRef = useRef(prompt);
@@ -106,76 +79,6 @@ export function StepIdea({ onGenerated }: StepIdeaProps) {
       setPrompt(project.ideaPrompt);
     }
   }, [project?.ideaPrompt]);
-
-  // Persist chatHistory to store immediately on change
-  const chatHistoryRef = useRef(chatHistory);
-  chatHistoryRef.current = chatHistory;
-  useEffect(() => {
-    updateProject({ ideaChatHistory: chatHistory.length > 0 ? chatHistory : undefined });
-  }, [chatHistory, updateProject]);
-
-  // Sync chatHistory when project changes (e.g., switching projects)
-  useEffect(() => {
-    const projectHistory = project?.ideaChatHistory ?? [];
-    if (JSON.stringify(chatHistoryRef.current) !== JSON.stringify(projectHistory)) {
-      setChatHistory(projectHistory);
-    }
-  }, [project?.ideaChatHistory]);
-
-  // Auto-scroll chat
-  useEffect(() => {
-    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [chatHistory]);
-
-  const systemPrompt = project?.language === "en" ? IDEA_SYSTEM_PROMPT_EN : IDEA_SYSTEM_PROMPT;
-
-  /** Send a message in the conversation */
-  const handleChatSend = async () => {
-    const input = chatInput.trim();
-    if (!input || isRefining || !providerConfig.apiKey) return;
-
-    // Include current textarea content so AI knows what to refine
-    const contextContent = prompt.trim()
-      ? `当前想法：\n${prompt.trim()}\n\n调整要求：${input}`
-      : input;
-
-    // Display only the user's adjustment input in chat history
-    const displayMsg: ChatTurn = { role: "user", content: input };
-    // But send full context to AI
-    const apiMsg: ChatTurn = { role: "user", content: contextContent };
-
-    const newHistory = [...chatHistory, displayMsg];
-    setChatHistory(newHistory);
-    setChatInput("");
-    setIsRefining(true);
-
-    try {
-      const messages = [
-        { role: "system" as const, content: systemPrompt },
-        ...chatHistory.map((m) => ({ role: m.role as "user" | "assistant", content: m.content })),
-        { role: "user" as const, content: apiMsg.content },
-      ];
-
-      const result = await chatCompletion({
-        apiKey: providerConfig.apiKey,
-        baseUrl: providerConfig.baseUrl,
-        messages,
-      });
-
-      const assistantMsg: ChatTurn = { role: "assistant", content: result.content };
-      setChatHistory((prev) => [...prev, assistantMsg]);
-      // Auto-apply: AI always outputs the complete idea
-      setPrompt(result.content);
-    } catch (err) {
-      // 显示具体失败原因（限流/配额/网络），避免用户只能猜测
-      const detail = err instanceof Error ? err.message : String(err);
-      setChatHistory((prev) => [...prev, { role: "assistant", content: `请求失败：${detail}` }]);
-    } finally {
-      setIsRefining(false);
-      // Auto-focus chat input so user can continue typing
-      requestAnimationFrame(() => chatInputRef.current?.focus());
-    }
-  };
 
   const handleGenerate = async () => {
     if (!prompt.trim()) return;
@@ -219,60 +122,27 @@ export function StepIdea({ onGenerated }: StepIdeaProps) {
 
   return (
     <div className="mx-auto flex max-w-2xl flex-col gap-5 py-8">
-      {/* Title + history icon */}
+      {/* Title */}
       <div className="flex items-center justify-center gap-3">
         <h2 className="text-lg font-bold text-slate-100">
           {t("wizard.enterIdea")}
         </h2>
-        {chatHistory.length > 0 && (
-          <div className="relative">
-            <button
-              onClick={() => setShowHistory(!showHistory)}
-              className="text-slate-600 transition hover:text-slate-400"
-              title={t("wizard.chatHistory" as any) || "对话历史"}
-            >
-              <History size={14} />
-            </button>
-            {showHistory && (
-              <>
-                {/* Backdrop */}
-                <div className="fixed inset-0 z-40" onClick={() => setShowHistory(false)} />
-                {/* Popover */}
-                <div className="absolute right-0 top-full z-50 mt-2 w-80 max-h-64 overflow-y-auto rounded-xl border border-slate-700 bg-slate-900 p-3 shadow-2xl space-y-2">
-                  {chatHistory.map((msg, i) => (
-                    <div key={i} className="flex gap-2">
-                      <div className={`shrink-0 mt-0.5 ${msg.role === "user" ? "text-emerald-400" : "text-violet-400"}`}>
-                        {msg.role === "user" ? <User size={11} /> : <Bot size={11} />}
-                      </div>
-                      <p className="flex-1 text-[11px] leading-relaxed text-slate-400 whitespace-pre-wrap">
-                        {msg.content}
-                      </p>
-                    </div>
-                  ))}
-                  {isRefining && (
-                    <div className="flex gap-2">
-                      <Bot size={11} className="shrink-0 mt-0.5 text-violet-400 animate-pulse" />
-                      <Loader2 size={11} className="animate-spin text-emerald-400" />
-                    </div>
-                  )}
-                  <div ref={chatEndRef} />
-                </div>
-              </>
-            )}
-          </div>
-        )}
       </div>
 
-      {/* Prompt textarea (taller) */}
+      {/* Prompt textarea（框内右下角：润色 / 撤销） */}
       <div className="relative">
-        <textarea
+        <AiPolishField
           value={prompt}
-          onChange={(e) => setPrompt(e.target.value)}
+          onChange={setPrompt}
+          systemPrompt={
+            project?.language === "en" ? IDEA_POLISH_PROMPT_EN : IDEA_POLISH_PROMPT
+          }
+          resetKey={project?.id}
           onKeyDown={handleKeyDown}
           placeholder={t("wizard.ideaPlaceholder")}
           rows={7}
-          disabled={isGenerating || isRefining}
-          className="w-full resize-none rounded-xl border border-slate-700 bg-slate-800 p-4 text-sm text-slate-100 placeholder:text-slate-600 focus:border-emerald-500 focus:outline-none disabled:opacity-50"
+          disabled={isGenerating}
+          appearanceClass="rounded-xl border border-slate-700 bg-slate-800 text-sm text-slate-100 placeholder:text-slate-600"
         />
 
         {/* Generating overlay */}
@@ -284,42 +154,6 @@ export function StepIdea({ onGenerated }: StepIdeaProps) {
             </div>
           </div>
         )}
-      </div>
-
-      {/* Chat input for follow-up conversation */}
-      <div className="flex gap-2">
-        <div className="relative flex-1">
-          <input
-            ref={chatInputRef}
-            type="text"
-            value={chatInput}
-            onChange={(e) => setChatInput(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey) {
-                e.preventDefault();
-                handleChatSend();
-              }
-            }}
-            placeholder={isRefining ? "" : (t("wizard.chatPlaceholder") || "和 AI 继续讨论...")}
-            disabled={isRefining || !providerConfig.apiKey}
-            className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-xs text-slate-100 placeholder:text-slate-600 focus:border-emerald-500 focus:outline-none disabled:opacity-50"
-          />
-          {isRefining && (
-            <div className="absolute inset-0 flex items-center gap-2 px-3 pointer-events-none">
-              <Loader2 size={13} className="animate-spin text-emerald-400" />
-              <span className="text-xs text-emerald-400/80 animate-pulse">
-                {t("wizard.generating") || "AI 思考中..."}
-              </span>
-            </div>
-          )}
-        </div>
-        <button
-          onClick={handleChatSend}
-          disabled={!chatInput.trim() || isRefining || !providerConfig.apiKey}
-          className="flex items-center justify-center rounded-lg bg-slate-700 px-3 py-2 text-emerald-400 transition hover:bg-slate-600 disabled:opacity-30 disabled:cursor-not-allowed"
-        >
-          <Send size={13} />
-        </button>
       </div>
 
       {/* Aspect ratio selector */}

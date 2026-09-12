@@ -10,6 +10,7 @@ import { useT, type TranslationKey } from "@/i18n";
 import { ShotCard } from "./ShotCard";
 import { PromptSubFields } from "./PromptSubFields";
 import { PromptField } from "./PromptField";
+import { SYSTEM_PROMPT_SCRIPT_TEXT } from "@/services/chatService";
 import { DialogueEditor } from "@/features/shots/DialogueEditor";
 import { useWizardActions } from "./useWizardActions";
 import { confirmDialog } from "@/components/ui/ConfirmDialog";
@@ -175,6 +176,8 @@ export function StepStoryboard() {
               label={t("pipeline.scriptText")}
               value={shot.scriptText}
               onChange={(v) => updateShot(shot.id, { scriptText: v })}
+              systemPrompt={SYSTEM_PROMPT_SCRIPT_TEXT}
+              resetKey={shot.id}
               rows={2}
               color="sky"
             />

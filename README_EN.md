@@ -30,7 +30,7 @@ A wizard-based short video production tool: enter a topic, and the AI automatica
 | 🎥 **Video Generation** | `agnes-video-2.5-flash` — 720P / 4-12s, async task + polling (with model_name), rate-limited by plan, auto-retry & recovery |
 | 🎞️ **Dual-Frame Control** | Optional first-frame + last-frame (image-to-video) for better motion consistency |
 | ✂️ **Video Concatenation** | FFmpeg.wasm client-side concat demuxer for final MP4 output |
-| ✨ **AI Prompt Assist** | Multi-turn AI chat to optimize any prompt field |
+| ✨ **AI Polish** | One-click polish inside any input field, with undo back to the previous version |
 | 🚦 **Plan-Based Rate Limits** | 5 tiers (Free / Enterprise / Starter / Plus / Pro), RPM throttling + Token Plan quotas |
 | 🔄 **Idempotent & Reliable** | Module-level idempotency guards: no duplicate server tasks, no killing in-flight tasks, auto-recovery on refresh/switch |
 | 📋 **Multi-Project** | Create / switch / delete / duplicate projects, localStorage persistence |
@@ -182,7 +182,7 @@ src/
 ├── components/
 │   ├── SettingsDialog.tsx         # Settings dialog (API Key / Base URL / Plan / Language)
 │   ├── ApiKeyBanner.tsx           # API key missing banner
-│   └── ui/                        # Shared UI components (ConfirmDialog / Lightbox / AiAssistDrawer, etc.)
+│   └── ui/                        # Shared UI components (AiPolishField / ConfirmDialog / Lightbox, etc.)
 ├── styles/
 │   └── globals.css                # Global styles
 ├── App.tsx                        # Root component
