@@ -4,17 +4,16 @@
 // ────────────────────────────────────────────────────────────────────────────
 
 import { useCallback } from "react";
-import { useProjectStore, selectActiveProject, newId, type Shot, type Asset, type AssetType, type Project } from "@/stores/projectStore";
+import { useProjectStore, selectActiveProject, newId, type Shot, type Asset, type Project } from "@/stores/projectStore";
 import { useSettingsStore } from "@/stores/settingsStore";
 import { useT } from "@/i18n";
 import { confirmDialog } from "@/components/ui/ConfirmDialog";
 import { resolvePlan, type PlanId } from "@/lib/plans";
 import { generateScript, extractAssetsFromIdea } from "@/services/scriptService";
 import { generateImage, aspectRatioToImageParams } from "@/services/imageService";
-import { generateAssetNamespace } from "@/lib/assetNamespace";
 import { generateVideo, aspectRatioToVideoAspect, VideoTaskCreatedError } from "@/services/videoService";
 import { injectCharacterDescriptions } from "@/lib/characterUtils";
-import { composeVisualPrompt, composeMotionPrompt, generateFullPrompt } from "@/lib/promptUtils";
+import { composeVisualPrompt, composeMotionPrompt } from "@/lib/promptUtils";
 import {
   composeTextToImagePrompt,
   composeImageToImagePrompt,
@@ -48,11 +47,7 @@ export function hasActiveAssetTask(projectId: string): boolean {
 }
 
 /** 模型提取的资产原始格式（style 仅 name+description，无 appearancePrompt） */
-type RawAsset = {
-  name: string;
-  description: string;
-  appearancePrompt?: string;
-};
+import { extractNewAssets } from "@/lib/extractAssets";
 
 type ImageGenerationInput = {
   prompt: string;
@@ -61,48 +56,10 @@ type ImageGenerationInput = {
 };
 
 /**
- * Build unique Asset records from model output without mutating inputs.
- * 返回 name→id 映射表：模型可能在 shots/dialogues 中使用自编 ID 引用角色，
- * 调用方需据此回填引用，保证对白归属与角色一致性。
- * 角色/产品/场景/风格共用此函数（type 区分）。
- * style 分支不走 appearancePrompt/namespace/fullPrompt：
- * prompt（英文 stylePrompt）为 L2 派生物，运行期由 ensureStyleAsset 懒派生。
+ * 去重语义见 lib/extractAssets.ts 顶部说明：
+ * 追加式传全部旧资产；替换式（重新提取）只传 manual 资产。
  */
-function extractNewAssets(
-  existing: Asset[],
-  incoming: RawAsset[],
-  type: AssetType,
-): { assets: Asset[]; idByName: Map<string, string> } {
-  const names = new Set(existing.map((a) => a.name.trim().toLocaleLowerCase()));
-  const assets: Asset[] = [];
-  const idByName = new Map<string, string>();
-  for (const item of incoming) {
-    const normalizedName = item.name.trim().toLocaleLowerCase();
-    if (!normalizedName || names.has(normalizedName)) continue;
-    names.add(normalizedName);
-    const record: Asset = {
-      id: newId("asset"),
-      type,
-      source: "extracted",
-      name: item.name,
-      description: item.description,
-      prompt: type === "style" ? "" : (item.appearancePrompt ?? ""),
-      ...(type === "character"
-        ? {
-            appearancePrompt: item.appearancePrompt ?? "",
-            assetNamespace: generateAssetNamespace(item.name),
-            fullPrompt: generateFullPrompt({
-              name: item.name,
-              appearancePrompt: item.appearancePrompt ?? "",
-            }),
-          }
-        : {}),
-    };
-    assets.push(record);
-    idByName.set(normalizedName, record.id);
-  }
-  return { assets, idByName };
-}
+export { extractNewAssets } from "@/lib/extractAssets";
 
 /** 按 URL 反查资产，返回其在多图合成中的角色语义（未命中视为风格参考） */
 function describeReferenceRole(
@@ -377,11 +334,15 @@ export function useWizardActions() {
         assets: project.assets,
       });
 
-      // 统一提取角色/产品/场景/风格资产（与手动资产重名的会被下方过滤）
-      const newCharacters = extractNewAssets(project.assets, result.characters, "character");
-      const newProducts = extractNewAssets(project.assets, result.products, "product");
-      const newScenes = extractNewAssets(project.assets, result.scenes, "scene");
-      const newStyles = extractNewAssets(project.assets, result.styles, "style");
+      // 统一提取角色/产品/场景/风格资产。
+      // ⚠️ 去重基准 = manualAssets（而非全部旧资产）：替换式写回会清掉全部旧
+      // extracted 资产，若旧 extracted 同名角色参与去重，同名新资产会被误跳过，
+      // 随后旧角色被清 → 角色凭空消失（2026-09-12 实测事故，两次复现）。
+      // 仅 manual 资产需要重名保护（保留用户手工创建/润色的版本）。
+      const newCharacters = extractNewAssets(project.assets, result.characters, "character", manualAssets);
+      const newProducts = extractNewAssets(project.assets, result.products, "product", manualAssets);
+      const newScenes = extractNewAssets(project.assets, result.scenes, "scene", manualAssets);
+      const newStyles = extractNewAssets(project.assets, result.styles, "style", manualAssets);
       const newAssets = [
         ...newCharacters.assets,
         ...newProducts.assets,
