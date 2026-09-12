@@ -17,7 +17,7 @@ import {
 import { Lightbox } from "@/components/ui/Lightbox";
 import { generateImage, aspectRatioToImageParams } from "@/services/imageService";
 import { generateAssetNamespace, generateFullPrompt } from "@/lib/assetNamespace";
-import { composePortraitPrompt, parseStructuredDescription } from "@/lib/promptComposer";
+import { composePortraitPrompt, parseCharacterDescription } from "@/lib/promptComposer";
 
 interface CharacterEditorProps {
   character: Asset | null; // null = creating new
@@ -276,9 +276,9 @@ export function CharacterEditor({ character, onClose }: CharacterEditorProps) {
             {t("characters.aiGenerateDescription")}
           </button>
         </div>
-        {/* 完整中文角色描述（唯一事实源，只读展示；8 要素行格式 → 字段化渲染，旧格式整段兜底） */}
+        {/* 完整中文角色描述（唯一事实源，只读展示；一行总述 + 8 要素分行，旧格式整段兜底） */}
         {(() => {
-          const structured = parseStructuredDescription(description);
+          const parsed = parseCharacterDescription(description);
           if (description.trim() === "") {
             return (
               <div className="w-full rounded-md border border-line bg-raised px-2 py-1.5 text-xs text-ink-5">
@@ -286,12 +286,15 @@ export function CharacterEditor({ character, onClose }: CharacterEditorProps) {
               </div>
             );
           }
-          if (structured) {
+          if (parsed && parsed.fields.length > 0) {
             return (
               <div className="w-full space-y-0.5 rounded-md border border-line bg-raised px-2 py-1.5 text-xs select-text">
-                {structured.map(({ label, value }) => (
+                {parsed.summary && (
+                  <p className="pb-1 leading-relaxed text-ink">{parsed.summary}</p>
+                )}
+                {parsed.fields.map(({ label, value }) => (
                   <div key={label} className="flex gap-1.5 leading-relaxed">
-                    <span className="shrink-0 font-medium text-ink-3">{label}</span>
+                    <span className="w-12 shrink-0 font-medium text-ink-3">{label}</span>
                     <span className="min-w-0 flex-1 text-ink">{value}</span>
                   </div>
                 ))}

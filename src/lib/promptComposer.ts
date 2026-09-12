@@ -239,28 +239,46 @@ export function pickShotReferences(
   return out;
 }
 
-/* ── 结构化角色描述解析（8 要素行格式） ─────────────────────────────────── */
+/* ── 结构化角色描述解析（首行总述 + 8 要素行格式） ───────────────────────── */
+
+export interface ParsedCharacterDescription {
+  /** 一句话总述（首行，供资产卡片单行展示）；无总述行时为 undefined */
+  summary?: string;
+  /** 8 要素字段行；为空数组时调用方应整段展示原始文本（旧格式/自由文本兜底） */
+  fields: Array<{ label: string; value: string }>;
+}
 
 /**
- * 解析「要素名：内容」行格式的角色描述，供编辑器分行渲染。
- * 约定：AI 按 8 要素输出，每行 `要素名：内容`（中英文冒号均可）。
- * 容错：任何一行不含合法前缀（前缀 1-6 字），或总行数 < 2，返回 null ——
- * 调用方应整段展示原始文本（兼容旧版一句话描述 / 自由文本）。
+ * 解析角色描述：
+ * - 「要素名：内容」行 → fields（中英文冒号均可，前缀 1-6 字）
+ * - 首行若不含前缀且后随要素行 → 识别为一句话总述（summary）
+ * - 含任何无法归类的行，或整体不是"总述+要素行"结构 → fields 为空，
+ *   调用方整段展示原始文本（兼容旧版一句话描述，不半解析）。
  */
-export function parseStructuredDescription(
-  description: string,
-): Array<{ label: string; value: string }> | null {
+export function parseCharacterDescription(description: string): ParsedCharacterDescription {
   const lines = description
     .split(/\r?\n/)
     .map((l) => l.trim())
     .filter(Boolean);
-  if (lines.length < 2) return null;
 
-  const out: Array<{ label: string; value: string }> = [];
-  for (const line of lines) {
+  const fields: Array<{ label: string; value: string }> = [];
+  let summary: string | undefined;
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
     const m = line.match(/^([^：:]{1,6})[：:]\s*(.+)$/);
-    if (!m) return null;
-    out.push({ label: m[1], value: m[2].trim() });
+    if (m) {
+      fields.push({ label: m[1], value: m[2].trim() });
+      continue;
+    }
+    // 无前缀行：仅首行（不含冒号、且后面还有要素行）可作总述；否则视为自由文本 → 兜底
+    if (i === 0 && lines.length > 1 && !/[：:]/.test(line)) {
+      summary = line;
+      continue;
+    }
+    return { fields: [] };
   }
-  return out;
+
+  if (fields.length === 0) return { fields: [] };
+  return { summary, fields };
 }

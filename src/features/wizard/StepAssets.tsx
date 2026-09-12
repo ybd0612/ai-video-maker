@@ -271,7 +271,7 @@ export function StepAssets() {
                 <div className="min-w-0 flex-1">
                   <p className="text-sm font-medium text-ink">{char.name}</p>
                   <p className="mt-0.5 text-xs text-ink-4 line-clamp-2">
-                    {char.description || char.appearancePrompt || "—"}
+                    {(char.description || char.appearancePrompt || "—").split("\n")[0]}
                   </p>
                   {char.error && (
                     <p className="mt-0.5 truncate text-[0.625rem] text-danger" title={char.error}>
