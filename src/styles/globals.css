@@ -22,7 +22,7 @@
   --c-raised: #f8fafc;       /* 卡片浮起层 */
   --c-hover: #e2e8f0;        /* hover 底色 / 滚动条 */
   --c-line: #e2e8f0;         /* 常规边框 */
-  --c-line-soft: #eef2f7;    /* 弱边框 */
+  --c-line-soft: #e2e8f0;    /* 弱边框（浅色下与 line 同级，保证模块分割线可见） */
   --c-line-strong: #cbd5e1;  /* 强边框 / 连线 */
   --c-ink: #0f172a;          /* 主文字 */
   --c-ink-2: #334155;        /* 次要文字 */
