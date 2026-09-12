@@ -141,7 +141,7 @@ export function StepAssembly() {
                 muted
               />
             </div>
-            <span className="text-[9px] text-slate-500">
+            <span className="text-[0.5625rem] text-slate-500">
               #{shot.index + 1}
             </span>
           </div>

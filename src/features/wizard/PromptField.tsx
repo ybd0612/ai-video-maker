@@ -38,7 +38,7 @@ export function PromptField({
 }: PromptFieldProps) {
   return (
     <div className="space-y-1">
-      <label className="text-[11px] font-medium text-slate-500">
+      <label className="text-[0.6875rem] font-medium text-slate-500">
         {label}
       </label>
       <AiPolishField

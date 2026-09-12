@@ -50,7 +50,7 @@ export function ReviewCheckpoint({ mode, onConfirm, failedShots = [], onRetryFai
           {failedShots.some((s) => s.error) && (
             <ul className="mt-1 space-y-0.5">
               {failedShots.filter((s) => s.error).map((s) => (
-                <li key={s.index} className="truncate text-[11px] text-red-300/80" title={s.error}>
+                <li key={s.index} className="truncate text-[0.6875rem] text-red-300/80" title={s.error}>
                   #{s.index + 1}: {s.error}
                 </li>
               ))}
@@ -59,7 +59,7 @@ export function ReviewCheckpoint({ mode, onConfirm, failedShots = [], onRetryFai
           {onRetryFailed && (
             <button
               onClick={onRetryFailed}
-              className="mt-2 flex items-center gap-1 rounded px-2 py-1 text-[11px] text-red-400 hover:bg-red-950/40 transition"
+              className="mt-2 flex items-center gap-1 rounded px-2 py-1 text-[0.6875rem] text-red-400 hover:bg-red-950/40 transition"
             >
               <RefreshCw size={11} />
               {t("review.retryFailedShots")}
@@ -69,7 +69,7 @@ export function ReviewCheckpoint({ mode, onConfirm, failedShots = [], onRetryFai
       )}
 
       {quota && (
-        <p className="mt-2 text-[11px] text-slate-500">
+        <p className="mt-2 text-[0.6875rem] text-slate-500">
           {t("review.quotaUsage", {
             imageUsed: quota.imageUsed,
             imageLimit: quota.imageLimit,

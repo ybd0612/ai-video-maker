@@ -98,6 +98,8 @@ src/
 - 国际化使用自研 `useT()` hook，翻译键在 `src/i18n/index.ts` 的 `zh` / `en` 字典中
 - 新增翻译键时必须同时添加 zh 和 en 两个字典
 - 成片预览使用组件内 state 管理（blob URL 不持久化到 store，避免刷新后失效）
+- **界面缩放与字号**：整体缩放由 `src/styles/globals.css` 的 `:root { font-size: 112.5% }` 统一控制（Tailwind 的尺寸/间距/字号类均以 rem 为单位）；**新增样式禁止写死 `text-[Npx]`**，小字用 `text-[0.625rem]` / `text-[0.6875rem]` 这类 rem 写法或 Tailwind 预设类，否则不参与整体缩放。需要整体调大/调小界面时只改这一个数字
+- **验证方式**：本项目**不使用浏览器/预览服务做验证**（由用户本地手动确认界面效果）；AI 侧只跑 `npx tsc --noEmit` + `git diff --check` + `npm run build`
 
 ## Pipeline 架构
 

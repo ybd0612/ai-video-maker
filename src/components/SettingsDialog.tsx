@@ -23,7 +23,7 @@ function PlanLimitSummary({
   const hasQuota = plan.accessType === "tokenplan";
 
   return (
-    <div className="mt-2 space-y-1 rounded-lg border border-slate-700/60 bg-slate-800/40 px-3 py-2 text-[10px] leading-relaxed text-slate-400">
+    <div className="mt-2 space-y-1 rounded-lg border border-slate-700/60 bg-slate-800/40 px-3 py-2 text-[0.625rem] leading-relaxed text-slate-400">
       <p>{t("settings.planHint")}</p>
       <p>
         <span className="text-slate-500">{t("settings.planRpm")}：</span>{" "}
@@ -172,7 +172,7 @@ export function SettingsDialog() {
               <div className="space-y-4">
                 {/* API Key */}
                 <div>
-                  <label className="mb-1 block text-[11px] font-medium text-slate-400">
+                  <label className="mb-1 block text-[0.6875rem] font-medium text-slate-400">
 {t("settings.apiKey")}
                                       <a
                       href="https://platform.agnes-ai.cn/settings/apiKeys"
@@ -202,7 +202,7 @@ export function SettingsDialog() {
 
                 {/* Base URL */}
                 <div>
-                  <label className="mb-1 block text-[11px] font-medium text-slate-400">
+                  <label className="mb-1 block text-[0.6875rem] font-medium text-slate-400">
 {t("settings.baseUrl")}
                   </label>
                   <input
@@ -216,7 +216,7 @@ export function SettingsDialog() {
 
                 {/* Plan / access tier */}
                 <div>
-                  <label className="mb-1 block text-[11px] font-medium text-slate-400">
+                  <label className="mb-1 block text-[0.6875rem] font-medium text-slate-400">
                     {t("settings.plan")}
                   </label>
                   <select
@@ -257,7 +257,7 @@ export function SettingsDialog() {
                 </div>
 
                 {testResult.status !== "idle" && (
-                  <div className={`flex items-start gap-2 rounded-lg border px-3 py-2 text-[11px] leading-relaxed ${testResult.status === "success" ? "border-emerald-700 bg-emerald-950/40 text-emerald-200" : "border-red-700 bg-red-950/40 text-red-200"}`}>
+                  <div className={`flex items-start gap-2 rounded-lg border px-3 py-2 text-[0.6875rem] leading-relaxed ${testResult.status === "success" ? "border-emerald-700 bg-emerald-950/40 text-emerald-200" : "border-red-700 bg-red-950/40 text-red-200"}`}>
                     {testResult.status === "success" ? <CheckCircle2 size={14} className="mt-0.5" /> : <AlertTriangle size={14} className="mt-0.5" />}
                     <span>{testResult.message}</span>
                   </div>
@@ -265,7 +265,7 @@ export function SettingsDialog() {
 
                 {/* Language */}
                 <div>
-                  <label className="mb-1 block text-[11px] font-medium text-slate-400">
+                  <label className="mb-1 block text-[0.6875rem] font-medium text-slate-400">
                     {t("settings.language")}
                   </label>
                   <div className="flex gap-2">
@@ -284,18 +284,18 @@ export function SettingsDialog() {
                     ))}
                   </div>
                 </div>
-                <p className="text-[10px] text-slate-600">
+                <p className="text-[0.625rem] text-slate-600">
 {t("settings.storageNote")}
                 </p>
                 <a
                   href="https://github.com/ybd0612/ai-flow-canvas"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="mt-2 flex items-center gap-2 rounded-lg border border-slate-700/50 bg-slate-800/40 px-3 py-2 text-[11px] text-slate-400 hover:text-slate-200 hover:border-slate-600 transition"
+                  className="mt-2 flex items-center gap-2 rounded-lg border border-slate-700/50 bg-slate-800/40 px-3 py-2 text-[0.6875rem] text-slate-400 hover:text-slate-200 hover:border-slate-600 transition"
                 >
                   <svg className="w-4 h-4 shrink-0" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
                   <span>GitHub</span>
-                  <span className="ml-auto text-[10px] text-slate-500">{t("settings.github.desc")}</span>
+                  <span className="ml-auto text-[0.625rem] text-slate-500">{t("settings.github.desc")}</span>
                 </a>
               </div>
             </motion.div>

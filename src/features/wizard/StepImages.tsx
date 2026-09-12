@@ -65,7 +65,7 @@ export function StepImages() {
         </h2>
         <div className="flex items-center gap-2">
           {generatingCount > 0 && (
-            <span className="flex items-center gap-1 text-[11px] text-violet-400">
+            <span className="flex items-center gap-1 text-[0.6875rem] text-violet-400">
               <RefreshCw size={11} className="animate-spin" />
               {generatingCount} {t("wizard.generating")}
             </span>
@@ -74,7 +74,7 @@ export function StepImages() {
             <button
               onClick={() => generateImagesForStep()}
               disabled={generatingCount > 0}
-              className="flex items-center gap-1 rounded px-2 py-1 text-[11px] text-red-400 hover:bg-red-950/30 transition disabled:opacity-50"
+              className="flex items-center gap-1 rounded px-2 py-1 text-[0.6875rem] text-red-400 hover:bg-red-950/30 transition disabled:opacity-50"
             >
               <RefreshCw size={11} />
               {t("wizard.retryFailed")} ({failedCount})
@@ -103,7 +103,7 @@ export function StepImages() {
               generateImagesForStep();
             }}
             disabled={generatingCount > 0}
-            className="flex items-center gap-1 rounded px-2 py-1 text-[11px] text-emerald-400 hover:bg-emerald-950/30 transition disabled:opacity-50"
+            className="flex items-center gap-1 rounded px-2 py-1 text-[0.6875rem] text-emerald-400 hover:bg-emerald-950/30 transition disabled:opacity-50"
           >
             <RefreshCw size={11} />
             {t("wizard.rerollAll")}

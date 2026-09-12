@@ -2,14 +2,21 @@
 
 /* ── Global dark-theme defaults ──────────────────────────────────────────── */
 
+/*
+ * 整体界面缩放：Tailwind 的尺寸/字号类均以 rem 为单位，改动根字号即可等比放大
+ * 所有元素（含间距、圆角、控件宽高）。需要整体调大/调小界面时只改这一处。
+ * 当前 112.5% = 18px（基准 16px，整体 +12.5%）。
+ */
 :root {
   color-scheme: dark;
+  font-size: 112.5%;
 }
 
 body {
   @apply m-0 overflow-hidden bg-slate-950 text-slate-100 antialiased;
   font-family: "Inter", system-ui, -apple-system, sans-serif;
-  font-size: 14px;
+  /* 跟随根字号缩放（原为固定 14px，不参与整体缩放） */
+  font-size: 0.875rem;
 }
 
 /* ── React Flow overrides ────────────────────────────────────────────────── */

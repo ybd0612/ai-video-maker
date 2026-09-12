@@ -91,7 +91,7 @@ export function ProjectSidebar() {
             />
             <button
               onClick={handleCreate}
-              className="rounded bg-emerald-600 px-2 py-1 text-[10px] text-white hover:bg-emerald-500"
+              className="rounded bg-emerald-600 px-2 py-1 text-[0.625rem] text-white hover:bg-emerald-500"
             >
               {t("dialog.confirm")}
             </button>
@@ -99,7 +99,7 @@ export function ProjectSidebar() {
         ) : (
           <button
             onClick={() => setIsCreating(true)}
-            className="flex w-full items-center justify-center gap-1 rounded border border-dashed border-slate-700 py-1.5 text-[10px] text-slate-500 hover:border-emerald-600 hover:text-emerald-400 transition"
+            className="flex w-full items-center justify-center gap-1 rounded border border-dashed border-slate-700 py-1.5 text-[0.625rem] text-slate-500 hover:border-emerald-600 hover:text-emerald-400 transition"
           >
             <Plus size={10} />
             {t("pipeline.newProject")}
@@ -115,7 +115,7 @@ export function ProjectSidebar() {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder={t("pipeline.searchPlaceholder")}
-            className="w-full rounded border border-slate-700 bg-slate-800 pl-5 pr-2 py-1 text-[10px] text-slate-200 placeholder:text-slate-600 focus:border-emerald-500 focus:outline-none"
+            className="w-full rounded border border-slate-700 bg-slate-800 pl-5 pr-2 py-1 text-[0.625rem] text-slate-200 placeholder:text-slate-600 focus:border-emerald-500 focus:outline-none"
           />
         </div>
         <button
@@ -206,7 +206,7 @@ export function ProjectSidebar() {
                           style={{ width: `${(doneCount / shotCount) * 100}%` }}
                         />
                       </div>
-                      <span className="text-[9px] text-slate-600">
+                      <span className="text-[0.5625rem] text-slate-600">
                         {doneCount}/{shotCount}
                       </span>
                     </div>

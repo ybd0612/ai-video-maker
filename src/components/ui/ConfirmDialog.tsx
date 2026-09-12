@@ -92,14 +92,14 @@ export function ConfirmDialogProvider({ children }: { children: ReactNode }) {
               <div className="flex justify-end gap-2">
                 <button
                   onClick={() => handleClose(false)}
-                  className="rounded-lg border border-slate-700 bg-slate-800 px-3.5 py-1.5 text-[11px] font-medium text-slate-300 transition hover:border-slate-500 hover:text-slate-100"
+                  className="rounded-lg border border-slate-700 bg-slate-800 px-3.5 py-1.5 text-[0.6875rem] font-medium text-slate-300 transition hover:border-slate-500 hover:text-slate-100"
                 >
                   {options.cancelLabel ?? t("dialog.cancel")}
                 </button>
                 <button
                   onClick={() => handleClose(true)}
                   autoFocus
-                  className={`rounded-lg px-3.5 py-1.5 text-[11px] font-semibold text-white transition ${
+                  className={`rounded-lg px-3.5 py-1.5 text-[0.6875rem] font-semibold text-white transition ${
                     isDanger
                       ? "bg-red-600 hover:bg-red-500"
                       : "bg-emerald-600 hover:bg-emerald-500"

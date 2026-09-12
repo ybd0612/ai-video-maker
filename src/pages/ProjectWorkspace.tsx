@@ -76,7 +76,7 @@ export function ProjectWorkspace() {
             </span>
           )}
           {projects.length > 1 && (
-            <span className="rounded bg-slate-800 px-1.5 py-0.5 text-[10px] text-slate-500">
+            <span className="rounded bg-slate-800 px-1.5 py-0.5 text-[0.625rem] text-slate-500">
               {projects.length} {t("pipeline.projectCount")}
             </span>
           )}
@@ -143,7 +143,7 @@ export function ProjectWorkspace() {
           <div className="flex border-b border-slate-800">
             <button
               onClick={() => setLeftTab("projects")}
-              className={`flex flex-1 items-center justify-center gap-1 py-2 text-[10px] font-medium transition ${
+              className={`flex flex-1 items-center justify-center gap-1 py-2 text-[0.625rem] font-medium transition ${
                 leftTab === "projects"
                   ? "border-b-2 border-emerald-500 text-emerald-400"
                   : "text-slate-600 hover:text-slate-400"
@@ -154,7 +154,7 @@ export function ProjectWorkspace() {
             </button>
             <button
               onClick={() => setLeftTab("shots")}
-              className={`flex flex-1 items-center justify-center gap-1 py-2 text-[10px] font-medium transition ${
+              className={`flex flex-1 items-center justify-center gap-1 py-2 text-[0.625rem] font-medium transition ${
                 leftTab === "shots"
                   ? "border-b-2 border-emerald-500 text-emerald-400"
                   : "text-slate-600 hover:text-slate-400"
@@ -165,7 +165,7 @@ export function ProjectWorkspace() {
             </button>
             <button
               onClick={() => setLeftTab("characters")}
-              className={`flex flex-1 items-center justify-center gap-1 py-2 text-[10px] font-medium transition ${
+              className={`flex flex-1 items-center justify-center gap-1 py-2 text-[0.625rem] font-medium transition ${
                 leftTab === "characters"
                   ? "border-b-2 border-emerald-500 text-emerald-400"
                   : "text-slate-600 hover:text-slate-400"
@@ -176,7 +176,7 @@ export function ProjectWorkspace() {
             </button>
             <button
               onClick={() => setLeftTab("history")}
-              className={`flex flex-1 items-center justify-center gap-1 py-2 text-[10px] font-medium transition ${
+              className={`flex flex-1 items-center justify-center gap-1 py-2 text-[0.625rem] font-medium transition ${
                 leftTab === "history"
                   ? "border-b-2 border-emerald-500 text-emerald-400"
                   : "text-slate-600 hover:text-slate-400"

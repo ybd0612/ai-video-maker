@@ -64,7 +64,7 @@ export function ShotCard({
         className="flex items-center gap-2 px-3 py-2 text-left"
       >
         {/* Shot number */}
-        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-slate-800 text-[10px] font-bold text-slate-400">
+        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-slate-800 text-[0.625rem] font-bold text-slate-400">
           {shot.index + 1}
         </span>
 
@@ -72,7 +72,7 @@ export function ShotCard({
         <StatusIcon size={12} className={`shrink-0 ${statusInfo.color}`} />
 
         {/* Summary */}
-        <span className="flex-1 truncate text-[11px] text-slate-400">
+        <span className="flex-1 truncate text-[0.6875rem] text-slate-400">
           {summary}
         </span>
 
@@ -89,7 +89,7 @@ export function ShotCard({
 
         {/* Progress for videoing */}
         {shot.status === "videoing" && (shot.videoProgress ?? 0) > 0 && (
-          <span className="text-[10px] text-amber-400">
+          <span className="text-[0.625rem] text-amber-400">
             {shot.videoProgress}%
           </span>
         )}
@@ -118,7 +118,7 @@ export function ShotCard({
 
               {/* 失败原因（分镜/图片/视频生成失败均可显示） */}
               {shot.error && (
-                <p className="rounded border border-red-800 bg-red-950/30 px-2 py-1 text-[10px] text-red-300">
+                <p className="rounded border border-red-800 bg-red-950/30 px-2 py-1 text-[0.625rem] text-red-300">
                   {shot.error}
                 </p>
               )}
@@ -129,7 +129,7 @@ export function ShotCard({
                   <button
                     onClick={onReroll}
                     disabled={isGenerating}
-                    className="flex items-center gap-1 rounded px-2 py-1 text-[10px] text-emerald-400 hover:bg-emerald-950/30 transition disabled:opacity-50"
+                    className="flex items-center gap-1 rounded px-2 py-1 text-[0.625rem] text-emerald-400 hover:bg-emerald-950/30 transition disabled:opacity-50"
                   >
                     <RefreshCw size={10} className={isGenerating ? "animate-spin" : ""} />
                     {t("wizard.reroll")}
@@ -138,7 +138,7 @@ export function ShotCard({
                 {onDelete && (
                   <button
                     onClick={onDelete}
-                    className="flex items-center gap-1 rounded px-2 py-1 text-[10px] text-red-400 hover:bg-red-950/30 transition"
+                    className="flex items-center gap-1 rounded px-2 py-1 text-[0.625rem] text-red-400 hover:bg-red-950/30 transition"
                   >
                     <Trash2 size={10} />
                   </button>

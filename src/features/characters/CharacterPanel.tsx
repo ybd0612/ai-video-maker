@@ -51,7 +51,7 @@ export function CharacterPanel() {
         </span>
         <button
           onClick={handleAdd}
-          className="flex items-center gap-1 rounded px-2 py-1 text-[11px] text-emerald-400 hover:bg-emerald-950/30 transition"
+          className="flex items-center gap-1 rounded px-2 py-1 text-[0.6875rem] text-emerald-400 hover:bg-emerald-950/30 transition"
         >
           <UserPlus size={11} />
           {t("characters.add")}
@@ -61,7 +61,7 @@ export function CharacterPanel() {
       {characters.length === 0 ? (
         <div className="flex flex-col items-center justify-center gap-2 py-8 text-center">
           <UserPlus size={20} className="text-slate-700" />
-          <p className="text-[11px] text-slate-600">{t("characters.noCharacters")}</p>
+          <p className="text-[0.6875rem] text-slate-600">{t("characters.noCharacters")}</p>
         </div>
       ) : (
         <div className="flex flex-col gap-1.5">
@@ -79,7 +79,7 @@ export function CharacterPanel() {
                     className="h-full w-full object-cover"
                   />
                 ) : (
-                  <div className="flex h-full w-full items-center justify-center text-[10px] text-slate-500">
+                  <div className="flex h-full w-full items-center justify-center text-[0.625rem] text-slate-500">
                     {char.name.charAt(0).toUpperCase()}
                   </div>
                 )}
@@ -90,7 +90,7 @@ export function CharacterPanel() {
                 <p className="truncate text-xs font-medium text-slate-200">
                   {char.name}
                 </p>
-                <p className="truncate text-[10px] text-slate-500">
+                <p className="truncate text-[0.625rem] text-slate-500">
                   {char.description || char.appearancePrompt || "—"}
                 </p>
               </div>

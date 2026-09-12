@@ -37,7 +37,7 @@ export function DualFrameToggle({ shot }: DualFrameToggleProps) {
           }
           className="h-3.5 w-3.5 rounded border-slate-600 bg-slate-800 text-amber-500 focus:ring-amber-500 focus:ring-offset-0"
         />
-        <span className="flex items-center gap-1 text-[11px] text-slate-400">
+        <span className="flex items-center gap-1 text-[0.6875rem] text-slate-400">
           <Film size={11} className="text-amber-400" />
           {t("wizard.useDualFrame")}
         </span>
@@ -49,7 +49,7 @@ export function DualFrameToggle({ shot }: DualFrameToggleProps) {
           {/* 从其他分镜图中点选尾帧 */}
           {candidateFrames.length > 0 && (
             <div className="space-y-1">
-              <label className="text-[11px] font-medium text-slate-500">
+              <label className="text-[0.6875rem] font-medium text-slate-500">
                 {t("wizard.pickLastFrame")}
               </label>
               <div className="flex gap-1.5 overflow-x-auto pb-1">
@@ -75,7 +75,7 @@ export function DualFrameToggle({ shot }: DualFrameToggleProps) {
             </div>
           )}
 
-          <label className="text-[11px] font-medium text-slate-500">
+          <label className="text-[0.6875rem] font-medium text-slate-500">
             {t("wizard.lastFrameUrl")}
           </label>
           <input

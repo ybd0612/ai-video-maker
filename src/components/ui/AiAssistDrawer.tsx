@@ -172,10 +172,10 @@ export function AiAssistDrawer({
 
             {/* Current content context */}
             <div className="border-b border-slate-800 px-4 py-2">
-              <p className="mb-1 text-[10px] font-medium text-slate-600">
+              <p className="mb-1 text-[0.625rem] font-medium text-slate-600">
                 {t("aiAssist.currentContent")}
               </p>
-              <div className="max-h-20 overflow-y-auto rounded-md border border-slate-700 bg-slate-800/50 p-2 text-[11px] leading-relaxed text-slate-400">
+              <div className="max-h-20 overflow-y-auto rounded-md border border-slate-700 bg-slate-800/50 p-2 text-[0.6875rem] leading-relaxed text-slate-400">
                 {currentValue || (
                   <span className="italic text-slate-600">{t("aiAssist.emptyField")}</span>
                 )}
@@ -205,7 +205,7 @@ export function AiAssistDrawer({
                       <button
                         onClick={() => handleApply(msg.content, i)}
                         disabled={appliedIndex === i}
-                        className={`mt-1 flex items-center gap-1 rounded px-2 py-0.5 text-[10px] font-medium transition ${
+                        className={`mt-1 flex items-center gap-1 rounded px-2 py-0.5 text-[0.625rem] font-medium transition ${
                           appliedIndex === i
                             ? "bg-emerald-900/30 text-emerald-400"
                             : "bg-slate-800 text-slate-400 hover:bg-emerald-900/30 hover:text-emerald-300"
@@ -230,7 +230,7 @@ export function AiAssistDrawer({
 
                 {/* Error */}
                 {error && (
-                  <div className="rounded-md border border-red-800 bg-red-950/30 p-2 text-[11px] text-red-300">
+                  <div className="rounded-md border border-red-800 bg-red-950/30 p-2 text-[0.6875rem] text-red-300">
                     {error}
                   </div>
                 )}

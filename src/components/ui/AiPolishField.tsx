@@ -45,7 +45,7 @@ const BARE_APPEARANCE =
   "bg-transparent text-xs text-slate-300 placeholder:text-slate-600";
 
 const ACTION_BUTTON =
-  "pointer-events-auto flex items-center gap-0.5 rounded border border-slate-600/70 bg-slate-900/85 px-1.5 py-0.5 text-[10px] text-slate-400 backdrop-blur-sm transition disabled:cursor-not-allowed disabled:opacity-40";
+  "pointer-events-auto flex items-center gap-0.5 rounded border border-slate-600/70 bg-slate-900/85 px-1.5 py-0.5 text-[0.625rem] text-slate-400 backdrop-blur-sm transition disabled:cursor-not-allowed disabled:opacity-40";
 
 export function AiPolishField({
   value,
@@ -195,7 +195,7 @@ export function AiPolishField({
 
       {/* 失败原因（不弹窗，就地提示） */}
       {error && (
-        <p className="mt-1 truncate text-[10px] text-red-400" title={error}>
+        <p className="mt-1 truncate text-[0.625rem] text-red-400" title={error}>
           {error}
         </p>
       )}

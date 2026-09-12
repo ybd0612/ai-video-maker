@@ -49,7 +49,7 @@ export function HelpTooltip({ children }: { children: ReactNode }) {
       {visible &&
         createPortal(
           <span
-            className="fixed z-[9999] w-52 -translate-x-1/2 -translate-y-full rounded-lg border border-slate-600 bg-slate-800 px-2.5 py-2 text-[11px] leading-relaxed text-slate-300 shadow-xl"
+            className="fixed z-[9999] w-52 -translate-x-1/2 -translate-y-full rounded-lg border border-slate-600 bg-slate-800 px-2.5 py-2 text-[0.6875rem] leading-relaxed text-slate-300 shadow-xl"
             style={{ top: pos.top, left: pos.left, pointerEvents: "none" }}
           >
             {children}

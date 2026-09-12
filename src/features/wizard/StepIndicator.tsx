@@ -46,7 +46,7 @@ export function StepIndicator() {
             <button
               onClick={() => handleClick(step)}
               disabled={step > currentStep}
-              className={`flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-medium transition ${
+              className={`flex items-center gap-1.5 rounded-full px-3 py-1 text-[0.6875rem] font-medium transition ${
                 isCurrent
                   ? "bg-emerald-600 text-white"
                   : isCompleted
@@ -57,7 +57,7 @@ export function StepIndicator() {
               {isCompleted ? (
                 <Check size={11} />
               ) : (
-                <span className="flex h-4 w-4 items-center justify-center rounded-full border text-[9px]">
+                <span className="flex h-4 w-4 items-center justify-center rounded-full border text-[0.5625rem]">
                   {step}
                 </span>
               )}

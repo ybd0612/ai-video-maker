@@ -210,7 +210,7 @@ export function StepAssets() {
 
       {/* 无资产提示：可直接下一步（等价跳过），但说明一致性影响 */}
       {characters.length === 0 && sceneReferences.length === 0 && products.length === 0 && (
-        <p className="rounded-lg border border-amber-800/50 bg-amber-950/20 px-3 py-2 text-center text-[11px] text-amber-300/90">
+        <p className="rounded-lg border border-amber-800/50 bg-amber-950/20 px-3 py-2 text-center text-[0.6875rem] text-amber-300/90">
           {t("wizard.noAssetsContinueHint")}
         </p>
       )}
@@ -225,7 +225,7 @@ export function StepAssets() {
             <button
               onClick={handleBatchPortraits}
               disabled={isGenerating}
-              className="flex items-center gap-1.5 rounded px-2 py-1 text-[11px] text-violet-400 hover:bg-violet-950/30 transition disabled:opacity-50"
+              className="flex items-center gap-1.5 rounded px-2 py-1 text-[0.6875rem] text-violet-400 hover:bg-violet-950/30 transition disabled:opacity-50"
             >
               {isGenerating ? <Loader2 size={11} className="animate-spin" /> : <Wand2 size={11} />}
               {t("wizard.generateAllPortraits")}
@@ -259,7 +259,7 @@ export function StepAssets() {
                     {char.description || char.appearancePrompt || "—"}
                   </p>
                   {char.error && (
-                    <p className="mt-0.5 truncate text-[10px] text-red-400" title={char.error}>
+                    <p className="mt-0.5 truncate text-[0.625rem] text-red-400" title={char.error}>
                       生成失败：{char.error}
                     </p>
                   )}
@@ -306,7 +306,7 @@ export function StepAssets() {
             <h3 className="text-sm font-semibold text-slate-300">
               {t("wizard.sceneReferences")} ({sceneReferences.length})
             </h3>
-            <p className="text-[11px] text-slate-600 mt-0.5">
+            <p className="text-[0.6875rem] text-slate-600 mt-0.5">
               {t("wizard.sceneReferencesHint")}
             </p>
           </div>
@@ -314,7 +314,7 @@ export function StepAssets() {
             <button
               onClick={handleBatchScenes}
               disabled={isGenerating}
-              className="flex items-center gap-1.5 rounded px-2 py-1 text-[11px] text-violet-400 hover:bg-violet-950/30 transition disabled:opacity-50"
+              className="flex items-center gap-1.5 rounded px-2 py-1 text-[0.6875rem] text-violet-400 hover:bg-violet-950/30 transition disabled:opacity-50"
             >
               {isGenerating ? <Loader2 size={11} className="animate-spin" /> : <Wand2 size={11} />}
               {t("wizard.generateAllScenes")}
@@ -372,7 +372,7 @@ export function StepAssets() {
                 appearanceClass="bg-transparent text-xs text-slate-300 placeholder:text-slate-600"
               />
               {scene.error && (
-                <p className="truncate text-[10px] text-red-400" title={scene.error}>
+                <p className="truncate text-[0.625rem] text-red-400" title={scene.error}>
                   生成失败：{scene.error}
                 </p>
               )}
@@ -419,7 +419,7 @@ export function StepAssets() {
             <h3 className="text-sm font-semibold text-slate-300">
               {t("wizard.productReferences")} ({products.length})
             </h3>
-            <p className="text-[11px] text-slate-600 mt-0.5">
+            <p className="text-[0.6875rem] text-slate-600 mt-0.5">
               {t("wizard.productReferencesHint")}
             </p>
           </div>
@@ -427,7 +427,7 @@ export function StepAssets() {
             <button
               onClick={handleBatchProducts}
               disabled={isGenerating}
-              className="flex items-center gap-1.5 rounded px-2 py-1 text-[11px] text-violet-400 hover:bg-violet-950/30 transition disabled:opacity-50"
+              className="flex items-center gap-1.5 rounded px-2 py-1 text-[0.6875rem] text-violet-400 hover:bg-violet-950/30 transition disabled:opacity-50"
             >
               {isGenerating ? <Loader2 size={11} className="animate-spin" /> : <Wand2 size={11} />}
               {t("wizard.generateAllProducts")}
@@ -485,7 +485,7 @@ export function StepAssets() {
                 appearanceClass="bg-transparent text-xs text-slate-300 placeholder:text-slate-600"
               />
               {product.error && (
-                <p className="truncate text-[10px] text-red-400" title={product.error}>
+                <p className="truncate text-[0.625rem] text-red-400" title={product.error}>
                   生成失败：{product.error}
                 </p>
               )}
@@ -531,7 +531,7 @@ export function StepAssets() {
           <h3 className="text-sm font-semibold text-slate-300">
             {t("wizard.styleReference")}
           </h3>
-          <p className="text-[11px] text-slate-600 mt-0.5">
+          <p className="text-[0.6875rem] text-slate-600 mt-0.5">
             {t("wizard.styleReferenceHint")}
           </p>
         </div>
@@ -555,14 +555,14 @@ export function StepAssets() {
               {project?.style || "未设置风格描述"}
             </p>
             {project?.styleReferenceError && (
-              <p className="mt-1 truncate text-[10px] text-red-400" title={project.styleReferenceError}>
+              <p className="mt-1 truncate text-[0.625rem] text-red-400" title={project.styleReferenceError}>
                 生成失败：{project.styleReferenceError}
               </p>
             )}
             <button
               onClick={handleGenerateStyle}
               disabled={generatingStyle}
-              className="mt-2 flex items-center gap-1.5 rounded px-3 py-1.5 text-[11px] text-violet-400 hover:bg-violet-950/30 transition disabled:opacity-50"
+              className="mt-2 flex items-center gap-1.5 rounded px-3 py-1.5 text-[0.6875rem] text-violet-400 hover:bg-violet-950/30 transition disabled:opacity-50"
             >
               {generatingStyle ? (
                 <Loader2 size={11} className="animate-spin" />

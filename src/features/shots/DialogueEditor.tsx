@@ -35,13 +35,13 @@ export function DialogueEditor({ shotId }: DialogueEditorProps) {
   return (
     <div className="space-y-1.5">
       <div className="flex items-center justify-between">
-        <label className="flex items-center gap-1 text-[11px] font-medium text-slate-500">
+        <label className="flex items-center gap-1 text-[0.6875rem] font-medium text-slate-500">
           <MessageSquare size={10} />
           {t("dialogue.title")} ({dialogues.length})
         </label>
         <button
           onClick={handleAdd}
-          className="flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] text-emerald-400 hover:bg-emerald-950/30 transition"
+          className="flex items-center gap-1 rounded px-1.5 py-0.5 text-[0.625rem] text-emerald-400 hover:bg-emerald-950/30 transition"
         >
           <Plus size={10} />
           {t("dialogue.add")}
@@ -70,7 +70,7 @@ export function DialogueEditor({ shotId }: DialogueEditorProps) {
                       characterId: e.target.value || null,
                     })
                   }
-                  className="rounded border border-slate-700 bg-slate-800 px-1.5 py-0.5 text-[10px] text-slate-300 focus:border-sky-500 focus:outline-none"
+                  className="rounded border border-slate-700 bg-slate-800 px-1.5 py-0.5 text-[0.625rem] text-slate-300 focus:border-sky-500 focus:outline-none"
                 >
                   <option value="">{t("dialogue.narrator")}</option>
                   {characters.map((char) => (
@@ -96,7 +96,7 @@ export function DialogueEditor({ shotId }: DialogueEditorProps) {
                 resetKey={`${shotId}:${line.id}`}
                 placeholder={t("dialogue.textPlaceholder")}
                 singleLine
-                appearanceClass="rounded border border-slate-700/50 bg-slate-900/50 text-[11px] text-slate-200 placeholder:text-slate-600"
+                appearanceClass="rounded border border-slate-700/50 bg-slate-900/50 text-[0.6875rem] text-slate-200 placeholder:text-slate-600"
                 focusClass="focus:border-sky-500"
               />
             </div>
@@ -109,7 +109,7 @@ export function DialogueEditor({ shotId }: DialogueEditorProps) {
                 updateDialogueLine(shotId, line.id, { delivery: e.target.value })
               }
               placeholder={t("dialogue.deliveryPlaceholder")}
-              className="w-full rounded border border-slate-800 bg-transparent px-2 py-0.5 text-[10px] text-slate-500 placeholder:text-slate-700 focus:border-slate-600 focus:outline-none"
+              className="w-full rounded border border-slate-800 bg-transparent px-2 py-0.5 text-[0.625rem] text-slate-500 placeholder:text-slate-700 focus:border-slate-600 focus:outline-none"
             />
           </div>
           );

@@ -35,7 +35,7 @@ export function AutomationModeSwitch({ mode, onChange }: AutomationModeSwitchPro
         ))}
       </div>
       {/* 当前模式说明，替代仅靠 hover tooltip */}
-      <span className="text-[10px] text-slate-500">{currentHint}</span>
+      <span className="text-[0.625rem] text-slate-500">{currentHint}</span>
     </div>
   );
 }

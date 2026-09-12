@@ -59,7 +59,7 @@ export function ShotEditor({
       {/* Character selector (both modes) */}
       {characters.length > 0 && (
         <div className="space-y-1.5">
-          <label className="flex items-center gap-1 text-[11px] font-medium text-slate-500">
+          <label className="flex items-center gap-1 text-[0.6875rem] font-medium text-slate-500">
             <Users size={10} />
             {t("shot.characters")}
           </label>
@@ -75,7 +75,7 @@ export function ShotEditor({
                       : [...shot.activeCharacterIds, char.id];
                     setActiveCharacters(shot.id, newIds);
                   }}
-                  className={`rounded-full px-2 py-0.5 text-[10px] font-medium transition ${
+                  className={`rounded-full px-2 py-0.5 text-[0.625rem] font-medium transition ${
                     isActive
                       ? "bg-emerald-900/50 text-emerald-300 border border-emerald-700"
                       : "bg-slate-800 text-slate-500 border border-slate-700 hover:border-slate-600"
@@ -95,7 +95,7 @@ export function ShotEditor({
 
       {/* Script text */}
       <div className="space-y-1">
-        <label className="text-[11px] font-medium text-slate-500">
+        <label className="text-[0.6875rem] font-medium text-slate-500">
           {t("pipeline.scriptText")}
         </label>
         <AiPolishField
@@ -110,7 +110,7 @@ export function ShotEditor({
 
       {/* Visual prompt (text-to-image) */}
       <div className="space-y-1">
-        <label className="text-[11px] font-medium text-slate-500">
+        <label className="text-[0.6875rem] font-medium text-slate-500">
           {t("pipeline.visualPrompt")}
         </label>
         <AiPolishField
@@ -125,7 +125,7 @@ export function ShotEditor({
 
       {/* Motion prompt (image-to-video) */}
       <div className="space-y-1">
-        <label className="text-[11px] font-medium text-slate-500">
+        <label className="text-[0.6875rem] font-medium text-slate-500">
           {t("pipeline.motionPrompt")}
         </label>
         <AiPolishField
@@ -141,10 +141,10 @@ export function ShotEditor({
       {/* Duration */}
       <div className="space-y-1">
         <div className="flex items-center justify-between">
-          <label className="text-[11px] font-medium text-slate-500">
+          <label className="text-[0.6875rem] font-medium text-slate-500">
             {t("pipeline.duration")}
           </label>
-          <span className="text-[10px] text-emerald-600">
+          <span className="text-[0.625rem] text-emerald-600">
             ≈{(shot.duration ?? 5) * 15}s
           </span>
         </div>
@@ -194,7 +194,7 @@ export function ShotEditor({
 
       {/* Error */}
       {shot.error && (
-        <div className="rounded-md border border-red-800 bg-red-950/30 p-2 text-[11px] text-red-300">
+        <div className="rounded-md border border-red-800 bg-red-950/30 p-2 text-[0.6875rem] text-red-300">
           {shot.error}
         </div>
       )}

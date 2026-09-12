@@ -69,7 +69,7 @@ export function HistoryPanel() {
     <div className="flex flex-1 flex-col overflow-hidden">
       {/* Header */}
       <div className="flex items-center justify-between border-b border-slate-800 px-3 py-1.5">
-        <span className="text-[10px] text-slate-500">
+        <span className="text-[0.625rem] text-slate-500">
           {t("pipeline.historyCount").replace("{count}", String(history.length))}
         </span>
         {history.length > 0 && (
@@ -92,7 +92,7 @@ export function HistoryPanel() {
         ) : (
           Object.entries(grouped).map(([dateKey, entries]) => (
             <div key={dateKey}>
-              <div className="sticky top-0 bg-slate-950 px-3 py-1 text-[9px] font-medium text-slate-600">
+              <div className="sticky top-0 bg-slate-950 px-3 py-1 text-[0.5625rem] font-medium text-slate-600">
                 {dateKey}
               </div>
               {entries.map((entry) => {
@@ -107,15 +107,15 @@ export function HistoryPanel() {
                   >
                     <Icon size={10} className={`mt-0.5 flex-shrink-0 ${color}`} />
                     <div className="flex-1 min-w-0">
-                      <p className="truncate text-[10px] text-slate-300">
+                      <p className="truncate text-[0.625rem] text-slate-300">
                         {entry.description}
                       </p>
                       <div className="flex items-center gap-1.5">
-                        <span className="text-[9px] text-slate-600">
+                        <span className="text-[0.5625rem] text-slate-600">
                           {formatTime(entry.timestamp)}
                         </span>
                         {project && (
-                          <span className="truncate text-[9px] text-slate-700">
+                          <span className="truncate text-[0.5625rem] text-slate-700">
                             {project.title}
                           </span>
                         )}

@@ -78,7 +78,7 @@ export function ShotList({ selectedShotId, onSelect }: ShotListProps) {
                 </span>
                 <Icon size={11} className={cfg.color} />
               </div>
-              <p className="mt-0.5 truncate text-[11px] text-slate-500">
+              <p className="mt-0.5 truncate text-[0.6875rem] text-slate-500">
                 {shot.scriptText || shot.visualPrompt || "\u2014"}
               </p>
             </div>

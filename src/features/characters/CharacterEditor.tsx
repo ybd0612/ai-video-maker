@@ -131,7 +131,7 @@ export function CharacterEditor({ character, onClose }: CharacterEditorProps) {
 
       {/* Name */}
       <div className="space-y-1">
-        <label className="text-[11px] font-medium text-slate-500">
+        <label className="text-[0.6875rem] font-medium text-slate-500">
           {t("characters.name")}
         </label>
         <input
@@ -145,7 +145,7 @@ export function CharacterEditor({ character, onClose }: CharacterEditorProps) {
 
       {/* Description */}
       <div className="space-y-1">
-        <label className="text-[11px] font-medium text-slate-500">
+        <label className="text-[0.6875rem] font-medium text-slate-500">
           {t("characters.description")}
         </label>
         <AiPolishField
@@ -161,13 +161,13 @@ export function CharacterEditor({ character, onClose }: CharacterEditorProps) {
       {/* Appearance */}
       <div className="space-y-1">
         <div className="flex items-center justify-between">
-          <label className="text-[11px] font-medium text-slate-500">
+          <label className="text-[0.6875rem] font-medium text-slate-500">
             {t("characters.appearance")}
           </label>
           <button
             onClick={handleAiGenerate}
             disabled={isGenerating || !providerConfig.apiKey}
-            className="flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] text-emerald-400 hover:bg-emerald-950/30 transition disabled:opacity-50"
+            className="flex items-center gap-1 rounded px-1.5 py-0.5 text-[0.625rem] text-emerald-400 hover:bg-emerald-950/30 transition disabled:opacity-50"
             title={t("characters.aiGenerate")}
           >
             {isGenerating ? (
@@ -192,13 +192,13 @@ export function CharacterEditor({ character, onClose }: CharacterEditorProps) {
       {/* Portrait Preview + Generate */}
       <div className="space-y-1">
         <div className="flex items-center justify-between">
-          <label className="text-[11px] font-medium text-slate-500">
+          <label className="text-[0.6875rem] font-medium text-slate-500">
             {t("characters.portrait")}
           </label>
           <button
             onClick={handleGeneratePortrait}
             disabled={isGeneratingPortrait || !appearancePrompt.trim() || !providerConfig.apiKey}
-            className="flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] text-violet-400 hover:bg-violet-950/30 transition disabled:opacity-50"
+            className="flex items-center gap-1 rounded px-1.5 py-0.5 text-[0.625rem] text-violet-400 hover:bg-violet-950/30 transition disabled:opacity-50"
             title={t("characters.generatePortrait")}
           >
             {isGeneratingPortrait ? (
@@ -227,7 +227,7 @@ export function CharacterEditor({ character, onClose }: CharacterEditorProps) {
           </div>
         )}
         {isGeneratingPortrait && (
-          <p className="text-[10px] text-emerald-400 animate-pulse">
+          <p className="text-[0.625rem] text-emerald-400 animate-pulse">
             {t("wizard.generating") || "生成中..."}
           </p>
         )}
@@ -235,7 +235,7 @@ export function CharacterEditor({ character, onClose }: CharacterEditorProps) {
 
       {/* Avatar URL (manual override) */}
       <div className="space-y-1">
-        <label className="text-[11px] font-medium text-slate-500">
+        <label className="text-[0.6875rem] font-medium text-slate-500">
           {t("characters.avatar")}
         </label>
         <input
@@ -258,7 +258,7 @@ export function CharacterEditor({ character, onClose }: CharacterEditorProps) {
 
       {/* Error */}
       {error && (
-        <div className="rounded-md border border-red-800 bg-red-950/30 p-2 text-[11px] text-red-300">
+        <div className="rounded-md border border-red-800 bg-red-950/30 p-2 text-[0.6875rem] text-red-300">
           {error}
         </div>
       )}

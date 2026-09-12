@@ -93,7 +93,7 @@ export function StepStoryboard() {
         {/* Idea preview */}
         {ideaPrompt && (
           <div className="w-full rounded-xl border border-slate-700 bg-slate-800/50 p-4">
-            <p className="text-[11px] font-medium text-slate-500 mb-1">{t("wizard.step1")}</p>
+            <p className="text-[0.6875rem] font-medium text-slate-500 mb-1">{t("wizard.step1")}</p>
             <p className="text-sm text-slate-300 line-clamp-4">{ideaPrompt}</p>
           </div>
         )}
@@ -143,14 +143,14 @@ export function StepStoryboard() {
           <button
             onClick={handleGenerateStoryboard}
             disabled={isGenerating}
-            className="flex items-center gap-1 rounded px-2 py-1 text-[11px] text-violet-400 hover:bg-violet-950/30 transition disabled:opacity-50"
+            className="flex items-center gap-1 rounded px-2 py-1 text-[0.6875rem] text-violet-400 hover:bg-violet-950/30 transition disabled:opacity-50"
           >
             {isGenerating ? <Loader2 size={11} className="animate-spin" /> : <Sparkles size={11} />}
             {isGenerating ? t("wizard.generating") : t("wizard.reroll")}
           </button>
           <button
             onClick={handleAddShot}
-            className="flex items-center gap-1 rounded px-2 py-1 text-[11px] text-emerald-400 hover:bg-emerald-950/30 transition"
+            className="flex items-center gap-1 rounded px-2 py-1 text-[0.6875rem] text-emerald-400 hover:bg-emerald-950/30 transition"
           >
             <Plus size={12} />
             {t("wizard.addShot")}
@@ -184,7 +184,7 @@ export function StepStoryboard() {
 
             {/* Duration */}
             <div className="flex items-center gap-2">
-              <label className="text-[11px] font-medium text-slate-500">
+              <label className="text-[0.6875rem] font-medium text-slate-500">
                 {t("pipeline.duration")}
               </label>
               <select
@@ -246,7 +246,7 @@ function AssetSummaryBar({
   const products = assets.filter((a) => a.type === "product").length;
   if (chars === 0 && scenes === 0 && products === 0 && !styleReady) return null;
   return (
-    <div className="flex flex-wrap gap-3 text-[11px] text-slate-500">
+    <div className="flex flex-wrap gap-3 text-[0.6875rem] text-slate-500">
       <span>{t("wizard.assetCharacters")}: {chars}</span>
       <span>{t("wizard.assetScenes")}: {scenes}</span>
       <span>{t("wizard.productReferences")}: {products}</span>

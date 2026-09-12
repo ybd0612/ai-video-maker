@@ -83,13 +83,13 @@ export function StepVideos() {
         </h2>
         <div className="flex items-center gap-2">
           {generatingCount > 0 && (
-            <span className="flex items-center gap-1 text-[11px] text-amber-400">
+            <span className="flex items-center gap-1 text-[0.6875rem] text-amber-400">
               <RefreshCw size={11} className="animate-spin" />
               {generatingCount} {t("wizard.generating")}
             </span>
           )}
           {queueCount > 0 && (
-            <span className="text-[11px] text-slate-500">
+            <span className="text-[0.6875rem] text-slate-500">
               {t("wizard.queueCount", { count: queueCount })} ·{" "}
               {t(plan === "default" ? "wizard.queueHintDefault" : "wizard.queueHintFaster")}
             </span>
@@ -98,7 +98,7 @@ export function StepVideos() {
             <button
               onClick={() => generateVideosForStep()}
               disabled={generatingCount > 0}
-              className="flex items-center gap-1 rounded px-2 py-1 text-[11px] text-red-400 hover:bg-red-950/30 transition disabled:opacity-50"
+              className="flex items-center gap-1 rounded px-2 py-1 text-[0.6875rem] text-red-400 hover:bg-red-950/30 transition disabled:opacity-50"
             >
               <RefreshCw size={11} />
               {t("wizard.retryFailed")} ({failedCount})
@@ -128,7 +128,7 @@ export function StepVideos() {
               generateVideosForStep();
             }}
             disabled={generatingCount > 0}
-            className="flex items-center gap-1 rounded px-2 py-1 text-[11px] text-emerald-400 hover:bg-emerald-950/30 transition disabled:opacity-50"
+            className="flex items-center gap-1 rounded px-2 py-1 text-[0.6875rem] text-emerald-400 hover:bg-emerald-950/30 transition disabled:opacity-50"
           >
             <RefreshCw size={11} />
             {t("wizard.rerollAll")}
@@ -137,7 +137,7 @@ export function StepVideos() {
       </div>
 
       {/* 成本预估：成片总时长 + 待生成视频配额消耗 */}
-      <div className="flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-slate-500">
+      <div className="flex flex-wrap gap-x-4 gap-y-1 text-[0.6875rem] text-slate-500">
         <span>{t("wizard.videoDurationEstimate", { seconds: totalDuration })}</span>
         {pendingSeconds > 0 && (
           <span className="text-amber-400/80">
@@ -202,11 +202,11 @@ export function StepVideos() {
                         style={{ width: `${shot.videoProgress ?? 0}%` }}
                       />
                     </div>
-                    <span className="text-[10px] text-amber-400">
+                    <span className="text-[0.625rem] text-amber-400">
                       {shot.videoProgress ?? 0}%
                     </span>
                     {shot.videoRetryCount && shot.videoRetryCount > 0 && (
-                      <span className="text-[9px] text-slate-500">
+                      <span className="text-[0.5625rem] text-slate-500">
                         Retry {shot.videoRetryCount}/3
                       </span>
                     )}
@@ -214,7 +214,7 @@ export function StepVideos() {
                 </div>
               ) : (
                 <div className="flex flex-1 items-center justify-center rounded-md border border-dashed border-slate-700 bg-slate-800/30 h-24">
-                  <span className="text-[10px] text-slate-600">{t("wizard.waiting")}</span>
+                  <span className="text-[0.625rem] text-slate-600">{t("wizard.waiting")}</span>
                 </div>
               )}
             </div>

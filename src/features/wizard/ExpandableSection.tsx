@@ -31,7 +31,7 @@ export function ExpandableSection({
         <div className="flex items-center gap-2">
           <span className="text-xs font-medium text-slate-300">{title}</span>
           {!expanded && summary && (
-            <span className="truncate text-[10px] text-slate-500 max-w-[200px]">
+            <span className="truncate text-[0.625rem] text-slate-500 max-w-[200px]">
               {summary}
             </span>
           )}
