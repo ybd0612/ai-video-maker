@@ -24,9 +24,13 @@ interface CharacterEditorProps {
   onClose: () => void;
 }
 
-/** 「重新生成」用随机种子：实测同 seed 同 prompt 输出字节级一致，随机 seed 破除结果趋同 */
+/**
+ * 「重新生成」用随机种子。
+ * ⚠️ 服务端校验 seed ∈ [-1, 999]（文档未写，实测 400 报错得知）；
+ * 超出范围直接 400 invalid_request。取 0-999 随机即可破除结果趋同。
+ */
 function randomSeed(): number {
-  return Math.floor(Math.random() * 2147483647);
+  return Math.floor(Math.random() * 1000);
 }
 
 export function CharacterEditor({ character, onClose }: CharacterEditorProps) {
