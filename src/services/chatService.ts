@@ -1,6 +1,7 @@
 // ────────────────────────────────────────────────────────────────────────────
 // src/services/chatService.ts
-// Multi-turn chat API for AI-assisted prompt optimization.
+// AI 辅助服务：字段级专家系统提示词 + 一键润色（polishText）。
+// polishText 供 components/ui/AiPolishField.tsx 的框内「润色」按钮调用。
 // ────────────────────────────────────────────────────────────────────────────
 
 import { createAIService } from "@/services/ai/factory";

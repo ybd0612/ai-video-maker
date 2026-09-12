@@ -40,7 +40,7 @@ src/
 │   ├── scriptService.ts           # 文本模型调用，生成结构化分镜（含 visualPrompt + motionPrompt）
 │   ├── imageService.ts            # 图片生成（单张，使用 visualPrompt）
 │   ├── videoService.ts            # 视频生成（异步创建 + 轮询 + 完成响应解析，使用 motionPrompt）
-│   ├── chatService.ts             # 多轮对话 API（AI 辅助提示词优化）
+│   ├── chatService.ts             # AI 辅助：字段专家提示词 + 一键润色（polishText）
 │   ├── renderService.ts           # FFmpeg.wasm 视频拼接
 │   ├── pipelineService.ts         # 旧版一键流水线（兼容保留，非主流程）
 │   └── ai/                        # AI 服务统一入口（OpenAI 兼容）
@@ -166,7 +166,14 @@ src/
 - 统一走 `components/ui/AiPolishField.tsx`（输入框 + 内嵌按钮），润色请求走 `chatService.polishText`；**禁止再引入旁挂式 AI 入口**（输入框外的 ✨ 按钮 / 抽屉）
 - 字段与专家系统提示词的对应关系集中在 `services/chatService.ts`：文案 `SYSTEM_PROMPT_SCRIPT_TEXT`、画面 `SYSTEM_PROMPT_VISUAL_PROMPT`、动态 `SYSTEM_PROMPT_MOTION_PROMPT`、负向 `SYSTEM_PROMPT_NEGATIVE_PROMPT`、对白 `SYSTEM_PROMPT_DIALOGUE`、角色外观 `SYSTEM_PROMPT_CHARACTER`、中文描述 `SYSTEM_PROMPT_DESCRIPTION_ZH`、主题 `SYSTEM_PROMPT_MAIN_PROMPT`
 - 边界行为：内容为空 / 无 API Key / 请求进行中时按钮自动禁用；失败就地显示原因（不弹窗）；润色结果与原文相同则不入撤销栈
+- 按钮样式（用户两次微调后的定稿）：**只用图标不显示文字**（`h-5 w-5` 方形 + 图标 `size={12}`，含义靠 `title` 提示）；**不得紧贴输入框边框**——多行贴右下角留距（`bottom-2.5 right-2.5`，输入框配 `pb-9`），单行垂直居中（`top-1/2 -translate-y-1/2 right-2`，输入框配 `pr-16`）
 - 旧的多轮对话抽屉 `AiAssistDrawer.tsx` **已弃用**（无任何引用，保留仅作历史参考）
+
+## UI 交互约定
+
+- **卡片的「进入编辑」统一为点击整张卡片**：`role="button"` + `tabIndex={0}` + Enter/Space 键盘可达 + `cursor-pointer` + `focus:border-emerald-500`，卡片上加 `title={t("characters.edit")}` 作为提示；**不再单独放铅笔按钮**（`Pencil` 图标已全项目移除）。角色卡片见 `wizard/StepAssets.tsx` 与 `characters/CharacterPanel.tsx`
+- 卡片内的次级操作（删除等）**必须 `e.stopPropagation()`**，否则会连带触发卡片的进入编辑
+- 界面整体缩放与字号规则见「编码规范」一节（rem 化，禁止写死 px 字号）
 
 ## 模型配置
 
