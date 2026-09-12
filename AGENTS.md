@@ -77,15 +77,31 @@ src/
 └── main.tsx                       # 入口文件
 ```
 
+顶层另有 `tests/`（单元测试目录，见「测试约定」）与 `vitest.config.ts`（单元测试配置）。
+
 ## 命令
 
 - `npm run dev` — 启动开发服务器（端口 5173）
 - `npm run build` — TypeScript 检查 + Vite 生产构建
 - `npm run preview` — 预览生产版本（端口 5180）
+- `npm run test` — 运行单元测试（Vitest 单次执行）
+- `npm run test:watch` — 单元测试 watch 模式
 
 ## 路径别名
 
 `@/` 映射到 `src/`（通过 `vite.config.ts` 和 `tsconfig.json` 的 `paths` 配置）。
+
+## 测试约定（单元测试）
+
+本项目的测试**只做代码单元测试，禁止浏览器 / E2E 测试**（Playwright 已移除，勿再引入）。
+
+- **运行器**：Vitest，配置在 `vitest.config.ts`（`environment: "node"`，仅复用 `@/` 别名，不加载 react / tailwind 插件）。
+- **用例位置**：`tests/**/*.test.ts`，按被测模块镜像分层（`tests/lib/` 对应 `src/lib/`，`tests/services/` 对应 `src/services/`）。
+- **不引入 jsdom**：需要 `localStorage` 的用例使用 `tests/helpers/localStorage.ts` 提供的轻量桩。
+- **断言必须来自真实实现**：写用例前先读源码，禁止依据注释或文档猜测期望值。若发现实现与注释不一致（例：`isValidApiKey` 注释写「minimum 10 chars」，正则实际只要求 9 位），用例应锁定**真实行为**并加注释说明，让偏差可见而非被掩盖。
+- **网络与时间一律伪造**：涉及重试 / 限流的用例必须用 `vi.stubGlobal("fetch", ...)` 与 `vi.useFakeTimers()`，禁止真实请求与真实等待。
+- **单例隔离**：`rateLimiter` 等模块级单例有跨用例状态，需用 `vi.resetModules()` + 动态 `import()` 取新实例（见 `tests/services/rateLimit.test.ts`）。
+- 注意 `tsconfig.json` 的 `include` 仅含 `src`，因此 `tests/` 与 `vitest.config.ts` **不参与 `npm run build` 的类型检查**，需靠 `npm run test` 自行保证正确性。
 
 ## 编码规范
 
@@ -208,7 +224,7 @@ src/
 
 ## 注意事项
 
-- 本项目无测试套件，无需运行测试；验证用 `npx tsc --noEmit` + `git diff --check` + `npm run build`（dist 被占用时先 `rm -rf dist`）
+- 项目只做**单元测试**（Vitest），**不使用浏览器 / E2E**；验证用 `npx tsc --noEmit` + `git diff --check` + `npm run test` + `npm run build`（dist 被占用时先 `rm -rf dist`）
 - `.env.example` 中的 `VITE_*` 环境变量仅作参考，实际配置通过应用内设置对话框完成
 - 模型调用无抽象层：`src/services/` 直接调用 Agnes API，不存在 adapter 中间层（旧 `src/providers/` 已在前一轮重构中移除，勿再引用）
 - 视频/图片等外部 API 响应字段以**用户实测为准**，不要仅凭官方文档推断（实测：Agnes 视频成片地址在响应顶层 `url` 字段，非文档示例的 `metadata.url`）

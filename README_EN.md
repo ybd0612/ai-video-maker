@@ -64,6 +64,9 @@ npm run build
 
 # Preview production build (port 5180)
 npm run preview
+
+# Run unit tests (Vitest, pure logic — no browser)
+npm run test
 ```
 
 ### Configure API Key

@@ -64,6 +64,9 @@ npm run build
 
 # 预览生产版本（端口 5180）
 npm run preview
+
+# 运行单元测试（Vitest，纯代码逻辑，不使用浏览器）
+npm run test
 ```
 
 ### 配置 API Key
