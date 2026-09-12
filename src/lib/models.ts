@@ -10,8 +10,9 @@ export const MODELS = {
 } as const;
 
 /**
- * 文本模型输出预算：统一给到模型最大输出（Agnes 3.0 Flash = 65,536）。
- * 项目方针：效果优先，不为节约 token 精打细算——调用方一律不设小预算，
- * 避免输出触顶截断（JSON 断裂/内容缺失）。若需覆盖，调用方显式传 maxTokens。
+ * 文本模型输出预算：固定为模型最大输出（Agnes 3.0 Flash = 65,536）。
+ * ⚠️ 必须显式传：实测不传时服务端缺省 max_tokens=4096，长内容会被
+ * finish_reason=length 截断。项目方针：效果优先，不做 token 精打细算，
+ * 此参数不对外暴露（ChatParams 上没有它）。
  */
 export const MAX_OUTPUT_TOKENS = 65536;

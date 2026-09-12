@@ -6,9 +6,11 @@
 export interface ChatParams {
   messages: Array<{ role: "system" | "user" | "assistant"; content: string }>;
   temperature?: number;
-  maxTokens?: number;
-  /** 是否启用推理模型的 Thinking 模式（默认 false：思考会占用 token 预算，
-   * 关闭后所有预算用于实际输出，避免思考耗尽导致 content 为空） */
+  /**
+   * 输出预算不可调：统一 MAX_OUTPUT_TOKENS（65536，见 lib/models.ts）。
+   * 实测服务端缺省 max_tokens=4096（finish_reason=length 截断），
+   * 显式传最大值是防止长 JSON 截断的唯一手段，故不暴露此参数。
+   */
   enableThinking?: boolean;
 }
 
