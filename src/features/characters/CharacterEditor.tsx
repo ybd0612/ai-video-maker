@@ -44,44 +44,19 @@ export function CharacterEditor({ character, onClose }: CharacterEditorProps) {
   const [descHistory, setDescHistory] = useState<string[]>([]);
   const [isApplyingInstruction, setIsApplyingInstruction] = useState(false);
   const [portraitUrl, setPortraitUrl] = useState(character?.imageUrl ?? "");
-  const [isGeneratingDescription, setIsGeneratingDescription] = useState(false);
   const [isGeneratingPortrait, setIsGeneratingPortrait] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
-  /** AI 生成/补全「完整中文角色描述」（6 要素：物种开头 / 身份 / 性格 / 外貌 / 服饰 / 记忆点） */
-  const handleAiGenerateDescription = useCallback(async () => {
-    if (!providerConfig.apiKey || !providerConfig.baseUrl || !name.trim()) return;
-    setIsGeneratingDescription(true);
-    setError(null);
-    try {
-      const result = await chatCompletion({
-        apiKey: providerConfig.apiKey,
-        baseUrl: providerConfig.baseUrl,
-        messages: [
-          { role: "system", content: SYSTEM_PROMPT_CHARACTER_DESCRIPTION_ZH },
-          {
-            role: "user",
-            content: [
-              `角色名：${name.trim()}`,
-              `现有描述：${description.trim() || "（暂无，请根据角色名补全完整描述）"}`,
-            ].join("\n"),
-          },
-        ],
-      });
-      setDescription(result.content.trim());
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-    } finally {
-      setIsGeneratingDescription(false);
-    }
-  }, [providerConfig, name, description]);
-
-  /** 按用户指令修改描述：AI 把要求融合进当前描述（描述本身只读，由 AI 维护） */
+  /**
+   * 修改描述（描述只读，由 AI 维护的唯一入口）：
+   * - 有指令：AI 把要求融合进当前描述
+   * - 空指令：AI 根据角色名与现有描述生成/补全完整角色描述
+   */
   const handleApplyInstruction = useCallback(async () => {
     const requirement = instruction.trim();
-    if (!requirement || isApplyingInstruction || !providerConfig.apiKey || !providerConfig.baseUrl) return;
+    if (isApplyingInstruction || !providerConfig.apiKey || !providerConfig.baseUrl) return;
     setIsApplyingInstruction(true);
     setError(null);
     setNotice(null);
@@ -96,9 +71,11 @@ export function CharacterEditor({ character, onClose }: CharacterEditorProps) {
             content: [
               `角色名：${name.trim() || "（未命名）"}`,
               `当前描述：${description.trim() || "（暂无）"}`,
-              `修改要求：${requirement}`,
+              requirement
+                ? `修改要求：${requirement}`
+                : "修改要求：无——请根据角色名与现有描述，输出/补全为完整角色描述",
               "",
-              "请把修改要求融合进当前描述，输出修改后的完整角色描述（保持 6 要素结构与既有内容，仅做要求涉及的改变）。",
+              "输出修改后的完整角色描述（保持既有结构：总述 + 8 要素；仅做要求涉及的改变，其余内容保持不变）。",
             ].join("\n"),
           },
         ],
@@ -258,24 +235,9 @@ export function CharacterEditor({ character, onClose }: CharacterEditorProps) {
 
       {/* Description（只读：由 AI 维护；用户经指令输入框让 AI 修改） */}
       <div className="space-y-1">
-        <div className="flex items-center justify-between">
-          <label className="text-[0.6875rem] font-medium text-ink-4">
-            {t("characters.description")}
-          </label>
-          <button
-            onClick={handleAiGenerateDescription}
-            disabled={isGeneratingDescription || !providerConfig.apiKey || !name.trim()}
-            className="flex items-center gap-1 rounded px-1.5 py-0.5 text-[0.625rem] text-success hover:bg-success-deep/30 transition disabled:opacity-50"
-            title={t("characters.aiGenerateDescription")}
-          >
-            {isGeneratingDescription ? (
-              <Loader2 size={10} className="animate-spin" />
-            ) : (
-              <Sparkles size={10} />
-            )}
-            {t("characters.aiGenerateDescription")}
-          </button>
-        </div>
+        <label className="text-[0.6875rem] font-medium text-ink-4">
+          {t("characters.description")}
+        </label>
         {/* 完整中文角色描述（唯一事实源，只读展示；一行总述 + 8 要素分行，旧格式整段兜底） */}
         {(() => {
           const parsed = parseCharacterDescription(description);
@@ -327,10 +289,7 @@ export function CharacterEditor({ character, onClose }: CharacterEditorProps) {
           <button
             onClick={handleApplyInstruction}
             disabled={
-              isApplyingInstruction ||
-              !instruction.trim() ||
-              !providerConfig.apiKey ||
-              !providerConfig.baseUrl
+              isApplyingInstruction || !providerConfig.apiKey || !providerConfig.baseUrl
             }
             className="flex shrink-0 items-center gap-1 rounded-md bg-success px-2 py-1.5 text-[0.6875rem] font-medium text-white transition hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
             title={t("characters.applyInstruction")}
