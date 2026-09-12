@@ -226,9 +226,7 @@ export async function generateScript(
         { role: "user", content: opts.prompt },
       ],
       temperature: 0.7,
-      // 8 镜头 ×（双提示词 + 10 个中文字段 + 对白）+ 9 行角色描述，实测峰值逼近 8K；
-      // 3.0 Flash 输出上限 65,536，给足余量避免触顶截断进入全量重试
-      maxTokens: 16384,
+      // 输出预算走 MAX_OUTPUT_TOKENS（65536，效果优先不做 token 精打细算）
       enableThinking: false,
     });
     const content = result.content;
@@ -433,9 +431,7 @@ export async function extractAssetsFromIdea(
       { role: "user", content: opts.prompt },
     ],
     temperature: 0.3,
-    // 角色 description 升级为 9 行（总述 + 8 要素）后输出翻倍，1024 已逼近触顶；
-    // 2K 预算覆盖 4 角色 + 多场景 + 风格的 JSON 全量输出
-    maxTokens: 2048,
+    // 输出预算走 MAX_OUTPUT_TOKENS（65536），9 行角色描述 + 多资产不再有触顶风险
     enableThinking: false,
   });
 

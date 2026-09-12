@@ -4,7 +4,7 @@
 // Reuses existing utilities (fetchWithRetry, MODELS) for robustness.
 // ────────────────────────────────────────────────────────────────────────────
 
-import { MODELS } from "@/lib/models";
+import { MODELS, MAX_OUTPUT_TOKENS } from "@/lib/models";
 import { resolveBaseUrl } from "@/lib/resolveBaseUrl";
 import { fetchWithRetry } from "@/lib/fetchWithRetry";
 import { rateLimiter, imageSizeToTier } from "@/services/rateLimit";
@@ -50,9 +50,9 @@ export class OpenAIService implements AIService {
         model: MODELS.text,
         messages: params.messages,
         temperature: params.temperature ?? 0.7,
-        // 推理模型（如 agnes-3.0-flash）会先消耗 token 用于思考（reasoning_content），
-        // 剩余才输出到 content。预算太小会导致思考耗尽、content 为空，故默认给 4096。
-        max_tokens: params.maxTokens ?? 4096,
+        // 输出预算统一给到模型最大值（效果优先，不做 token 精打细算）：
+        // 预算太小会导致内容截断（JSON 断裂）或思考耗尽、content 为空。
+        max_tokens: params.maxTokens ?? MAX_OUTPUT_TOKENS,
         // 默认关闭 Thinking 模式：聊天/脚本生成等任务无需深度推理，
         // 关闭后所有 token 预算用于实际输出，从根本上避免思考耗尽导致 content 为空，且响应更快。
         chat_template_kwargs: { enable_thinking: params.enableThinking ?? false },

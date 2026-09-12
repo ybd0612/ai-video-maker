@@ -161,7 +161,6 @@ async function deriveStylePrompt(
           { role: "user", content: userContent },
         ],
         temperature: 0.4,
-        maxTokens: 256,
         enableThinking: false,
       });
       const text = result.content.trim();
