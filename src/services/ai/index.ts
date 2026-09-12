@@ -22,10 +22,13 @@ export interface ChatResult {
 
 export interface ImageParams {
   prompt: string;
+  /** 尺寸档位串（"1K" | "2K"），直接作为请求体 size */
   size: string;
+  /** 画幅比例（请求体 ratio，如 "9:16"），缺省 "1:1" */
+  ratio?: string;
   negativePrompt?: string;
-  /** 参考图 URL（图生图模式） */
-  inputImageUrl?: string;
+  /** 参考图 URL 列表（图生图 / 多图合成模式，官方要求放 extra_body.image） */
+  referenceImageUrls?: string[];
 }
 
 export interface ImageResult {

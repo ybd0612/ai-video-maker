@@ -6,6 +6,10 @@
 
 import type { Shot, Asset } from "@/stores/projectStore";
 import { createAIService } from "@/services/ai/factory";
+import {
+  buildSystemPrompt as buildTaskSystemPrompt,
+  getActiveRules,
+} from "@/lib/promptRules";
 
 interface GenerateScriptOptions {
   apiKey: string;
@@ -58,11 +62,19 @@ interface RawScene {
   appearancePrompt: string;
 }
 
+/** 风格资产（模型输出格式；仅 name+description，中文风格描述为 L1 用户事实源，
+ *  英文 stylePrompt 由运行期懒派生，不落库在模型输出里） */
+export interface RawStyle {
+  name: string;
+  description: string;
+}
+
 export interface GenerateScriptResult {
   shots: Omit<Shot, "id" | "index" | "status">[];
   characters: RawCharacter[];
   products: RawProduct[];
   scenes: RawScene[];
+  styles: RawStyle[];
 }
 
 /* ── Motion translation ─────────────────────────────────────────────────── */
@@ -109,15 +121,51 @@ function buildSystemPrompt(
   language: "zh" | "en",
   assets?: Asset[],
 ): string {
-  return language === "zh"
-    ? buildPromptZh(assets)
-    : buildPromptEn(assets);
+  // 规则注册表渲染：骨架（JSON 格式）+ BUILTIN_RULES + 用户覆盖条目
+  const base = buildTaskSystemPrompt("storyboard", language, getActiveRules());
+  // 资产上下文段是动态数据，不入条目，函数内拼装后注入 {{assets}} 槽
+  return base.replace("{{assets}}", () => buildAssetsContext(language, assets));
 }
 
-function buildPromptZh(assets?: Asset[]): string {
+/** 资产上下文段（动态数据：已有角色/场景/产品列表，供模型复用 ID 与保持一致性） */
+function buildAssetsContext(language: "zh" | "en", assets?: Asset[]): string {
   const characters = (assets ?? []).filter((a) => a.type === "character");
   const scenes = (assets ?? []).filter((a) => a.type === "scene");
   const products = (assets ?? []).filter((a) => a.type === "product");
+
+  if (language === "en") {
+    let charSection = "";
+    if (characters.length > 0) {
+      charSection =
+        "\nExisting characters (use corresponding IDs if content involves them):\n" +
+        characters
+          .map((c) => `- ${c.name} (ID: ${c.id}): ${c.description || "No description"}`)
+          .join("\n") +
+        "\n";
+    }
+
+    let sceneSection = "";
+    if (scenes.length > 0) {
+      sceneSection =
+        "\nAvailable scene references (use these scenes, keep sceneDesc consistent with scene names):\n" +
+        scenes
+          .map((s) => `- ${s.name}: ${s.description}`)
+          .join("\n") +
+        "\n";
+    }
+
+    let productSection = "";
+    if (products.length > 0) {
+      productSection =
+        "\nExisting product subjects (if content involves these products, keep the subject consistent across shots):\n" +
+        products
+          .map((p) => `- ${p.name}: ${p.description}`)
+          .join("\n") +
+        "\n";
+    }
+
+    return `${charSection}${sceneSection}${productSection}`;
+  }
 
   let charSection = "";
   if (characters.length > 0) {
@@ -149,189 +197,7 @@ function buildPromptZh(assets?: Asset[]): string {
       "\n";
   }
 
-  return `你是一位专业的短视频分镜策划师。用户会给你一个主题或想法，你需要：
-1. 将其拆分为 4-8 个分镜镜头
-2. 如果内容中有人物角色，提取角色信息
-3. 如果内容是产品/商品/实物主体，提取产品信息
-4. 如果内容涉及具体场景，提取场景信息
-${charSection}${sceneSection}${productSection}
-严格按以下 JSON 格式返回，不要包含任何其他文字：
-{
-  "characters": [
-    {
-      "name": "角色名",
-      "description": "角色简介（性格、身份；动物/拟人角色同样适用）",
-      "appearancePrompt": "外貌描述（英文，用于 AI 绘图；人物写年龄体型发型服饰，动物写物种体型毛色特征等）"
-    }
-  ],
-  "products": [
-    {
-      "name": "产品名",
-      "description": "产品简介（类型、用途）",
-      "appearancePrompt": "外观描述（英文，用于 AI 绘图，包含款式、颜色、材质、细节、logo 等）"
-    }
-  ],
-  "scenes": [
-    {
-      "name": "场景名",
-      "description": "场景简介（中文）",
-      "appearancePrompt": "场景英文描述（用于 AI 绘图：环境、光线、氛围）"
-    }
-  ],
-  "shots": [
-    {
-      "activeCharacterIds": ["char_xxx"],
-      "dialogues": [
-        { "characterId": null, "text": "旁白文本", "delivery": "平静" },
-        { "characterId": "char_xxx", "text": "角色台词", "delivery": "温柔地" }
-      ],
-      "scriptText": "该镜头旁白/文案（中文，简短有力）",
-      "visualPrompt": "文生图英文提示词（完整描述，如有角色出场必须包含角色外貌）",
-      "motionPrompt": "图生视频英文提示词（完整动态描述）",
-      "subjectDesc": "主体描述（中文）",
-      "sceneDesc": "场景/背景描述（中文）",
-      "detailDesc": "细节/服饰描述（中文）",
-      "lightingDesc": "光影/色调（中文）",
-      "styleDesc": "艺术风格（中文）",
-      "negativePrompt": "负向提示词（中文）",
-      "actionDesc": "主体动作（中文）",
-      "cameraDesc": "镜头运镜（中文）",
-      "envChangeDesc": "环境变化（中文）",
-      "motionSpeedDesc": "运动速率（中文）",
-      "negativeMotionPrompt": "负向动态提示（中文）",
-      "duration": 5
-    }
-  ]
-}
-
-重要规则：
-- characters 数组：涵盖故事中的**一切角色主体**——人物、动物（如小兔子、小猫）、拟人化角色、机器人等，只要是故事的主角/配角就必须填入；仅纯风景内容才返回空数组 []
-- products 数组：仅当某个实物是内容的**核心展示主体**（如带货商品、产品广告的主角）时才填写；角色手中/身边的普通道具（如小兔子抱着的胡萝卜）不要填入
-- scenes 数组：故事提到任何环境/地点（森林、城市、室内、梦境空间等）就必须至少提取一个场景；仅纯抽象内容才返回空数组 []
-- 如有已有角色，复用其 ID（不要重复创建）；如是新角色，生成新的 ID
-- visualPrompt 和 motionPrompt 必须用英文（直接用于 AI API）
-- 如有角色出场，visualPrompt 必须包含角色完整外貌描述
-- 如有产品主体，visualPrompt 必须包含产品完整外观描述（款式、颜色、材质）
-- 中文子字段给用户在界面上看，用中文填写
-- dialogues：characterId 为 null 表示旁白
-- 每镜头 duration 为 4、5 或 8 秒（视频模型支持 4-12 秒）
-- 总镜头数 4-8 个，节奏有起承转合
-
-⚠️ 内容安全要求：
-- 用 "young man/young woman/teenager" 代替 "boy/girl/child"
-- 不要暴力、血腥、裸露等敏感内容
-- 不要真人政治人物、名人肖像
-- 服饰描述得体，适合全年龄段`;
-}
-
-function buildPromptEn(assets?: Asset[]): string {
-  const characters = (assets ?? []).filter((a) => a.type === "character");
-  const scenes = (assets ?? []).filter((a) => a.type === "scene");
-  const products = (assets ?? []).filter((a) => a.type === "product");
-
-  let charSection = "";
-  if (characters.length > 0) {
-    charSection =
-      "\nExisting characters (use corresponding IDs if content involves them):\n" +
-      characters
-        .map((c) => `- ${c.name} (ID: ${c.id}): ${c.description || "No description"}`)
-        .join("\n") +
-      "\n";
-  }
-
-  let sceneSection = "";
-  if (scenes.length > 0) {
-    sceneSection =
-      "\nAvailable scene references (use these scenes, keep sceneDesc consistent with scene names):\n" +
-      scenes
-        .map((s) => `- ${s.name}: ${s.description}`)
-        .join("\n") +
-      "\n";
-  }
-
-  let productSection = "";
-  if (products.length > 0) {
-    productSection =
-      "\nExisting product subjects (if content involves these products, keep the subject consistent across shots):\n" +
-      products
-        .map((p) => `- ${p.name}: ${p.description}`)
-        .join("\n") +
-      "\n";
-  }
-
-  return `You are a professional short-video storyboard planner. The user will give you a topic or idea. You need to:
-1. Break it into 4-8 shot scenes
-2. If the content involves ANY character/subject (humans, animals like a little rabbit, anthropomorphic creatures, robots), extract character info
-3. If a physical item is the CORE showcased subject (e.g. a product ad), extract product info
-4. If the content involves concrete scenes, extract scene info
-${charSection}${sceneSection}${productSection}
-Return strictly in this JSON format, no other text:
-{
-  "characters": [
-    {
-      "name": "Character name",
-      "description": "Brief description (personality, role; applies to animals/anthropomorphic subjects too)",
-      "appearancePrompt": "Appearance description in English (humans: age, build, hair, clothing; animals: species, body shape, fur color, features, etc.)"
-    }
-  ],
-  "products": [
-    {
-      "name": "Product name",
-      "description": "Brief description (type, purpose)",
-      "appearancePrompt": "Appearance description in English (style, color, material, details, logo, etc. for AI image generation)"
-    }
-  ],
-  "scenes": [
-    {
-      "name": "Scene name",
-      "description": "Brief description of the scene",
-      "appearancePrompt": "English scene description (environment, lighting, atmosphere for AI image generation)"
-    }
-  ],
-  "shots": [
-    {
-      "activeCharacterIds": ["char_xxx"],
-      "dialogues": [
-        { "characterId": null, "text": "Narrator text", "delivery": "calm" },
-        { "characterId": "char_xxx", "text": "Character dialogue", "delivery": "gently" }
-      ],
-      "scriptText": "Shot narration (short, punchy)",
-      "visualPrompt": "Text-to-image English prompt (full description, must include character appearance if characters appear)",
-      "motionPrompt": "Image-to-video English prompt (full motion description)",
-      "subjectDesc": "Subject description",
-      "sceneDesc": "Scene/background",
-      "detailDesc": "Details/clothing",
-      "lightingDesc": "Lighting/color",
-      "styleDesc": "Art style",
-      "negativePrompt": "Negative prompt",
-      "actionDesc": "Subject action",
-      "cameraDesc": "Camera movement",
-      "envChangeDesc": "Environment changes",
-      "motionSpeedDesc": "Motion speed",
-      "negativeMotionPrompt": "Negative motion prompt",
-      "duration": 5
-    }
-  ]
-}
-
-Important rules:
-- characters array: include ANY story character/subject — humans, animals (e.g. a little rabbit), anthropomorphic or fantasy creatures, robots. Every protagonist/side character MUST be listed; only return [] for pure landscape content
-- products array: ONLY fill when a physical item is the CORE subject being showcased (e.g. a product for an ad). Everyday props held by characters (e.g. a carrot a rabbit hugs) do NOT belong here
-- scenes array: if the story mentions ANY environment/setting (forest, city, indoor, dream space, etc.), extract at least one scene; only return [] for purely abstract content
-- Reuse existing character IDs if applicable; generate new IDs for new characters
-- visualPrompt and motionPrompt MUST be in English (sent directly to AI APIs)
-- If characters appear, visualPrompt MUST include their full appearance
-- If a product subject appears, visualPrompt MUST include its full appearance (style, color, material)
-- Sub-fields (subjectDesc etc.) are shown to users in their language
-- dialogues: characterId null = narrator
-- Each shot duration: 4, 5, or 8 seconds (the video model supports 4-12s)
-- 4-8 shots total, with narrative pacing
-
-Content safety:
-- Use "young man/young woman/teenager" instead of "boy/girl/child"
-- No violence, gore, nudity, or sensitive content
-- No real political figures or celebrity likenesses
-- Keep clothing descriptions modest and appropriate`;
+  return `${charSection}${sceneSection}${productSection}`;
 }
 
 /* ── Main function ───────────────────────────────────────────────────────── */
@@ -385,6 +251,7 @@ export async function generateScript(
         characters?: RawCharacter[];
         products?: RawProduct[];
         scenes?: RawScene[];
+        styles?: RawStyle[];
       };
       if (!Array.isArray(parsed.shots) || parsed.shots.length === 0) {
         throw new Error("Model returned empty or invalid shots array.");
@@ -460,6 +327,16 @@ export async function generateScript(
           }))
         : [];
 
+      // 风格提取（仅中文描述；英文 stylePrompt 运行期懒派生）
+      const extractedStyles: RawStyle[] = Array.isArray(parsed.styles)
+        ? parsed.styles
+            .slice(0, 1) // 最多 1 个整体风格
+            .map((s) => ({
+              name: s.name ?? "",
+              description: s.description ?? "",
+            }))
+        : [];
+
       // Update activeCharacterIds in shots to reference existing characters by name match
       // (AI may generate new IDs that don't match existing store IDs)
       const existingCharacters = (opts.assets ?? []).filter((a) => a.type === "character");
@@ -483,7 +360,13 @@ export async function generateScript(
         }
       }
 
-      return { shots, characters: extractedCharacters, products: extractedProducts, scenes: extractedScenes };
+      return {
+        shots,
+        characters: extractedCharacters,
+        products: extractedProducts,
+        scenes: extractedScenes,
+        styles: extractedStyles,
+      };
     } catch (parseErr) {
       lastError = new Error(
         `JSON 解析失败（第 ${attempt + 1} 次尝试）：${parseErr instanceof Error ? parseErr.message : String(parseErr)}。提取内容：${jsonStr.slice(0, 200)}`,
@@ -498,7 +381,20 @@ export async function generateScript(
 
 /* ── 轻量资产提取（步骤 1 使用，不生成分镜，节省 token） ──────────────────── */
 
-function buildExtractPromptZh(assets?: Asset[]): string {
+/** 资产提取上下文段（动态数据：已有角色/产品名单） */
+function buildExtractAssetsContext(language: "zh" | "en", assets?: Asset[]): string {
+  if (language === "en") {
+    const charSection =
+      (assets ?? []).filter((a) => a.type === "character").length > 0
+        ? "\nExisting characters: " + (assets ?? []).filter((a) => a.type === "character").map((c) => `- ${c.name}`).join("\n") + "\n"
+        : "";
+    const productSection =
+      (assets ?? []).filter((a) => a.type === "product").length > 0
+        ? "\nExisting products: " + (assets ?? []).filter((a) => a.type === "product").map((p) => `- ${p.name}`).join("\n") + "\n"
+        : "";
+    return `${charSection}${productSection}`;
+  }
+
   const charSection =
     (assets ?? []).filter((a) => a.type === "character").length > 0
       ? "\n已有角色：" + (assets ?? []).filter((a) => a.type === "character").map((c) => `- ${c.name}`).join("\n") + "\n"
@@ -507,53 +403,7 @@ function buildExtractPromptZh(assets?: Asset[]): string {
     (assets ?? []).filter((a) => a.type === "product").length > 0
       ? "\n已有产品：" + (assets ?? []).filter((a) => a.type === "product").map((p) => `- ${p.name}`).join("\n") + "\n"
       : "";
-  return `你是一位专业的短视频资产提取助手。用户会给你一个视频主题或想法，请提取其中的资产信息，严格按以下 JSON 格式返回，不要包含任何其他文字：
-{
-  "characters": [
-    { "name": "角色名", "description": "角色简介（性格、身份）", "appearancePrompt": "外貌描述（英文，用于 AI 绘图）" }
-  ],
-  "products": [
-    { "name": "产品名", "description": "产品简介（类型、用途）", "appearancePrompt": "外观描述（英文，用于 AI 绘图，包含款式、颜色、材质、logo 等）" }
-  ],
-  "scenes": [
-    { "name": "场景名", "description": "场景简介（中文）", "appearancePrompt": "场景英文描述（环境、光线、氛围）" }
-  ]
-}
-${charSection}${productSection}
-规则：
-- characters：涵盖故事中的**一切角色主体**——人物、动物（如小兔子、小猫）、拟人化角色、机器人等，只要是故事的主角/配角就必须全部填入；仅纯风景内容才 []
-- products：仅当某个实物是内容的**核心展示主体**（如带货商品、产品广告的主角）时填写；角色手中/身边的普通道具（如小兔子抱着的胡萝卜）不要填入
-- scenes：故事提到任何环境/地点（森林、城市、室内、梦境空间等）就必须至少提取一个场景；仅纯抽象内容才 []
-- 不要生成分镜，只返回上述 JSON`;
-}
-
-function buildExtractPromptEn(assets?: Asset[]): string {
-  const charSection =
-    (assets ?? []).filter((a) => a.type === "character").length > 0
-      ? "\nExisting characters: " + (assets ?? []).filter((a) => a.type === "character").map((c) => `- ${c.name}`).join("\n") + "\n"
-      : "";
-  const productSection =
-    (assets ?? []).filter((a) => a.type === "product").length > 0
-      ? "\nExisting products: " + (assets ?? []).filter((a) => a.type === "product").map((p) => `- ${p.name}`).join("\n") + "\n"
-      : "";
-  return `You are a professional short-video asset extraction assistant. The user will give you a video topic or idea. Extract asset info and return strictly in this JSON format, no other text:
-{
-  "characters": [
-    { "name": "Character name", "description": "Brief description", "appearancePrompt": "Appearance description in English (for AI image generation)" }
-  ],
-  "products": [
-    { "name": "Product name", "description": "Brief description", "appearancePrompt": "Appearance description in English (style, color, material, logo, etc.)" }
-  ],
-  "scenes": [
-    { "name": "Scene name", "description": "Brief description", "appearancePrompt": "English scene description (environment, lighting, atmosphere)" }
-  ]
-}
-${charSection}${productSection}
-Rules:
-- characters: ONLY fill if content has characters, otherwise []
-- products: ONLY fill if content has a product/goods subject, otherwise []
-- scenes: ONLY fill if content involves concrete scenes, otherwise []
-- Do NOT generate storyboard shots; return only the JSON above`;
+  return `${charSection}${productSection}`;
 }
 
 /**
@@ -562,9 +412,12 @@ Rules:
  */
 export async function extractAssetsFromIdea(
   opts: GenerateScriptOptions,
-): Promise<{ characters: RawCharacter[]; products: RawProduct[]; scenes: RawScene[] }> {
-  const systemPrompt =
-    opts.language === "en" ? buildExtractPromptEn(opts.assets) : buildExtractPromptZh(opts.assets);
+): Promise<{ characters: RawCharacter[]; products: RawProduct[]; scenes: RawScene[]; styles: RawStyle[] }> {
+  const systemPrompt = buildTaskSystemPrompt(
+    "extractAssets",
+    opts.language,
+    getActiveRules(),
+  ).replace("{{assets}}", () => buildExtractAssetsContext(opts.language, opts.assets));
 
   const service = createAIService({
     provider: "openai",
@@ -591,6 +444,7 @@ export async function extractAssetsFromIdea(
     characters?: RawCharacter[];
     products?: RawProduct[];
     scenes?: RawScene[];
+    styles?: RawStyle[];
   };
 
   const map = (arr: RawCharacter[] | undefined) =>
@@ -602,9 +456,18 @@ export async function extractAssetsFromIdea(
         }))
       : [];
 
+  const mapStyles = (arr: RawStyle[] | undefined) =>
+    Array.isArray(arr)
+      ? arr.slice(0, 1).map((s) => ({
+          name: s.name ?? "",
+          description: s.description ?? "",
+        }))
+      : [];
+
   return {
     characters: map(parsed.characters),
     products: map(parsed.products),
     scenes: map(parsed.scenes),
+    styles: mapStyles(parsed.styles),
   };
 }

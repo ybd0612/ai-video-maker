@@ -1,5 +1,5 @@
-import { useState, useEffect } from "react";
-import { X, Eye, EyeOff, CheckCircle2, Loader2, AlertTriangle } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
+import { X, Eye, EyeOff, CheckCircle2, Loader2, AlertTriangle, Plus, Trash2, RotateCcw, Download, Upload } from "lucide-react";
 import { useSettingsStore } from "@/stores/settingsStore";
 import { useProjectStore } from "@/stores/projectStore";
 import { motion, AnimatePresence } from "framer-motion";
@@ -9,6 +9,10 @@ import type { Language } from '@/stores/settingsStore';
 import { isValidUrl } from "@/lib/validation";
 import { MODELS } from "@/lib/models";
 import { PLANS, resolvePlan, type PlanId } from "@/lib/plans";
+import type { TranslationKey } from "@/i18n";
+import { BUILTIN_RULES, mergeRules, type PromptRule, type PromptTask, type RuleSection } from "@/lib/promptRules";
+import { AiPolishField } from "@/components/ui/AiPolishField";
+import { confirmDialog } from "@/components/ui/ConfirmDialog";
 
 /* 展示所选套餐的 RPM 与订阅配额，帮助用户理解当前限制 */
 function PlanLimitSummary({
@@ -45,6 +49,278 @@ function PlanLimitSummary({
   );
 }
 
+/* ── 提示词规则设置（T05） ─────────────────────────────────────────────────── */
+
+const RULE_TASKS: PromptTask[] = [
+  "extractAssets", "storyboard", "characterAppearance",
+  "styleRef", "composeShot", "negativeStrategy", "polish",
+];
+const RULE_SECTIONS: RuleSection[] = ["rules", "examples", "safety"];
+
+/** 导入 JSON 的宽松校验：结构合法即可（id 非空 / task·section 在枚举内 / content zh·en 为字符串 / enabled 布尔） */
+function isPromptRule(v: unknown): v is PromptRule {
+  if (!v || typeof v !== "object") return false;
+  const r = v as Record<string, unknown>;
+  const content = r.content as { zh?: unknown; en?: unknown } | undefined;
+  return (
+    typeof r.id === "string" && r.id.trim() !== "" &&
+    RULE_TASKS.includes(r.task as PromptTask) &&
+    RULE_SECTIONS.includes(r.section as RuleSection) &&
+    !!content &&
+    typeof content.zh === "string" &&
+    typeof content.en === "string" &&
+    typeof r.enabled === "boolean"
+  );
+}
+
+function PromptRulesSettings({
+  t,
+  language,
+  showToast,
+}: {
+  t: (key: TranslationKey, vars?: Record<string, string | number>) => string;
+  language: Language;
+  showToast: (type: "success" | "error", message: string) => void;
+}) {
+  const stored = useSettingsStore((s) => s.promptRules);
+  const setStored = useSettingsStore((s) => s.setPromptRules);
+
+  const effective = mergeRules(BUILTIN_RULES, stored ?? []);
+  const storedIds = new Set((stored ?? []).map((r) => r.id));
+
+  const [newTask, setNewTask] = useState<PromptTask>("storyboard");
+  const [newSection, setNewSection] = useState<RuleSection>("rules");
+  const [newContent, setNewContent] = useState("");
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  /* 存储只记差异：覆盖内置条目存全量（同 id 覆盖），自定义条目直接追加 */
+  const upsertStored = (rule: PromptRule) => {
+    const rest = (stored ?? []).filter((r) => r.id !== rule.id);
+    setStored([...rest, rule]);
+  };
+  const removeFromStored = (id: string) => {
+    setStored((stored ?? []).filter((r) => r.id !== id));
+  };
+
+  /* 编辑内容：覆盖后条目为单语文本（zh=en 同值）；「恢复默认」删差异即回到内置双语原文 */
+  const updateContent = (rule: PromptRule, value: string) => {
+    upsertStored({ ...rule, content: { zh: value, en: value } });
+  };
+  const toggleEnabled = (rule: PromptRule) => {
+    upsertStored({ ...rule, enabled: !rule.enabled });
+  };
+
+  const addCustom = () => {
+    const content = newContent.trim();
+    if (!content) return;
+    const rule: PromptRule = {
+      id: `custom.${Date.now()}`,
+      task: newTask,
+      section: newSection,
+      content: { zh: content, en: content },
+      enabled: true,
+      source: "custom",
+    };
+    setStored([...(stored ?? []), rule]);
+    setNewContent("");
+  };
+
+  const handleResetAll = async () => {
+    const ok = await confirmDialog({
+      title: t("settings.tabRules"),
+      message: t("settings.rules.resetAllConfirm"),
+    });
+    if (ok) setStored([]);
+  };
+
+  const handleExport = () => {
+    const data = stored ?? [];
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "wxhb-prompt-rules.json";
+    a.click();
+    URL.revokeObjectURL(url);
+    showToast("success", t("settings.rules.exported", { count: data.length }));
+  };
+
+  const handleImportFile = async (file: File) => {
+    try {
+      const text = await file.text();
+      const parsed: unknown = JSON.parse(text);
+      if (!Array.isArray(parsed) || !parsed.every(isPromptRule)) {
+        showToast("error", t("settings.rules.importInvalid"));
+        return;
+      }
+      setStored(parsed as PromptRule[]);
+      showToast("success", t("settings.rules.imported", { count: parsed.length }));
+    } catch {
+      showToast("error", t("settings.rules.importInvalid"));
+    }
+  };
+
+  const iconBtn =
+    "flex items-center gap-1 rounded-lg border border-slate-700 bg-slate-800 px-2.5 py-1.5 text-[0.6875rem] font-medium text-slate-300 transition hover:border-emerald-600 hover:text-white";
+
+  return (
+    <div className="flex max-h-[65vh] flex-col gap-3">
+      <p className="text-[0.6875rem] leading-relaxed text-slate-500">{t("settings.rules.hint")}</p>
+
+      {/* 全局操作：恢复默认 / 导出 / 导入 */}
+      <div className="flex flex-wrap gap-2">
+        <button type="button" onClick={() => void handleResetAll()} className={iconBtn}>
+          <RotateCcw size={12} /> {t("settings.rules.resetAll")}
+        </button>
+        <button type="button" onClick={handleExport} className={iconBtn}>
+          <Download size={12} /> {t("settings.rules.export")}
+        </button>
+        <button type="button" onClick={() => fileRef.current?.click()} className={iconBtn}>
+          <Upload size={12} /> {t("settings.rules.import")}
+        </button>
+        <input
+          ref={fileRef}
+          type="file"
+          accept="application/json,.json"
+          className="hidden"
+          onChange={(e) => {
+            const f = e.target.files?.[0];
+            if (f) void handleImportFile(f);
+            e.target.value = "";
+          }}
+        />
+      </div>
+
+      {/* 条目列表（按 task 分组） */}
+      <div className="flex-1 space-y-4 overflow-y-auto pr-1">
+        {RULE_TASKS.map((task) => {
+          const rules = effective.filter((r) => r.task === task);
+          if (rules.length === 0) return null;
+          return (
+            <section key={task} className="space-y-2">
+              <h3 className="text-[0.6875rem] font-semibold text-slate-300">
+                {t(("settings.rules.task." + task) as TranslationKey)}
+              </h3>
+              {rules.map((rule) => {
+                const overridden = storedIds.has(rule.id);
+                const shown = language === "en" ? rule.content.en : rule.content.zh;
+                return (
+                  <div
+                    key={rule.id}
+                    className={`rounded-lg border p-2 ${
+                      rule.enabled
+                        ? "border-slate-700/60 bg-slate-800/40"
+                        : "border-slate-800 bg-slate-900/60 opacity-60"
+                    }`}
+                  >
+                    <div className="mb-1 flex items-center gap-2">
+                      <span title={rule.id} className="min-w-0 flex-1 truncate text-[0.625rem] text-slate-500">
+                        {rule.id}
+                      </span>
+                      <span
+                        className={`shrink-0 rounded px-1.5 py-0.5 text-[0.625rem] ${
+                          rule.source === "custom"
+                            ? "bg-violet-950/60 text-violet-300"
+                            : "bg-slate-700/50 text-slate-400"
+                        }`}
+                      >
+                        {rule.source === "custom"
+                          ? t("settings.rules.customBadge")
+                          : t("settings.rules.builtinBadge")}
+                      </span>
+                      <label className="flex shrink-0 cursor-pointer items-center gap-1 text-[0.625rem] text-slate-400">
+                        <input
+                          type="checkbox"
+                          checked={rule.enabled}
+                          onChange={() => toggleEnabled(rule)}
+                          className="accent-emerald-600"
+                        />
+                        {t("settings.rules.enabled")}
+                      </label>
+                      {rule.source === "custom" ? (
+                        <button
+                          type="button"
+                          onClick={() => removeFromStored(rule.id)}
+                          title={t("settings.rules.delete")}
+                          className="shrink-0 rounded p-1 text-slate-500 hover:bg-slate-800 hover:text-red-400"
+                        >
+                          <Trash2 size={12} />
+                        </button>
+                      ) : (
+                        overridden && (
+                          <button
+                            type="button"
+                            onClick={() => removeFromStored(rule.id)}
+                            title={t("settings.rules.restoreItem")}
+                            className="shrink-0 rounded p-1 text-slate-500 hover:bg-slate-800 hover:text-amber-300"
+                          >
+                            <RotateCcw size={12} />
+                          </button>
+                        )
+                      )}
+                    </div>
+                    <AiPolishField
+                      value={shown}
+                      onChange={(v) => updateContent(rule, v)}
+                      rows={3}
+                      resetKey={rule.id}
+                      bare
+                    />
+                  </div>
+                );
+              })}
+            </section>
+          );
+        })}
+      </div>
+
+      {/* 新增自定义条目 */}
+      <div className="space-y-2 rounded-lg border border-slate-700/60 bg-slate-800/40 p-3">
+        <p className="text-[0.6875rem] font-semibold text-slate-300">{t("settings.rules.addTitle")}</p>
+        <div className="grid grid-cols-2 gap-2">
+          <select
+            value={newTask}
+            onChange={(e) => setNewTask(e.target.value as PromptTask)}
+            className="w-full rounded-lg border border-slate-700 bg-slate-800 px-2 py-1.5 text-[0.6875rem] text-slate-100 focus:border-emerald-500 focus:outline-none"
+          >
+            {RULE_TASKS.map((task) => (
+              <option key={task} value={task}>
+                {t(("settings.rules.task." + task) as TranslationKey)}
+              </option>
+            ))}
+          </select>
+          <select
+            value={newSection}
+            onChange={(e) => setNewSection(e.target.value as RuleSection)}
+            className="w-full rounded-lg border border-slate-700 bg-slate-800 px-2 py-1.5 text-[0.6875rem] text-slate-100 focus:border-emerald-500 focus:outline-none"
+          >
+            {RULE_SECTIONS.map((sec) => (
+              <option key={sec} value={sec}>
+                {t(("settings.rules.section." + sec) as TranslationKey)}
+              </option>
+            ))}
+          </select>
+        </div>
+        <AiPolishField
+          value={newContent}
+          onChange={setNewContent}
+          placeholder={t("settings.rules.contentPlaceholder")}
+          rows={2}
+          resetKey="new-rule"
+        />
+        <button
+          type="button"
+          onClick={addCustom}
+          disabled={!newContent.trim()}
+          className="flex items-center gap-1 rounded-lg bg-emerald-600 px-3 py-1.5 text-[0.6875rem] font-semibold text-white transition hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          <Plus size={12} /> {t("settings.rules.add")}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export function SettingsDialog() {
   const open = useSettingsStore((s) => s.settingsDialogOpen);
   const language = useSettingsStore((s) => s.language);
@@ -54,6 +330,7 @@ export function SettingsDialog() {
   const providerConfig = useSettingsStore((s) => s.providerConfig);
   const setProviderConfig = useSettingsStore((s) => s.setProviderConfig);
 
+  const [tab, setTab] = useState<"general" | "rules">("general");
   const [apiKey, setApiKey] = useState("");
   const [baseUrl, setBaseUrl] = useState("https://api.agnes-ai.cn/v1");
   const [plan, setPlan] = useState<PlanId>("default");
@@ -159,7 +436,7 @@ export function SettingsDialog() {
               initial={{ scale: 0.95, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.95, opacity: 0 }}
-              className="w-full max-w-md rounded-2xl border border-slate-700 bg-slate-900 p-6 shadow-2xl"
+              className="w-full max-w-lg rounded-2xl border border-slate-700 bg-slate-900 p-6 shadow-2xl"
               onClick={(e) => e.stopPropagation()}
             >
               <div className="mb-4 flex items-center justify-between">
@@ -169,6 +446,28 @@ export function SettingsDialog() {
                 </button>
               </div>
 
+              {/* Tab 切换：基础 / 提示词规则 */}
+              <div className="mb-3 flex gap-2">
+                {([
+                  ["general", t("settings.tabGeneral") as string],
+                  ["rules", t("settings.tabRules") as string],
+                ] as Array<["general" | "rules", string]>).map(([id, label]) => (
+                  <button
+                    key={id}
+                    type="button"
+                    onClick={() => setTab(id)}
+                    className={`flex-1 rounded-lg border px-3 py-1.5 text-[0.6875rem] font-medium transition ${
+                      tab === id
+                        ? "border-emerald-500 bg-emerald-950/40 text-emerald-300"
+                        : "border-slate-700 bg-slate-800 text-slate-400 hover:border-slate-600 hover:text-slate-200"
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+
+              {tab === "general" ? (
               <div className="space-y-4">
                 {/* API Key */}
                 <div>
@@ -298,6 +597,9 @@ export function SettingsDialog() {
                   <span className="ml-auto text-[0.625rem] text-slate-500">{t("settings.github.desc")}</span>
                 </a>
               </div>
+              ) : (
+                <PromptRulesSettings t={t} language={language} showToast={showToast} />
+              )}
             </motion.div>
           </motion.div>
         )}

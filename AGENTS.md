@@ -57,6 +57,8 @@ src/
 │   ├── promptUtils.ts             # 画面/运动提示词组合
 │   ├── characterUtils.ts          # 角色描述注入
 │   ├── assetNamespace.ts          # 角色命名空间与完整提示词
+│   ├── promptComposer.ts          # 官方结构拼装器（六段式/图生图/多图合成/定妆照物种锁定/多参考选取）
+│   ├── promptRules.ts             # 规则条目注册表（骨架 + 内置默认条目 + buildSystemPrompt/mergeRules）
 │   ├── resolveBaseUrl.ts          # API 地址解析工具
 │   └── validation.ts              # 校验工具（帧数计算、prompt 清理等）
 ├── components/
@@ -143,8 +145,8 @@ src/
 - 异步结果一律按项目 ID 写回（`updateXxxByProjectId`），禁止用 active-project 版本，防串写。
 - “重试失败 / 全部重新生成”按钮必须走批量生成函数（幂等 + 并发受控），禁止 forEach 并发 reroll。
 - 视频完成响应解析链：`url`（顶层）→ `metadata.url` → `video_url` → `output.url` → `output.video_url` → `remixed_from_video_id`。
-- **风格参考图必须先于资产图生成**（2026-09-12）：`generateAssetImages` 分两阶段——阶段 1 串行生成风格图（`generateStyleReference`，幂等 + activeAssetTasks 互斥），阶段 2 的角色/场景/产品任务把风格图作为 `inputImageUrl` 传入，并在 prompt 前缀加"参考图只用于画风/色调/光照，勿复制内容构图"指令；风格图失败不阻塞资产生成（退化为文生图）。角色定妆照 prompt 已移除 `photorealistic` 硬编码（它是"动画故事出写实图"的推手之一）。
-- `extractCharactersFromIdea` 成功写回后自动 `void generateStyleReference(targetProjectId)` 后台生成风格图（不阻塞进入步骤 2）；风格提示词**从 `project.ideaPrompt` 派生**（保证风格贴合故事，如动画故事出动画风格）。分镜图经 `findBestReference` 兜底使用风格图；StepAssets 手动「重新生成风格图」传 `force=true` 覆盖已有图。
+- **风格参考图必须先于资产图生成**（2026-09-12；B 方案后更新）：`generateAssetImages` 分两阶段——阶段 1 串行生成风格图（`generateStyleReference`，幂等 + activeAssetTasks 互斥，风格提示词由 AI 从 idea + 中文风格描述**零角色派生**，硬性禁止出现人物/生物），阶段 2 的角色/场景/产品任务经 `referenceImageUrls` 参考风格图（生图请求走 `extra_body.image[]` 多参考，`size` 用档位 `"1K"/"2K"` + `ratio`，不用精确像素）；风格图失败不阻塞资产生成（退化为文生图）。角色定妆照 prompt 已移除 `photorealistic` 硬编码与 `Portrait of / head and shoulders / looking at camera` 人像语汇（后者是"动物角色画成人"的推手之一，2026-09-12 实锤），改用 `promptComposer.composePortraitPrompt`（物种锁定句 + 全身设定）。
+- `extractCharactersFromIdea` 成功写回后自动 `void generateStyleReference(targetProjectId)` 后台生成风格图（不阻塞进入步骤 2）；风格资产（`Asset.type="style"`）与风格提示词由 AI 派生（`ensureStyleAsset` 懒派生）。分镜图经 `pickShotReferences` 选取多参考（场景→角色→产品合计 ≤2 张，风格图恒占末位，总数 ≤3）；StepAssets 手动「重新生成风格图」传 `force=true` 覆盖已有图。
 - **资产防重复（2026-09-12）**：`Asset.source` 标记来源（`extracted`=AI 提取 / `manual`=手动添加，缺省视为 extracted 兼容旧数据；`addAsset` 默认 manual）。重新提取是**替换式**：旧的 extracted 资产整体被新结果取代、manual 保留且与新结果重名时以手动版为准；有 extracted 资产时先弹 `confirmDialog`（列出将替换的名字）确认，取消则返回 `false` 不推进向导。模型对同一故事命名不稳定（「小兔子」/「小白兔」），**禁止改回纯追加式**。
 - 分镜阶段 `generateScript` 已产出完整英文双提示词，**禁止二次翻译覆盖**（translateToMotion 已移除）。
 - 分镜生成后必须**回填角色 ID 引用**：模型返回的 `activeCharacterIds` / `dialogues.characterId` 可能是自编 ID，需按「角色名 → store 角色 ID」映射统一回填（新资产由 `extractNewAssets` 建映射），匹配不到的对白置 `null`（归旁白），否则角色一致性（图片注入/定妆照参考）与对白归属会失效。
@@ -167,7 +169,7 @@ src/
 - 所有 AI 可辅助的输入框右下角**内嵌「润色」按钮**：一键把当前内容交给该字段的专家角色优化，结果自动回填（用户无需输入额外指令）
 - 润色后可点「撤销」**逐步回退**到上一次润色前的内容；撤销栈为组件本地状态，随镜头 / 资产切换（`resetKey`）与刷新清空
 - 统一走 `components/ui/AiPolishField.tsx`（输入框 + 内嵌按钮），润色请求走 `chatService.polishText`；**禁止再引入旁挂式 AI 入口**（输入框外的 ✨ 按钮 / 抽屉）
-- 字段与专家系统提示词的对应关系集中在 `services/chatService.ts`：文案 `SYSTEM_PROMPT_SCRIPT_TEXT`、画面 `SYSTEM_PROMPT_VISUAL_PROMPT`、动态 `SYSTEM_PROMPT_MOTION_PROMPT`、负向 `SYSTEM_PROMPT_NEGATIVE_PROMPT`、对白 `SYSTEM_PROMPT_DIALOGUE`、角色外观 `SYSTEM_PROMPT_CHARACTER`、中文描述 `SYSTEM_PROMPT_DESCRIPTION_ZH`、主题 `SYSTEM_PROMPT_MAIN_PROMPT`
+- 字段与专家系统提示词统一由**规则条目注册表** `lib/promptRules.ts` 管理（2026-09-12 B 方案）：`chatService.ts` 的 8 个 `SYSTEM_PROMPT_*` 常量已整体搬迁为注册表内置条目（polish 任务），`AiPolishField` 经 `resolvePolishSystemPrompt` 取生效版；用户可在设置对话框「提示词规则」Tab 查看/编辑/开关/新增/导入导出（存 `settingsStore.promptRules`，persist v2，同 id 覆盖内置，改规则即时生效零构建）；`scriptService` 的分镜/抽资产系统提示词同样走骨架（SKELETONS）+ 生效条目（`buildSystemPrompt`）拼装，动态 assets 上下文段在函数内拼装不入条目。**修改提示词规则优先改条目，不改代码**
 - 边界行为：内容为空 / 无 API Key / 请求进行中时按钮自动禁用；失败就地显示原因（不弹窗）；润色结果与原文相同则不入撤销栈
 - 按钮样式（用户两次微调后的定稿）：**只用图标不显示文字**（`h-5 w-5` 方形 + 图标 `size={12}`，含义靠 `title` 提示）；**不得紧贴输入框边框**——多行贴右下角留距（`bottom-2.5 right-2.5`，输入框配 `pb-9`），单行垂直居中（`top-1/2 -translate-y-1/2 right-2`，输入框配 `pr-16`）
 - 旧的多轮对话抽屉 `AiAssistDrawer.tsx` **已弃用**（无任何引用，保留仅作历史参考）

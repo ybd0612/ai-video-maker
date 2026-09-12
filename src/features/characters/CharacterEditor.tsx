@@ -9,8 +9,9 @@ import { useSettingsStore } from "@/stores/settingsStore";
 import { useT } from "@/i18n";
 import { ArrowLeft, Sparkles, Loader2, RefreshCw, ImageIcon } from "lucide-react";
 import { chatCompletion, SYSTEM_PROMPT_CHARACTER, SYSTEM_PROMPT_DESCRIPTION_ZH } from "@/services/chatService";
+import { buildCharacterAppearancePrompt } from "@/lib/promptRules";
 import { AiPolishField } from "@/components/ui/AiPolishField";
-import { generateImage } from "@/services/imageService";
+import { generateImage, aspectRatioToImageParams } from "@/services/imageService";
 import { generateAssetNamespace, generateFullPrompt } from "@/lib/assetNamespace";
 
 interface CharacterEditorProps {
@@ -38,11 +39,14 @@ export function CharacterEditor({ character, onClose }: CharacterEditorProps) {
     setIsGeneratingPortrait(true);
     setError(null);
     try {
+      // 统一档位串参数（1K 档 + 1:1 画幅，等价于原 1024x1024 像素串）
+      const { size, ratio } = aspectRatioToImageParams("1:1");
       const portraitUrl = await generateImage({
         apiKey: providerConfig.apiKey,
         baseUrl: providerConfig.baseUrl,
         prompt: `Portrait photo of ${appearancePrompt.trim()}, facing camera, clean background, high quality, detailed facial features, photorealistic, professional, all-ages appropriate`,
-        size: "1024x1024",
+        size,
+        ratio,
       });
       // Save portrait to character（统一资产 imageUrl 字段）
       if (character) {
@@ -107,7 +111,8 @@ export function CharacterEditor({ character, onClose }: CharacterEditorProps) {
         apiKey: providerConfig.apiKey,
         baseUrl: providerConfig.baseUrl,
         messages: [
-          { role: "system", content: SYSTEM_PROMPT_CHARACTER },
+          // 系统提示词走规则注册表（character.species-lock / character.infer-missing + 用户覆盖）
+          { role: "system", content: buildCharacterAppearancePrompt() },
           { role: "user", content: descHint },
         ],
       });

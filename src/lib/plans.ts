@@ -150,10 +150,15 @@ export function rpmFor(plan: PlanConfig, kind: ModelKind, tier?: SizeTier): numb
 }
 
 /**
- * 将像素尺寸字符串（如 "1344x768" / "1024x1024"）映射到官方尺寸档位。
- * 依据官方档位长边：1K≈1312、2K≈2624、3K≈3936、4K≈5248。
+ * 将尺寸串映射到官方尺寸档位。
+ * - 档位串（"1K"/"2K"/"3K"/"4K"，大小写不敏感）直接透传；
+ * - 像素尺寸串（如 "1344x768" / "1024x1024"）按官方档位长边解析：
+ *   1K≈1312、2K≈2624、3K≈3936、4K≈5248；
+ * - 无法识别时回退 1K。
  */
 export function imageSizeToTier(size: string | undefined): SizeTier {
+  const tierMatch = /^\s*(1K|2K|3K|4K)\s*$/i.exec(size ?? "");
+  if (tierMatch) return tierMatch[1].toUpperCase() as SizeTier;
   const m = /^(\d+)\s*x\s*(\d+)$/i.exec(size?.trim() ?? "");
   if (!m) return "1K";
   const maxEdge = Math.max(Number(m[1]), Number(m[2]));

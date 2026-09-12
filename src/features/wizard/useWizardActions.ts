@@ -4,17 +4,29 @@
 // ────────────────────────────────────────────────────────────────────────────
 
 import { useCallback } from "react";
-import { useProjectStore, selectActiveProject, newId, type Shot, type Asset, type Project } from "@/stores/projectStore";
+import { useProjectStore, selectActiveProject, newId, type Shot, type Asset, type AssetType, type Project } from "@/stores/projectStore";
 import { useSettingsStore } from "@/stores/settingsStore";
 import { useT } from "@/i18n";
 import { confirmDialog } from "@/components/ui/ConfirmDialog";
 import { resolvePlan, type PlanId } from "@/lib/plans";
 import { generateScript, extractAssetsFromIdea } from "@/services/scriptService";
-import { generateImage, aspectRatioToImageSize } from "@/services/imageService";
+import { generateImage, aspectRatioToImageParams } from "@/services/imageService";
 import { generateAssetNamespace } from "@/lib/assetNamespace";
 import { generateVideo, aspectRatioToVideoAspect, VideoTaskCreatedError } from "@/services/videoService";
 import { injectCharacterDescriptions } from "@/lib/characterUtils";
 import { composeVisualPrompt, composeMotionPrompt, generateFullPrompt } from "@/lib/promptUtils";
+import {
+  composeTextToImagePrompt,
+  composeImageToImagePrompt,
+  composeMultiReferencePrompt,
+  composePortraitPrompt,
+  pickShotReferences,
+  getStyleReferenceUrl,
+  getStylePrompt,
+  type ReferenceRole,
+} from "@/lib/promptComposer";
+import { buildSystemPrompt as buildRulesSystemPrompt, getActiveRules } from "@/lib/promptRules";
+import { createAIService } from "@/services/ai/factory";
 
 /**
  * 正在运行的视频生成任务：projectId -> AbortController。
@@ -35,27 +47,31 @@ export function hasActiveAssetTask(projectId: string): boolean {
   return activeAssetTasks.has(projectId);
 }
 
+/** 模型提取的资产原始格式（style 仅 name+description，无 appearancePrompt） */
 type RawAsset = {
   name: string;
   description: string;
-  appearancePrompt: string;
+  appearancePrompt?: string;
 };
 
 type ImageGenerationInput = {
   prompt: string;
-  inputImageUrl?: string;
+  /** 参考图 URL 列表（多图合成；空数组 = 纯文生图） */
+  referenceImageUrls: string[];
 };
 
 /**
  * Build unique Asset records from model output without mutating inputs.
  * 返回 name→id 映射表：模型可能在 shots/dialogues 中使用自编 ID 引用角色，
  * 调用方需据此回填引用，保证对白归属与角色一致性。
- * 角色与产品共用此函数（type 区分），场景资产由用户手动添加。
+ * 角色/产品/场景/风格共用此函数（type 区分）。
+ * style 分支不走 appearancePrompt/namespace/fullPrompt：
+ * prompt（英文 stylePrompt）为 L2 派生物，运行期由 ensureStyleAsset 懒派生。
  */
 function extractNewAssets(
   existing: Asset[],
   incoming: RawAsset[],
-  type: "character" | "product" | "scene",
+  type: AssetType,
 ): { assets: Asset[]; idByName: Map<string, string> } {
   const names = new Set(existing.map((a) => a.name.trim().toLocaleLowerCase()));
   const assets: Asset[] = [];
@@ -70,12 +86,15 @@ function extractNewAssets(
       source: "extracted",
       name: item.name,
       description: item.description,
-      prompt: item.appearancePrompt,
+      prompt: type === "style" ? "" : (item.appearancePrompt ?? ""),
       ...(type === "character"
         ? {
-            appearancePrompt: item.appearancePrompt,
+            appearancePrompt: item.appearancePrompt ?? "",
             assetNamespace: generateAssetNamespace(item.name),
-            fullPrompt: generateFullPrompt(item),
+            fullPrompt: generateFullPrompt({
+              name: item.name,
+              appearancePrompt: item.appearancePrompt ?? "",
+            }),
           }
         : {}),
     };
@@ -85,21 +104,117 @@ function extractNewAssets(
   return { assets, idByName };
 }
 
-/** Compose the complete image prompt and the best available img2img reference. */
+/** 按 URL 反查资产，返回其在多图合成中的角色语义（未命中视为风格参考） */
+function describeReferenceRole(
+  url: string,
+  project: { assets: Asset[] },
+): ReferenceRole {
+  const asset = project.assets.find((a) => a.imageUrl === url || a.avatarUrl === url);
+  if (asset) return asset.type;
+  return "style";
+}
+
+/** 按 URL 反查资产，生成参考图说明（名称 + 描述/提示词） */
+function describeReferenceNote(
+  url: string,
+  project: { assets: Asset[] },
+): string {
+  const asset = project.assets.find((a) => a.imageUrl === url || a.avatarUrl === url);
+  if (!asset) return "overall art style / mood reference";
+  return `${asset.name}: ${(asset.description || asset.prompt).trim()}`;
+}
+
+/**
+ * Compose the complete image prompt and the multi-reference list for a shot.
+ * - 参考图：pickShotReferences（场景 → 角色 → 产品 → 风格，≤3 张）
+ * - 有参考图：composeMultiReferencePrompt（参考图角色说明 + 图像关系指令）
+ * - 无参考图：composeTextToImagePrompt 六段式
+ *   （subject 复用 injectCharacterDescriptions(composeVisualPrompt(...))，产品主体前置）
+ */
 function buildImageGenerationInput(
   shot: Shot,
   project: { style: string; assets: Asset[]; styleReferenceUrl?: string },
 ): ImageGenerationInput {
-  let prompt = injectCharacterDescriptions(
+  const referenceImageUrls = pickShotReferences(shot, project);
+
+  // 主体：完整 visualPrompt + 角色外貌注入 + 产品主体前置（保持主体一致性）
+  let subject = injectCharacterDescriptions(
     composeVisualPrompt(shot),
     shot.activeCharacterIds ?? [],
     project.assets,
   );
-  // 产品主体注入：有产品资产时把产品外观描述前置到提示词，保证主体一致性
   const product = project.assets.find((a) => a.type === "product" && !!a.prompt.trim());
-  if (product) prompt = `${product.prompt.trim()}. ${prompt}`;
-  if (project.style) prompt = `${project.style} style. ${prompt}`;
-  return { prompt, inputImageUrl: findBestReference(shot, project) };
+  if (product) subject = `${product.prompt.trim()}. ${subject}`;
+
+  if (referenceImageUrls.length > 0) {
+    const references = referenceImageUrls.map((url, i) => ({
+      index: i + 1,
+      role: describeReferenceRole(url, project),
+      note: describeReferenceNote(url, project),
+    }));
+    return {
+      prompt: composeMultiReferencePrompt({ references, scene: subject }),
+      referenceImageUrls,
+    };
+  }
+
+  return {
+    prompt: composeTextToImagePrompt({
+      subject,
+      style: project.style || undefined,
+      quality: "high quality, 8k",
+    }),
+    referenceImageUrls: [],
+  };
+}
+
+/** 派生失败兜底：project.style 非空 → style reference 模板；否则 cinematic 模板 */
+function fallbackStylePrompt(style: string): string {
+  return style
+    ? `${style} style reference, cohesive visual aesthetic, color palette, mood board`
+    : "Cinematic style reference, cohesive visual aesthetic, warm tones, professional photography";
+}
+
+/**
+ * L2 派生：从想法文本 + 中文风格描述派生英文 stylePrompt（画种/色调/光照/氛围）。
+ * 硬性禁止角色/生物/人物（STYLE_DERIVE_SYSTEM_PROMPT）。
+ * 派生失败（网络/内容过滤/空输出）走兜底链，不抛错——风格图生成不能因此阻塞。
+ */
+async function deriveStylePrompt(
+  ideaPrompt: string,
+  styleDescription: string,
+  apiKey: string,
+  baseUrl: string,
+): Promise<string> {
+  const idea = ideaPrompt.trim();
+  const zhStyle = styleDescription.trim();
+  if (idea || zhStyle) {
+    try {
+      const service = createAIService({ provider: "openai", apiKey, baseUrl });
+      const userContent = [
+        idea ? `Story idea: ${idea.slice(0, 600)}` : "",
+        zhStyle ? `Desired style (Chinese): ${zhStyle}` : "",
+      ]
+        .filter(Boolean)
+        .join("\n");
+      // 系统提示词走规则注册表（styleref.no-characters 条目 + 用户覆盖）
+      const result = await service.chatCompletion({
+        messages: [
+          { role: "system", content: buildRulesSystemPrompt("styleRef", "en", getActiveRules()) },
+          { role: "user", content: userContent },
+        ],
+        temperature: 0.4,
+        maxTokens: 256,
+        enableThinking: false,
+      });
+      const text = result.content.trim();
+      if (text) return text;
+    } catch (err) {
+      console.warn("Style prompt derivation failed, using fallback:", err);
+    }
+  }
+  // 兜底链：中文风格描述非空 → `${style} style reference...`；否则 cinematic 模板
+  return fallbackStylePrompt(zhStyle);
 }
 
 export function useWizardActions() {
@@ -109,8 +224,13 @@ export function useWizardActions() {
    * 生成风格参考图（项目级风格锚点）。
    * 幂等：已有风格图（force=true 除外）、或该项目已有资产生成任务在跑
    * （activeAssetTasks 互斥）时直接跳过。
-   * 风格提示词优先从想法文本派生——保证风格贴合故事本身（如动画故事出动画风格，
-   * 而不是固定回落到写实摄影导致定妆照与故事风格脱节）。
+   *
+   * B 方案：风格提示词改为 style 资产的 prompt（L2 派生物）。
+   * ensureStyleAsset：style 资产缺失、或 prompt 为空且未锁定时，从
+   * ideaPrompt + 中文风格描述派生英文 stylePrompt（画种/色调/光照/氛围，
+   * 硬性禁止角色/生物/人物），按项目 ID 写回 style 资产（updateAssetByProjectId）。
+   * 派生失败兜底链：project.style 非空 → `${style} style reference...`；否则 cinematic 模板。
+   * 派生调用在注册表 set 之后（幂等铁律：不与后续生成并行重入）。
    * 角色/场景/产品与分镜图都以此为风格参考。
    */
   const generateStyleReference = useCallback(async (targetProjectId?: string, force = false) => {
@@ -121,9 +241,12 @@ export function useWizardActions() {
     const project = targetProjectId
       ? store.projects.find((p) => p.id === targetProjectId)
       : selectActiveProject(store);
-    if (!project || (project.styleReferenceUrl && !force)) return;
-
+    if (!project) return;
     const pid = project.id;
+
+    // 幂等：已有风格图（style 资产或旧字段）时跳过（force 用于重新生成）
+    if (getStyleReferenceUrl(project) && !force) return;
+
     // 与资产生成共用注册表互斥：风格图不与资产图并行（资产图要参考风格图）
     if (activeAssetTasks.has(pid)) return;
 
@@ -131,26 +254,65 @@ export function useWizardActions() {
     activeAssetTasks.set(pid, controller);
 
     try {
-      const ideaText = (project.ideaPrompt ?? "").trim();
-      const stylePrompt = ideaText
-        ? `Visual style reference / mood board for this story: ${ideaText.slice(0, 400)}. ` +
-          `Show the overall art style, color palette, lighting mood and atmosphere that best fit this story. ` +
-          `Cohesive composition, no text, no watermark, no character in focus.`
-        : project.style
-          ? `${project.style} style reference, cohesive visual aesthetic, color palette, mood board`
-          : `Cinematic style reference, cohesive visual aesthetic, warm tones, professional photography`;
+      // ── ensureStyleAsset：style 资产缺失时创建（不进 migrate，运行期懒派生） ──
+      const latest = useProjectStore.getState().projects.find((p) => p.id === pid) ?? project;
+      let styleAsset = latest.assets.find((a) => a.type === "style");
+      if (!styleAsset) {
+        const created: Asset = {
+          id: newId("asset"),
+          type: "style",
+          source: "extracted",
+          name: latest.language === "en" ? "Overall style" : "整体风格",
+          description: latest.style.trim(),
+          prompt: "",
+        };
+        useProjectStore.getState().updateProjectById(pid, (p) => ({
+          ...p,
+          assets: [...p.assets, created],
+        }));
+        styleAsset = created;
+      }
+
+      // ── L2 派生：prompt 为空且未锁定时，从 ideaPrompt + 中文风格描述派生 ──
+      if (!styleAsset.prompt.trim() && !styleAsset.derivation?.locked) {
+        const derived = await deriveStylePrompt(
+          latest.ideaPrompt ?? "",
+          styleAsset.description.trim() || latest.style.trim(),
+          providerConfig.apiKey,
+          providerConfig.baseUrl,
+        );
+        // 按项目 ID 写回（铁律：异步结果禁止写 active-project 版本）
+        useProjectStore.getState().updateAssetByProjectId(pid, styleAsset.id, {
+          prompt: derived,
+        });
+        styleAsset = { ...styleAsset, prompt: derived };
+      }
+
+      const stylePrompt =
+        styleAsset.prompt.trim() || fallbackStylePrompt(latest.style.trim());
+
+      const imagePrompt =
+        `${stylePrompt}. Visual style reference / mood board, cohesive composition, ` +
+        `no text, no watermark, no character in focus.`;
+      const { size, ratio } = aspectRatioToImageParams(latest.aspectRatio);
 
       const url = await generateImage({
         apiKey: providerConfig.apiKey,
         baseUrl: providerConfig.baseUrl,
-        prompt: stylePrompt,
-        size: aspectRatioToImageSize(project.aspectRatio),
+        prompt: imagePrompt,
+        size,
+        ratio,
       });
+      // 同时写项目旧字段（兼容旧 UI/旧数据）与 style 资产 imageUrl（新参考链事实源）
       useProjectStore.getState().updateProjectById(pid, (p) => ({
         ...p,
         styleReferenceUrl: url,
         styleReferenceError: undefined,
       }));
+      useProjectStore.getState().updateAssetByProjectId(pid, styleAsset.id, {
+        imageUrl: url,
+        error: undefined,
+      });
       useProjectStore.getState().addHistory("style_generated", "生成风格参考图", pid);
     } catch (err) {
       // 失败写入 styleReferenceError，资产页会就地展示；不阻塞后续资产生成
@@ -215,11 +377,17 @@ export function useWizardActions() {
         assets: project.assets,
       });
 
-      // 统一提取角色/产品/场景资产（与手动资产重名的会被下方过滤）
+      // 统一提取角色/产品/场景/风格资产（与手动资产重名的会被下方过滤）
       const newCharacters = extractNewAssets(project.assets, result.characters, "character");
       const newProducts = extractNewAssets(project.assets, result.products, "product");
       const newScenes = extractNewAssets(project.assets, result.scenes, "scene");
-      const newAssets = [...newCharacters.assets, ...newProducts.assets, ...newScenes.assets];
+      const newStyles = extractNewAssets(project.assets, result.styles, "style");
+      const newAssets = [
+        ...newCharacters.assets,
+        ...newProducts.assets,
+        ...newScenes.assets,
+        ...newStyles.assets,
+      ];
 
       // 替换式写回：手动添加的资产保留在前；新提取项与手动资产重名时跳过
       // （保留手动版本，避免把用户精心润色过的资产冲掉）
@@ -321,10 +489,11 @@ export function useWizardActions() {
 
       store.setShotsByProjectId(targetProjectId, shots);
 
-      // Auto-add any newly extracted characters, products and scenes
+      // Auto-add any newly extracted characters, products, scenes and style
       const newProducts = extractNewAssets(project.assets, result.products, "product").assets;
       const newScenes = extractNewAssets(project.assets, result.scenes, "scene").assets;
-      const newAssets = [...newCharacters, ...newProducts, ...newScenes];
+      const newStyles = extractNewAssets(project.assets, result.styles, "style").assets;
+      const newAssets = [...newCharacters, ...newProducts, ...newScenes, ...newStyles];
       if (newAssets.length > 0) {
         useProjectStore.getState().updateProjectById(targetProjectId, (p) => ({
           ...p,
@@ -454,7 +623,7 @@ export function useWizardActions() {
     // 幂等守卫：同一项目已有资产生成任务在跑时不重复启动
     if (activeAssetTasks.has(targetProjectId)) return;
 
-    const imageSize = aspectRatioToImageSize(project.aspectRatio);
+    const { size: imageSize, ratio: imageRatio } = aspectRatioToImageParams(project.aspectRatio);
     const generatePortraits = opts?.generatePortraits !== false;
     const generateScenes = opts?.generateScenes !== false;
     const generateProducts = opts?.generateProducts !== false;
@@ -464,11 +633,12 @@ export function useWizardActions() {
     // 角色/场景/产品定妆照都要参考风格图（否则动画故事会生成写实照片），
     // 必须等它就绪再生成资产图；风格图失败不阻塞（资产图退化为纯文生图，
     // 错误已写入 styleReferenceError 在资产页展示）。
-    if (generateStyle && !project.styleReferenceUrl) {
+    if (generateStyle && !getStyleReferenceUrl(project)) {
       await generateStyleReference(targetProjectId);
     }
     const latestProject = useProjectStore.getState().projects.find((p) => p.id === targetProjectId);
-    const styleReferenceUrl = latestProject?.styleReferenceUrl;
+    const styleReferenceUrl = latestProject ? getStyleReferenceUrl(latestProject) : undefined;
+    const stylePrompt = latestProject ? getStylePrompt(latestProject) : undefined;
     // 风格指令：参考图只用于画风/色调/光照，主体与构图仍以文本描述为准
     const styleInstruction = styleReferenceUrl
       ? "Match the art style, color palette and lighting mood of the reference image; do not copy its content or composition. "
@@ -476,20 +646,24 @@ export function useWizardActions() {
 
     const tasks: Array<() => Promise<void>> = [];
 
-    // Character portrait tasks（角色定妆照）
+    // Character portrait tasks（角色定妆照：物种锁定 + 全身设定，禁止半身像模板）
     if (generatePortraits) {
       for (const char of project.assets.filter((a) => a.type === "character")) {
         if (char.imageUrl) continue; // skip already generated
         tasks.push(async () => {
           if (signal?.aborted) return;
           try {
-            const portraitPrompt = `${styleInstruction}Portrait of ${char.prompt}, head and shoulders, looking at camera, high detail`;
+            const portraitPrompt = composePortraitPrompt({
+              appearancePrompt: char.appearancePrompt?.trim() || char.prompt.trim(),
+              stylePrompt,
+            });
             const url = await generateImage({
               apiKey: providerConfig.apiKey,
               baseUrl: providerConfig.baseUrl,
-              prompt: portraitPrompt,
+              prompt: `${styleInstruction}${portraitPrompt}`,
               size: imageSize,
-              ...(styleReferenceUrl ? { inputImageUrl: styleReferenceUrl } : {}),
+              ratio: imageRatio,
+              ...(styleReferenceUrl ? { referenceImageUrls: [styleReferenceUrl] } : {}),
             });
             useProjectStore.getState().updateAssetByProjectId(targetProjectId, char.id, { imageUrl: url, error: undefined });
           } catch (err) {
@@ -503,7 +677,7 @@ export function useWizardActions() {
       }
     }
 
-    // Scene reference tasks（场景参考图）
+    // Scene reference tasks（场景参考图：图生图结构，keep = 场景描述原样）
     if (generateScenes) {
       for (const scene of project.assets.filter((a) => a.type === "scene")) {
         if (scene.imageUrl) continue; // skip already generated
@@ -513,9 +687,16 @@ export function useWizardActions() {
             const url = await generateImage({
               apiKey: providerConfig.apiKey,
               baseUrl: providerConfig.baseUrl,
-              prompt: `${styleInstruction}${scene.prompt}`,
+              prompt: composeImageToImagePrompt({
+                change: styleInstruction
+                  ? `${styleInstruction.trim()} Render the scene below as a clean environment reference image`
+                  : "Render the scene below as a clean environment reference image",
+                newStyle: stylePrompt,
+                keep: scene.prompt,
+              }),
               size: imageSize,
-              ...(styleReferenceUrl ? { inputImageUrl: styleReferenceUrl } : {}),
+              ratio: imageRatio,
+              ...(styleReferenceUrl ? { referenceImageUrls: [styleReferenceUrl] } : {}),
             });
             useProjectStore.getState().updateAssetByProjectId(targetProjectId, scene.id, { imageUrl: url, error: undefined });
           } catch (err) {
@@ -528,7 +709,7 @@ export function useWizardActions() {
       }
     }
 
-    // Product reference tasks（产品参考图：主体一致性锚点）
+    // Product reference tasks（产品参考图：图生图结构，keep = 产品描述原样）
     if (generateProducts) {
       for (const product of project.assets.filter((a) => a.type === "product")) {
         if (product.imageUrl) continue; // skip already generated
@@ -538,9 +719,16 @@ export function useWizardActions() {
             const url = await generateImage({
               apiKey: providerConfig.apiKey,
               baseUrl: providerConfig.baseUrl,
-              prompt: `${styleInstruction}${product.prompt}`,
+              prompt: composeImageToImagePrompt({
+                change: styleInstruction
+                  ? `${styleInstruction.trim()} Render the product below as a clean product reference image`
+                  : "Render the product below as a clean product reference image",
+                newStyle: stylePrompt,
+                keep: product.prompt,
+              }),
               size: imageSize,
-              ...(styleReferenceUrl ? { inputImageUrl: styleReferenceUrl } : {}),
+              ratio: imageRatio,
+              ...(styleReferenceUrl ? { referenceImageUrls: [styleReferenceUrl] } : {}),
             });
             useProjectStore.getState().updateAssetByProjectId(targetProjectId, product.id, { imageUrl: url, error: undefined });
           } catch (err) {
@@ -614,7 +802,9 @@ export function useWizardActions() {
 
     store.setImageGenerationStartedByProjectId(targetProjectId, true);
     store.setProjectStatusById(targetProjectId, "imaging");
-    const imageSize = aspectRatioToImageSize(latestProject?.aspectRatio ?? project.aspectRatio);
+    const { size: imageSize, ratio: imageRatio } = aspectRatioToImageParams(
+      latestProject?.aspectRatio ?? project.aspectRatio,
+    );
 
     // Generate images with concurrency 3
     const tasks = shotsNeedingImages.map((shot) => async () => {
@@ -622,14 +812,15 @@ export function useWizardActions() {
       useProjectStore.getState().setShotStatusByProjectId(targetProjectId, shot.id, "imaging");
 
       try {
-        const { prompt: enrichedPrompt, inputImageUrl: referenceImageUrl } = buildImageGenerationInput(shot, project);
+        const { prompt: enrichedPrompt, referenceImageUrls } = buildImageGenerationInput(shot, project);
 
         const imageUrl = await generateImage({
           apiKey: providerConfig.apiKey,
           baseUrl: providerConfig.baseUrl,
           prompt: enrichedPrompt,
           size: imageSize,
-          inputImageUrl: referenceImageUrl,
+          ratio: imageRatio,
+          ...(referenceImageUrls.length > 0 ? { referenceImageUrls } : {}),
         });
 
         useProjectStore.getState().updateShotByProjectId(targetProjectId, shot.id, { imageUrl, status: "imaged" });
@@ -680,14 +871,16 @@ export function useWizardActions() {
     store.setShotStatusByProjectId(targetProjectId, shotId, "imaging");
 
     try {
-      const { prompt: enrichedPrompt, inputImageUrl: referenceImageUrl } = buildImageGenerationInput(shot, project);
+      const { prompt: enrichedPrompt, referenceImageUrls } = buildImageGenerationInput(shot, project);
+      const { size, ratio } = aspectRatioToImageParams(project.aspectRatio);
 
       const imageUrl = await generateImage({
         apiKey: providerConfig.apiKey,
         baseUrl: providerConfig.baseUrl,
         prompt: enrichedPrompt,
-        size: aspectRatioToImageSize(project.aspectRatio),
-        inputImageUrl: referenceImageUrl,
+        size,
+        ratio,
+        ...(referenceImageUrls.length > 0 ? { referenceImageUrls } : {}),
       });
 
       store.updateShotByProjectId(targetProjectId, shotId, { imageUrl, status: "imaged" });
@@ -914,45 +1107,8 @@ export function useWizardActions() {
 
 /* ── Reference image resolution ─────────────────────────────────────────── */
 
-/**
- * Find the best img2img reference for a shot（统一资产参考链）：
- * 1. 场景参考（shot.sceneDesc 匹配场景名）
- * 2. 角色定妆照（activeCharacterIds 命中的角色）
- * 3. 产品参考图（全局主体锚点）
- * 4. 风格参考（项目级风格锚点）
- */
-function findBestReference(
-  shot: Shot,
-  project: { assets: Asset[]; styleReferenceUrl?: string },
-): string | undefined {
-  const scenes = project.assets.filter((a) => a.type === "scene");
-  // Try scene reference match
-  if (scenes.length > 0 && shot.sceneDesc) {
-    const shotScene = shot.sceneDesc.toLowerCase();
-    const matched = scenes.find((s) =>
-      s.imageUrl && shotScene.includes(s.name.toLowerCase()),
-    );
-    if (matched?.imageUrl) return matched.imageUrl;
-  }
-  // Fall back to first scene reference with an image
-  const firstScene = scenes.find((s) => !!s.imageUrl);
-  if (firstScene?.imageUrl) return firstScene.imageUrl;
-
-  // Fall back to character portrait
-  const portraitUrls = (shot.activeCharacterIds ?? [])
-    .map((id) => project.assets.find((a) => a.id === id && a.type === "character"))
-    .filter((c): c is Asset => c != null)
-    .map((c) => c.imageUrl ?? c.avatarUrl)
-    .filter((url): url is string => !!url);
-  if (portraitUrls[0]) return portraitUrls[0];
-
-  // Fall back to product reference（全局主体锚点）
-  const product = project.assets.find((a) => a.type === "product" && !!a.imageUrl);
-  if (product?.imageUrl) return product.imageUrl;
-
-  // Fall back to style reference
-  return project.styleReferenceUrl;
-}
+// 已迁移至 src/lib/promptComposer.ts 的 pickShotReferences（多参考选取，≤3 张）
+// 与 getStyleReferenceUrl（风格图读取）。findBestReference 已删除。
 
 /* ── Concurrency helper ─────────────────────────────────────────────────── */
 

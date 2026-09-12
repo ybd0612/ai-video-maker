@@ -6,7 +6,7 @@
 import { useProjectStore, selectActiveProject, type Shot } from "@/stores/projectStore";
 import { useSettingsStore } from "@/stores/settingsStore";
 import { generateScript } from "./scriptService";
-import { generateImage, aspectRatioToImageSize } from "./imageService";
+import { generateImage, aspectRatioToImageParams } from "./imageService";
 import { generateVideo, aspectRatioToVideoAspect, VideoTaskCreatedError } from "./videoService";
 import { injectCharacterDescriptions } from "@/lib/characterUtils";
 
@@ -36,7 +36,7 @@ export async function runPipeline(prompt: string, opts: RunOptions = {}) {
   const project = selectActiveProject(store);
   if (!project) throw new Error("No active project.");
 
-  const imageSize = aspectRatioToImageSize(project.aspectRatio);
+  const { size: imageSize, ratio: imageRatio } = aspectRatioToImageParams(project.aspectRatio);
   const videoAspect = aspectRatioToVideoAspect(project.aspectRatio);
 
   // ── Phase 1: Script (skip if prompt is empty and shots already exist) ──
@@ -108,7 +108,8 @@ export async function runPipeline(prompt: string, opts: RunOptions = {}) {
           baseUrl,
           prompt: enrichedPrompt,
           size: imageSize,
-          inputImageUrl: portraitUrls[0],
+          ratio: imageRatio,
+          ...(portraitUrls.length > 0 ? { referenceImageUrls: portraitUrls } : {}),
         });
 
         store.updateShot(shot.id, { imageUrl, status: "imaged" });
@@ -197,7 +198,7 @@ export async function runSingleShot(shotId: string, opts: RunOptions = {}) {
   if (!shot) throw new Error("Shot not found.");
   if (!shot.visualPrompt?.trim()) throw new Error("镜头画面描述为空，无法生成。");
 
-  const imageSize = aspectRatioToImageSize(project.aspectRatio);
+  const { size: imageSize, ratio: imageRatio } = aspectRatioToImageParams(project.aspectRatio);
   const videoAspect = aspectRatioToVideoAspect(project.aspectRatio);
 
   // Image
@@ -222,7 +223,8 @@ export async function runSingleShot(shotId: string, opts: RunOptions = {}) {
       baseUrl,
       prompt: enrichedPrompt,
       size: imageSize,
-      inputImageUrl: portraitUrls[0],
+      ratio: imageRatio,
+      ...(portraitUrls.length > 0 ? { referenceImageUrls: portraitUrls } : {}),
     });
     store.updateShot(shotId, { imageUrl, status: "imaged" });
   } catch (err) {

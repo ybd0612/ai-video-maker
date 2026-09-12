@@ -16,7 +16,8 @@ import {
 } from "lucide-react";
 import { CharacterEditor } from "@/features/characters/CharacterEditor";
 import { useWizardActions, hasActiveAssetTask } from "./useWizardActions";
-import { generateImage, aspectRatioToImageSize } from "@/services/imageService";
+import { generateImage, aspectRatioToImageParams } from "@/services/imageService";
+import { getStyleReferenceUrl } from "@/lib/promptComposer";
 import { AiPolishField } from "@/components/ui/AiPolishField";
 import {
   SYSTEM_PROMPT_DESCRIPTION_ZH,
@@ -115,8 +116,8 @@ export function StepAssets() {
     if (!scene.prompt.trim() || !providerConfig.apiKey) return;
     setGeneratingScenes((prev) => new Set(prev).add(scene.id));
     try {
-      const size = aspectRatioToImageSize(project?.aspectRatio ?? "16:9");
-      const styleRef = project?.styleReferenceUrl;
+      const { size, ratio } = aspectRatioToImageParams(project?.aspectRatio ?? "16:9");
+      const styleRef = project ? getStyleReferenceUrl(project) : undefined;
       const styleInstruction = styleRef
         ? "Match the art style, color palette and lighting mood of the reference image; do not copy its content or composition. "
         : "";
@@ -125,7 +126,8 @@ export function StepAssets() {
         baseUrl: providerConfig.baseUrl,
         prompt: `${styleInstruction}${scene.prompt}`,
         size,
-        ...(styleRef ? { inputImageUrl: styleRef } : {}),
+        ratio,
+        ...(styleRef ? { referenceImageUrls: [styleRef] } : {}),
       });
       updateAsset(scene.id, { imageUrl: url, error: undefined });
     } catch (err) {
@@ -150,8 +152,8 @@ export function StepAssets() {
     if (!product.prompt.trim() || !providerConfig.apiKey) return;
     setGeneratingProducts((prev) => new Set(prev).add(product.id));
     try {
-      const size = aspectRatioToImageSize(project?.aspectRatio ?? "16:9");
-      const styleRef = project?.styleReferenceUrl;
+      const { size, ratio } = aspectRatioToImageParams(project?.aspectRatio ?? "16:9");
+      const styleRef = project ? getStyleReferenceUrl(project) : undefined;
       const styleInstruction = styleRef
         ? "Match the art style, color palette and lighting mood of the reference image; do not copy its content or composition. "
         : "";
@@ -160,7 +162,8 @@ export function StepAssets() {
         baseUrl: providerConfig.baseUrl,
         prompt: `${styleInstruction}${product.prompt}`,
         size,
-        ...(styleRef ? { inputImageUrl: styleRef } : {}),
+        ratio,
+        ...(styleRef ? { referenceImageUrls: [styleRef] } : {}),
       });
       updateAsset(product.id, { imageUrl: url, error: undefined });
     } catch (err) {

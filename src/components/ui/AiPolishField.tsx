@@ -11,6 +11,7 @@ import { Loader2, Sparkles, Undo2 } from "lucide-react";
 import { useT } from "@/i18n";
 import { useSettingsStore } from "@/stores/settingsStore";
 import { polishText } from "@/services/chatService";
+import { resolvePolishSystemPrompt } from "@/lib/promptRules";
 
 interface AiPolishFieldProps {
   value: string;
@@ -100,7 +101,8 @@ export function AiPolishField({
         apiKey,
         baseUrl,
         value: snapshot,
-        systemPrompt,
+        // 走规则注册表解析：传入文本命中内置 polish 条目时，取用户覆盖后的生效版本
+        systemPrompt: resolvePolishSystemPrompt(systemPrompt),
         language,
       });
       if (!mountedRef.current) return;

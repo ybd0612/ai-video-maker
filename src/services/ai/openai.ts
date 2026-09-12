@@ -118,14 +118,16 @@ export class OpenAIService implements AIService {
     // ⚠️ 图生图 / 多图合成的参考图必须放在 extra_body.image（官方文档要求）。
     // 放在请求体顶层会被服务端拒绝（403 team_model_access_denied，报错文案有误导性）。
     const extraBody: Record<string, unknown> = { response_format: "url" };
-    if (params.inputImageUrl) {
-      extraBody.image = [params.inputImageUrl];
+    if (params.referenceImageUrls && params.referenceImageUrls.length > 0) {
+      extraBody.image = params.referenceImageUrls;
     }
 
     const body: Record<string, unknown> = {
       model: MODELS.image,
       prompt: params.prompt,
+      // size 传档位串（"1K"/"2K"），画幅由 ratio 决定（官方要求分开传）
       size: params.size,
+      ratio: params.ratio ?? "1:1",
       extra_body: extraBody,
     };
 

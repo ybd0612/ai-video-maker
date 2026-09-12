@@ -36,16 +36,35 @@ export type AutomationMode = 'auto' | 'semi-auto';
 
 /* ── Asset model（角色/场景/产品统一为资产） ────────────────────────────── */
 
-export type AssetType = "character" | "scene" | "product";
+/** 资产类型：style 为整体风格锚点（B 方案新增，复用现有字段零新列） */
+export type AssetType = "character" | "scene" | "product" | "style";
+
+/** 资产派生元数据（懒派生 dirty + 锁定）。缺省视为 { locked: false, dirty: false } */
+export interface AssetDerivation {
+  /** true = 派生物已被用户确认/历史遗留，自动派生不得覆盖 */
+  locked?: boolean;
+  /** true = 源字段（description 等）已被修改，派生物（prompt 等）需要重新派生 */
+  dirty?: boolean;
+}
+
+/** 分镜派生锁定（画面/动态提示词各自独立） */
+export interface ShotDerivation {
+  visualLocked?: boolean;
+  motionLocked?: boolean;
+  visualDirty?: boolean;
+  motionDirty?: boolean;
+}
 
 export interface Asset {
   id: string;
   type: AssetType;
   name: string;
   description: string;
-  /** 英文参考图生成提示词（scene/product 直接使用；character 与 appearancePrompt 一致） */
+  /** 英文参考图生成提示词（scene/product 直接使用；character 与 appearancePrompt 一致；
+   *  style 资产专有语义：英文风格提示词 stylePrompt，L2 派生自 ideaPrompt+中文风格描述，
+   *  硬性禁止出现角色/生物/人物） */
   prompt: string;
-  /** 生成的参考图（角色=定妆照、场景=场景参考图、产品=产品参考图） */
+  /** 生成的参考图（角色=定妆照、场景=场景参考图、产品=产品参考图、风格=风格参考图） */
   imageUrl?: string;
   /** 参考图生成失败原因（便于 UI 展示重试入口） */
   error?: string;
@@ -64,6 +83,8 @@ export interface Asset {
    * 缺省视为 extracted（兼容历史数据）。
    */
   source?: "extracted" | "manual";
+  /** L2 派生元数据（懒派生 dirty + 锁定）。缺省视为 { locked: false, dirty: false } */
+  derivation?: AssetDerivation;
 }
 
 export interface DialogueLine {
@@ -104,6 +125,8 @@ export interface Shot {
   firstFrameUrl?: string;
   lastFrameUrl?: string;
   useDualFrame: boolean;
+  /** 提示词派生锁定（画面/动态各自独立，B 方案新增） */
+  derivation?: ShotDerivation;
 }
 
 export interface ChatTurn {
@@ -242,6 +265,185 @@ function updateActive(
 ): Project[] {
   if (!activeProjectId) return projects;
   return projects.map((p) => (p.id === activeProjectId ? updater(p) : p));
+}
+
+/* ── Persisted-state migration（导出纯函数，便于单测） ───────────────────── */
+
+/**
+ * persist 存储迁移主体（纯函数）：v1→v9 全链路迁移。
+ * 与 store 实例解耦，tests/stores/projectMigrate.test.ts 可直接调用；
+ * 对缺字段/坏结构不抛错，重复执行幂等。
+ */
+export function migratePersistedState(
+  persisted: unknown,
+  version: number,
+): Record<string, unknown> {
+  const state = persisted as Record<string, unknown>;
+
+  // Migrate from v1 (single project) to v2 (multi-project)
+  if (version < 2) {
+    const old = persisted as Record<string, unknown>;
+    const project = old.project as Project | null;
+    if (project) {
+      state.projects = [project];
+      state.activeProjectId = project.id;
+      state.history = [];
+    }
+  }
+
+  // Migrate from v2 to v3: add character system + dialogue system
+  if (version < 3) {
+    const projects = state.projects as Array<Record<string, unknown>> | undefined;
+    if (projects) {
+      state.projects = projects.map((p) => ({
+        ...p,
+        mode: "simple",
+        characters: [],
+        shots: ((p.shots as Array<Record<string, unknown>>) ?? []).map(
+          (s) => ({
+            ...s,
+            dialogues: [],
+            activeCharacterIds: [],
+          }),
+        ),
+      }));
+    }
+  }
+
+  // Migrate from v3 to v4: add wizardStep + structured prompt sub-elements
+  if (version < 4) {
+    const projects = state.projects as Array<Record<string, unknown>> | undefined;
+    if (projects) {
+      state.projects = projects.map((p) => ({
+        ...p,
+        wizardStep: 1,
+      }));
+    }
+  }
+
+  // Migrate from v4 to v5: unified flow, remove mode, 6-step wizard
+  if (version < 5) {
+    const projects = state.projects as Array<Record<string, unknown>> | undefined;
+    if (projects) {
+      state.projects = projects.map((p) => {
+        const { mode, ...rest } = p;
+        // Map old wizard steps to new 4-step flow
+        const oldStep = (p.wizardStep as number) ?? 1;
+        let newStep: number;
+        if (mode === "drama") {
+          // drama: 1(chars)→skip, 2(idea)→1, 3(storyboard)→2, 4(images)→3, 5(videos)→3, 6(assembly)→4
+          newStep = oldStep <= 1 ? 1 : oldStep === 2 ? 1 : oldStep === 3 ? 2 : 4;
+        } else {
+          // simple: 1(idea)→1, 2(storyboard)→2, 3(images)→3, 4(videos)→3, 5(assembly)→4
+          newStep = oldStep <= 2 ? oldStep : oldStep <= 4 ? 3 : 4;
+        }
+        return { ...rest, wizardStep: newStep, automationMode: 'semi-auto' as const };
+      });
+    }
+  }
+
+  // Migrate from v5 to v6: add sceneReferences and styleReferenceUrl
+  if (version < 6) {
+    const projects = state.projects as Array<Record<string, unknown>> | undefined;
+    if (projects) {
+      state.projects = projects.map((p) => ({
+        ...p,
+        sceneReferences: (p.sceneReferences as unknown[]) ?? [],
+        styleReferenceUrl: (p.styleReferenceUrl as string) ?? undefined,
+      }));
+    }
+  }
+
+  // Migrate from v6 to v7: add generation started flags
+  if (version < 7) {
+    const projects = state.projects as Array<Record<string, unknown>> | undefined;
+    if (projects) {
+      state.projects = projects.map((p) => ({
+        ...p,
+        assetGenerationStarted: false,
+        imageGenerationStarted: false,
+        videoGenerationStarted: false,
+      }));
+    }
+  }
+
+  // Migrate from v7 to v8: 角色/场景/产品统一为 assets 数组。
+  // 旧 characters[] / sceneReferences[] 合并进 assets（保持原 ID，
+  // 否则对白引用与 activeCharacterIds 会断裂）；风格参考图保留为项目字段。
+  if (version < 8) {
+    const projects = state.projects as Array<Record<string, unknown>> | undefined;
+    if (projects) {
+      state.projects = projects.map((p) => {
+        const { characters, sceneReferences, ...rest } = p;
+        const merged: Asset[] = [
+          ...((characters as Array<Record<string, unknown>> | undefined) ?? []).map((c) => ({
+            id: c.id as string,
+            type: "character" as const,
+            name: c.name as string,
+            description: (c.description as string) ?? "",
+            prompt: (c.appearancePrompt as string) ?? "",
+            imageUrl: c.generatedPortraitUrl as string | undefined,
+            error: c.error as string | undefined,
+            appearancePrompt: c.appearancePrompt as string | undefined,
+            assetNamespace: c.assetNamespace as string | undefined,
+            fullPrompt: c.fullPrompt as string | undefined,
+            avatarUrl: c.avatarUrl as string | undefined,
+            multiViewUrl: c.multiViewUrl as string | undefined,
+          })),
+          ...((sceneReferences as Array<Record<string, unknown>> | undefined) ?? []).map((s) => ({
+            id: s.id as string,
+            type: "scene" as const,
+            name: s.name as string,
+            description: (s.description as string) ?? "",
+            prompt: (s.prompt as string) ?? "",
+            imageUrl: s.imageUrl as string | undefined,
+            error: s.error as string | undefined,
+          })),
+        ];
+        return { ...rest, assets: merged };
+      });
+    }
+  }
+
+  // Migrate from v8 to v9: 资产派生元数据（derivation）+ style 资产类型。
+  // 不凭空创建 style 资产（无 style 资产的项目维持现状，运行期由
+  // useWizardActions 的 ensureStyleAsset 懒派生补齐）；仅做结构合法化：
+  // 已有资产的非空英文派生物（prompt/appearancePrompt）补 derivation.locked=true，
+  // 防止后续自动派生覆盖历史内容。重复执行幂等。
+  if (version < 9) {
+    const projects = state.projects;
+    if (Array.isArray(projects)) {
+      state.projects = (projects as unknown[]).map((p) => {
+        if (!p || typeof p !== "object") return p;
+        const proj = p as Record<string, unknown>;
+        if (!Array.isArray(proj.assets)) return p;
+        return {
+          ...proj,
+          assets: (proj.assets as unknown[]).map((a) => {
+            if (!a || typeof a !== "object") return a;
+            const asset = a as Record<string, unknown>;
+            const prompt =
+              typeof asset.prompt === "string" ? asset.prompt.trim() : "";
+            const appearance =
+              typeof asset.appearancePrompt === "string"
+                ? asset.appearancePrompt.trim()
+                : "";
+            // 无任何非空派生物：不置锁（空派生不该被锁定）
+            if (!prompt && !appearance) return a;
+            const derivation =
+              asset.derivation && typeof asset.derivation === "object"
+                ? (asset.derivation as Record<string, unknown>)
+                : {};
+            // 幂等：已锁定则原样返回
+            if (derivation.locked === true) return a;
+            return { ...asset, derivation: { ...derivation, locked: true } };
+          }),
+        };
+      });
+    }
+  }
+
+  return state;
 }
 
 /* ── Store ──────────────────────────────────────────────────────────────── */
@@ -701,147 +903,10 @@ export const useProjectStore = create<ProjectState>()(
     }),
     {
       name: "wxhb-project",
-      version: 8,
-      migrate: (persisted: unknown, version: number) => {
-        // Migrate from v1 (single project) to v2 (multi-project)
-        if (version < 2) {
-          const old = persisted as Record<string, unknown>;
-          const project = old.project as Project | null;
-          if (project) {
-            (persisted as Record<string, unknown>).projects = [project];
-            (persisted as Record<string, unknown>).activeProjectId = project.id;
-            (persisted as Record<string, unknown>).history = [];
-          }
-        }
-
-        // Migrate from v2 to v3: add character system + dialogue system
-        if (version < 3) {
-          const state = persisted as {
-            projects?: Array<Record<string, unknown>>;
-          };
-          if (state.projects) {
-            state.projects = state.projects.map((p) => ({
-              ...p,
-              mode: "simple",
-              characters: [],
-              shots: ((p.shots as Array<Record<string, unknown>>) ?? []).map(
-                (s) => ({
-                  ...s,
-                  dialogues: [],
-                  activeCharacterIds: [],
-                }),
-              ),
-            }));
-          }
-        }
-
-        // Migrate from v3 to v4: add wizardStep + structured prompt sub-elements
-        if (version < 4) {
-          const state = persisted as {
-            projects?: Array<Record<string, unknown>>;
-          };
-          if (state.projects) {
-            state.projects = state.projects.map((p) => ({
-              ...p,
-              wizardStep: 1,
-            }));
-          }
-        }
-
-        // Migrate from v4 to v5: unified flow, remove mode, 6-step wizard
-        if (version < 5) {
-          const state = persisted as {
-            projects?: Array<Record<string, unknown>>;
-          };
-          if (state.projects) {
-            state.projects = state.projects.map((p) => {
-              const { mode, ...rest } = p;
-              // Map old wizard steps to new 4-step flow
-              const oldStep = (p.wizardStep as number) ?? 1;
-              let newStep: number;
-              if (mode === "drama") {
-                // drama: 1(chars)→skip, 2(idea)→1, 3(storyboard)→2, 4(images)→3, 5(videos)→3, 6(assembly)→4
-                newStep = oldStep <= 1 ? 1 : oldStep === 2 ? 1 : oldStep === 3 ? 2 : 4;
-              } else {
-                // simple: 1(idea)→1, 2(storyboard)→2, 3(images)→3, 4(videos)→3, 5(assembly)→4
-                newStep = oldStep <= 2 ? oldStep : oldStep <= 4 ? 3 : 4;
-              }
-              return { ...rest, wizardStep: newStep, automationMode: 'semi-auto' as const };
-            });
-          }
-        }
-
-        // Migrate from v5 to v6: add sceneReferences and styleReferenceUrl
-        if (version < 6) {
-          const state = persisted as {
-            projects?: Array<Record<string, unknown>>;
-          };
-          if (state.projects) {
-            state.projects = state.projects.map((p) => ({
-              ...p,
-              sceneReferences: (p.sceneReferences as unknown[]) ?? [],
-              styleReferenceUrl: (p.styleReferenceUrl as string) ?? undefined,
-            }));
-          }
-        }
-
-        // Migrate from v6 to v7: add generation started flags
-        if (version < 7) {
-          const state = persisted as {
-            projects?: Array<Record<string, unknown>>;
-          };
-          if (state.projects) {
-            state.projects = state.projects.map((p) => ({
-              ...p,
-              assetGenerationStarted: false,
-              imageGenerationStarted: false,
-              videoGenerationStarted: false,
-            }));
-          }
-        }
-
-        // Migrate from v7 to v8: 角色/场景/产品统一为 assets 数组。
-        // 旧 characters[] / sceneReferences[] 合并进 assets（保持原 ID，
-        // 否则对白引用与 activeCharacterIds 会断裂）；风格参考图保留为项目字段。
-        if (version < 8) {
-          const state = persisted as {
-            projects?: Array<Record<string, unknown>>;
-          };
-          if (state.projects) {
-            state.projects = state.projects.map((p) => {
-              const { characters, sceneReferences, ...rest } = p;
-              const merged: Asset[] = [
-                ...((characters as Array<Record<string, unknown>> | undefined) ?? []).map((c) => ({
-                  id: c.id as string,
-                  type: "character" as const,
-                  name: c.name as string,
-                  description: (c.description as string) ?? "",
-                  prompt: (c.appearancePrompt as string) ?? "",
-                  imageUrl: c.generatedPortraitUrl as string | undefined,
-                  error: c.error as string | undefined,
-                  appearancePrompt: c.appearancePrompt as string | undefined,
-                  assetNamespace: c.assetNamespace as string | undefined,
-                  fullPrompt: c.fullPrompt as string | undefined,
-                  avatarUrl: c.avatarUrl as string | undefined,
-                  multiViewUrl: c.multiViewUrl as string | undefined,
-                })),
-                ...((sceneReferences as Array<Record<string, unknown>> | undefined) ?? []).map((s) => ({
-                  id: s.id as string,
-                  type: "scene" as const,
-                  name: s.name as string,
-                  description: (s.description as string) ?? "",
-                  prompt: (s.prompt as string) ?? "",
-                  imageUrl: s.imageUrl as string | undefined,
-                  error: s.error as string | undefined,
-                })),
-              ];
-              return { ...rest, assets: merged };
-            });
-          }
-        }
-
-        return persisted as Record<string, unknown>;
-      },
+      version: 9,
+      // 迁移主体提取为导出纯函数 migratePersistedState（见文件上方），便于单测
+      migrate: (persisted: unknown, version: number) =>
+        migratePersistedState(persisted, version),
     },
   ),
 );
