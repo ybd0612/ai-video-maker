@@ -54,10 +54,10 @@ export interface PromptRule {
 export const SKELETONS: Record<PromptTask, { zh: string; en: string }> = {
   /* ── 步骤 1 轻量资产提取（scriptService.extractAssetsFromIdea） ── */
   extractAssets: {
-    zh: `你是一位专业的短视频资产提取助手。用户会给你一个视频主题或想法，请提取其中的资产信息，严格按以下 JSON 格式返回，不要包含任何其他文字：
+    zh: `你是一位专业的视频资产提取助手。用户会给你一个视频主题或想法，请提取其中的资产信息，严格按以下 JSON 格式返回，不要包含任何其他文字：
 {
   "characters": [
-    { "name": "角色名", "description": "完整角色描述（中文，按顺序：物种/类型 → 身份定位 → 性格气质 → 外貌要点 → 服饰配饰 → 记忆点，2-4 句）", "appearancePrompt": "外貌描述（英文，用于 AI 绘图）" }
+    { "name": "角色名", "description": "完整角色描述（中文，共 8 行，每行一个要素，行首为要素名+冒号：物种 → 身份 → 年龄 → 性格 → 外貌 → 服饰 → 记忆点 → 背景）", "appearancePrompt": "外貌描述（英文，用于 AI 绘图）" }
   ],
   "products": [
     { "name": "产品名", "description": "产品简介（类型、用途）", "appearancePrompt": "外观描述（英文，用于 AI 绘图，包含款式、颜色、材质、logo 等）" }
@@ -82,10 +82,10 @@ export const SKELETONS: Record<PromptTask, { zh: string; en: string }> = {
 {{safety}}
 {{/safety}}
 - 不要生成分镜，只返回上述 JSON`,
-    en: `You are a professional short-video asset extraction assistant. The user will give you a video topic or idea. Extract asset info and return strictly in this JSON format, no other text:
+    en: `You are a professional video asset extraction assistant. The user will give you a video topic or idea. Extract asset info and return strictly in this JSON format, no other text:
 {
   "characters": [
-    { "name": "Character name", "description": "Full character description in Chinese (in order: species/type → role → personality → looks → outfit → signature traits, 2-4 sentences)", "appearancePrompt": "Appearance description in English (for AI image generation)" }
+    { "name": "Character name", "description": "Full character description in Chinese (exactly 8 lines, one element per line, each line prefixed with the element name + colon: species → role → age → personality → looks → outfit → signature → background)", "appearancePrompt": "Appearance description in English (for AI image generation)" }
   ],
   "products": [
     { "name": "Product name", "description": "Brief description", "appearancePrompt": "Appearance description in English (style, color, material, logo, etc.)" }
@@ -114,7 +114,7 @@ Examples:
 
   /* ── 步骤 3 完整分镜生成（scriptService.generateScript） ── */
   storyboard: {
-    zh: `你是一位专业的短视频分镜策划师。用户会给你一个主题或想法，你需要：
+    zh: `你是一位专业的视频分镜策划师。用户会给你一个主题或想法，你需要：
 1. 将其拆分为 4-8 个分镜镜头
 2. 如果内容中有人物角色，提取角色信息
 3. 如果内容是产品/商品/实物主体，提取产品信息
@@ -125,7 +125,7 @@ Examples:
   "characters": [
     {
       "name": "角色名",
-      "description": "完整角色描述（中文，按顺序：物种/类型 → 身份定位 → 性格气质 → 外貌要点 → 服饰配饰 → 记忆点，2-4 句；动物/拟人角色同样适用）",
+      "description": "完整角色描述（中文，共 8 行，每行一个要素，行首为要素名+冒号：物种 → 身份 → 年龄 → 性格 → 外貌 → 服饰 → 记忆点 → 背景；动物/拟人角色同样适用）",
       "appearancePrompt": "外貌描述（英文，用于 AI 绘图；人物写年龄体型发型服饰，动物写物种体型毛色特征等）"
     }
   ],
@@ -184,7 +184,7 @@ Examples:
 ⚠️ 内容安全要求：
 {{safety}}
 {{/safety}}`,
-    en: `You are a professional short-video storyboard planner. The user will give you a topic or idea. You need to:
+    en: `You are a professional video storyboard planner. The user will give you a topic or idea. You need to:
 1. Break it into 4-8 shot scenes
 2. If the content involves ANY character/subject (humans, animals like a little rabbit, anthropomorphic creatures, robots), extract character info
 3. If a physical item is the CORE showcased subject (e.g. a product ad), extract product info
@@ -195,7 +195,7 @@ Return strictly in this JSON format, no other text:
   "characters": [
     {
       "name": "Character name",
-      "description": "Full character description in Chinese (species/type → role → personality → looks → outfit → signature traits, 2-4 sentences; applies to animals/anthropomorphic subjects too)",
+      "description": "Full character description in Chinese (exactly 8 lines, one element per line, each line prefixed with the element name + colon: species → role → age → personality → looks → outfit → signature → background; applies to animals/anthropomorphic subjects too)",
       "appearancePrompt": "Appearance description in English (humans: age, build, hair, clothing; animals: species, body shape, fur color, features, etc.)"
     }
   ],
@@ -399,7 +399,7 @@ Examples:
 /* polish 专家系统提示词（原 chatService 常量搬迁至此，chatService 转为再导出；
  * 单语原文整体作为单条目，不翻译——内容与迁移前逐字一致，零行为变化） */
 
-export const SYSTEM_PROMPT_SCRIPT_TEXT = `你是一位专业的短视频文案优化专家。用户会给你一段视频旁白或文案，请帮助优化和改进。
+export const SYSTEM_PROMPT_SCRIPT_TEXT = `你是一位专业的视频文案优化专家。用户会给你一段视频旁白或文案，请帮助优化和改进。
 
 要求：
 - 保持原有语义和核心信息
@@ -421,7 +421,7 @@ Requirements:
 
 If the user has specific requests, incorporate them. Always return the complete optimized prompt.`;
 
-export const SYSTEM_PROMPT_MAIN_PROMPT = `你是一位专业的短视频创意策划师。用户会给你一段关于视频主题的描述，请帮助完善和优化。
+export const SYSTEM_PROMPT_MAIN_PROMPT = `你是一位专业的视频创意策划师。用户会给你一段关于视频主题的描述，请帮助完善和优化。
 
 要求：
 - 让主题描述更具体、更有画面感
@@ -452,20 +452,23 @@ export const SYSTEM_PROMPT_DESCRIPTION_ZH = `你是一位 AI 视觉创作的描�
 - 用中文，长度与原文相当，不要扩写成段落
 - 直接返回润色后的描述，不要任何解释说明`;
 
-export const SYSTEM_PROMPT_CHARACTER_DESCRIPTION_ZH = `你是一位 AI 角色设定专家。用户会给你一个角色名和现有描述（可能不完整），请输出这个角色的**完整中文角色描述**，作为该角色唯一的事实源（后续英文绘图提示词将由它派生）。
+export const SYSTEM_PROMPT_CHARACTER_DESCRIPTION_ZH = `你是一位 AI 角色设定专家，服务于短视频、短剧、长视频等各类视频创作。用户会给你一个角色名和现有描述（可能不完整），请输出这个角色的**完整角色描述**，作为该角色唯一的事实源（后续英文绘图提示词与分镜创作都将由它派生）。
 
-完整描述必须按以下 6 要素组织，按顺序写：
-1. 物种/类型（放在最前面——这是防止绘制时主体漂移的第一锚点，如"小兔子""年轻女性""机器人"）
-2. 身份/角色定位（主角、兔妈妈、咖啡店员等）
-3. 性格气质（温柔、活泼、安静等）
-4. 外貌要点（体型、毛色或发色、五官特征）
-5. 服饰/配饰（如没有则根据角色身份补一套贴合的）
-6. 记忆点（1-2 个跨镜头识别特征，如"蓝围巾""一高一低的歪耳朵"——这是角色一致性的核心）
+完整角色描述必须包含以下 8 个要素，**每个要素单独一行**，行首为要素名 + 中文冒号，顺序固定如下：
+物种：<物种或类型，放在第一行——这是防止绘制时主体漂移的第一锚点，如"小白兔""年轻女性""机器人">
+身份：<角色定位，如胎教短片主角、兔妈妈、咖啡店店员>
+年龄：<年龄阶段，如幼年/少年/成年/老年——影响体型与神态>
+性格：<性格气质，2-3 个词>
+外貌：<体型、毛色或发色、五官等外貌特征>
+服饰：<服装与配饰；原文没有则根据身份补一套贴合的>
+记忆点：<1-2 个跨镜头识别特征——这是角色一致性的核心>
+背景：<一句话来历，以及与其他角色的关系；确实没有可写"暂无">
 
 硬性规则：
 - 严格保持用户给出的物种/类型，禁止把非人类主体写成人类
 - 只写静态设定，不要写动作/状态（如"正在睡觉"属于分镜层，不进角色描述）
-- 用中文，2-4 句，紧凑无废话
+- 8 行缺一不可，不要合并、不要加序号或 markdown 符号
+- 要素内容保持通用，不要绑定单一时长、平台或内容形态
 - 直接返回完整角色描述，不要任何解释说明`;
 
 export const SYSTEM_PROMPT_NEGATIVE_PROMPT = `你是一位 AI 图像/视频生成的负向提示词专家。用户会给你一段负向提示词（描述画面中需要避免的瑕疵），请帮助优化。

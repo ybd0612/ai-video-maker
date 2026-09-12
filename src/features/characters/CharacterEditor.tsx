@@ -17,7 +17,7 @@ import {
 import { Lightbox } from "@/components/ui/Lightbox";
 import { generateImage, aspectRatioToImageParams } from "@/services/imageService";
 import { generateAssetNamespace, generateFullPrompt } from "@/lib/assetNamespace";
-import { composePortraitPrompt } from "@/lib/promptComposer";
+import { composePortraitPrompt, parseStructuredDescription } from "@/lib/promptComposer";
 
 interface CharacterEditorProps {
   character: Asset | null; // null = creating new
@@ -276,15 +276,34 @@ export function CharacterEditor({ character, onClose }: CharacterEditorProps) {
             {t("characters.aiGenerateDescription")}
           </button>
         </div>
-        {/* 完整中文角色描述（唯一事实源，只读展示） */}
-        <div
-          className="w-full whitespace-pre-wrap rounded-md border border-line bg-raised px-2 py-1.5 text-xs leading-relaxed text-ink select-text"
-          title={t("characters.descriptionReadonlyHint")}
-        >
-          {description.trim() || (
-            <span className="text-ink-5">{t("characters.appearanceEmpty")}</span>
-          )}
-        </div>
+        {/* 完整中文角色描述（唯一事实源，只读展示；8 要素行格式 → 字段化渲染，旧格式整段兜底） */}
+        {(() => {
+          const structured = parseStructuredDescription(description);
+          if (description.trim() === "") {
+            return (
+              <div className="w-full rounded-md border border-line bg-raised px-2 py-1.5 text-xs text-ink-5">
+                {t("characters.descriptionEmpty")}
+              </div>
+            );
+          }
+          if (structured) {
+            return (
+              <div className="w-full space-y-0.5 rounded-md border border-line bg-raised px-2 py-1.5 text-xs select-text">
+                {structured.map(({ label, value }) => (
+                  <div key={label} className="flex gap-1.5 leading-relaxed">
+                    <span className="shrink-0 font-medium text-ink-3">{label}</span>
+                    <span className="min-w-0 flex-1 text-ink">{value}</span>
+                  </div>
+                ))}
+              </div>
+            );
+          }
+          return (
+            <div className="w-full whitespace-pre-wrap rounded-md border border-line bg-raised px-2 py-1.5 text-xs leading-relaxed text-ink select-text">
+              {description}
+            </div>
+          );
+        })()}
         <p className="text-[0.625rem] text-ink-5">{t("characters.descriptionReadonlyHint")}</p>
 
         {/* 指令输入框 + 修改描述（AI 融合要求） + 撤销 */}

@@ -13,6 +13,7 @@ import {
   pickShotReferences,
   getStyleReferenceUrl,
   getStylePrompt,
+  parseStructuredDescription,
 } from "@/lib/promptComposer";
 
 /* ── 测试数据工厂 ─────────────────────────────────────────────────────────── */
@@ -312,5 +313,59 @@ describe("getStylePrompt", () => {
     const empty = { assets: [makeAsset({ id: "s1", type: "style", name: "style", prompt: "  " })] };
     expect(getStylePrompt(empty)).toBeUndefined();
     expect(getStylePrompt({ assets: [] })).toBeUndefined();
+  });
+});
+
+/* ── parseStructuredDescription（8 要素行格式解析） ────────────────────────── */
+
+describe("parseStructuredDescription", () => {
+  it("解析 8 行行前缀格式为字段数组", () => {
+    const desc = [
+      "物种：小白兔",
+      "身份：胎教短片主角",
+      "年龄：幼年",
+      "性格：纯真安静",
+      "外貌：圆滚滚的白色小兔，长耳朵内侧粉色",
+      "服饰：淡蓝色小围巾",
+      "记忆点：蓝围巾 + 歪耳朵",
+      "背景：森林月夜里与兔妈相依",
+    ].join("\n");
+    expect(parseStructuredDescription(desc)).toEqual([
+      { label: "物种", value: "小白兔" },
+      { label: "身份", value: "胎教短片主角" },
+      { label: "年龄", value: "幼年" },
+      { label: "性格", value: "纯真安静" },
+      { label: "外貌", value: "圆滚滚的白色小兔，长耳朵内侧粉色" },
+      { label: "服饰", value: "淡蓝色小围巾" },
+      { label: "记忆点", value: "蓝围巾 + 歪耳朵" },
+      { label: "背景", value: "森林月夜里与兔妈相依" },
+    ]);
+  });
+
+  it("兼容英文冒号与值内冒号（取第一个冒号拆分）", () => {
+    expect(parseStructuredDescription("物种:小白兔\n记忆点:蓝围巾: 蓝色系")).toEqual([
+      { label: "物种", value: "小白兔" },
+      { label: "记忆点", value: "蓝围巾: 蓝色系" },
+    ]);
+  });
+
+  it("无前缀的自由文本返回 null（整段兜底）", () => {
+    expect(parseStructuredDescription("一只安详入睡的小兔子，怀里抱着胡萝卜。")).toBeNull();
+  });
+
+  it("含任何无法解析的行时整体返回 null（不半解析）", () => {
+    expect(
+      parseStructuredDescription("物种：小白兔\n这是一句没有前缀的说明文字。"),
+    ).toBeNull();
+  });
+
+  it("单行 / 空文本返回 null", () => {
+    expect(parseStructuredDescription("物种：小白兔")).toBeNull();
+    expect(parseStructuredDescription("")).toBeNull();
+    expect(parseStructuredDescription("  \n  ")).toBeNull();
+  });
+
+  it("前缀超长（>6 字）视为非要素行，整体返回 null", () => {
+    expect(parseStructuredDescription("这是一个超长前缀不止六字：内容")).toBeNull();
   });
 });
