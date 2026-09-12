@@ -72,3 +72,24 @@ export function setupDevDump(): void {
   // Drop an initial snapshot right after hydration.
   void post();
 }
+
+/**
+ * DEV-ONLY: 资产提取原始响应留痕（LLM 间歇性异常输出的事后取证现场）。
+ * 经 Vite 插件写入 debug-dump/extract-logs/extract-<ts>.json；best-effort，
+ * 失败仅 console.debug，绝不影响提取主流程。生产构建不调用。
+ */
+export async function dumpExtractLog(payload: {
+  idea: string;
+  raw: string;
+}): Promise<void> {
+  if (!import.meta.env.DEV) return;
+  try {
+    await fetch("/__debug/extract-log", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ at: new Date().toISOString(), ...payload }),
+    });
+  } catch (err) {
+    console.debug("[devDump] extract log failed:", err);
+  }
+}

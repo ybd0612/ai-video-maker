@@ -435,7 +435,17 @@ export async function extractAssetsFromIdea(
     enableThinking: false,
   });
 
-  const jsonStr = extractJsonFromResponse(result.content);
+  const content = result.content;
+
+  // DEV-ONLY 取证留痕：把提取的模型原始响应写入 debug-dump/extract-logs/，
+  // 用于事后分析 LLM 间歇性异常输出（如某次提取缺失角色）。best-effort 不影响主流程。
+  if (import.meta.env.DEV) {
+    void import("@/lib/devDump").then((m) =>
+      m.dumpExtractLog({ idea: opts.prompt.slice(0, 400), raw: content }),
+    );
+  }
+
+  const jsonStr = extractJsonFromResponse(content);
   if (!jsonStr) {
     throw new Error("无法从模型响应中提取资产 JSON。");
   }
