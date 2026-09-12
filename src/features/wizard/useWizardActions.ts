@@ -101,6 +101,65 @@ function buildImageGenerationInput(
 
 export function useWizardActions() {
 
+  /**
+   * 生成风格参考图（项目级风格锚点）。
+   * 幂等：已有风格图（force=true 除外）、或该项目已有资产生成任务在跑
+   * （activeAssetTasks 互斥）时直接跳过。
+   * 风格提示词优先从想法文本派生——保证风格贴合故事本身（如动画故事出动画风格，
+   * 而不是固定回落到写实摄影导致定妆照与故事风格脱节）。
+   * 角色/场景/产品与分镜图都以此为风格参考。
+   */
+  const generateStyleReference = useCallback(async (targetProjectId?: string, force = false) => {
+    const { providerConfig } = useSettingsStore.getState();
+    if (!providerConfig.apiKey || !providerConfig.baseUrl) return;
+
+    const store = useProjectStore.getState();
+    const project = targetProjectId
+      ? store.projects.find((p) => p.id === targetProjectId)
+      : selectActiveProject(store);
+    if (!project || (project.styleReferenceUrl && !force)) return;
+
+    const pid = project.id;
+    // 与资产生成共用注册表互斥：风格图不与资产图并行（资产图要参考风格图）
+    if (activeAssetTasks.has(pid)) return;
+
+    const controller = new AbortController();
+    activeAssetTasks.set(pid, controller);
+
+    try {
+      const ideaText = (project.ideaPrompt ?? "").trim();
+      const stylePrompt = ideaText
+        ? `Visual style reference / mood board for this story: ${ideaText.slice(0, 400)}. ` +
+          `Show the overall art style, color palette, lighting mood and atmosphere that best fit this story. ` +
+          `Cohesive composition, no text, no watermark, no character in focus.`
+        : project.style
+          ? `${project.style} style reference, cohesive visual aesthetic, color palette, mood board`
+          : `Cinematic style reference, cohesive visual aesthetic, warm tones, professional photography`;
+
+      const url = await generateImage({
+        apiKey: providerConfig.apiKey,
+        baseUrl: providerConfig.baseUrl,
+        prompt: stylePrompt,
+        size: aspectRatioToImageSize(project.aspectRatio),
+      });
+      useProjectStore.getState().updateProjectById(pid, (p) => ({
+        ...p,
+        styleReferenceUrl: url,
+        styleReferenceError: undefined,
+      }));
+      useProjectStore.getState().addHistory("style_generated", "生成风格参考图", pid);
+    } catch (err) {
+      // 失败写入 styleReferenceError，资产页会就地展示；不阻塞后续资产生成
+      useProjectStore.getState().updateProjectById(pid, (p) => ({
+        ...p,
+        styleReferenceError: err instanceof Error ? err.message : String(err),
+      }));
+      console.error("Failed to generate style reference:", err);
+    } finally {
+      activeAssetTasks.delete(pid);
+    }
+  }, []);
+
   /** Step 1→2: Extract characters from idea, advance to assets step */
   const extractCharactersFromIdea = useCallback(async (prompt: string) => {
     const { providerConfig } = useSettingsStore.getState();
@@ -143,6 +202,12 @@ export function useWizardActions() {
         error: undefined,
         wizardStep: 2,
       }));
+
+      // 自动生成风格参考图（后台执行，不阻塞进入资产步骤）：
+      // 角色/场景/产品定妆照与分镜图都会以它为风格锚点，
+      // 必须先于资产生成就绪才能让资产图带上故事风格。
+      // 失败不阻塞流程，错误写入 styleReferenceError 在资产页展示。
+      void generateStyleReference(targetProjectId);
     } catch (err) {
       // 失败时将发起项目复位为 failed，避免其状态永远停留在 scripting
       useProjectStore.getState().updateProjectById(targetProjectId, (p) => ({
@@ -152,7 +217,7 @@ export function useWizardActions() {
       }));
       throw err;
     }
-  }, []);
+  }, [generateStyleReference]);
 
   /** Step 3: Generate storyboard shots using asset context */
   const generateStoryboard = useCallback(async (prompt: string) => {
@@ -353,6 +418,20 @@ export function useWizardActions() {
     const generateProducts = opts?.generateProducts !== false;
     const generateStyle = opts?.generateStyle !== false;
 
+    // ── 阶段 1：风格参考图先行 ──
+    // 角色/场景/产品定妆照都要参考风格图（否则动画故事会生成写实照片），
+    // 必须等它就绪再生成资产图；风格图失败不阻塞（资产图退化为纯文生图，
+    // 错误已写入 styleReferenceError 在资产页展示）。
+    if (generateStyle && !project.styleReferenceUrl) {
+      await generateStyleReference(targetProjectId);
+    }
+    const latestProject = useProjectStore.getState().projects.find((p) => p.id === targetProjectId);
+    const styleReferenceUrl = latestProject?.styleReferenceUrl;
+    // 风格指令：参考图只用于画风/色调/光照，主体与构图仍以文本描述为准
+    const styleInstruction = styleReferenceUrl
+      ? "Match the art style, color palette and lighting mood of the reference image; do not copy its content or composition. "
+      : "";
+
     const tasks: Array<() => Promise<void>> = [];
 
     // Character portrait tasks（角色定妆照）
@@ -362,12 +441,13 @@ export function useWizardActions() {
         tasks.push(async () => {
           if (signal?.aborted) return;
           try {
-            const portraitPrompt = `Portrait of ${char.prompt}, head and shoulders, looking at camera, high detail, photorealistic`;
+            const portraitPrompt = `${styleInstruction}Portrait of ${char.prompt}, head and shoulders, looking at camera, high detail`;
             const url = await generateImage({
               apiKey: providerConfig.apiKey,
               baseUrl: providerConfig.baseUrl,
               prompt: portraitPrompt,
               size: imageSize,
+              ...(styleReferenceUrl ? { inputImageUrl: styleReferenceUrl } : {}),
             });
             useProjectStore.getState().updateAssetByProjectId(targetProjectId, char.id, { imageUrl: url, error: undefined });
           } catch (err) {
@@ -391,8 +471,9 @@ export function useWizardActions() {
             const url = await generateImage({
               apiKey: providerConfig.apiKey,
               baseUrl: providerConfig.baseUrl,
-              prompt: scene.prompt,
+              prompt: `${styleInstruction}${scene.prompt}`,
               size: imageSize,
+              ...(styleReferenceUrl ? { inputImageUrl: styleReferenceUrl } : {}),
             });
             useProjectStore.getState().updateAssetByProjectId(targetProjectId, scene.id, { imageUrl: url, error: undefined });
           } catch (err) {
@@ -415,8 +496,9 @@ export function useWizardActions() {
             const url = await generateImage({
               apiKey: providerConfig.apiKey,
               baseUrl: providerConfig.baseUrl,
-              prompt: product.prompt,
+              prompt: `${styleInstruction}${product.prompt}`,
               size: imageSize,
+              ...(styleReferenceUrl ? { inputImageUrl: styleReferenceUrl } : {}),
             });
             useProjectStore.getState().updateAssetByProjectId(targetProjectId, product.id, { imageUrl: url, error: undefined });
           } catch (err) {
@@ -427,31 +509,6 @@ export function useWizardActions() {
           }
         });
       }
-    }
-
-    // Style reference task（风格参考图，项目级锚点）
-    if (generateStyle && !project.styleReferenceUrl) {
-      tasks.push(async () => {
-        if (signal?.aborted) return;
-        try {
-          const stylePrompt = project.style
-            ? `${project.style} style reference, cohesive visual aesthetic, color palette, mood board`
-            : `Cinematic style reference, cohesive visual aesthetic, warm tones, professional photography`;
-          const url = await generateImage({
-            apiKey: providerConfig.apiKey,
-            baseUrl: providerConfig.baseUrl,
-            prompt: stylePrompt,
-            size: imageSize,
-          });
-          useProjectStore.getState().updateProjectById(targetProjectId, (p) => ({ ...p, styleReferenceUrl: url, styleReferenceError: undefined }));
-        } catch (err) {
-          useProjectStore.getState().updateProjectById(targetProjectId, (p) => ({
-            ...p,
-            styleReferenceError: err instanceof Error ? err.message : String(err),
-          }));
-          console.error("Failed to generate style reference:", err);
-        }
-      });
     }
 
     if (tasks.length === 0) {
@@ -804,6 +861,7 @@ export function useWizardActions() {
     extractCharactersFromIdea,
     generateStoryboard,
     generateAssetImages,
+    generateStyleReference,
     rerollShot,
     generateImagesForStep,
     rerollImage,

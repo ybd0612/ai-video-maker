@@ -29,10 +29,9 @@ export function StepAssets() {
   const removeAsset = useProjectStore((s) => s.removeAsset);
   const addAsset = useProjectStore((s) => s.addAsset);
   const updateAsset = useProjectStore((s) => s.updateAsset);
-  const updateProject = useProjectStore((s) => s.updateProject);
   const setWizardStep = useProjectStore((s) => s.setWizardStep);
   const providerConfig = useSettingsStore((s) => s.providerConfig);
-  const { generateAssetImages } = useWizardActions();
+  const { generateAssetImages, generateStyleReference } = useWizardActions();
 
   const [editingChar, setEditingChar] = useState<Asset | null>(null);
   const [showEditor, setShowEditor] = useState(false);
@@ -117,11 +116,16 @@ export function StepAssets() {
     setGeneratingScenes((prev) => new Set(prev).add(scene.id));
     try {
       const size = aspectRatioToImageSize(project?.aspectRatio ?? "16:9");
+      const styleRef = project?.styleReferenceUrl;
+      const styleInstruction = styleRef
+        ? "Match the art style, color palette and lighting mood of the reference image; do not copy its content or composition. "
+        : "";
       const url = await generateImage({
         apiKey: providerConfig.apiKey,
         baseUrl: providerConfig.baseUrl,
-        prompt: scene.prompt,
+        prompt: `${styleInstruction}${scene.prompt}`,
         size,
+        ...(styleRef ? { inputImageUrl: styleRef } : {}),
       });
       updateAsset(scene.id, { imageUrl: url, error: undefined });
     } catch (err) {
@@ -147,11 +151,16 @@ export function StepAssets() {
     setGeneratingProducts((prev) => new Set(prev).add(product.id));
     try {
       const size = aspectRatioToImageSize(project?.aspectRatio ?? "16:9");
+      const styleRef = project?.styleReferenceUrl;
+      const styleInstruction = styleRef
+        ? "Match the art style, color palette and lighting mood of the reference image; do not copy its content or composition. "
+        : "";
       const url = await generateImage({
         apiKey: providerConfig.apiKey,
         baseUrl: providerConfig.baseUrl,
-        prompt: product.prompt,
+        prompt: `${styleInstruction}${product.prompt}`,
         size,
+        ...(styleRef ? { inputImageUrl: styleRef } : {}),
       });
       updateAsset(product.id, { imageUrl: url, error: undefined });
     } catch (err) {
@@ -172,19 +181,9 @@ export function StepAssets() {
     if (!providerConfig.apiKey) return;
     setGeneratingStyle(true);
     try {
-      const size = aspectRatioToImageSize(project?.aspectRatio ?? "16:9");
-      const stylePrompt = project?.style
-        ? `${project.style} style reference, cohesive visual aesthetic, color palette, mood board`
-        : `Cinematic style reference, cohesive visual aesthetic, warm tones, professional photography`;
-      const url = await generateImage({
-        apiKey: providerConfig.apiKey,
-        baseUrl: providerConfig.baseUrl,
-        prompt: stylePrompt,
-        size,
-      });
-      updateProject({ styleReferenceUrl: url });
-    } catch (err) {
-      console.error("Failed to generate style reference:", err);
+      // 统一走 useWizardActions 的生成逻辑：风格提示词从想法派生、
+      // 幂等守卫、错误写回 styleReferenceError（force 用于重新生成已有图）
+      await generateStyleReference(undefined, !!styleReferenceUrl);
     } finally {
       setGeneratingStyle(false);
     }
@@ -559,7 +558,7 @@ export function StepAssets() {
           </div>
           <div className="flex-1">
             <p className="text-xs text-slate-400">
-              {project?.style || "未设置风格描述"}
+              {project?.style || t("wizard.styleAutoHint")}
             </p>
             {project?.styleReferenceError && (
               <p className="mt-1 truncate text-[0.625rem] text-red-400" title={project.styleReferenceError}>
@@ -576,7 +575,7 @@ export function StepAssets() {
               ) : (
                 <Wand2 size={11} />
               )}
-              {t("wizard.generateStyleRef")}
+              {styleReferenceUrl ? t("wizard.regenerateStyleRef") : t("wizard.generateStyleRef")}
             </button>
           </div>
         </div>

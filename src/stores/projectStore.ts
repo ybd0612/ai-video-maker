@@ -139,6 +139,7 @@ export type HistoryAction =
   | "project_deleted"
   | "project_switched"
   | "script_generated"
+  | "style_generated"
   | "pipeline_started"
   | "pipeline_completed"
   | "pipeline_failed"

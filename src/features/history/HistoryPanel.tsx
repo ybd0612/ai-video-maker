@@ -8,7 +8,7 @@ import { useT } from "@/i18n";
 import {
   FolderPlus, FolderMinus, ArrowRightLeft,
   FileText, Play, CheckCircle2, XCircle,
-  RefreshCw, Settings, Trash2,
+  RefreshCw, Settings, Trash2, Palette,
 } from "lucide-react";
 
 const actionIcons: Record<HistoryAction, typeof FolderPlus> = {
@@ -16,6 +16,7 @@ const actionIcons: Record<HistoryAction, typeof FolderPlus> = {
   project_deleted: FolderMinus,
   project_switched: ArrowRightLeft,
   script_generated: FileText,
+  style_generated: Palette,
   pipeline_started: Play,
   pipeline_completed: CheckCircle2,
   pipeline_failed: XCircle,
@@ -28,6 +29,7 @@ const actionColors: Record<HistoryAction, string> = {
   project_deleted: "text-red-400",
   project_switched: "text-sky-400",
   script_generated: "text-violet-400",
+  style_generated: "text-fuchsia-400",
   pipeline_started: "text-amber-400",
   pipeline_completed: "text-emerald-400",
   pipeline_failed: "text-red-400",
