@@ -160,8 +160,8 @@ ${charSection}${sceneSection}${productSection}
   "characters": [
     {
       "name": "角色名",
-      "description": "角色简介（性格、身份）",
-      "appearancePrompt": "外貌描述（英文，用于 AI 绘图，包含年龄、体型、发型、服饰等）"
+      "description": "角色简介（性格、身份；动物/拟人角色同样适用）",
+      "appearancePrompt": "外貌描述（英文，用于 AI 绘图；人物写年龄体型发型服饰，动物写物种体型毛色特征等）"
     }
   ],
   "products": [
@@ -205,8 +205,8 @@ ${charSection}${sceneSection}${productSection}
 }
 
 重要规则：
-- characters 数组：仅当内容中有人物角色时才填写，纯风景/产品/抽象内容返回空数组 []
-- products 数组：仅当内容是产品/商品/实物主体时才填写，纯人物/风景/抽象内容返回空数组 []
+- characters 数组：涵盖故事中的**一切角色主体**——人物、动物（如小兔子、小猫）、拟人化角色、机器人等，只要是故事的主角/配角就必须填入；仅纯风景内容才返回空数组 []
+- products 数组：仅当某个实物是内容的**核心展示主体**（如带货商品、产品广告的主角）时才填写；角色手中/身边的普通道具（如小兔子抱着的胡萝卜）不要填入
 - scenes 数组：仅当内容涉及具体场景（室内/室外/城市/自然等）时才填写，纯抽象内容返回空数组 []
 - 如有已有角色，复用其 ID（不要重复创建）；如是新角色，生成新的 ID
 - visualPrompt 和 motionPrompt 必须用英文（直接用于 AI API）
@@ -261,8 +261,8 @@ function buildPromptEn(assets?: Asset[]): string {
 
   return `You are a professional short-video storyboard planner. The user will give you a topic or idea. You need to:
 1. Break it into 4-8 shot scenes
-2. If the content involves characters, extract character info
-3. If the content involves a product/goods subject, extract product info
+2. If the content involves ANY character/subject (humans, animals like a little rabbit, anthropomorphic creatures, robots), extract character info
+3. If a physical item is the CORE showcased subject (e.g. a product ad), extract product info
 4. If the content involves concrete scenes, extract scene info
 ${charSection}${sceneSection}${productSection}
 Return strictly in this JSON format, no other text:
@@ -270,8 +270,8 @@ Return strictly in this JSON format, no other text:
   "characters": [
     {
       "name": "Character name",
-      "description": "Brief description (personality, role)",
-      "appearancePrompt": "Appearance description in English (age, build, hair, clothing, etc. for AI image generation)"
+      "description": "Brief description (personality, role; applies to animals/anthropomorphic subjects too)",
+      "appearancePrompt": "Appearance description in English (humans: age, build, hair, clothing; animals: species, body shape, fur color, features, etc.)"
     }
   ],
   "products": [
@@ -315,8 +315,8 @@ Return strictly in this JSON format, no other text:
 }
 
 Important rules:
-- characters array: ONLY fill if content has characters. For landscape/product/abstract content, return empty array []
-- products array: ONLY fill if content has a product/goods subject. For character/landscape/abstract content, return empty array []
+- characters array: include ANY story character/subject — humans, animals (e.g. a little rabbit), anthropomorphic or fantasy creatures, robots. Every protagonist/side character MUST be listed; only return [] for pure landscape content
+- products array: ONLY fill when a physical item is the CORE subject being showcased (e.g. a product for an ad). Everyday props held by characters (e.g. a carrot a rabbit hugs) do NOT belong here
 - scenes array: ONLY fill if content involves concrete scenes (indoor/outdoor/city/nature etc.). For abstract content, return empty array []
 - Reuse existing character IDs if applicable; generate new IDs for new characters
 - visualPrompt and motionPrompt MUST be in English (sent directly to AI APIs)
