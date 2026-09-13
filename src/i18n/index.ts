@@ -494,7 +494,7 @@ const zh = {
 
   // 流程优化（分镜确认/成本感知/任务提示）
   "wizard.storyboardRegenerateTitle": "重新生成全部分镜？",
-  "wizard.storyboardRegenerateConfirm": "将重新生成全部 {count} 个镜头，覆盖手动修改，并消耗一次文本配额。",
+  "wizard.storyboardRegenerateConfirm": "将重新生成全部 {count} 个镜头，覆盖手动修改，并消耗一次文本配额。风格/场景参考图与资产不会随之重新生成；若已更换想法，请返回第 1 步重新提取。",
   "wizard.storyboardConfirmHint": "请确认分镜文案与画面描述符合预期，然后进入图片生成。",
   "wizard.noAssetsContinueHint": "当前无角色/场景/产品资产：画面一致性会减弱，可手动添加资产，或直接继续。",
   "wizard.missingVisualPrompt": "{count} 个镜头缺少画面描述，将跳过图片生成，请返回分镜步骤补充。",
@@ -1019,7 +1019,7 @@ const en = {
 
   // Flow optimizations (storyboard confirm / cost awareness / task notice)
   "wizard.storyboardRegenerateTitle": "Regenerate all shots?",
-  "wizard.storyboardRegenerateConfirm": "Will regenerate all {count} shots, overwriting manual edits and consuming one text quota.",
+  "wizard.storyboardRegenerateConfirm": "Will regenerate all {count} shots, overwriting manual edits and consuming one text quota. Style/scene reference images and assets are NOT regenerated; if you changed the idea, go back to Step 1 and re-extract.",
   "wizard.storyboardConfirmHint": "Please confirm the storyboard copy and visual descriptions before proceeding to image generation.",
   "wizard.noAssetsContinueHint": "No assets yet: visual consistency will be weaker. Add characters/scenes/products or continue directly.",
   "wizard.missingVisualPrompt": "{count} shot(s) lack visual descriptions and will be skipped. Go back to the storyboard step to fill them in.",
