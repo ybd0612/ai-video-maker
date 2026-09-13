@@ -58,7 +58,7 @@ export function Lightbox({
   return (
     <>
       <div
-        className="cursor-pointer transition hover:opacity-80"
+        className="h-full cursor-pointer transition hover:opacity-80"
         onClick={(e) => {
           e.stopPropagation();
           handleOpen();

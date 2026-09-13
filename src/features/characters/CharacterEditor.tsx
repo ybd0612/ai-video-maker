@@ -223,10 +223,10 @@ export function CharacterEditor({ character, onClose }: CharacterEditorProps) {
         </span>
       </div>
 
-      {/* 主体：左列文字 / 右列定妆照（容器宽 <32rem 时回退上下布局，适配窄侧边栏） */}
-      <div className="flex flex-col gap-3 @md:flex-row @md:items-start">
+      {/* 主体：左列文字(3) / 右列定妆照(2) ≈ 6:4，右列高度 stretch 撑满与左列齐平（容器宽 <32rem 时回退上下布局，适配窄侧边栏） */}
+      <div className="flex flex-col gap-3 @md:flex-row @md:items-stretch">
         {/* 左：名称 / 描述 / 外观提示词 */}
-        <div className="min-w-0 flex-1 space-y-3">
+        <div className="min-w-0 flex-1 space-y-3 @md:flex-[3_1_0%]">
 
       {/* Name（可编辑） */}
       <div className="space-y-1">
@@ -338,30 +338,32 @@ export function CharacterEditor({ character, onClose }: CharacterEditorProps) {
 
         </div>
 
-        {/* 右：定妆照（放大展示：宽度随右列撑满，约 2 倍于旧版 80px；生成按钮移至照片下方） */}
-        <div className="space-y-1 @md:w-40 @md:shrink-0">
-          <label className="text-[0.6875rem] font-medium text-ink-4">
+        {/* 右：定妆照（与左列等高的弹性列，宽度占比 2/5；生成按钮移至照片下方） */}
+        <div className="flex flex-col gap-1 @md:flex-[2_1_0%]">
+          <label className="shrink-0 text-[0.6875rem] font-medium text-ink-4">
             {t("characters.portrait")}
           </label>
           {portraitUrl ? (
-            <Lightbox src={portraitUrl} alt={t("characters.portrait")}>
-              <div className="relative aspect-square w-full overflow-hidden rounded-lg border border-line bg-raised">
-                <img
-                  src={portraitUrl}
-                  alt={t("characters.portrait")}
-                  className="h-full w-full object-cover"
-                />
-              </div>
-            </Lightbox>
+            <div className="aspect-square w-full @md:aspect-auto @md:min-h-0 @md:flex-1">
+              <Lightbox src={portraitUrl} alt={t("characters.portrait")}>
+                <div className="relative h-full w-full overflow-hidden rounded-lg border border-line bg-raised">
+                  <img
+                    src={portraitUrl}
+                    alt={t("characters.portrait")}
+                    className="h-full w-full object-cover"
+                  />
+                </div>
+              </Lightbox>
+            </div>
           ) : (
-            <div className="flex aspect-square w-full items-center justify-center rounded-lg border border-dashed border-line text-ink-5">
+            <div className="flex aspect-square w-full items-center justify-center rounded-lg border border-dashed border-line text-ink-5 @md:aspect-auto @md:min-h-0 @md:flex-1">
               <ImageIcon size={24} />
             </div>
           )}
           <button
             onClick={handleGeneratePortrait}
             disabled={isGeneratingPortrait || !appearancePrompt.trim() || !providerConfig.apiKey}
-            className="flex w-full items-center justify-center gap-1 rounded border border-line px-1.5 py-1 text-[0.625rem] text-accent transition hover:bg-accent-deep/30 disabled:opacity-50"
+            className="flex w-full shrink-0 items-center justify-center gap-1 rounded border border-line px-1.5 py-1 text-[0.625rem] text-accent transition hover:bg-accent-deep/30 disabled:opacity-50"
             title={t("characters.generatePortrait")}
           >
             {isGeneratingPortrait ? (
@@ -374,7 +376,7 @@ export function CharacterEditor({ character, onClose }: CharacterEditorProps) {
             {portraitUrl ? t("characters.regeneratePortrait") : t("characters.generatePortrait")}
           </button>
           {isGeneratingPortrait && (
-            <p className="text-[0.625rem] text-success animate-pulse">
+            <p className="shrink-0 text-[0.625rem] text-success animate-pulse">
               {t("wizard.generating") || "生成中..."}
             </p>
           )}
