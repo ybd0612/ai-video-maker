@@ -1,0 +1,331 @@
+import { useCallback } from "react";
+import {
+  useProjectStore,
+  selectActiveProject,
+  newId,
+  type Asset,
+} from "@/stores/projectStore";
+import { useSettingsStore } from "@/stores/settingsStore";
+import { generateImage, aspectRatioToImageParams } from "@/services/imageService";
+import { createAIService } from "@/services/ai/factory";
+import { createBatchRunner, hasActiveTask } from "@/lib/batchRunner";
+import {
+  getStylePrompt,
+  getStyleReferenceUrl,
+  composeImageToImagePrompt,
+  composePortraitPrompt,
+} from "@/lib/promptComposer";
+import { buildSystemPrompt as buildRulesSystemPrompt, getActiveRules } from "@/lib/promptRules";
+
+const activeAssetTasks = new Map<string, AbortController>();
+
+export interface AssetGenerationOptions {
+  generatePortraits?: boolean;
+  generateScenes?: boolean;
+  generateProducts?: boolean;
+  generateStyle?: boolean;
+}
+
+export interface AssetActions {
+  generateAssetImages: (
+    opts?: AssetGenerationOptions,
+    projectIdOverride?: string,
+  ) => Promise<void>;
+  generateStyleReference: (targetProjectId?: string, force?: boolean) => Promise<void>;
+}
+
+/** 查询某项目是否仍有存活的资产生成任务，供资产步骤恢复 UI 标记。 */
+export function hasActiveAssetTask(projectId: string): boolean {
+  return hasActiveTask(activeAssetTasks, projectId);
+}
+
+/** 派生失败兜底：project.style 非空 → style reference 模板；否则 cinematic 模板。 */
+function fallbackStylePrompt(style: string): string {
+  return style
+    ? `${style} style reference, cohesive visual aesthetic, color palette, mood board`
+    : "Cinematic style reference, cohesive visual aesthetic, warm tones, professional photography";
+}
+
+/**
+ * L2 派生：从想法文本 + 中文风格描述派生英文 stylePrompt。
+ * 派生失败（网络/内容过滤/空输出）走兜底链，不阻塞风格图生成。
+ */
+async function deriveStylePrompt(
+  ideaPrompt: string,
+  styleDescription: string,
+  apiKey: string,
+  baseUrl: string,
+): Promise<string> {
+  const idea = ideaPrompt.trim();
+  const zhStyle = styleDescription.trim();
+  if (idea || zhStyle) {
+    try {
+      const service = createAIService({ provider: "openai", apiKey, baseUrl });
+      const userContent = [
+        idea ? `Story idea: ${idea.slice(0, 600)}` : "",
+        zhStyle ? `Desired style (Chinese): ${zhStyle}` : "",
+      ]
+        .filter(Boolean)
+        .join("\n");
+      const result = await service.chatCompletion({
+        messages: [
+          { role: "system", content: buildRulesSystemPrompt("styleRef", "en", getActiveRules()) },
+          { role: "user", content: userContent },
+        ],
+        temperature: 0.4,
+        enableThinking: false,
+      });
+      const text = result.content.trim();
+      if (text) return text;
+    } catch (err) {
+      console.warn("Style prompt derivation failed, using fallback:", err);
+    }
+  }
+  return fallbackStylePrompt(zhStyle);
+}
+
+export function useAssetActions(): AssetActions {
+  /**
+   * 生成风格参考图（项目级风格锚点）。
+   * 幂等：已有风格图（force=true 除外），或该项目已有资产生成任务在跑时直接跳过。
+   */
+  const generateStyleReference = useCallback(async (targetProjectId?: string, force = false) => {
+    const { providerConfig } = useSettingsStore.getState();
+    if (!providerConfig.apiKey || !providerConfig.baseUrl) return;
+
+    const store = useProjectStore.getState();
+    const project = targetProjectId
+      ? store.projects.find((item) => item.id === targetProjectId)
+      : selectActiveProject(store);
+    if (!project) return;
+    const pid = project.id;
+
+    if (getStyleReferenceUrl(project) && !force) return;
+    if (hasActiveTask(activeAssetTasks, pid)) return;
+
+    const controller = new AbortController();
+    activeAssetTasks.set(pid, controller);
+
+    try {
+      const latest = useProjectStore.getState().projects.find((item) => item.id === pid) ?? project;
+      let styleAsset = latest.assets.find((asset) => asset.type === "style");
+      if (!styleAsset) {
+        const created: Asset = {
+          id: newId("asset"),
+          type: "style",
+          source: "extracted",
+          name: latest.language === "en" ? "Overall style" : "整体风格",
+          description: latest.style.trim(),
+          prompt: "",
+        };
+        useProjectStore.getState().updateProjectById(pid, (currentProject) => ({
+          ...currentProject,
+          assets: [...currentProject.assets, created],
+        }));
+        styleAsset = created;
+      }
+
+      if (!styleAsset.prompt.trim() && !styleAsset.derivation?.locked) {
+        const derived = await deriveStylePrompt(
+          latest.ideaPrompt ?? "",
+          styleAsset.description.trim() || latest.style.trim(),
+          providerConfig.apiKey,
+          providerConfig.baseUrl,
+        );
+        useProjectStore.getState().updateAssetByProjectId(pid, styleAsset.id, {
+          prompt: derived,
+        });
+        styleAsset = { ...styleAsset, prompt: derived };
+      }
+
+      const stylePrompt = styleAsset.prompt.trim() || fallbackStylePrompt(latest.style.trim());
+      const imagePrompt =
+        `${stylePrompt}. Visual style reference / mood board, cohesive composition, ` +
+        `no text, no watermark, no character in focus.`;
+      const { size, ratio } = aspectRatioToImageParams(latest.aspectRatio);
+
+      const url = await generateImage({
+        apiKey: providerConfig.apiKey,
+        baseUrl: providerConfig.baseUrl,
+        prompt: imagePrompt,
+        size,
+        ratio,
+      });
+      useProjectStore.getState().updateProjectById(pid, (currentProject) => ({
+        ...currentProject,
+        styleReferenceUrl: url,
+        styleReferenceError: undefined,
+      }));
+      useProjectStore.getState().updateAssetByProjectId(pid, styleAsset.id, {
+        imageUrl: url,
+        error: undefined,
+      });
+      useProjectStore.getState().addHistory("style_generated", { key: "history.styleGenerated" }, pid);
+    } catch (err) {
+      useProjectStore.getState().updateProjectById(pid, (currentProject) => ({
+        ...currentProject,
+        styleReferenceError: err instanceof Error ? err.message : String(err),
+      }));
+      console.error("Failed to generate style reference:", err);
+    } finally {
+      activeAssetTasks.delete(pid);
+    }
+  }, []);
+
+  /** Step 2: Generate asset images (character portraits + scene/product references). */
+  const generateAssetImages = useCallback(async (
+    opts?: AssetGenerationOptions,
+    projectIdOverride?: string,
+  ) => {
+    const { providerConfig } = useSettingsStore.getState();
+    if (!providerConfig.apiKey || !providerConfig.baseUrl) return;
+
+    const store = useProjectStore.getState();
+    const project = projectIdOverride
+      ? store.projects.find((item) => item.id === projectIdOverride)
+      : selectActiveProject(store);
+    if (!project) return;
+    const targetProjectId = project.id;
+
+    if (hasActiveTask(activeAssetTasks, targetProjectId)) return;
+
+    const generatePortraits = opts?.generatePortraits !== false;
+    const generateScenes = opts?.generateScenes !== false;
+    const generateProducts = opts?.generateProducts !== false;
+    const generateStyle = opts?.generateStyle !== false;
+
+    // 阶段 1：风格参考图先行。风格失败不阻塞资产图，资产图会退化为文生图。
+    if (generateStyle && !getStyleReferenceUrl(project)) {
+      await generateStyleReference(targetProjectId);
+    }
+
+    const runAssetBatch = createBatchRunner({
+      registry: activeAssetTasks,
+      buildTasks: (_pid, signal) => {
+        const latestProject = useProjectStore.getState().projects.find((item) => item.id === targetProjectId);
+        const styleReferenceUrl = latestProject ? getStyleReferenceUrl(latestProject) : undefined;
+        const stylePrompt = latestProject ? getStylePrompt(latestProject) : undefined;
+        const styleInstruction = styleReferenceUrl
+          ? "Match the art style, color palette and lighting mood of the reference image; do not copy its content or composition. "
+          : "";
+        const { size: imageSize, ratio: imageRatio } = aspectRatioToImageParams(project.aspectRatio);
+        const tasks: Array<() => Promise<void>> = [];
+
+        if (generatePortraits) {
+          for (const char of project.assets.filter((asset) => asset.type === "character")) {
+            if (char.imageUrl) continue;
+            tasks.push(async () => {
+              if (signal.aborted) return;
+              try {
+                const portraitPrompt = composePortraitPrompt({
+                  appearancePrompt: char.appearancePrompt?.trim() || char.prompt.trim(),
+                  stylePrompt,
+                });
+                const url = await generateImage({
+                  apiKey: providerConfig.apiKey,
+                  baseUrl: providerConfig.baseUrl,
+                  prompt: `${styleInstruction}${portraitPrompt}`,
+                  size: imageSize,
+                  ratio: imageRatio,
+                  ...(styleReferenceUrl ? { referenceImageUrls: [styleReferenceUrl] } : {}),
+                });
+                useProjectStore.getState().updateAssetByProjectId(targetProjectId, char.id, {
+                  imageUrl: url,
+                  error: undefined,
+                });
+              } catch (err) {
+                useProjectStore.getState().updateAssetByProjectId(targetProjectId, char.id, {
+                  error: err instanceof Error ? err.message : String(err),
+                });
+                console.error(`Failed to generate portrait for ${char.name}:`, err);
+              }
+            });
+          }
+        }
+
+        if (generateScenes) {
+          for (const scene of project.assets.filter((asset) => asset.type === "scene")) {
+            if (scene.imageUrl) continue;
+            tasks.push(async () => {
+              if (signal.aborted) return;
+              try {
+                const url = await generateImage({
+                  apiKey: providerConfig.apiKey,
+                  baseUrl: providerConfig.baseUrl,
+                  prompt: composeImageToImagePrompt({
+                    change: styleInstruction
+                      ? `${styleInstruction.trim()} Render the scene below as a clean environment reference image`
+                      : "Render the scene below as a clean environment reference image",
+                    newStyle: stylePrompt,
+                    keep: scene.prompt,
+                  }),
+                  size: imageSize,
+                  ratio: imageRatio,
+                  ...(styleReferenceUrl ? { referenceImageUrls: [styleReferenceUrl] } : {}),
+                });
+                useProjectStore.getState().updateAssetByProjectId(targetProjectId, scene.id, {
+                  imageUrl: url,
+                  error: undefined,
+                });
+              } catch (err) {
+                useProjectStore.getState().updateAssetByProjectId(targetProjectId, scene.id, {
+                  error: err instanceof Error ? err.message : String(err),
+                });
+                console.error(`Failed to generate scene image for ${scene.name}:`, err);
+              }
+            });
+          }
+        }
+
+        if (generateProducts) {
+          for (const product of project.assets.filter((asset) => asset.type === "product")) {
+            if (product.imageUrl) continue;
+            tasks.push(async () => {
+              if (signal.aborted) return;
+              try {
+                const url = await generateImage({
+                  apiKey: providerConfig.apiKey,
+                  baseUrl: providerConfig.baseUrl,
+                  prompt: composeImageToImagePrompt({
+                    change: styleInstruction
+                      ? `${styleInstruction.trim()} Render the product below as a clean product reference image`
+                      : "Render the product below as a clean product reference image",
+                    newStyle: stylePrompt,
+                    keep: product.prompt,
+                  }),
+                  size: imageSize,
+                  ratio: imageRatio,
+                  ...(styleReferenceUrl ? { referenceImageUrls: [styleReferenceUrl] } : {}),
+                });
+                useProjectStore.getState().updateAssetByProjectId(targetProjectId, product.id, {
+                  imageUrl: url,
+                  error: undefined,
+                });
+              } catch (err) {
+                useProjectStore.getState().updateAssetByProjectId(targetProjectId, product.id, {
+                  error: err instanceof Error ? err.message : String(err),
+                });
+                console.error(`Failed to generate product image for ${product.name}:`, err);
+              }
+            });
+          }
+        }
+
+        return tasks;
+      },
+      onBeforeRun: (pid) => {
+        useProjectStore.getState().setAssetGenerationStartedByProjectId(pid, true);
+      },
+      onEmpty: (pid) => {
+        useProjectStore.getState().setAssetGenerationStartedByProjectId(pid, false);
+      },
+      onFinally: (pid) => {
+        useProjectStore.getState().setAssetGenerationStartedByProjectId(pid, false);
+      },
+    });
+
+    await runAssetBatch({ projectId: targetProjectId, concurrency: 3 });
+  }, [generateStyleReference]);
+
+  return { generateAssetImages, generateStyleReference };
+}
