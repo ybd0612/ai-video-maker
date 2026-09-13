@@ -19,14 +19,7 @@ const STEPS: { step: WizardStep; labelKey: TranslationKey }[] = [
 export function StepIndicator() {
   const t = useT();
   const project = useProjectStore(selectActiveProject);
-  const setWizardStep = useProjectStore((s) => s.setWizardStep);
   const currentStep = project?.wizardStep ?? 1;
-
-  const handleClick = (step: WizardStep) => {
-    if (step <= currentStep) {
-      setWizardStep(step);
-    }
-  };
 
   return (
     <div className="flex items-center justify-center gap-1">
@@ -43,15 +36,14 @@ export function StepIndicator() {
                 }`}
               />
             )}
-            <button
-              onClick={() => handleClick(step)}
-              disabled={step > currentStep}
+            <div
+              aria-current={isCurrent ? "step" : undefined}
               className={`flex items-center gap-1.5 rounded-full px-3 py-1 text-[0.6875rem] font-medium transition ${
                 isCurrent
                   ? "bg-success-solid text-white"
                   : isCompleted
-                    ? "bg-success-deep/40 text-success hover:bg-success-deep/60"
-                    : "bg-raised text-ink-4 cursor-not-allowed"
+                    ? "bg-success-deep/40 text-success"
+                    : "bg-raised text-ink-4"
               }`}
             >
               {isCompleted ? (
@@ -62,7 +54,7 @@ export function StepIndicator() {
                 </span>
               )}
               {t(labelKey)}
-            </button>
+            </div>
           </div>
         );
       })}
