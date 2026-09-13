@@ -41,6 +41,11 @@ export function StepAssets() {
   const [generatingProducts, setGeneratingProducts] = useState<Set<string>>(new Set());
   const [generatingStyle, setGeneratingStyle] = useState(false);
   const isGenerating = project?.assetGenerationStarted ?? false;
+  // 本页任一生成请求进行中（批量 / 风格 / 单项场景 / 单项产品）：
+  // 统一禁用所有生成按钮 —— 批量与单项可能重复提交同一资产（双倍配额消耗），
+  // 且共用集中式限流器，逐个排队不如明确禁用直观。全部请求返回后恢复。
+  const anyGenerating =
+    isGenerating || generatingStyle || generatingScenes.size > 0 || generatingProducts.size > 0;
 
   const assets = project?.assets ?? [];
   const characters = assets.filter((a) => a.type === "character");
@@ -227,7 +232,7 @@ export function StepAssets() {
           {characters.some((c) => !c.imageUrl) && (
             <button
               onClick={handleBatchPortraits}
-              disabled={isGenerating}
+              disabled={anyGenerating}
               className="flex items-center gap-1.5 rounded px-2 py-1 text-[0.6875rem] text-accent hover:bg-accent-deep/30 transition disabled:opacity-50"
             >
               {isGenerating ? <Loader2 size={11} className="animate-spin" /> : <Wand2 size={11} />}
@@ -325,7 +330,7 @@ export function StepAssets() {
           {sceneReferences.some((s) => !s.imageUrl && s.prompt.trim()) && (
             <button
               onClick={handleBatchScenes}
-              disabled={isGenerating}
+              disabled={anyGenerating}
               className="flex items-center gap-1.5 rounded px-2 py-1 text-[0.6875rem] text-accent hover:bg-accent-deep/30 transition disabled:opacity-50"
             >
               {isGenerating ? <Loader2 size={11} className="animate-spin" /> : <Wand2 size={11} />}
@@ -440,7 +445,7 @@ export function StepAssets() {
           {products.some((p) => !p.imageUrl && p.prompt.trim()) && (
             <button
               onClick={handleBatchProducts}
-              disabled={isGenerating}
+              disabled={anyGenerating}
               className="flex items-center gap-1.5 rounded px-2 py-1 text-[0.6875rem] text-accent hover:bg-accent-deep/30 transition disabled:opacity-50"
             >
               {isGenerating ? <Loader2 size={11} className="animate-spin" /> : <Wand2 size={11} />}
@@ -596,7 +601,7 @@ export function StepAssets() {
       {/* ── Generate all button ───────────────────────────────────────── */}
       <button
         onClick={handleGenerateAll}
-        disabled={isGenerating}
+        disabled={anyGenerating}
         className="mx-auto flex items-center gap-2 rounded-xl bg-success-solid px-6 py-2.5 text-sm font-medium text-white transition hover:bg-success-solid disabled:opacity-50"
       >
         {isGenerating ? (

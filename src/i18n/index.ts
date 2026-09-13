@@ -378,6 +378,9 @@ const zh = {
   "characters.portrait": "定妆照",
   "characters.generatePortrait": "生成定妆照",
   "characters.regeneratePortrait": "重新生成",
+  "characters.autoRegeneratePortrait": "AI 修改描述后自动重新生成定妆照",
+  "characters.autoRegenerateHint": "勾选后，AI 修改角色描述成功即自动重新生成定妆照；生成期间相关按钮会暂时禁用",
+  "characters.portraitAutoSkipped": "定妆照未自动更新：英文提示词派生失败，请手动重新生成",
 
   // Dialogue
   "dialogue.title": "对话",
@@ -906,6 +909,9 @@ const en = {
   "characters.portrait": "Portrait",
   "characters.generatePortrait": "Generate Portrait",
   "characters.regeneratePortrait": "Regenerate",
+  "characters.autoRegeneratePortrait": "Auto-regenerate portrait after AI edits",
+  "characters.autoRegenerateHint": "When enabled, a successful AI description edit automatically regenerates the portrait; related buttons are disabled while generating",
+  "characters.portraitAutoSkipped": "Portrait not updated automatically: failed to derive the English prompt. Please regenerate manually.",
 
   // Dialogue
   "dialogue.title": "Dialogue",

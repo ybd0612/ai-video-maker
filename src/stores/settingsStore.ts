@@ -33,6 +33,11 @@ interface SettingsState {
    * 与 BUILTIN_RULES 经 mergeRules 合并后生效；空数组 = 全部内置默认。
    */
   promptRules: PromptRule[];
+  /**
+   * 角色编辑器：AI 修改角色描述成功后自动重新生成定妆照（默认开启）。
+   * 旧版本地存储缺此字段时由 persist 浅合并回退到默认值 true，无需迁移。
+   */
+  autoRegeneratePortrait: boolean;
 
   setTheme: (theme: Theme) => void;
   setLanguage: (lang: Language) => void;
@@ -40,6 +45,7 @@ interface SettingsState {
   setProviderConfig: (config: Partial<ProviderConfig>) => void;
   /** 整体替换用户存储的规则差异（UI 计算好新数组后写入） */
   setPromptRules: (rules: PromptRule[]) => void;
+  setAutoRegeneratePortrait: (value: boolean) => void;
 }
 
 /**
@@ -92,6 +98,7 @@ export const useSettingsStore = create<SettingsState>()(
         plan: "default",
       },
       promptRules: [],
+      autoRegeneratePortrait: true,
 
       setTheme: (theme) => set({ theme }),
       setLanguage: (language) => set({ language }),
@@ -99,6 +106,7 @@ export const useSettingsStore = create<SettingsState>()(
       setProviderConfig: (config) =>
         set((s) => ({ providerConfig: { ...s.providerConfig, ...config } })),
       setPromptRules: (promptRules) => set({ promptRules }),
+      setAutoRegeneratePortrait: (autoRegeneratePortrait) => set({ autoRegeneratePortrait }),
     }),
     {
       name: "wxhb-settings",

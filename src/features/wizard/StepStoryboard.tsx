@@ -170,6 +170,8 @@ export function StepStoryboard() {
             mode="storyboard"
             onReroll={() => rerollShot(shot.id)}
             onDelete={() => removeShot(shot.id)}
+            // 单镜头重写脚本期间（status="scripting"）禁用重roll按钮，防止重复提交重复计费
+            isGenerating={shot.status === "scripting"}
           >
             {/* Script text */}
             <PromptField

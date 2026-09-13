@@ -1,7 +1,9 @@
 // ────────────────────────────────────────────────────────────────────────────
 // src/features/characters/CharacterEditor.tsx
 // Character editing form: 用户只编辑「名称」；角色描述（完整角色信息，中文）由 AI 经指令维护；
-// 英文外貌提示词为派生物（AI 修改描述后即时重派生，保存时兜底），只读展示；定妆照手动按钮生成。
+// 英文外貌提示词为派生物（AI 修改描述后即时重派生，保存时兜底），只读展示。
+// 定妆照：默认勾选「AI 修改描述后自动重新生成」；未勾选时保留手动按钮。
+// 任一 AI/生成请求进行中，编辑器内的 AI 修改 / 撤销 / 保存 / 定妆照按钮统一禁用（返回后恢复）。
 // ────────────────────────────────────────────────────────────────────────────
 
 import { useState, useCallback, useEffect, useRef } from "react";
@@ -42,6 +44,8 @@ export function CharacterEditor({ character, onClose }: CharacterEditorProps) {
   const addAsset = useProjectStore((s) => s.addAsset);
   const updateAsset = useProjectStore((s) => s.updateAsset);
   const providerConfig = useSettingsStore((s) => s.providerConfig);
+  const autoRegeneratePortrait = useSettingsStore((s) => s.autoRegeneratePortrait);
+  const setAutoRegeneratePortrait = useSettingsStore((s) => s.setAutoRegeneratePortrait);
 
   const [name, setName] = useState(character?.name ?? "");
   const [description, setDescription] = useState(() =>
@@ -102,10 +106,49 @@ export function CharacterEditor({ character, onClose }: CharacterEditorProps) {
   );
 
   /**
+   * 定妆照生成核心：用「已解析」的英文外貌提示词生图并写回资产。
+   * 手动按钮（先按需派生英文）与自动链路（英文已就绪）共用同一生图与写回链路。
+   * 自管 isGeneratingPortrait 状态：进入即置 true、返回即复位，供按钮禁用逻辑使用。
+   */
+  const generatePortraitFrom = useCallback(
+    async (effectiveAppearance: string) => {
+      if (!providerConfig.apiKey || !providerConfig.baseUrl) return;
+      setIsGeneratingPortrait(true);
+      setError(null);
+      try {
+        // 物种锁定拼装器（与批量链路一致）；替换旧版 "Portrait photo of ... photorealistic" 人像语汇
+        const prompt = composePortraitPrompt({ appearancePrompt: effectiveAppearance });
+        // 统一档位串参数（1K 档 + 1:1 画幅）；随机 seed 保证每次重新生成效果不同
+        const { size, ratio } = aspectRatioToImageParams("1:1");
+        const url = await generateImage({
+          apiKey: providerConfig.apiKey,
+          baseUrl: providerConfig.baseUrl,
+          prompt,
+          size,
+          ratio,
+          seed: randomSeed(),
+        });
+        // Save portrait to character（统一资产 imageUrl 字段）
+        if (character) {
+          updateAsset(character.id, { imageUrl: url });
+        }
+        setPortraitUrl(url);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : String(err));
+      } finally {
+        setIsGeneratingPortrait(false);
+      }
+    },
+    [providerConfig, character, updateAsset],
+  );
+
+  /**
    * 修改描述（描述只读，由 AI 维护的唯一入口）：
    * - 有指令：AI 把要求融合进当前描述
    * - 空指令：AI 根据角色名与现有描述生成/补全完整角色描述
    * 成功后即时联动：立刻按新描述重派生英文外貌提示词（失败不阻塞，保存时兜底）。
+   * 勾选「自动重新生成定妆照」时：英文派生成功后继续自动生图，整条链路期间
+   * 编辑器内相关按钮保持禁用，全部返回后才恢复。
    */
   const handleApplyInstruction = useCallback(async () => {
     const requirement = instruction.trim();
@@ -113,6 +156,8 @@ export function CharacterEditor({ character, onClose }: CharacterEditorProps) {
     setIsApplyingInstruction(true);
     setError(null);
     setNotice(null);
+    // 自动链路入参：竞态守卫通过且拿到新英文时记录，链路尾部决定是否自动生图
+    let autoPortraitAppearance: string | null = null;
     try {
       const result = await chatCompletion({
         apiKey: providerConfig.apiKey,
@@ -143,9 +188,15 @@ export function CharacterEditor({ character, onClose }: CharacterEditorProps) {
         setAppearanceStale(true);
         const derived = await deriveAppearance(next, name.trim() || "（未命名）");
         // 竞态守卫：派生期间描述又被改动（撤销/再次 AI 修改）→ 丢弃过期结果
-        if (descriptionRef.current === next && derived) {
-          setAppearancePrompt(derived);
-          setAppearanceStale(false);
+        if (descriptionRef.current === next) {
+          if (derived) {
+            setAppearancePrompt(derived);
+            setAppearanceStale(false);
+            autoPortraitAppearance = derived;
+          } else if (useSettingsStore.getState().autoRegeneratePortrait) {
+            // 派生失败：不沿用旧英文自动生图（只会误导），就地提示手动重试
+            setNotice(t("characters.portraitAutoSkipped"));
+          }
         }
       } else {
         setNotice(t("characters.instructionNoChange"));
@@ -156,7 +207,13 @@ export function CharacterEditor({ character, onClose }: CharacterEditorProps) {
       setIsApplyingInstruction(false);
       setIsDerivingAppearance(false);
     }
-  }, [instruction, isApplyingInstruction, providerConfig, name, description, appearancePrompt, deriveAppearance, t]);
+    // 自动重生成定妆照：勾选状态以当下 store 实时值为准（链路期间用户可能改主意）。
+    // generatePortraitFrom 在首个 await 前同步置 isGeneratingPortrait=true，
+    // 与 finally 里的复位同批渲染，busy 不会出现闪烁空窗。
+    if (autoPortraitAppearance && useSettingsStore.getState().autoRegeneratePortrait) {
+      await generatePortraitFrom(autoPortraitAppearance);
+    }
+  }, [instruction, isApplyingInstruction, providerConfig, name, description, appearancePrompt, deriveAppearance, generatePortraitFrom, t]);
 
   /** 撤销最近一次 AI 描述修改（逐级回退快照栈，描述与对应英文一并恢复） */
   const handleUndoDescription = useCallback(() => {
@@ -169,9 +226,9 @@ export function CharacterEditor({ character, onClose }: CharacterEditorProps) {
   }, [descHistory]);
 
   /**
-   * Generate a portrait image（手动按钮，非自动）。
-   * 描述有未保存变更（或英文为空但描述非空）时，先派生新英文外貌提示词再生成——
-   * 保证「改完描述直接点重新生成」用的是新描述，而非停留在旧英文。
+   * 手动重新生成定妆照：描述有未保存变更（或英文为空但描述非空）时，
+   * 先派生新英文外貌提示词再生成——保证「改完描述直接点重新生成」用的是新描述，
+   * 而非停留在旧英文；生图与写回委托给 generatePortraitFrom。
    */
   const handleGeneratePortrait = useCallback(async () => {
     if (!providerConfig.apiKey || !providerConfig.baseUrl) return;
@@ -192,29 +249,13 @@ export function CharacterEditor({ character, onClose }: CharacterEditorProps) {
         effectiveAppearance = derived;
         setAppearancePrompt(derived);
       }
-      // 物种锁定拼装器（与批量链路一致）；替换旧版 "Portrait photo of ... photorealistic" 人像语汇
-      const prompt = composePortraitPrompt({ appearancePrompt: effectiveAppearance });
-      // 统一档位串参数（1K 档 + 1:1 画幅）；随机 seed 保证每次重新生成效果不同
-      const { size, ratio } = aspectRatioToImageParams("1:1");
-      const portraitUrl = await generateImage({
-        apiKey: providerConfig.apiKey,
-        baseUrl: providerConfig.baseUrl,
-        prompt,
-        size,
-        ratio,
-        seed: randomSeed(),
-      });
-      // Save portrait to character（统一资产 imageUrl 字段）
-      if (character) {
-        updateAsset(character.id, { imageUrl: portraitUrl });
-      }
-      setPortraitUrl(portraitUrl);
+      await generatePortraitFrom(effectiveAppearance);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
       setIsGeneratingPortrait(false);
     }
-  }, [appearancePrompt, description, character, providerConfig, name, updateAsset, deriveAppearance, t]);
+  }, [appearancePrompt, description, character, providerConfig, name, deriveAppearance, generatePortraitFrom, t]);
 
   /**
    * Save：描述有变且英文尚未跟随（即时派生失败/跳过）→ 保存时兜底重派生（不耗图片配额）；
@@ -272,6 +313,10 @@ export function CharacterEditor({ character, onClose }: CharacterEditorProps) {
     setIsSaving(false);
     onClose();
   };
+
+  // 任一 AI/生成请求进行中：统一禁用 AI 修改 / 撤销 / 保存 / 定妆照按钮，全部返回后恢复。
+  // 覆盖自动链路全程（AI 改描述 → 派生英文 → 生成定妆照），避免中途操作产生竞态或重复计费。
+  const busy = isApplyingInstruction || isDerivingAppearance || isGeneratingPortrait;
 
   return (
     <div className="@container flex flex-col gap-3 p-3">
@@ -363,7 +408,7 @@ export function CharacterEditor({ character, onClose }: CharacterEditorProps) {
           <button
             onClick={handleApplyInstruction}
             disabled={
-              isApplyingInstruction || !providerConfig.apiKey || !providerConfig.baseUrl
+              busy || !providerConfig.apiKey || !providerConfig.baseUrl
             }
             className="flex shrink-0 items-center gap-1 rounded-md bg-success px-2 py-1.5 text-[0.6875rem] font-medium text-white transition hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
             title={t("characters.applyInstruction")}
@@ -378,7 +423,8 @@ export function CharacterEditor({ character, onClose }: CharacterEditorProps) {
           {descHistory.length > 0 && (
             <button
               onClick={handleUndoDescription}
-              className="shrink-0 rounded-md border border-line px-2 py-1.5 text-[0.6875rem] text-ink-3 transition hover:bg-raised"
+              disabled={busy}
+              className="shrink-0 rounded-md border border-line px-2 py-1.5 text-[0.6875rem] text-ink-3 transition hover:bg-raised disabled:opacity-50 disabled:cursor-not-allowed"
               title={t("characters.undoDescription")}
             >
               {t("characters.undoDescription")}
@@ -434,11 +480,11 @@ export function CharacterEditor({ character, onClose }: CharacterEditorProps) {
           <button
             onClick={handleGeneratePortrait}
             disabled={
-              isGeneratingPortrait ||
+              busy ||
               (!appearancePrompt.trim() && !description.trim()) ||
               !providerConfig.apiKey
             }
-            className="flex w-full shrink-0 items-center justify-center gap-1 rounded border border-line px-1.5 py-1 text-[0.625rem] text-accent transition hover:bg-accent-deep/30 disabled:opacity-50"
+            className="flex w-full shrink-0 items-center justify-center gap-1 rounded border border-line px-1.5 py-1 text-[0.625rem] text-accent transition hover:bg-accent-deep/30 disabled:opacity-50 disabled:cursor-not-allowed"
             title={t("characters.generatePortrait")}
           >
             {isGeneratingPortrait ? (
@@ -455,13 +501,29 @@ export function CharacterEditor({ character, onClose }: CharacterEditorProps) {
               {t("wizard.generating") || "生成中..."}
             </p>
           )}
+          {/* 自动重生成开关：勾选后 AI 修改描述成功即自动重生成定妆照（默认勾选，持久化到设置） */}
+          <label
+            className={`flex shrink-0 select-none items-center gap-1.5 text-[0.625rem] text-ink-3 ${
+              busy ? "cursor-not-allowed opacity-60" : "cursor-pointer"
+            }`}
+            title={t("characters.autoRegenerateHint")}
+          >
+            <input
+              type="checkbox"
+              checked={autoRegeneratePortrait}
+              disabled={busy}
+              onChange={(e) => setAutoRegeneratePortrait(e.target.checked)}
+              className="h-3 w-3 accent-success"
+            />
+            {t("characters.autoRegeneratePortrait")}
+          </label>
         </div>
       </div>
 
-      {/* Save button */}
+      {/* Save button（AI/生成请求期间一并禁用：描述未定稿、定妆照与 imageUrl 存在竞态） */}
       <button
         onClick={handleSave}
-        disabled={!name.trim() || isSaving}
+        disabled={!name.trim() || busy}
         className="mt-2 rounded-md bg-success-solid px-4 py-2 text-xs font-medium text-white transition hover:bg-success-solid disabled:opacity-50 disabled:cursor-not-allowed"
       >
         {isSaving ? t("characters.saving") : character ? t("characters.edit") : t("characters.add")}
