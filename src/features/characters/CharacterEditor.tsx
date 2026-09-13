@@ -109,14 +109,59 @@ export function CharacterEditor({ character, onClose }: CharacterEditorProps) {
     });
   }, []);
 
-  /** Generate a portrait image from the derived appearance prompt（手动按钮，非自动） */
+  /**
+   * 从中文角色描述派生英文外貌提示词（文本调用，不耗图片配额）。
+   * handleSave 与 handleGeneratePortrait 共用同一派生链路。
+   */
+  const deriveAppearance = useCallback(
+    async (characterName: string, desc: string): Promise<string> => {
+      const result = await chatCompletion({
+        apiKey: providerConfig.apiKey,
+        baseUrl: providerConfig.baseUrl,
+        messages: [
+          { role: "system", content: buildCharacterAppearancePrompt() },
+          {
+            role: "user",
+            content: [
+              `Name: ${characterName}`,
+              `Description: ${desc}`,
+              "",
+              "Write the appearance description for THIS subject. Keep its species/type exactly as given above.",
+            ].join("\n"),
+          },
+        ],
+      });
+      return result.content.trim();
+    },
+    [providerConfig],
+  );
+
+  /**
+   * Generate a portrait image（手动按钮，非自动）。
+   * 描述有未保存变更（或英文为空但描述非空）时，先派生新英文外貌提示词再生成——
+   * 保证「改完描述直接点重新生成」用的是新描述，而非停留在旧英文。
+   */
   const handleGeneratePortrait = useCallback(async () => {
-    if (!appearancePrompt.trim() || !providerConfig.apiKey || !providerConfig.baseUrl) return;
+    if (!providerConfig.apiKey || !providerConfig.baseUrl) return;
+    const trimmedDescription = description.trim();
+    // 可生成条件：有英文提示词，或描述非空（可现场派生）
+    if (!appearancePrompt.trim() && !trimmedDescription) return;
     setIsGeneratingPortrait(true);
     setError(null);
     try {
+      let effectiveAppearance = appearancePrompt.trim();
+      const descriptionChanged = character
+        ? trimmedDescription !== (character.description ?? "").trim()
+        : true;
+      if (descriptionChanged && trimmedDescription) {
+        // 描述有变：先派生新英文；派生失败则中止（用旧提示词生成只会误导）
+        const derived = await deriveAppearance(name.trim() || "（未命名）", trimmedDescription);
+        if (!derived) throw new Error(t("characters.portraitDeriveFailed"));
+        effectiveAppearance = derived;
+        setAppearancePrompt(derived);
+      }
       // 物种锁定拼装器（与批量链路一致）；替换旧版 "Portrait photo of ... photorealistic" 人像语汇
-      const prompt = composePortraitPrompt({ appearancePrompt: appearancePrompt.trim() });
+      const prompt = composePortraitPrompt({ appearancePrompt: effectiveAppearance });
       // 统一档位串参数（1K 档 + 1:1 画幅）；随机 seed 保证每次重新生成效果不同
       const { size, ratio } = aspectRatioToImageParams("1:1");
       const portraitUrl = await generateImage({
@@ -137,7 +182,7 @@ export function CharacterEditor({ character, onClose }: CharacterEditorProps) {
     } finally {
       setIsGeneratingPortrait(false);
     }
-  }, [appearancePrompt, providerConfig, character, updateAsset]);
+  }, [appearancePrompt, description, character, providerConfig, name, updateAsset, deriveAppearance, t]);
 
   /**
    * Save：描述有变 → 先自动派生英文外貌提示词（文本调用，不耗图片配额）再入库；
@@ -157,23 +202,7 @@ export function CharacterEditor({ character, onClose }: CharacterEditorProps) {
 
     if (trimmedDescription && descriptionChanged && providerConfig.apiKey && providerConfig.baseUrl) {
       try {
-        const result = await chatCompletion({
-          apiKey: providerConfig.apiKey,
-          baseUrl: providerConfig.baseUrl,
-          messages: [
-            { role: "system", content: buildCharacterAppearancePrompt() },
-            {
-              role: "user",
-              content: [
-                `Name: ${trimmedName}`,
-                `Description: ${trimmedDescription}`,
-                "",
-                "Write the appearance description for THIS subject. Keep its species/type exactly as given above.",
-              ].join("\n"),
-            },
-          ],
-        });
-        const derived = result.content.trim();
+        const derived = await deriveAppearance(trimmedName, trimmedDescription);
         if (derived) {
           trimmedAppearance = derived;
           setAppearancePrompt(derived);
@@ -362,7 +391,11 @@ export function CharacterEditor({ character, onClose }: CharacterEditorProps) {
           )}
           <button
             onClick={handleGeneratePortrait}
-            disabled={isGeneratingPortrait || !appearancePrompt.trim() || !providerConfig.apiKey}
+            disabled={
+              isGeneratingPortrait ||
+              (!appearancePrompt.trim() && !description.trim()) ||
+              !providerConfig.apiKey
+            }
             className="flex w-full shrink-0 items-center justify-center gap-1 rounded border border-line px-1.5 py-1 text-[0.625rem] text-accent transition hover:bg-accent-deep/30 disabled:opacity-50"
             title={t("characters.generatePortrait")}
           >
