@@ -1,10 +1,10 @@
 // ────────────────────────────────────────────────────────────────────────────
 // src/features/characters/CharacterEditor.tsx
-// Character editing form: 用户只编辑「名称」和「角色描述」（完整角色信息，中文）；
-// 英文外貌提示词为派生物（保存时自动派生），只读展示；定妆照手动按钮生成。
+// Character editing form: 用户只编辑「名称」；角色描述（完整角色信息，中文）由 AI 经指令维护；
+// 英文外貌提示词为派生物（AI 修改描述后即时重派生，保存时兜底），只读展示；定妆照手动按钮生成。
 // ────────────────────────────────────────────────────────────────────────────
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { useProjectStore, type Asset } from "@/stores/projectStore";
 import { useSettingsStore } from "@/stores/settingsStore";
 import { useT } from "@/i18n";
@@ -41,11 +41,19 @@ export function CharacterEditor({ character, onClose }: CharacterEditorProps) {
 
   const [name, setName] = useState(character?.name ?? "");
   const [description, setDescription] = useState(character?.description ?? "");
-  // 英文外貌提示词是「角色描述」的派生物：保存时若描述有变则自动重派生，用户不可编辑
+  // 英文外貌提示词是「角色描述」的派生物：AI 修改描述后即时重派生（失败则保存时兜底），用户不可编辑
   const [appearancePrompt, setAppearancePrompt] = useState(character?.appearancePrompt ?? "");
-  // 描述由 AI 维护（只读）：用户经指令输入框让 AI 修改；快照栈支持逐级撤销
+  // 当前英文是否与描述脱节（即时派生失败/中断时为 true，保存时自动兜底重派生）
+  const [appearanceStale, setAppearanceStale] = useState(false);
+  const [isDerivingAppearance, setIsDerivingAppearance] = useState(false);
+  // 描述由 AI 维护（只读）：用户经指令输入框让 AI 修改；快照栈支持逐级撤销（描述 + 对应英文一并恢复）
   const [instruction, setInstruction] = useState("");
-  const [descHistory, setDescHistory] = useState<string[]>([]);
+  const [descHistory, setDescHistory] = useState<Array<{ description: string; appearance: string }>>([]);
+  // 竞态守卫：派生完成时校验描述是否已又被改动（撤销/再次 AI 修改），变了则丢弃过期结果
+  const descriptionRef = useRef(description);
+  useEffect(() => {
+    descriptionRef.current = description;
+  }, [description]);
   const [isApplyingInstruction, setIsApplyingInstruction] = useState(false);
   const [portraitUrl, setPortraitUrl] = useState(character?.imageUrl ?? "");
   const [isGeneratingPortrait, setIsGeneratingPortrait] = useState(false);
@@ -54,9 +62,44 @@ export function CharacterEditor({ character, onClose }: CharacterEditorProps) {
   const [notice, setNotice] = useState<string | null>(null);
 
   /**
+   * 从中文描述派生英文外貌提示词（文本调用，不耗图片配额）。
+   * AI 修改描述后的即时联动、保存兜底、定妆照生成前刷新共用同一派生链路。
+   * 返回 null 表示派生失败（网络/内容过滤/空输出），由调用方决定兜底策略。
+   */
+  const deriveAppearance = useCallback(
+    async (desc: string, charName: string): Promise<string | null> => {
+      if (!desc.trim() || !providerConfig.apiKey || !providerConfig.baseUrl) return null;
+      try {
+        const result = await chatCompletion({
+          apiKey: providerConfig.apiKey,
+          baseUrl: providerConfig.baseUrl,
+          messages: [
+            { role: "system", content: buildCharacterAppearancePrompt() },
+            {
+              role: "user",
+              content: [
+                `Name: ${charName}`,
+                `Description: ${desc.trim()}`,
+                "",
+                "Write the appearance description for THIS subject. Keep its species/type exactly as given above.",
+              ].join("\n"),
+            },
+          ],
+        });
+        return result.content.trim() || null;
+      } catch (err) {
+        console.error("Failed to derive appearance prompt:", err);
+        return null;
+      }
+    },
+    [providerConfig],
+  );
+
+  /**
    * 修改描述（描述只读，由 AI 维护的唯一入口）：
    * - 有指令：AI 把要求融合进当前描述
    * - 空指令：AI 根据角色名与现有描述生成/补全完整角色描述
+   * 成功后即时联动：立刻按新描述重派生英文外貌提示词（失败不阻塞，保存时兜底）。
    */
   const handleApplyInstruction = useCallback(async () => {
     const requirement = instruction.trim();
@@ -86,9 +129,18 @@ export function CharacterEditor({ character, onClose }: CharacterEditorProps) {
       });
       const next = result.content.trim();
       if (next && next !== description.trim()) {
-        setDescHistory((h) => [...h, description]);
+        setDescHistory((h) => [...h, { description, appearance: appearancePrompt }]);
         setDescription(next);
         setInstruction("");
+        // 即时联动：描述一变立刻重派生英文，界面同步刷新
+        setIsDerivingAppearance(true);
+        setAppearanceStale(true);
+        const derived = await deriveAppearance(next, name.trim() || "（未命名）");
+        // 竞态守卫：派生期间描述又被改动（撤销/再次 AI 修改）→ 丢弃过期结果
+        if (descriptionRef.current === next && derived) {
+          setAppearancePrompt(derived);
+          setAppearanceStale(false);
+        }
       } else {
         setNotice(t("characters.instructionNoChange"));
       }
@@ -96,45 +148,19 @@ export function CharacterEditor({ character, onClose }: CharacterEditorProps) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
       setIsApplyingInstruction(false);
+      setIsDerivingAppearance(false);
     }
-  }, [instruction, isApplyingInstruction, providerConfig, name, description, t]);
+  }, [instruction, isApplyingInstruction, providerConfig, name, description, appearancePrompt, deriveAppearance, t]);
 
-  /** 撤销最近一次 AI 描述修改（逐级回退快照栈） */
+  /** 撤销最近一次 AI 描述修改（逐级回退快照栈，描述与对应英文一并恢复） */
   const handleUndoDescription = useCallback(() => {
-    setDescHistory((h) => {
-      if (h.length === 0) return h;
-      const prev = h[h.length - 1];
-      setDescription(prev);
-      return h.slice(0, -1);
-    });
-  }, []);
-
-  /**
-   * 从中文角色描述派生英文外貌提示词（文本调用，不耗图片配额）。
-   * handleSave 与 handleGeneratePortrait 共用同一派生链路。
-   */
-  const deriveAppearance = useCallback(
-    async (characterName: string, desc: string): Promise<string> => {
-      const result = await chatCompletion({
-        apiKey: providerConfig.apiKey,
-        baseUrl: providerConfig.baseUrl,
-        messages: [
-          { role: "system", content: buildCharacterAppearancePrompt() },
-          {
-            role: "user",
-            content: [
-              `Name: ${characterName}`,
-              `Description: ${desc}`,
-              "",
-              "Write the appearance description for THIS subject. Keep its species/type exactly as given above.",
-            ].join("\n"),
-          },
-        ],
-      });
-      return result.content.trim();
-    },
-    [providerConfig],
-  );
+    if (descHistory.length === 0) return;
+    const prev = descHistory[descHistory.length - 1];
+    setDescription(prev.description);
+    setAppearancePrompt(prev.appearance);
+    setAppearanceStale(false);
+    setDescHistory((h) => h.slice(0, -1));
+  }, [descHistory]);
 
   /**
    * Generate a portrait image（手动按钮，非自动）。
@@ -155,7 +181,7 @@ export function CharacterEditor({ character, onClose }: CharacterEditorProps) {
         : true;
       if (descriptionChanged && trimmedDescription) {
         // 描述有变：先派生新英文；派生失败则中止（用旧提示词生成只会误导）
-        const derived = await deriveAppearance(name.trim() || "（未命名）", trimmedDescription);
+        const derived = await deriveAppearance(trimmedDescription, name.trim() || "（未命名）");
         if (!derived) throw new Error(t("characters.portraitDeriveFailed"));
         effectiveAppearance = derived;
         setAppearancePrompt(derived);
@@ -185,8 +211,8 @@ export function CharacterEditor({ character, onClose }: CharacterEditorProps) {
   }, [appearancePrompt, description, character, providerConfig, name, updateAsset, deriveAppearance, t]);
 
   /**
-   * Save：描述有变 → 先自动派生英文外貌提示词（文本调用，不耗图片配额）再入库；
-   * 派生失败不阻塞保存（保留原英文并提示）。未改动则沿用现有英文。
+   * Save：描述有变且英文尚未跟随（即时派生失败/跳过）→ 保存时兜底重派生（不耗图片配额）；
+   * 即时派生已成功则直接沿用；未改动则沿用现有英文。派生失败不阻塞保存（提示保留原值）。
    */
   const handleSave = async () => {
     if (!name.trim() || isSaving) return;
@@ -200,17 +226,21 @@ export function CharacterEditor({ character, onClose }: CharacterEditorProps) {
     const descriptionChanged =
       !character || trimmedDescription !== (character.description ?? "").trim();
 
-    if (trimmedDescription && descriptionChanged && providerConfig.apiKey && providerConfig.baseUrl) {
-      try {
-        const derived = await deriveAppearance(trimmedName, trimmedDescription);
-        if (derived) {
-          trimmedAppearance = derived;
-          setAppearancePrompt(derived);
-        }
-      } catch (err) {
+    if (
+      trimmedDescription &&
+      descriptionChanged &&
+      appearanceStale &&
+      providerConfig.apiKey &&
+      providerConfig.baseUrl
+    ) {
+      const derived = await deriveAppearance(trimmedDescription, trimmedName);
+      if (derived) {
+        trimmedAppearance = derived;
+        setAppearancePrompt(derived);
+        setAppearanceStale(false);
+      } else {
         // 派生失败不阻塞保存：保留原英文提示词，就地提示
         setNotice(t("characters.descDeriveFailed"));
-        console.error("Failed to derive appearance prompt:", err);
       }
     }
 
@@ -362,7 +392,13 @@ export function CharacterEditor({ character, onClose }: CharacterEditorProps) {
         >
           {appearancePrompt.trim() || t("characters.appearanceEmpty")}
         </div>
-        <p className="text-[0.625rem] text-ink-5">{t("characters.appearanceReadonly")}</p>
+        <p className="text-[0.625rem] text-ink-5">
+          {isDerivingAppearance
+            ? t("characters.deriving")
+            : appearanceStale
+              ? t("characters.deriveRetryOnSave")
+              : t("characters.appearanceReadonly")}
+        </p>
       </div>
 
         </div>
