@@ -2,7 +2,8 @@
 // tests/stores/projectMigrate.test.ts
 // migratePersistedState 纯函数的单测：
 // - v8 → v9：非空 prompt/appearancePrompt 资产获得 derivation.locked=true
-// - v7 及更早链式迁移不回归（v1/v7 真实历史结构 → 全链路跑通）
+// - v9 → v10：单行角色描述恢复为总述 + 8 要素换行格式
+// - v7 及更早链式迁移不回归（v1/v7 真实历史结构 → 全链路跑到 v10）
 // - 幂等：缺字段/坏结构不抛错，重复执行结果稳定
 // ────────────────────────────────────────────────────────────────────────────
 
@@ -78,7 +79,7 @@ describe("migratePersistedState：v8 → v9（derivation 补锁）", () => {
     expect(assets[0].derivation).toEqual({ locked: true, dirty: true });
   });
 
-  it("v9 输入不再改动（幂等：二次执行结果一致）", () => {
+  it("迁移后的 v10 输入不再改动（幂等：二次执行结果一致）", () => {
     const state = makeState(8, {
       id: "p1",
       assets: [{ id: "a1", type: "scene", name: "s", description: "d", prompt: "p" }],
@@ -87,13 +88,13 @@ describe("migratePersistedState：v8 → v9（derivation 补锁）", () => {
     const once = migratePersistedState(state, 8);
     const twice = migratePersistedState(
       JSON.parse(JSON.stringify(once)),
-      9, // 已到 v9，直接跳过所有分支
+      10, // 已到 v10，直接跳过所有分支
     );
     expect(twice).toEqual(once);
   });
 
-  it("version >= 9 时整个迁移为 no-op", () => {
-    const state = makeState(9, {
+  it("version >= 10 时整个迁移为 no-op", () => {
+    const state = makeState(10, {
       id: "p1",
       assets: [{ id: "a1", type: "scene", name: "s", description: "d", prompt: "p" }],
     });
@@ -101,6 +102,61 @@ describe("migratePersistedState：v8 → v9（derivation 补锁）", () => {
     const migrated = migratePersistedState(state, 9);
     const project = (migrated.projects as Array<Record<string, unknown>>)[0];
     expect((project.assets as Array<Record<string, unknown>>)[0].derivation).toBeUndefined();
+  });
+});
+
+describe("migratePersistedState：v9 → v10（角色描述格式恢复）", () => {
+  it.each([null, undefined, [], "bad", 42])("坏根结构 %j 不抛错", (persisted) => {
+    expect(() => migratePersistedState(persisted, 9)).not.toThrow();
+    expect(migratePersistedState(persisted, 9)).toEqual({});
+  });
+  it("将单行分号/句号分隔的角色描述迁移为 9 行", () => {
+    const state = makeState(9, {
+      id: "p1",
+      assets: [
+        {
+          id: "c1",
+          type: "character",
+          name: "小猪",
+          description: "一只可爱的小猪。物种：猪。身份：主角。年龄：幼年。性格：活泼。外貌：粉色圆滚。服饰：无。记忆点：卷尾巴。背景：乡村居民。",
+          prompt: "pig",
+        },
+      ],
+    });
+
+    const migrated = migratePersistedState(state, 9);
+    const project = (migrated.projects as Array<Record<string, unknown>>)[0];
+    const character = (project.assets as Array<Record<string, unknown>>)[0];
+
+    expect(character.description).toBe(
+      "一只可爱的小猪\n物种：猪\n身份：主角\n年龄：幼年\n性格：活泼\n外貌：粉色圆滚\n服饰：无\n记忆点：卷尾巴\n背景：乡村居民",
+    );
+  });
+
+  it("坏的角色 description 类型不抛错且保持原对象", () => {
+    const state = makeState(9, {
+      id: "p1",
+      assets: [{ id: "c1", type: "character", name: "角色", description: 123, prompt: "character" }],
+    });
+    expect(() => migratePersistedState(state, 9)).not.toThrow();
+    const migrated = migratePersistedState(state, 9);
+    const asset = (migrated.projects as Array<Record<string, unknown>>)[0].assets as Array<Record<string, unknown>>;
+    expect(asset[0].description).toBe(123);
+  });
+
+  it("非角色资产与无法识别的自由文本保持原样", () => {
+    const state = makeState(9, {
+      id: "p1",
+      assets: [
+        { id: "s1", type: "scene", name: "森林", description: "场景。物种：不应改", prompt: "forest" },
+        { id: "c1", type: "character", name: "角色", description: "普通自由文本", prompt: "character" },
+      ],
+    });
+
+    const migrated = migratePersistedState(state, 9);
+    const assets = (migrated.projects as Array<Record<string, unknown>>)[0].assets as Array<Record<string, unknown>>;
+    expect(assets[0].description).toBe("场景。物种：不应改");
+    expect(assets[1].description).toBe("普通自由文本");
   });
 });
 
@@ -126,7 +182,7 @@ describe("migratePersistedState：v1 全链路迁移不回归", () => {
     const shots = p.shots as Array<Record<string, unknown>>;
     expect(shots[0].dialogues).toEqual([]);
     expect(shots[0].activeCharacterIds).toEqual([]);
-    // v8：v1 无 characters/sceneReferences，assets 为空数组
+    // v8：v1 无 characters/sceneReferences，assets 为空数组；v10 无角色描述可规范化
     expect(p.assets).toEqual([]);
   });
 
@@ -158,7 +214,7 @@ describe("migratePersistedState：v1 全链路迁移不回归", () => {
     expect(assets[0].prompt).toBe("a small orange fox");
     expect(assets[1].id).toBe("scene_keep");
     expect(assets[1].type).toBe("scene");
-    // v7 数据的资产在 v8 合并后于 v9 补锁（appearancePrompt/prompt 非空）
+    // v7 数据的资产在 v8 合并后于 v9 补锁（appearancePrompt/prompt 非空），再经过 v10 描述迁移
     expect(assets[0].derivation).toEqual({ locked: true });
     expect(assets[1].derivation).toEqual({ locked: true });
   });

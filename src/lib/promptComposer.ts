@@ -255,8 +255,57 @@ export interface ParsedCharacterDescription {
  * - 含任何无法归类的行，或整体不是"总述+要素行"结构 → fields 为空，
  *   调用方整段展示原始文本（兼容旧版一句话描述，不半解析）。
  */
+const CHARACTER_FIELDS = [
+  "物种",
+  "身份",
+  "年龄",
+  "性格",
+  "外貌",
+  "服饰",
+  "记忆点",
+  "背景",
+] as const;
+
+const CHARACTER_FIELD_PATTERN = /(?:^|[。；;])\s*(物种|身份|年龄|性格|外貌|服饰|记忆点|背景)[：:]\s*/g;
+
+/**
+ * 将模型偶尔压成单行、用句号/分号连接的角色描述恢复为规范 9 行格式。
+ * 已经是换行格式或无法识别为完整 8 要素时保持原文，避免破坏自由文本。
+ */
+export function normalizeCharacterDescription(description: string): string {
+  const original = description.trim();
+  if (!original || /\r?\n/.test(original)) return original;
+
+  const matches = [...original.matchAll(CHARACTER_FIELD_PATTERN)];
+  if (matches.length === 0) return original;
+
+  // 已是规范换行时，换行属于字段边界，不应留在上一个字段值中。
+  const firstFieldStart = matches[0].index ?? -1;
+  const summary = original.slice(0, firstFieldStart).trim().replace(/[。；;]\s*$/, "");
+  if (!summary || /[：:]/.test(summary)) return original;
+
+  const fields = matches.map((match, index) => {
+    const label = match[1];
+    const valueStart = (match.index ?? 0) + match[0].length;
+    const nextStart = index + 1 < matches.length
+      ? (matches[index + 1].index ?? original.length)
+      : original.length;
+    return `${label}：${original.slice(valueStart, nextStart).trim().replace(/[。；;]\s*$/, "")}`;
+  });
+
+  const labels = fields.map((field) => field.slice(0, field.indexOf("：")));
+  const isComplete =
+    matches.length === CHARACTER_FIELDS.length &&
+    labels.every((label, index) => label === CHARACTER_FIELDS[index]) &&
+    fields.every((field) => field.includes("：") && field.slice(field.indexOf("：") + 1).trim());
+  if (!isComplete) return original;
+
+  return [summary, ...fields].filter(Boolean).join("\n");
+}
+
 export function parseCharacterDescription(description: string): ParsedCharacterDescription {
-  const lines = description
+  const normalized = normalizeCharacterDescription(description);
+  const lines = normalized
     .split(/\r?\n/)
     .map((l) => l.trim())
     .filter(Boolean);

@@ -8,6 +8,7 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 // 仅类型导入（verbatimModuleSyntax 下运行时零依赖，无循环加载风险）
 import type { L10nText } from "@/i18n";
+import { normalizeCharacterDescription } from "@/lib/promptComposer";
 
 /* ── Status enums ───────────────────────────────────────────────────────── */
 
@@ -277,7 +278,7 @@ function updateActive(
 /* ── Persisted-state migration（导出纯函数，便于单测） ───────────────────── */
 
 /**
- * persist 存储迁移主体（纯函数）：v1→v9 全链路迁移。
+ * persist 存储迁移主体（纯函数）：v1→v10 全链路迁移。
  * 与 store 实例解耦，tests/stores/projectMigrate.test.ts 可直接调用；
  * 对缺字段/坏结构不抛错，重复执行幂等。
  */
@@ -285,6 +286,9 @@ export function migratePersistedState(
   persisted: unknown,
   version: number,
 ): Record<string, unknown> {
+  if (!persisted || typeof persisted !== "object" || Array.isArray(persisted)) {
+    return {};
+  }
   const state = persisted as Record<string, unknown>;
 
   // Migrate from v1 (single project) to v2 (multi-project)
@@ -444,6 +448,30 @@ export function migratePersistedState(
             // 幂等：已锁定则原样返回
             if (derivation.locked === true) return a;
             return { ...asset, derivation: { ...derivation, locked: true } };
+          }),
+        };
+      });
+    }
+  }
+
+  // Migrate from v9 to v10: restore the canonical character description layout.
+  // Some model responses were persisted as one line with `。`/`;` separators;
+  // normalize those descriptions so existing projects regain summary + 8 rows.
+  if (version < 10) {
+    const projects = state.projects;
+    if (Array.isArray(projects)) {
+      state.projects = (projects as unknown[]).map((p) => {
+        if (!p || typeof p !== "object") return p;
+        const project = p as Record<string, unknown>;
+        if (!Array.isArray(project.assets)) return p;
+        return {
+          ...project,
+          assets: (project.assets as unknown[]).map((a) => {
+            if (!a || typeof a !== "object") return a;
+            const asset = a as Record<string, unknown>;
+            if (asset.type !== "character" || typeof asset.description !== "string") return a;
+            const description = normalizeCharacterDescription(asset.description);
+            return description === asset.description ? a : { ...asset, description };
           }),
         };
       });
@@ -910,7 +938,7 @@ export const useProjectStore = create<ProjectState>()(
     }),
     {
       name: "wxhb-project",
-      version: 9,
+      version: 10,
       // 迁移主体提取为导出纯函数 migratePersistedState（见文件上方），便于单测
       migrate: (persisted: unknown, version: number) =>
         migratePersistedState(persisted, version),

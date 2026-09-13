@@ -13,6 +13,7 @@
 
 import { newId, type Asset, type AssetType } from "@/stores/projectStore";
 import { generateAssetNamespace, generateFullPrompt } from "@/lib/assetNamespace";
+import { normalizeCharacterDescription } from "@/lib/promptComposer";
 
 /** 模型输出的资产条目（提取/分镜共用的原始形态；style 仅 name+description） */
 export interface RawAsset {
@@ -42,23 +43,29 @@ export function extractNewAssets(
   const assets: Asset[] = [];
   const idByName = new Map<string, string>();
   for (const item of incoming) {
-    const normalizedName = item.name.trim().toLocaleLowerCase();
+    const name = typeof item.name === "string" ? item.name : "";
+    const description = typeof item.description === "string" ? item.description : "";
+    const appearancePrompt =
+      typeof item.appearancePrompt === "string" ? item.appearancePrompt : "";
+    const normalizedName = name.trim().toLocaleLowerCase();
     if (!normalizedName || names.has(normalizedName)) continue;
     names.add(normalizedName);
     const record: Asset = {
       id: newId("asset"),
       type,
       source: "extracted",
-      name: item.name,
-      description: item.description,
-      prompt: type === "style" ? "" : (item.appearancePrompt ?? ""),
+      name,
+      description: type === "character"
+        ? normalizeCharacterDescription(description)
+        : description,
+      prompt: type === "style" ? "" : appearancePrompt,
       ...(type === "character"
         ? {
-            appearancePrompt: item.appearancePrompt ?? "",
-            assetNamespace: generateAssetNamespace(item.name),
+            appearancePrompt,
+            assetNamespace: generateAssetNamespace(name),
             fullPrompt: generateFullPrompt({
-              name: item.name,
-              appearancePrompt: item.appearancePrompt ?? "",
+              name,
+              appearancePrompt,
             }),
           }
         : {}),

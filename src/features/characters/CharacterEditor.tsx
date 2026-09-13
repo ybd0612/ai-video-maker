@@ -17,7 +17,11 @@ import {
 import { Lightbox } from "@/components/ui/Lightbox";
 import { generateImage, aspectRatioToImageParams } from "@/services/imageService";
 import { generateAssetNamespace, generateFullPrompt } from "@/lib/assetNamespace";
-import { composePortraitPrompt, parseCharacterDescription } from "@/lib/promptComposer";
+import {
+  composePortraitPrompt,
+  normalizeCharacterDescription,
+  parseCharacterDescription,
+} from "@/lib/promptComposer";
 
 interface CharacterEditorProps {
   character: Asset | null; // null = creating new
@@ -40,7 +44,9 @@ export function CharacterEditor({ character, onClose }: CharacterEditorProps) {
   const providerConfig = useSettingsStore((s) => s.providerConfig);
 
   const [name, setName] = useState(character?.name ?? "");
-  const [description, setDescription] = useState(character?.description ?? "");
+  const [description, setDescription] = useState(() =>
+    normalizeCharacterDescription(character?.description ?? ""),
+  );
   // 英文外貌提示词是「角色描述」的派生物：AI 修改描述后即时重派生（失败则保存时兜底），用户不可编辑
   const [appearancePrompt, setAppearancePrompt] = useState(character?.appearancePrompt ?? "");
   // 当前英文是否与描述脱节（即时派生失败/中断时为 true，保存时自动兜底重派生）
@@ -127,7 +133,7 @@ export function CharacterEditor({ character, onClose }: CharacterEditorProps) {
           },
         ],
       });
-      const next = result.content.trim();
+      const next = normalizeCharacterDescription(result.content);
       if (next && next !== description.trim()) {
         setDescHistory((h) => [...h, { description, appearance: appearancePrompt }]);
         setDescription(next);

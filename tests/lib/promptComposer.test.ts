@@ -13,6 +13,7 @@ import {
   pickShotReferences,
   getStyleReferenceUrl,
   getStylePrompt,
+  normalizeCharacterDescription,
   parseCharacterDescription,
 } from "@/lib/promptComposer";
 
@@ -350,6 +351,55 @@ describe("parseCharacterDescription", () => {
       { label: "物种", value: "小白兔" },
       { label: "记忆点", value: "蓝围巾: 蓝色系" },
     ]);
+  });
+
+  it("兼容模型压成单行、使用句号分隔的 1+8 格式", () => {
+    const parsed = parseCharacterDescription(
+      "一只憨态可掬的小猪。物种：猪。身份：故事主角。年龄：幼年期。性格：贪玩、好奇。外貌：圆润的粉色身体。服饰：无。记忆点：圆滚滚的体型。背景：乡村田野居民。",
+    );
+    expect(parsed.summary).toBe("一只憨态可掬的小猪");
+    expect(parsed.fields).toHaveLength(8);
+    expect(parsed.fields[0]).toEqual({ label: "物种", value: "猪" });
+    expect(parsed.fields[7]).toEqual({ label: "背景", value: "乡村田野居民" });
+  });
+
+  it("将单行角色描述规范化为总述 + 要素换行", () => {
+    const normalized = normalizeCharacterDescription(
+      "一只憨态可掬的小猪。物种：猪。身份：故事主角。年龄：幼年期。性格：贪玩、好奇。外貌：圆润的粉色身体。服饰：无。记忆点：圆滚滚的体型。背景：乡村田野居民。",
+    );
+    expect(normalized.split("\n")).toEqual([
+      "一只憨态可掬的小猪",
+      "物种：猪",
+      "身份：故事主角",
+      "年龄：幼年期",
+      "性格：贪玩、好奇",
+      "外貌：圆润的粉色身体",
+      "服饰：无",
+      "记忆点：圆滚滚的体型",
+      "背景：乡村田野居民",
+    ]);
+  });
+
+  it("已有换行格式保持原文，包括行尾标点", () => {
+    const desc = "一只兔子。\n物种：兔。\n身份：主角。";
+    expect(normalizeCharacterDescription(desc)).toBe(desc);
+  });
+
+  it("自由文本即使包含字段词也不强行结构化", () => {
+    const desc = "说明：这是一段自由文本。物种：兔。身份：主角。年龄：幼年。性格：安静。外貌：白色。服饰：围巾。记忆点：蓝眼睛。背景：森林。";
+    expect(normalizeCharacterDescription(desc)).toBe(desc);
+    expect(parseCharacterDescription(desc).fields).toHaveLength(0);
+  });
+
+  it("字段缺失、乱序或重复时保持原文", () => {
+    const desc = "一只兔子。物种：兔。身份：主角。年龄：幼年。性格：安静。外貌：白色。服饰：围巾。背景：森林。";
+    expect(normalizeCharacterDescription(desc)).toBe(desc);
+  });
+
+  it("规范化保持幂等", () => {
+    const desc = "一只兔子。物种：兔。身份：主角。年龄：幼年。性格：安静。外貌：白色。服饰：围巾。记忆点：蓝眼睛。背景：森林。";
+    const normalized = normalizeCharacterDescription(desc);
+    expect(normalizeCharacterDescription(normalized)).toBe(normalized);
   });
 
   it("旧版一句话描述（单行无前缀）：fields 为空 → 调用方整段兜底", () => {

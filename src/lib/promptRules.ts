@@ -471,7 +471,8 @@ export const SYSTEM_PROMPT_CHARACTER_DESCRIPTION_ZH = `你是一位 AI 角色设
 - 只写静态设定，不要写动作/状态（如"正在睡觉"属于分镜层，不进角色描述）
 - 9 行缺一不可，不要合并、不要加序号或 markdown 符号
 - 要素内容保持通用，不要绑定单一时长、平台或内容形态
-- 直接返回完整角色描述，不要任何解释说明`;
+- 直接返回完整角色描述，不要任何解释说明
+- 即使输出通道会压缩空白，也必须保留 9 行结构；每个要素前使用换行，禁止用句号或分号把 8 个要素连成一行`;
 
 export const SYSTEM_PROMPT_NEGATIVE_PROMPT = `你是一位 AI 图像/视频生成的负向提示词专家。用户会给你一段负向提示词（描述画面中需要避免的瑕疵），请帮助优化。
 
@@ -536,8 +537,8 @@ export const BUILTIN_RULES: PromptRule[] = [
     task: "extractAssets",
     section: "rules",
     content: {
-      zh: "- characters：涵盖故事中的**一切角色主体**——人物、动物（如小兔子、小猫）、拟人化角色、机器人等，只要是故事的主角/配角就必须全部填入；仅纯风景内容才 []",
-      en: "- characters: ONLY fill if content has characters, otherwise []",
+      zh: "- characters：涵盖故事中的**一切角色主体**——人物、动物（如小兔子、小猫）、拟人化角色、机器人等，只要是故事的主角/配角就必须全部填入；仅纯风景内容才 []\n- 每个角色 description 必须严格保留 9 行：第 1 行一句话总述，后面按顺序逐行输出物种、身份、年龄、性格、外貌、服饰、记忆点、背景；禁止用句号/分号压成一行",
+      en: "- characters: ONLY fill if content has characters, otherwise []\n- Each character description MUST preserve exactly 9 lines: one summary line followed by species, role, age, personality, looks, outfit, signature and background; never compress the elements into one sentence",
     },
     enabled: true,
     source: "builtin",
@@ -582,8 +583,8 @@ export const BUILTIN_RULES: PromptRule[] = [
     task: "storyboard",
     section: "rules",
     content: {
-      zh: "- characters 数组：涵盖故事中的**一切角色主体**——人物、动物（如小兔子、小猫）、拟人化角色、机器人等，只要是故事的主角/配角就必须填入；仅纯风景内容才返回空数组 []",
-      en: "- characters array: include ANY story character/subject — humans, animals (e.g. a little rabbit), anthropomorphic or fantasy creatures, robots. Every protagonist/side character MUST be listed; only return [] for pure landscape content",
+      zh: "- characters 数组：涵盖故事中的**一切角色主体**——人物、动物（如小兔子、小猫）、拟人化角色、机器人等，只要是故事的主角/配角就必须填入；仅纯风景内容才返回空数组 []\n- 每个角色 description 必须严格保留 9 行：第 1 行一句话总述，后面按顺序逐行输出物种、身份、年龄、性格、外貌、服饰、记忆点、背景；禁止用句号/分号压成一行",
+      en: "- characters array: include ANY story character/subject — humans, animals (e.g. a little rabbit), anthropomorphic or fantasy creatures, robots. Every protagonist/side character MUST be listed; only return [] for pure landscape content\n- Each character description MUST preserve exactly 9 lines: one summary line followed by species, role, age, personality, looks, outfit, signature and background; never compress the elements into one sentence",
     },
     enabled: true,
     source: "builtin",
