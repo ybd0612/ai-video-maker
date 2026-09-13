@@ -23,14 +23,12 @@ import { confirmDialog } from "@/components/ui/ConfirmDialog";
 import { CreationWizard } from "@/features/wizard/CreationWizard";
 import { useWizardActions } from "@/features/wizard/useWizardActions";
 
-type AspectRatio = "9:16" | "16:9" | "1:1";
 type LeftTab = "projects" | "shots" | "characters" | "history";
 
 export function ProjectWorkspace() {
   const t = useT();
   const project = useProjectStore(selectActiveProject);
   const projects = useProjectStore((s) => s.projects);
-  const updateProject = useProjectStore((s) => s.updateProject);
   const clearProject = useProjectStore((s) => s.clearProject);
   const openSettings = useSettingsStore((s) => s.setSettingsDialogOpen);
   const theme = useSettingsStore((s) => s.theme);
@@ -94,34 +92,6 @@ export function ProjectWorkspace() {
           >
             {theme === "dark" ? <Sun size={14} /> : <Moon size={14} />}
           </button>
-
-          {/* Aspect ratio selector */}
-          {project && (
-            <select
-              value={project.aspectRatio}
-              onChange={async (e) => {
-                const next = e.target.value as AspectRatio;
-                if (next === project.aspectRatio) return;
-                // 画幅变更后已生成的图片/视频不会自动重新生成：若有生成产物，
-                // 先确认再切换，避免用户误以为内容会跟随新画幅自动更新
-                const hasGenerated = project.shots.some((s) => s.imageUrl || s.videoUrl);
-                if (hasGenerated) {
-                  const ok = await confirmDialog({
-                    title: t("wizard.aspectRatioChangeTitle"),
-                    message: t("wizard.aspectRatioChangeMessage"),
-                    confirmLabel: t("dialog.confirm"),
-                  });
-                  if (!ok) return; // 受控 select 保持原值，自动回退
-                }
-                updateProject({ aspectRatio: next });
-              }}
-              className="rounded border border-line bg-raised px-2 py-1 text-xs text-ink-2 focus:outline-none"
-            >
-              <option value="16:9">16:9</option>
-              <option value="9:16">9:16</option>
-              <option value="1:1">1:1</option>
-            </select>
-          )}
 
           {/* Settings */}
           <button
