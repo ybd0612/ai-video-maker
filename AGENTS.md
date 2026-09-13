@@ -103,7 +103,7 @@ src/
 - **单例隔离**：`rateLimiter` 等模块级单例有跨用例状态，需用 `vi.resetModules()` + 动态 `import()` 取新实例（见 `tests/services/rateLimit.test.ts`）。
 - 注意 `tsconfig.json` 的 `include` 仅含 `src`，因此 `tests/` 与 `vitest.config.ts` **不参与 `npm run build` 的类型检查**，需靠 `npm run test` 自行保证正确性。
 
-## 编码规范
+## 基础编码规范
 
 - TypeScript `strict: true`，开启 `noUnusedLocals` / `noUnusedParameters`
 - 使用 `verbatimModuleSyntax` — 类型导入必须用 `import type`
@@ -117,6 +117,97 @@ src/
 - **界面缩放与字号**：整体缩放由 `src/styles/globals.css` 的 `:root { font-size: 112.5% }` 统一控制（Tailwind 的尺寸/间距/字号类均以 rem 为单位）；**新增样式禁止写死 `text-[Npx]`**，小字用 `text-[0.625rem]` / `text-[0.6875rem]` 这类 rem 写法或 Tailwind 预设类，否则不参与整体缩放。需要整体调大/调小界面时只改这一个数字
 - **黑白主题（2026-09-12 方案 A 落地）**：语义色 token 定义在 `src/styles/globals.css`（light 为默认值，`html[data-theme="dark"]` 覆盖，经 `@theme inline` 映射为 `bg-app` / `bg-surface` / `bg-raised` / `bg-hover` / `border-line(-soft/-strong)` / `text-ink~ink-5` / `accent` / `info` / `success` / `warn` / `danger` 等工具类，支持 `/xx` 透明度修饰符）。**新组件禁用 slate/red/emerald 等原始色类，一律用语义 token**；主题状态在 settingsStore（persist v3，默认 `light`），App.tsx effect 同步到 `<html data-theme>`，index.html 内联脚本防首帧闪白；顶栏 ☀️/🌙 按钮切换
 - **验证方式**：本项目**不使用浏览器/预览服务做验证**（由用户本地手动确认界面效果）；AI 侧只跑 `npx tsc --noEmit` + `git diff --check` + `npm run build`
+
+## 编码规范（结构化、变量化、复用）
+
+本节是本项目新增和修改代码的强制规范。已有代码若与本节冲突，先记录真实影响和整改范围，再按最小 diff 逐步收敛；不得为了“统一风格”进行无边界重构。
+
+### 1. 设计总则
+
+- **先分层，再实现**：先明确数据模型、领域规则、服务调用、状态写回和 UI 展示分别属于哪一层；不把所有逻辑堆进页面组件或一个超大 Hook。
+- **单一职责**：函数、组件、服务和 Store action 只负责一个清晰职责；输入校验、数据规范化、API 调用、状态写回、UI 提示尽量分开。
+- **数据驱动**：能用类型、配置、规则表、映射表表达的内容，不用重复的条件分支和散落字面量表达。
+- **边界清晰**：组件负责交互和展示，`features` 负责业务编排，`services` 负责外部服务，`lib` 负责无副作用的领域工具，`stores` 负责状态与持久化。
+- **先复用后新增**：新增函数前必须搜索现有 `lib/`、`services/`、`stores/` 和同功能 feature，确认没有可直接复用的实现；不能仅因为调用位置不同就复制一份相同逻辑。
+
+### 2. 结构化代码
+
+- 业务流程按“输入 → 规范化 → 校验 → 执行 → 结果解析 → 状态写回”组织，禁止把多个阶段隐式混在一个条件分支中。
+- 外部 API、模型响应、持久化数据、用户导入数据一律先视为 `unknown`，经过运行时校验或 type guard 后才能进入领域类型。
+- 领域数据使用明确接口、字面量联合类型和显式映射；避免用 `Record<string, unknown>` 或无约束 `string` 掩盖真实业务结构。
+- 页面组件不得直接拼接 API URL、直接 `fetch`、解析第三方响应或实现重试；这些逻辑必须由服务层和共享工具承接。
+- 同一业务语义只能有一个权威实现。例如风格参考图、项目写回、视频时长规范化、Prompt 拼装和 Base URL 归一化，不允许页面各自实现一套规则。
+- 抽取共享函数时以“相同业务语义”为依据，而不是只看代码长得像；如果两个流程未来可能独立演进，应保留清晰边界并共享底层纯函数。
+
+### 3. 文本变量化
+
+- 所有用户可见文本（标题、按钮、placeholder、title、错误、空状态、确认文案）必须进入 `src/i18n/index.ts`，同时维护 `zh` / `en`；禁止在 JSX 中散落中文或英文。
+- 所有长 Prompt、系统规则、模型输出格式要求统一进入 `src/lib/promptRules.ts` 的规则注册表；组件和服务只传递规则 ID、动态上下文或变量，不新增无法覆盖的长 Prompt。
+- Prompt 的静态规则与动态数据分离：项目想法、角色、场景、产品、用户输入通过明确占位或上下文注入，不复制成多份静态模板。
+- 错误信息按错误类型和翻译键管理；服务层不得在多个文件重复拼接同一错误文案。需要携带诊断信息时使用结构化错误字段，展示层再翻译和格式化。
+- 文本进入 API 或 Store 前必须明确规范化策略：普通单行文本可 `trim`，Prompt 需保留必要换行；不得在不同入口对同一字段采用不同清洗规则。
+
+### 4. 参数变量化与单一事实源
+
+- 禁止硬编码会变化、会计费、会影响协议或会影响产品行为的事实，包括模型名、API 地址、套餐 RPM/配额、超时、重试次数、并发度、视频时长、画幅、尺寸档位、分镜数量、Prompt、用户文案和 magic number。
+- 这类参数必须放入职责明确的配置或策略模块，并通过类型和白名单约束；例如模型放 `lib/models.ts`，套餐放 `lib/plans.ts`，视频策略应集中维护最小/最大/默认时长、允许选项和计费口径。
+- 同一参数必须从同一规范化结果派生出 UI 展示、API 请求、配额计算、日志和测试断言；禁止“原始值用于计费、修正值用于请求”这类分裂语义。
+- API 参数使用领域类型，例如 `ImageSizeTier`、`ImageRatio`、视频画幅联合类型；不要为了省事把参数声明为 `string`。
+- 固定协议字段名和算法必要常量可以存在，但必须使用有意义的命名常量或类型表达，不能用无法解释的裸数字；一次性局部实现也不得隐藏业务规则。
+- 配置按领域拆分，不建立一个包含所有开关的巨型配置对象；环境差异、用户可配置项、协议常量和产品策略分别归位。
+
+### 5. 相同/相似逻辑的复用规则
+
+- 新增同类方法前先回答：已有实现在哪里？差异是参数不同还是业务语义不同？能否抽成纯函数、策略函数或领域服务？
+- 两个以上入口共享“生成请求 + 参数转换 + 错误处理 + 结果写回”时，优先抽取共享领域函数；UI 只提供输入和回调，不复制服务流程。
+- 共享函数必须显式接收依赖和参数，禁止通过隐式全局状态、当前活动项目或闭包变量改变行为。
+- 复用不能牺牲可读性：单次使用、尚未稳定的逻辑不提前抽象；抽取后必须保留清晰命名、输入输出类型和边界测试。
+- 修复一个入口后必须搜索同类入口，确认没有同样缺陷；新增规则、参数或错误处理时同步检查批量、单项、重试和手动入口。
+
+### 6. API、异常与安全
+
+- 所有 AI 请求必须经过统一服务层、统一 Base URL 归一化、统一超时和错误解析；组件不得直接访问供应商接口。
+- 非幂等的图片/视频生成 POST 禁止直接套用通用自动重试；只有服务端提供幂等键、请求 ID 或任务恢复机制时才允许创建请求重试。
+- 长请求、轮询、下载、FFmpeg 和退避等待必须支持 `AbortSignal`；用户取消不得进入下一轮重试或继续占用资源。
+- 区分参数错误、配额耗尽、用户取消、网络错误、服务端任务已创建但轮询失败和内容安全错误；禁止只靠错误字符串判断业务状态。
+- API Key、Token、Cookie、真实请求头和个人数据禁止进入源码、文档、测试 fixture、日志、截图、构建产物和 CI artifact。调试落盘必须先脱敏；发现历史凭证时先轮换，再处理 Git 历史清理。
+- 所有用户输入和外部响应都视为不可信；展示前避免 HTML 注入，拼接 URL/正则/文件名时必须做边界处理。
+
+### 7. 异步任务与状态写回
+
+- 跨 `await` 的操作必须在开始时捕获 `targetProjectId`；完成、失败、进度、定时器和 fire-and-forget 回调都只能按目标 ID 写回。
+- 异步流程禁止使用 `updateProject`、`updateShot`、`updateAsset`、`setWizardStep` 等只作用于 active project 的 action，除非操作已证明不会跨项目；优先使用 `ByProjectId` 版本。
+- 批量任务必须使用模块级注册表做幂等守卫、独立 `AbortController`、受控并发和 `finally` 清理；取消、项目切换、组件卸载时不能遗留任务、监听器、定时器或 Blob URL。
+- `Promise.all` / `Promise.allSettled` 的选择必须表达业务语义：需要收集所有任务结果时使用 `allSettled`，需要失败即停时才使用 `all`；禁止无意吞掉异常。
+- fire-and-forget 必须显式处理 rejection；进度回调不得写入已经不存在或已切换的项目。
+
+### 8. TypeScript、测试与完成标准
+
+- 保持 `strict`、`noUnusedLocals`、`noUnusedParameters`、`verbatimModuleSyntax` 和 `erasableSyntaxOnly`；类型导入使用 `import type`。
+- 禁止用 `as any`、`as never`、`@ts-ignore` 或 `@ts-expect-error` 绕过业务类型；动态字段更新使用 `keyof`、映射类型或显式字段映射。
+- 纯函数、配置解析、Prompt 拼装、API 请求体、外部响应解析、Store 迁移、限流、批量执行、取消、重试耗尽、跨项目写回和资源清理必须有 Vitest 单元测试。
+- 网络和时间一律伪造；单例模块按现有约定使用 `vi.resetModules()` 隔离；本项目不引入浏览器/E2E 测试。
+- 已知缺陷的 characterization test 必须标注“锁定现状而非期望行为”；修复缺陷时先更新测试期望，再修改实现。
+- 每次提交前至少完成：结构/硬编码/复用自检、`npx tsc --noEmit`、`git diff --check`、适用的单元测试和 `npm run build`；结果必须如实记录。
+- 功能、接口、模型参数、配置、目录结构或编码规则变更时，同一次工作同步相关文档；关键事实先改 SSOT，再扫描旧值残留。
+
+## 当前审计结论（2026-09-13）
+
+以下是本轮基于真实源码发现的“规范与现状差异”，仅作为后续整改清单；本轮不做无边界业务重构。处理时按 P0 → P1 → P2 分批，小步修改、每批验证并提交。
+
+- **P0 安全**：旧 `TEST_REPORT.md` 曾包含历史 API Key；当前文件已脱敏，但凭证是否仍有效、Git 历史是否需要清理，必须由用户先完成轮换/确认。
+- **P1 非幂等重试**：`services/ai/openai.ts` 的图片创建和 `services/videoService.ts` 的视频创建仍复用通用 `fetchWithRetry`；在没有幂等键/任务恢复协议前，不得继续扩大创建请求重试。
+- **P1 多项目写回**：`StepAssets.tsx`、`CharacterEditor.tsx`、`StepIdea.tsx` 等仍存在 active-project action 跨异步边界使用；后续统一捕获 `targetProjectId`，改用 `ByProjectId` action。
+- **P1 取消链路**：文本/图片服务接口、视频轮询、retry backoff 和部分批量入口的 `AbortSignal` 尚未完全贯通；补齐前不得宣称“所有 AI 请求可取消”。
+- **P1 数据契约**：负向提示词目前存在 UI/模型字段但需核实是否完整进入请求；视频时长与分镜数量存在多处口径，须先确定产品策略，再建立单一事实源和运行时校验。
+- **P1 结构化响应**：`scriptService` 已有分镜 JSON 重试，但轻量资产提取仍需统一 `unknown → 解析 → 运行时校验 → 重试/报错` 链路。
+- **P1 质量门禁**：当前 `npm run test` 在收集阶段失败，不能将“测试已通过”写入报告；CI 目前只构建，后续应让单元测试成为部署前门禁。
+- **P2 复用与口径**：Base URL 归一化、单资产/批量资产生成、风格参考图读取、i18n 文案和部分参数仍有重复/绕过统一 helper 的入口；修复一个入口时必须检索同类入口。
+- **P2 维护性**：`useWizardActions.ts` 职责较重；旧组件/历史报告与当前主流程存在漂移，清理前先确认无引用并保留历史证据边界。
+
+### 当前未决口径
+
+- README/本文件与产品说明采用 **4-6 个分镜**，但 `src/lib/promptRules.ts` 当前规则文本采用 **4-8 个分镜**，服务层也尚未做数量运行时约束；在用户确认产品目标前，禁止继续扩散或擅自统一该数值。
 
 ## Pipeline 架构
 
@@ -175,7 +266,7 @@ src/
 
 ## UI 交互约定
 
-- **卡片的「进入编辑」统一为点击整张卡片**：`role="button"` + `tabIndex={0}` + Enter/Space 键盘可达 + `cursor-pointer` + `focus:border-emerald-500`，卡片上加 `title={t("characters.edit")}` 作为提示；**不再单独放铅笔按钮**（`Pencil` 图标已全项目移除）。角色卡片见 `wizard/StepAssets.tsx` 与 `characters/CharacterPanel.tsx`
+- **卡片的「进入编辑」统一为点击整张卡片**：`role="button"` + `tabIndex={0}` + Enter/Space 键盘可达 + `cursor-pointer` + 语义化 focus 边框（如 `focus:border-success`），卡片上加 `title={t("characters.edit")}` 作为提示；**不再单独放铅笔按钮**（`Pencil` 图标已全项目移除）。角色卡片见 `wizard/StepAssets.tsx` 与 `characters/CharacterPanel.tsx`
 - 卡片内的次级操作（删除等）**必须 `e.stopPropagation()`**，否则会连带触发卡片的进入编辑
 - 界面整体缩放与字号规则见「编码规范」一节（rem 化，禁止写死 px 字号）
 
@@ -192,7 +283,7 @@ src/
   - 视频 `agnes-video-2.5-flash` — 仅支持 `size="720P"`，画幅用 `aspect_ratio`（16:9 → 1280x704），时长用 `seconds`（"4"~"12"），有首帧/尾帧时 `mode="keyframe"`（`first_frame` / `last_frame`），无图时 `mode="text"`；轮询必须带 `model_name`，成片 URL 在响应顶层 `url`
 - ⚠️ 视频 2.5 Flash 与旧版 `agnes-video-v2.0` 参数体系不同（旧版 `num_frames`（8n+1、≤441）/ `frame_rate` / `width` / `height` / `image` / `last_image` 均已废弃，`calcNumFrames` 已无调用方），修改 `videoService.ts` 时勿混用两套参数
 - API Key 和 Base URL 由用户在设置对话框中配置，存储在浏览器本地
-- 📌 模型名/参数变更的**文档同步清单**（升级时必须逐处更新，改完 grep 全仓旧名确认零残留）：`src/lib/models.ts`（SSOT）、`README.md` 与 `README_EN.md`（特性表 + MODELS 代码块，中英口径一致）、`AGENTS.md`（本节 + Pipeline 架构章节）。`docs/` 下的历史评审报告与 `TEST_REPORT.md` 属历史实测记录，**不回改**。
+- 📌 模型名/参数变更的**文档同步清单**（升级时必须逐处更新，改完 grep 全仓旧名确认零残留）：`src/lib/models.ts`（SSOT）、`README.md` 与 `README_EN.md`（特性表 + MODELS 代码块，中英口径一致）、`AGENTS.md`（本节 + Pipeline 架构章节）。`docs/` 下的历史评审报告与 `TEST_REPORT.md` 属历史实测记录，**不作为当前 SSOT**；除安全脱敏、历史状态警示和明显误导性待办修订外，不改写其原始证据。
 
 ## 用量限制与套餐（Rate Limit / Plan）
 
@@ -225,19 +316,23 @@ src/
 - 左侧面板四个标签：**项目**（ProjectSidebar）、**分镜**（ShotList）、**角色**（CharacterPanel）、**历史**（HistoryPanel）
 - 项目操作：创建 / 切换 / 删除 / 复制
 - 复制项目时保留分镜结构，重置状态为 idle
-- v1 → v2 存储迁移：旧单项目自动转换为新多项目格式
+- v1 → v10 持续存储迁移：旧单项目、多轮字段和角色描述格式逐步转换为当前多项目结构；新增持久化字段必须增加版本迁移与回归测试
 
 ## 工作流约定（Agent 必须遵守）
 
 每次完成代码编写任务后，执行以下流程：
 
-1. **文档同步检查** — 审查相关文档（README.md、README_EN.md、AGENTS.md 等），确保与代码变动一致。如有新增/删除/重命名的文件、接口变更、功能变更等，必须同步更新文档（中英双语口径一致）。
-2. **提交代码** — 使用 `git add` + `git commit` 提交所有变更，commit message 遵循约定式提交格式（`feat:` / `fix:` / `docs:` / `refactor:` 等）。只精确暂存业务文件，**禁止 `git add -A`**（`.workbuddy/` 等工具数据不入库）。
-3. **推送代码** — 默认不推送；仅在用户明确要求 push 时执行 `git push`。
+1. **文档同步检查** — 审查相关文档（README.md、README_EN.md、AGENTS.md 等），确保与代码变动一致。如有新增/删除/重命名的文件、接口变更、功能变更等，必须同步更新文档（中英双语口径一致）。关键事实先更新 SSOT，再扫描引用方；历史报告必须标明历史状态，不得继续作为现行协议依据。
+2. **安全扫描** — 提交前搜索 API Key、Token、Cookie、真实请求头和个人数据；发现疑似凭证先停止提交，轮换/脱敏后再继续。测试 fixture、日志、截图和 CI artifact 也必须脱敏。
+3. **结构与复用自检** — 检查本次改动是否新增散落 Prompt、业务 magic number、无约束参数类型、active-project 异步写回或重复实现；能复用现有 helper/服务/类型时不得复制。
+4. **提交代码** — 使用 `git add` + `git commit` 提交所有变更，commit message 遵循约定式提交格式（`feat:` / `fix:` / `docs:` / `refactor:` 等）。只精确暂存业务文件，**禁止 `git add -A`**（`.workbuddy/` 等工具数据不入库）。
+5. **推送代码** — 默认不推送；仅在用户明确要求 push 时执行 `git push`。
 
 ## 注意事项
 
-- 项目只做**单元测试**（Vitest），**不使用浏览器 / E2E**；验证用 `npx tsc --noEmit` + `git diff --check` + `npm run test` + `npm run build`（dist 被占用时先 `rm -rf dist`）
-- `.env.example` 中的 `VITE_*` 环境变量仅作参考，实际配置通过应用内设置对话框完成
-- 模型调用无抽象层：`src/services/` 直接调用 Agnes API，不存在 adapter 中间层（旧 `src/providers/` 已在前一轮重构中移除，勿再引用）
-- 视频/图片等外部 API 响应字段以**用户实测为准**，不要仅凭官方文档推断（实测：Agnes 视频成片地址在响应顶层 `url` 字段，非文档示例的 `metadata.url`）
+- 项目只做**单元测试**（Vitest），**不使用浏览器 / E2E**；验证用 `npx tsc --noEmit` + `git diff --check` + `npm run test` + `npm run build`（dist 被占用时先 `rm -rf dist`）。UI 效果由用户本地手动确认，AI 不启动 dev/preview 服务做界面核对。
+- `.env.example` 中的 `VITE_*` 环境变量仅作参考，实际配置通过应用内设置对话框完成。
+- 模型调用无抽象层：`src/services/` 直接调用 Agnes API，不存在 adapter 中间层（旧 `src/providers/` 已在前一轮重构中移除，勿再引用）。
+- 视频/图片等外部 API 响应字段以**用户实测为准**，不要仅凭官方文档推断（实测：Agnes 视频成片地址在响应顶层 `url` 字段，非文档示例的 `metadata.url`）。
+- `TEST_REPORT.md`、`docs/` 下的旧报告属于历史证据，不能作为当前模型、参数或测试规范的 SSOT；当前口径以源码、`models.ts` / `plans.ts`、本文件和同步后的 README 为准。
+- 发现疑似密钥泄露时，不得继续提交或传播原值；先轮换凭证，再脱敏当前文件并评估 Git 历史清理范围。

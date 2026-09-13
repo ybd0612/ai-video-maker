@@ -1,8 +1,10 @@
 # AI Video Maker 测试报告
 
+> ⚠️ **历史报告（2026-08-18）**：本文仅保留当时的实测证据，不是当前模型、API 参数或测试规范的权威来源。当前项目只做 Vitest 代码单元测试，不做浏览器 / E2E 验证；历史凭证已脱敏。
+
 **测试时间**: 2026-08-18  
 **测试环境**: Windows 11, Node 22.22.2, Vite 8.0.16  
-**API Key**: `sk-sf7rR50o8N5Ho0Xc3Cviz2bNvxMEBYDZDj2DzdFPmgM5dJBt` ✅
+**API Key**: `[已脱敏：历史测试密钥]`
 
 ---
 
