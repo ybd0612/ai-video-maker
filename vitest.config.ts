@@ -1,5 +1,8 @@
 import { defineConfig } from "vitest/config";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+const projectRoot = fileURLToPath(new URL(".", import.meta.url));
 
 // 单元测试专用配置（不使用浏览器环境）。
 // 仅复用 vite 的 @ 路径别名；不加载 react / tailwind 插件 —— 单元测试只覆盖纯逻辑，
@@ -7,7 +10,7 @@ import path from "node:path";
 export default defineConfig({
   resolve: {
     alias: {
-      "@": path.resolve(__dirname, "./src"),
+      "@": path.resolve(projectRoot, "./src"),
     },
   },
   test: {

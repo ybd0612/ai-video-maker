@@ -317,6 +317,9 @@ export function parseCharacterDescription(description: string): ParsedCharacterD
     const line = lines[i];
     const m = line.match(/^([^：:]{1,6})[：:]\s*(.+)$/);
     if (m) {
+      if (!CHARACTER_FIELDS.includes(m[1] as (typeof CHARACTER_FIELDS)[number])) {
+        return { fields: [] };
+      }
       fields.push({ label: m[1], value: m[2].trim() });
       continue;
     }
