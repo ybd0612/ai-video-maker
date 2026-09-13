@@ -558,6 +558,12 @@ export function useWizardActions() {
         status: "idle",
         error: undefined,
         wizardStep: 2,
+        // 换想法后旧风格参考图随之失效：若保留旧 URL，getStyleReferenceUrl
+        // 会命中 legacy 字段，generateStyleReference 幂等早退，风格图永远
+        // 停留在旧想法生成的版本（2026-09-13 用户实测）。清空后随新想法
+        // 重新派生 stylePrompt 并重生成，资产图也以新风格图为锚点。
+        styleReferenceUrl: undefined,
+        styleReferenceError: undefined,
       }));
 
       // 全自动资产生成（后台执行，不阻塞进入资产步骤）：
