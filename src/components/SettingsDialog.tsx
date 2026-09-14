@@ -98,8 +98,16 @@ function PromptRulesSettings({
     const rest = (stored ?? []).filter((r) => r.id !== rule.id);
     setStored([...rest, rule]);
   };
-  const removeFromStored = (id: string) => {
-    setStored((stored ?? []).filter((r) => r.id !== id));
+  const removeFromStored = async (rule: PromptRule) => {
+    const ok = await confirmDialog({
+      title: t("settings.rules.delete"),
+      message: rule.source === "custom"
+        ? t("settings.rules.deleteCustomConfirm", { id: rule.id })
+        : t("settings.rules.restoreConfirm", { id: rule.id }),
+      confirmLabel: t("dialog.confirm"),
+      variant: rule.source === "custom" ? "danger" : "default",
+    });
+    if (ok) setStored((stored ?? []).filter((r) => r.id !== rule.id));
   };
 
   /* 编辑内容：覆盖后条目为单语文本（zh=en 同值）；「恢复默认」删差异即回到内置双语原文 */
@@ -240,7 +248,7 @@ function PromptRulesSettings({
                       {rule.source === "custom" ? (
                         <button
                           type="button"
-                          onClick={() => removeFromStored(rule.id)}
+                          onClick={() => void removeFromStored(rule)}
                           title={t("settings.rules.delete")}
                           className="shrink-0 rounded p-1 text-ink-4 hover:bg-raised hover:text-danger"
                         >
@@ -250,7 +258,7 @@ function PromptRulesSettings({
                         overridden && (
                           <button
                             type="button"
-                            onClick={() => removeFromStored(rule.id)}
+                            onClick={() => void removeFromStored(rule)}
                             title={t("settings.rules.restoreItem")}
                             className="shrink-0 rounded p-1 text-ink-4 hover:bg-raised hover:text-warn"
                           >

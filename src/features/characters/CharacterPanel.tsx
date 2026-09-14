@@ -9,6 +9,7 @@ import { useT } from "@/i18n";
 import { UserPlus, Trash2 } from "lucide-react";
 import { CharacterEditor } from "./CharacterEditor";
 import { Lightbox } from "@/components/ui/Lightbox";
+import { confirmDialog } from "@/components/ui/ConfirmDialog";
 
 export function CharacterPanel() {
   const t = useT();
@@ -29,10 +30,14 @@ export function CharacterPanel() {
     setShowEditor(true);
   };
 
-  const handleDelete = (char: Asset) => {
-    if (confirm(t("characters.deleteConfirm", { name: char.name }))) {
-      removeAsset(char.id);
-    }
+  const handleDelete = async (char: Asset) => {
+    const ok = await confirmDialog({
+      title: t("characters.delete"),
+      message: t("characters.deleteConfirm", { name: char.name }),
+      confirmLabel: t("dialog.confirm"),
+      variant: "danger",
+    });
+    if (ok) removeAsset(char.id);
   };
 
   const handleEditorClose = () => {

@@ -21,6 +21,7 @@ import { AssetEditor } from "./AssetEditor";
 import { useWizardActions, hasActiveAssetTask } from "./useWizardActions";
 import { generateImage, aspectRatioToImageParams } from "@/services/imageService";
 import { Lightbox } from "@/components/ui/Lightbox";
+import { confirmDialog } from "@/components/ui/ConfirmDialog";
 import {
   composeImageToImagePrompt,
   getStylePrompt,
@@ -82,10 +83,24 @@ export function StepAssets() {
     setShowEditor(true);
   };
 
-  const handleDelete = (char: Asset) => {
-    if (confirm(t("characters.deleteConfirm", { name: char.name }))) {
-      removeAsset(char.id);
-    }
+  const handleDelete = async (char: Asset) => {
+    const ok = await confirmDialog({
+      title: t("characters.delete"),
+      message: t("characters.deleteConfirm", { name: char.name }),
+      confirmLabel: t("dialog.confirm"),
+      variant: "danger",
+    });
+    if (ok) removeAsset(char.id);
+  };
+
+  const handleDeleteAsset = async (asset: Asset) => {
+    const ok = await confirmDialog({
+      title: t("dialog.delete"),
+      message: t("wizard.assetDeleteConfirm", { name: asset.name || "未命名资产" }),
+      confirmLabel: t("dialog.confirm"),
+      variant: "danger",
+    });
+    if (ok) removeAsset(asset.id);
   };
 
   const handleEditorClose = () => {
@@ -453,19 +468,7 @@ export function StepAssets() {
             {/* Actions */}
             <div className="flex shrink-0 flex-col gap-1 opacity-0 transition group-hover:opacity-100" onClick={(e) => e.stopPropagation()}>
               <button
-                onClick={() => handleGenerateScene(scene)}
-                disabled={anyGenerating || !scene.prompt.trim() || generatingScenes.has(scene.id)}
-                className="rounded p-1.5 text-accent hover:bg-accent-deep/30 disabled:opacity-30"
-                title="生成场景图"
-              >
-                {generatingScenes.has(scene.id) ? (
-                  <Loader2 size={12} className="animate-spin" />
-                ) : (
-                  <Wand2 size={12} />
-                )}
-              </button>
-              <button
-                onClick={() => removeAsset(scene.id)}
+                onClick={() => void handleDeleteAsset(scene)}
                 className="rounded p-1.5 text-ink-4 hover:bg-danger-deep hover:text-danger"
                 title="删除"
               >
@@ -542,19 +545,7 @@ export function StepAssets() {
             {/* Actions */}
             <div className="flex shrink-0 flex-col gap-1 opacity-0 transition group-hover:opacity-100" onClick={(e) => e.stopPropagation()}>
               <button
-                onClick={() => handleGenerateProduct(product)}
-                disabled={anyGenerating || !product.prompt.trim() || generatingProducts.has(product.id)}
-                className="rounded p-1.5 text-accent hover:bg-accent-deep/30 disabled:opacity-30"
-                title="生成产品图"
-              >
-                {generatingProducts.has(product.id) ? (
-                  <Loader2 size={12} className="animate-spin" />
-                ) : (
-                  <Wand2 size={12} />
-                )}
-              </button>
-              <button
-                onClick={() => removeAsset(product.id)}
+                onClick={() => void handleDeleteAsset(product)}
                 className="rounded p-1.5 text-ink-4 hover:bg-danger-deep hover:text-danger"
                 title="删除"
               >
@@ -623,15 +614,7 @@ export function StepAssets() {
             </div>
             <div className="flex shrink-0 flex-col gap-1 opacity-0 transition group-hover:opacity-100" onClick={(e) => e.stopPropagation()}>
               <button
-                onClick={() => handleGenerateProp(prop)}
-                disabled={anyGenerating || !prop.prompt.trim() || generatingProps.has(prop.id)}
-                className="rounded p-1.5 text-accent hover:bg-accent-deep/30 disabled:opacity-30"
-                title={t("wizard.propImageTitle")}
-              >
-                {generatingProps.has(prop.id) ? <Loader2 size={12} className="animate-spin" /> : <Wand2 size={12} />}
-              </button>
-              <button
-                onClick={() => removeAsset(prop.id)}
+                onClick={() => void handleDeleteAsset(prop)}
                 className="rounded p-1.5 text-ink-4 hover:bg-danger-deep hover:text-danger"
                 title="删除"
               >
