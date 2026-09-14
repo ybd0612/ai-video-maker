@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
-import { ArrowLeft, Loader2, Sparkles, Undo2 } from "lucide-react";
+import { Loader2, Sparkles, Undo2 } from "lucide-react";
+import { AssetDetailLayout, AssetPreviewFrame } from "./AssetDetailLayout";
 import { useProjectStore, selectActiveProject, type VisualDirection } from "@/stores/projectStore";
 import { useSettingsStore } from "@/stores/settingsStore";
 import { useT } from "@/i18n";
@@ -10,6 +11,8 @@ import { getStyleReferenceUrl } from "@/lib/promptComposer";
 
 interface VisualDirectionEditorProps {
   onClose: () => void;
+  onGenerate?: () => Promise<void>;
+  generating?: boolean;
 }
 
 type EditableField = keyof Pick<
@@ -46,11 +49,12 @@ function parseVisualDirection(content: string, fallback: VisualDirection): Visua
   }
 }
 
-export function VisualDirectionEditor({ onClose }: VisualDirectionEditorProps) {
+export function VisualDirectionEditor({ onClose, onGenerate, generating = false }: VisualDirectionEditorProps) {
   const t = useT();
   const project = useProjectStore(selectActiveProject);
   const updateVisualDirection = useProjectStore((s) => s.updateVisualDirection);
   const providerConfig = useSettingsStore((s) => s.providerConfig);
+  const autoRegenerateAssetImages = useSettingsStore((s) => s.autoRegenerateAssetImages);
   const direction = project?.visualDirection;
   const [draft, setDraft] = useState<VisualDirection | undefined>(direction);
   const [instruction, setInstruction] = useState("");
@@ -100,12 +104,13 @@ export function VisualDirectionEditor({ onClose }: VisualDirectionEditorProps) {
       setHistory((items) => [...items, draft]);
       setDraft(next);
       setInstruction("");
+      if (autoRegenerateAssetImages && onGenerate) await onGenerate();
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
       setBusy(false);
     }
-  }, [busy, draft, instruction, providerConfig, t]);
+  }, [autoRegenerateAssetImages, busy, draft, instruction, onGenerate, providerConfig, t]);
 
   if (!project || !draft) {
     return <div className="p-3 text-xs text-ink-4">{t("wizard.visualDirectionUnset" as any)}</div>;
@@ -114,20 +119,38 @@ export function VisualDirectionEditor({ onClose }: VisualDirectionEditorProps) {
   const referenceUrl = getStyleReferenceUrl(project);
 
   return (
-    <div className="flex flex-col gap-3 p-3">
-      <button
-        type="button"
-        onClick={onClose}
-        disabled={busy}
-        className="flex w-fit items-center gap-2 rounded p-1 text-xs font-medium text-ink-2 transition hover:bg-raised hover:text-ink-2 disabled:opacity-50"
-        title={t("dialog.cancel")}
-      >
-        <ArrowLeft size={14} />
-        <span>{t("wizard.editVisualDirection" as any)}</span>
-      </button>
-
-      <div className="flex flex-col gap-3 @md:flex-row">
-        <div className="min-w-0 flex-1 space-y-3">
+    <AssetDetailLayout
+      title={t("wizard.editVisualDirection" as any)}
+      onBack={onClose}
+      backDisabled={busy || generating}
+      preview={(
+        <>
+          <label className="text-[0.6875rem] font-medium text-ink-4">{t("wizard.visualDirectionReference" as any)}</label>
+          {referenceUrl ? (
+            <Lightbox src={referenceUrl} alt={t("wizard.visualDirectionReference" as any)}>
+              <AssetPreviewFrame><img src={referenceUrl} alt={t("wizard.visualDirectionReference" as any)} className="h-full w-full object-contain" /></AssetPreviewFrame>
+            </Lightbox>
+          ) : <AssetPreviewFrame><span className="text-ink-5">—</span></AssetPreviewFrame>}
+          {onGenerate && <>
+            <button onClick={() => void onGenerate()} disabled={busy || generating} className="flex w-full items-center justify-center gap-1 rounded border border-line px-1.5 py-1 text-[0.625rem] text-accent hover:bg-accent-deep/30 disabled:opacity-50">
+              {generating ? <Loader2 size={10} className="animate-spin" /> : <Sparkles size={10} />}
+              重新生成视觉方向图
+            </button>
+            <label className="flex select-none items-center gap-1.5 text-[0.625rem] text-ink-3">
+              <input type="checkbox" checked={autoRegenerateAssetImages} onChange={(event) => useSettingsStore.getState().setAutoRegenerateAssetImages(event.target.checked)} disabled={busy || generating} className="h-3 w-3 accent-accent" />
+              编辑后自动生成图片
+            </label>
+          </>}
+        </>
+      )}
+      footer={(
+        <div className="flex justify-end gap-2 border-t border-line-soft pt-3">
+          <button onClick={onClose} disabled={busy} className="rounded-md border border-line px-3 py-1.5 text-xs text-ink-3 hover:bg-raised disabled:opacity-50">{t("common.cancel" as any)}</button>
+          <button onClick={() => { updateVisualDirection({ name: draft.name, mediumMaterial: draft.mediumMaterial, colorPalette: draft.colorPalette, lightingMood: draft.lightingMood, cameraTexture: draft.cameraTexture, composition: draft.composition, emotion: draft.emotion }); onClose(); }} disabled={busy || !draft.name.trim()} className="rounded-md bg-success px-3 py-1.5 text-xs font-medium text-white hover:opacity-90 disabled:opacity-50">{t("wizard.saveVisualDirection" as any)}</button>
+        </div>
+      )}
+    >
+        <div className="space-y-3">
           <div className="space-y-1">
             <label className="text-[0.6875rem] font-medium text-ink-4">{t("wizard.visualDirectionName" as any)}</label>
             <input
@@ -177,39 +200,6 @@ export function VisualDirectionEditor({ onClose }: VisualDirectionEditorProps) {
           {error && <p className="text-[0.625rem] text-danger">{error}</p>}
         </div>
 
-        <div className="flex flex-col gap-1 @md:w-2/5">
-          <label className="text-[0.6875rem] font-medium text-ink-4">{t("wizard.visualDirectionReference" as any)}</label>
-          {referenceUrl ? (
-            <Lightbox src={referenceUrl} alt={t("wizard.visualDirectionReference" as any)}>
-              <div className="flex h-48 w-full items-center justify-center overflow-hidden rounded-lg border border-line bg-raised @md:h-56"><img src={referenceUrl} alt={t("wizard.visualDirectionReference" as any)} className="h-full w-full object-contain" /></div>
-            </Lightbox>
-          ) : (
-            <div className="flex aspect-square items-center justify-center rounded-lg border border-dashed border-line text-ink-5">—</div>
-          )}
-        </div>
-      </div>
-
-      <div className="flex justify-end gap-2 border-t border-line-soft pt-3">
-        <button onClick={onClose} disabled={busy} className="rounded-md border border-line px-3 py-1.5 text-xs text-ink-3 hover:bg-raised disabled:opacity-50">{t("common.cancel" as any)}</button>
-        <button
-          onClick={() => {
-            updateVisualDirection({
-              name: draft.name,
-              mediumMaterial: draft.mediumMaterial,
-              colorPalette: draft.colorPalette,
-              lightingMood: draft.lightingMood,
-              cameraTexture: draft.cameraTexture,
-              composition: draft.composition,
-              emotion: draft.emotion,
-            });
-            onClose();
-          }}
-          disabled={busy || !draft.name.trim()}
-          className="rounded-md bg-success px-3 py-1.5 text-xs font-medium text-white hover:opacity-90 disabled:opacity-50"
-        >
-          {t("wizard.saveVisualDirection" as any)}
-        </button>
-      </div>
-    </div>
+    </AssetDetailLayout>
   );
 }

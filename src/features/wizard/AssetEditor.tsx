@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useState } from "react";
-import { ArrowLeft, ImageIcon, Loader2, Sparkles, Undo2 } from "lucide-react";
+import { ImageIcon, Loader2, Sparkles, Undo2 } from "lucide-react";
 import { useProjectStore, type Asset } from "@/stores/projectStore";
 import { useSettingsStore } from "@/stores/settingsStore";
 import { useT } from "@/i18n";
 import { chatCompletion } from "@/services/chatService";
 import { SYSTEM_PROMPT_ASSET_EDIT_ZH } from "@/lib/promptRules";
 import { Lightbox } from "@/components/ui/Lightbox";
+import { AssetDetailLayout, AssetPreviewFrame } from "./AssetDetailLayout";
 
 interface AssetEditorProps {
   asset: Asset;
@@ -36,6 +37,7 @@ export function AssetEditor({ asset, onClose, onGenerate, generating }: AssetEdi
   const t = useT();
   const updateAsset = useProjectStore((s) => s.updateAsset);
   const providerConfig = useSettingsStore((s) => s.providerConfig);
+  const autoRegenerateAssetImages = useSettingsStore((s) => s.autoRegenerateAssetImages);
   const [draft, setDraft] = useState({ name: asset.name, description: asset.description, prompt: asset.prompt });
   const [instruction, setInstruction] = useState("");
   const [history, setHistory] = useState<Array<typeof draft>>([]);
@@ -77,12 +79,15 @@ export function AssetEditor({ asset, onClose, onGenerate, generating }: AssetEdi
       setHistory((items) => [...items, draft]);
       setDraft(next);
       setInstruction("");
+      if (autoRegenerateAssetImages) {
+        await onGenerate({ ...asset, ...next });
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
       setBusy(false);
     }
-  }, [asset, busy, draft, instruction, providerConfig, t]);
+  }, [asset, autoRegenerateAssetImages, busy, draft, instruction, onGenerate, providerConfig, t]);
 
   const save = () => {
     if (!draft.name.trim() || busy || generating) return;
@@ -91,20 +96,32 @@ export function AssetEditor({ asset, onClose, onGenerate, generating }: AssetEdi
   };
 
   return (
-    <div className="flex flex-col gap-3 p-3">
-      <button
-        type="button"
-        onClick={onClose}
-        disabled={busy || generating}
-        className="flex w-fit items-center gap-2 rounded p-1 text-xs font-medium text-ink-2 transition hover:bg-raised disabled:opacity-50"
-        title={t("dialog.cancel")}
-      >
-        <ArrowLeft size={14} />
-        <span>编辑{assetLabel(asset.type)}</span>
-      </button>
-
-      <div className="flex flex-col gap-3 @md:flex-row">
-        <div className="min-w-0 flex-1 space-y-3">
+    <AssetDetailLayout
+      title={`编辑${assetLabel(asset.type)}`}
+      onBack={onClose}
+      backDisabled={busy || generating}
+      preview={(
+        <>
+          <label className="text-[0.6875rem] font-medium text-ink-4">参考图</label>
+          {asset.imageUrl ? <Lightbox src={asset.imageUrl} alt={asset.name}><AssetPreviewFrame><img src={asset.imageUrl} alt={asset.name} className="h-full w-full object-contain" /></AssetPreviewFrame></Lightbox> : <AssetPreviewFrame><ImageIcon size={24} className="text-ink-5" /></AssetPreviewFrame>}
+          <button onClick={() => void onGenerate({ ...asset, ...draft })} disabled={busy || generating || !draft.prompt.trim() || !providerConfig.apiKey} className="flex w-full items-center justify-center gap-1 rounded border border-line px-1.5 py-1 text-[0.625rem] text-accent hover:bg-accent-deep/30 disabled:opacity-50">
+            {generating ? <Loader2 size={10} className="animate-spin" /> : <ImageIcon size={10} />}
+            {asset.imageUrl ? "重新生成参考图" : "生成参考图"}
+          </button>
+          <label className="flex select-none items-center gap-1.5 text-[0.625rem] text-ink-3">
+            <input type="checkbox" checked={autoRegenerateAssetImages} onChange={(event) => useSettingsStore.getState().setAutoRegenerateAssetImages(event.target.checked)} disabled={busy || generating} className="h-3 w-3 accent-accent" />
+            编辑后自动生成图片
+          </label>
+        </>
+      )}
+      footer={(
+        <div className="flex justify-end gap-2 border-t border-line-soft pt-3">
+          <button onClick={onClose} disabled={busy || generating} className="rounded-md border border-line px-3 py-1.5 text-xs text-ink-3 hover:bg-raised disabled:opacity-50">{t("dialog.cancel")}</button>
+          <button onClick={save} disabled={busy || generating || !draft.name.trim()} className="rounded-md bg-success px-3 py-1.5 text-xs font-medium text-white hover:opacity-90 disabled:opacity-50">保存资产</button>
+        </div>
+      )}
+    >
+        <div className="space-y-3">
           <div className="space-y-1">
             <label className="text-[0.6875rem] font-medium text-ink-4">名称</label>
             <input value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} className="w-full rounded-md border border-line bg-raised px-2 py-1.5 text-xs text-ink focus:border-accent focus:outline-none" />
@@ -135,21 +152,6 @@ export function AssetEditor({ asset, onClose, onGenerate, generating }: AssetEdi
           </div>
           {error && <p className="text-[0.625rem] text-danger">{error}</p>}
         </div>
-
-        <div className="flex flex-col gap-1 @md:w-2/5">
-          <label className="text-[0.6875rem] font-medium text-ink-4">参考图</label>
-          {asset.imageUrl ? <Lightbox src={asset.imageUrl} alt={asset.name}><div className="flex h-48 w-full items-center justify-center overflow-hidden rounded-lg border border-line bg-raised @md:h-56"><img src={asset.imageUrl} alt={asset.name} className="h-full w-full object-contain" /></div></Lightbox> : <div className="flex h-48 w-full items-center justify-center rounded-lg border border-dashed border-line text-ink-5 @md:h-56"><ImageIcon size={24} /></div>}
-          <button onClick={() => void onGenerate({ ...asset, ...draft })} disabled={busy || generating || !draft.prompt.trim() || !providerConfig.apiKey} className="flex w-full items-center justify-center gap-1 rounded border border-line px-1.5 py-1 text-[0.625rem] text-accent hover:bg-accent-deep/30 disabled:opacity-50">
-            {generating ? <Loader2 size={10} className="animate-spin" /> : <ImageIcon size={10} />}
-            {asset.imageUrl ? "重新生成参考图" : "生成参考图"}
-          </button>
-        </div>
-      </div>
-
-      <div className="flex justify-end gap-2 border-t border-line-soft pt-3">
-        <button onClick={onClose} disabled={busy || generating} className="rounded-md border border-line px-3 py-1.5 text-xs text-ink-3 hover:bg-raised disabled:opacity-50">{t("dialog.cancel")}</button>
-        <button onClick={save} disabled={busy || generating || !draft.name.trim()} className="rounded-md bg-success px-3 py-1.5 text-xs font-medium text-white hover:opacity-90 disabled:opacity-50">保存资产</button>
-      </div>
-    </div>
+    </AssetDetailLayout>
   );
 }

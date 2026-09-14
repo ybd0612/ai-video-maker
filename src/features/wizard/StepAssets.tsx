@@ -222,7 +222,7 @@ export function StepAssets() {
   // ── Editor mode ───────────────────────────────────────────────────────
 
   if (showVisualDirectionEditor) {
-    return <VisualDirectionEditor onClose={() => setShowVisualDirectionEditor(false)} />;
+    return <VisualDirectionEditor onClose={() => setShowVisualDirectionEditor(false)} onGenerate={() => handleGenerateStyle()} generating={generatingStyle} />;
   }
 
   if (editingAsset) {

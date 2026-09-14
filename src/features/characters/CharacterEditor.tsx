@@ -486,7 +486,7 @@ export function CharacterEditor({ character, onClose }: CharacterEditorProps) {
             {t("characters.portrait")}
           </label>
           {portraitUrl ? (
-            <div className="h-48 w-full @md:h-56">
+            <div className="aspect-video w-full">
               <Lightbox src={portraitUrl} alt={t("characters.portrait")}>
                 <div className="relative h-full w-full overflow-hidden rounded-lg border border-line bg-raised">
                   <img
@@ -498,7 +498,7 @@ export function CharacterEditor({ character, onClose }: CharacterEditorProps) {
               </Lightbox>
             </div>
           ) : (
-            <div className="flex aspect-square w-full items-center justify-center rounded-lg border border-dashed border-line text-ink-5 @md:aspect-auto @md:min-h-0 @md:flex-1">
+            <div className="flex aspect-video w-full items-center justify-center rounded-lg border border-dashed border-line text-ink-5">
               <ImageIcon size={24} />
             </div>
           )}

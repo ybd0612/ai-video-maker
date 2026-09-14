@@ -38,6 +38,7 @@ interface SettingsState {
    * 旧版本地存储缺此字段时由 persist 浅合并回退到默认值 true，无需迁移。
    */
   autoRegeneratePortrait: boolean;
+  autoRegenerateAssetImages: boolean;
 
   setTheme: (theme: Theme) => void;
   setLanguage: (lang: Language) => void;
@@ -46,6 +47,7 @@ interface SettingsState {
   /** 整体替换用户存储的规则差异（UI 计算好新数组后写入） */
   setPromptRules: (rules: PromptRule[]) => void;
   setAutoRegeneratePortrait: (value: boolean) => void;
+  setAutoRegenerateAssetImages: (value: boolean) => void;
 }
 
 /**
@@ -99,6 +101,7 @@ export const useSettingsStore = create<SettingsState>()(
       },
       promptRules: [],
       autoRegeneratePortrait: true,
+      autoRegenerateAssetImages: true,
 
       setTheme: (theme) => set({ theme }),
       setLanguage: (language) => set({ language }),
@@ -107,6 +110,7 @@ export const useSettingsStore = create<SettingsState>()(
         set((s) => ({ providerConfig: { ...s.providerConfig, ...config } })),
       setPromptRules: (promptRules) => set({ promptRules }),
       setAutoRegeneratePortrait: (autoRegeneratePortrait) => set({ autoRegeneratePortrait }),
+      setAutoRegenerateAssetImages: (autoRegenerateAssetImages) => set({ autoRegenerateAssetImages }),
     }),
     {
       name: "wxhb-settings",
