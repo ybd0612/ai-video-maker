@@ -28,6 +28,9 @@ interface RawShot {
   duration: number;
   dialogues?: Array<{ characterId: string | null; text: string; delivery?: string }>;
   activeCharacterIds?: string[];
+  activeSceneId?: string;
+  activeProductIds?: string[];
+  activePropIds?: string[];
   subjectDesc?: string;
   sceneDesc?: string;
   detailDesc?: string;
@@ -55,6 +58,13 @@ interface RawProduct {
   appearancePrompt: string;
 }
 
+/** 道具 / 关键物件资产（模型输出格式，与产品同构） */
+interface RawProp {
+  name: string;
+  description: string;
+  appearancePrompt: string;
+}
+
 /** 场景资产（模型输出格式，与产品同构；appearancePrompt 为英文场景描述） */
 interface RawScene {
   name: string;
@@ -73,6 +83,7 @@ export interface GenerateScriptResult {
   shots: Omit<Shot, "id" | "index" | "status">[];
   characters: RawCharacter[];
   products: RawProduct[];
+  props: RawProp[];
   scenes: RawScene[];
   styles: RawStyle[];
 }
@@ -132,6 +143,7 @@ function buildAssetsContext(language: "zh" | "en", assets?: Asset[]): string {
   const characters = (assets ?? []).filter((a) => a.type === "character");
   const scenes = (assets ?? []).filter((a) => a.type === "scene");
   const products = (assets ?? []).filter((a) => a.type === "product");
+  const props = (assets ?? []).filter((a) => a.type === "prop");
 
   if (language === "en") {
     let charSection = "";
@@ -164,7 +176,17 @@ function buildAssetsContext(language: "zh" | "en", assets?: Asset[]): string {
         "\n";
     }
 
-    return `${charSection}${sceneSection}${productSection}`;
+    let propSection = "";
+    if (props.length > 0) {
+      propSection =
+        "\nExisting props / key objects (use IDs when they appear in a shot):\n" +
+        props
+          .map((p) => `- ${p.name} (ID: ${p.id}): ${p.description}`)
+          .join("\n") +
+        "\n";
+    }
+
+    return `${charSection}${sceneSection}${productSection}${propSection}`;
   }
 
   let charSection = "";
@@ -197,7 +219,17 @@ function buildAssetsContext(language: "zh" | "en", assets?: Asset[]): string {
       "\n";
   }
 
-  return `${charSection}${sceneSection}${productSection}`;
+  let propSection = "";
+  if (props.length > 0) {
+    propSection =
+      "\n已有道具 / 关键物件（出现在镜头中时请使用对应 ID）：\n" +
+      props
+        .map((p) => `- ${p.name}（ID: ${p.id}）：${p.description}`)
+        .join("\n") +
+      "\n";
+  }
+
+  return `${charSection}${sceneSection}${productSection}${propSection}`;
 }
 
 /* ── Main function ───────────────────────────────────────────────────────── */
@@ -250,6 +282,7 @@ export async function generateScript(
         shots: RawShot[];
         characters?: RawCharacter[];
         products?: RawProduct[];
+        props?: RawProp[];
         scenes?: RawScene[];
         styles?: RawStyle[];
       };
@@ -268,6 +301,9 @@ export async function generateScript(
           delivery: d.delivery,
         })),
         activeCharacterIds: s.activeCharacterIds ?? [],
+        activeSceneId: s.activeSceneId,
+        activeProductIds: s.activeProductIds ?? [],
+        activePropIds: s.activePropIds ?? [],
         subjectDesc: s.subjectDesc ?? "",
         sceneDesc: s.sceneDesc ?? "",
         detailDesc: s.detailDesc ?? "",
@@ -312,6 +348,15 @@ export async function generateScript(
       // 产品主体提取（与角色同构，供步骤 2 生成产品参考图）
       const extractedProducts: RawProduct[] = Array.isArray(parsed.products)
         ? parsed.products.map((c) => ({
+            name: c.name ?? "",
+            description: c.description ?? "",
+            appearancePrompt: c.appearancePrompt ?? "",
+          }))
+        : [];
+
+      // 道具提取（供步骤 2 生成道具参考图）
+      const extractedProps: RawProp[] = Array.isArray(parsed.props)
+        ? parsed.props.map((c) => ({
             name: c.name ?? "",
             description: c.description ?? "",
             appearancePrompt: c.appearancePrompt ?? "",
@@ -364,6 +409,7 @@ export async function generateScript(
         shots,
         characters: extractedCharacters,
         products: extractedProducts,
+        props: extractedProps,
         scenes: extractedScenes,
         styles: extractedStyles,
       };
@@ -381,29 +427,33 @@ export async function generateScript(
 
 /* ── 轻量资产提取（步骤 1 使用，不生成分镜，节省 token） ──────────────────── */
 
-/** 资产提取上下文段（动态数据：已有角色/产品名单） */
+/** 资产提取上下文段（动态数据：已有角色/场景/产品/道具/风格名单） */
 function buildExtractAssetsContext(language: "zh" | "en", assets?: Asset[]): string {
+  const allAssets = assets ?? [];
+  const names = (type: Asset["type"]) =>
+    allAssets.filter((asset) => asset.type === type).map((asset) => `- ${asset.name}`).join("\n");
+  const section = (title: string, type: Asset["type"]): string => {
+    const content = names(type);
+    return content ? `\n${title}:\n${content}\n` : "";
+  };
+
   if (language === "en") {
-    const charSection =
-      (assets ?? []).filter((a) => a.type === "character").length > 0
-        ? "\nExisting characters: " + (assets ?? []).filter((a) => a.type === "character").map((c) => `- ${c.name}`).join("\n") + "\n"
-        : "";
-    const productSection =
-      (assets ?? []).filter((a) => a.type === "product").length > 0
-        ? "\nExisting products: " + (assets ?? []).filter((a) => a.type === "product").map((p) => `- ${p.name}`).join("\n") + "\n"
-        : "";
-    return `${charSection}${productSection}`;
+    return [
+      section("Existing characters", "character"),
+      section("Existing scenes", "scene"),
+      section("Existing products", "product"),
+      section("Existing props / key objects", "prop"),
+      section("Existing visual styles", "style"),
+    ].join("");
   }
 
-  const charSection =
-    (assets ?? []).filter((a) => a.type === "character").length > 0
-      ? "\n已有角色：" + (assets ?? []).filter((a) => a.type === "character").map((c) => `- ${c.name}`).join("\n") + "\n"
-      : "";
-  const productSection =
-    (assets ?? []).filter((a) => a.type === "product").length > 0
-      ? "\n已有产品：" + (assets ?? []).filter((a) => a.type === "product").map((p) => `- ${p.name}`).join("\n") + "\n"
-      : "";
-  return `${charSection}${productSection}`;
+  return [
+    section("已有角色", "character"),
+    section("已有场景", "scene"),
+    section("已有产品", "product"),
+    section("已有道具 / 关键物件", "prop"),
+    section("已有视觉风格", "style"),
+  ].join("");
 }
 
 /**
@@ -412,7 +462,7 @@ function buildExtractAssetsContext(language: "zh" | "en", assets?: Asset[]): str
  */
 export async function extractAssetsFromIdea(
   opts: GenerateScriptOptions,
-): Promise<{ characters: RawCharacter[]; products: RawProduct[]; scenes: RawScene[]; styles: RawStyle[] }> {
+): Promise<{ characters: RawCharacter[]; products: RawProduct[]; props: RawProp[]; scenes: RawScene[]; styles: RawStyle[] }> {
   const systemPrompt = buildTaskSystemPrompt(
     "extractAssets",
     opts.language,
@@ -460,6 +510,7 @@ export async function extractAssetsFromIdea(
   const parsed = JSON.parse(jsonStr) as {
     characters?: RawCharacter[];
     products?: RawProduct[];
+    props?: RawProp[];
     scenes?: RawScene[];
     styles?: RawStyle[];
   };
@@ -484,6 +535,7 @@ export async function extractAssetsFromIdea(
   return {
     characters: map(parsed.characters),
     products: map(parsed.products),
+    props: map(parsed.props),
     scenes: map(parsed.scenes),
     styles: mapStyles(parsed.styles),
   };

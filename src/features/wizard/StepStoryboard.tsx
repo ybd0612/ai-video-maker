@@ -23,6 +23,7 @@ export function StepStoryboard() {
   const removeShot = useProjectStore((s) => s.removeShot);
   const addShot = useProjectStore((s) => s.addShot);
   const setWizardStep = useProjectStore((s) => s.setWizardStep);
+  const updateProject = useProjectStore((s) => s.updateProject);
   const { rerollShot, generateStoryboard } = useWizardActions();
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -31,6 +32,8 @@ export function StepStoryboard() {
   const assets = project?.assets ?? [];
   const hasCharacters = assets.some((a) => a.type === "character");
   const ideaPrompt = project?.ideaPrompt ?? "";
+  const allShotsHaveScript = shots.length > 0 && shots.every((shot) => shot.scriptText.trim());
+  const allShotsHaveVisualPrompt = shots.length > 0 && shots.every((shot) => shot.visualPrompt.trim());
 
   const handleGenerateStoryboard = async () => {
     if (!ideaPrompt.trim() || !project) return;
@@ -72,6 +75,8 @@ export function StepStoryboard() {
       motionPrompt: "",
       dialogues: [],
       activeCharacterIds: [],
+      activeProductIds: [],
+      activePropIds: [],
       duration: 5,
       useDualFrame: false,
     });
@@ -222,8 +227,12 @@ export function StepStoryboard() {
             {t("wizard.storyboardConfirmHint")}
           </p>
           <button
-            onClick={() => setWizardStep(4)}
-            className="mt-4 rounded-lg bg-success-solid px-4 py-2 text-sm font-medium text-white transition hover:bg-success-solid"
+            onClick={() => {
+              updateProject({ storyboardReviewed: true });
+              setWizardStep(4);
+            }}
+            disabled={!allShotsHaveScript || !allShotsHaveVisualPrompt}
+            className="mt-4 rounded-lg bg-success-solid px-4 py-2 text-sm font-medium text-white transition hover:bg-success-solid disabled:cursor-not-allowed disabled:opacity-50"
           >
             {t("wizard.confirmStoryboard")}
           </button>
@@ -246,12 +255,14 @@ function AssetSummaryBar({
   const chars = assets.filter((a) => a.type === "character").length;
   const scenes = assets.filter((a) => a.type === "scene").length;
   const products = assets.filter((a) => a.type === "product").length;
-  if (chars === 0 && scenes === 0 && products === 0 && !styleReady) return null;
+  const props = assets.filter((a) => a.type === "prop").length;
+  if (chars === 0 && scenes === 0 && products === 0 && props === 0 && !styleReady) return null;
   return (
     <div className="flex flex-wrap gap-3 text-[0.6875rem] text-ink-4">
       <span>{t("wizard.assetCharacters")}: {chars}</span>
       <span>{t("wizard.assetScenes")}: {scenes}</span>
       <span>{t("wizard.productReferences")}: {products}</span>
+      <span>{t("wizard.propReferences")}: {props}</span>
       {styleReady && <span>{t("wizard.assetStyle")}: ✓</span>}
     </div>
   );

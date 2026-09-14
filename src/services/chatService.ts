@@ -18,6 +18,7 @@ export interface ChatOptions {
   apiKey: string;
   baseUrl: string;
   messages: ChatMessage[];
+  temperature?: number;
 }
 
 export interface ChatResult {
@@ -63,7 +64,7 @@ export async function chatCompletion(opts: ChatOptions): Promise<ChatResult> {
     apiKey: opts.apiKey,
     baseUrl: opts.baseUrl,
   });
-  return service.chatCompletion({ messages: trimmed });
+  return service.chatCompletion({ messages: trimmed, temperature: opts.temperature });
 }
 
 /* ── One-click polish ───────────────────────────────────────────────────── */

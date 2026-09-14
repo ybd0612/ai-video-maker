@@ -40,6 +40,7 @@ const runVideoBatch = createBatchRunner({
 
     return shotsNeedingVideos.map((shot) => async () => {
       if (signal.aborted) return;
+      const expectedRevision = shot.renderRevision ?? 0;
       useProjectStore.getState().setShotStatusByProjectId(pid, shot.id, "videoing");
       useProjectStore.getState().updateShotByProjectId(pid, shot.id, { videoProgress: 0 });
 
@@ -68,39 +69,56 @@ const runVideoBatch = createBatchRunner({
             signal,
           );
 
-          useProjectStore.getState().updateShotByProjectId(pid, shot.id, {
-            videoUrl: result.videoUrl,
-            status: "videoed",
-          });
+          const applied = useProjectStore.getState().updateShotByProjectIdIfRevision(
+            pid,
+            shot.id,
+            expectedRevision,
+            { videoUrl: result.videoUrl, status: "videoed" },
+          );
+          if (!applied) return;
           return;
         } catch (err) {
           // 任务已在服务端创建：继续等待同一个任务，不创建重复任务。
           if (err instanceof VideoTaskCreatedError) {
             if (!err.stillRunning) {
-              useProjectStore.getState().setShotStatusByProjectId(pid, shot.id, "failed", err.message);
+              useProjectStore.getState().setShotStatusByProjectIdIfRevision(
+                pid,
+                shot.id,
+                expectedRevision,
+                "failed",
+                err.message,
+              );
             } else {
-              useProjectStore.getState().updateShotByProjectId(pid, shot.id, {
-                videoProgress: 0,
-                videoRetryCount: attempt + 1,
-                error: `${err.message} 已保留服务端任务，不重复创建。`,
-              });
+              useProjectStore.getState().updateShotByProjectIdIfRevision(
+                pid,
+                shot.id,
+                expectedRevision,
+                {
+                  videoProgress: 0,
+                  videoRetryCount: attempt + 1,
+                  error: `${err.message} 已保留服务端任务，不重复创建。`,
+                },
+              );
             }
             return;
           }
 
           const isLastAttempt = attempt >= MAX_TASK_RETRIES;
           if (isLastAttempt) {
-            useProjectStore.getState().setShotStatusByProjectId(
+            useProjectStore.getState().setShotStatusByProjectIdIfRevision(
               pid,
               shot.id,
+              expectedRevision,
               "failed",
               err instanceof Error ? err.message : String(err),
             );
           } else {
-            useProjectStore.getState().updateShotByProjectId(pid, shot.id, {
-              videoProgress: 0,
-              videoRetryCount: attempt + 1,
-            });
+            useProjectStore.getState().updateShotByProjectIdIfRevision(
+              pid,
+              shot.id,
+              expectedRevision,
+              { videoProgress: 0, videoRetryCount: attempt + 1 },
+            );
             await new Promise<void>((resolve) => setTimeout(resolve, RETRY_DELAY_MS * (attempt + 1)));
           }
         }
@@ -166,6 +184,7 @@ export function useVideoActions(): VideoActions {
     const shot = project.shots.find((item) => item.id === shotId);
     if (!shot || !shot.imageUrl) return;
 
+    const expectedRevision = shot.renderRevision ?? 0;
     store.setShotStatusByProjectId(targetProjectId, shotId, "videoing");
     store.updateShotByProjectId(targetProjectId, shotId, { videoProgress: 0 });
 
@@ -193,10 +212,13 @@ export function useVideoActions(): VideoActions {
         signal,
       );
 
-      useProjectStore.getState().updateShotByProjectId(targetProjectId, shotId, {
-        videoUrl: result.videoUrl,
-        status: "videoed",
-      });
+      const applied = useProjectStore.getState().updateShotByProjectIdIfRevision(
+        targetProjectId,
+        shotId,
+        expectedRevision,
+        { videoUrl: result.videoUrl, status: "videoed" },
+      );
+      if (!applied) return;
       restoreProjectStatusIfReady(targetProjectId, (currentProject) =>
         currentProject.shots.every((item) => !!item.videoUrl),
       );
@@ -208,17 +230,29 @@ export function useVideoActions(): VideoActions {
     } catch (err) {
       if (err instanceof VideoTaskCreatedError) {
         if (!err.stillRunning) {
-          useProjectStore.getState().setShotStatusByProjectId(targetProjectId, shotId, "failed", err.message);
+          useProjectStore.getState().setShotStatusByProjectIdIfRevision(
+            targetProjectId,
+            shotId,
+            expectedRevision,
+            "failed",
+            err.message,
+          );
         } else {
-          useProjectStore.getState().updateShotByProjectId(targetProjectId, shotId, {
-            videoProgress: 0,
-            error: `${err.message} 已保留服务端任务，不重复创建。`,
-          });
+          useProjectStore.getState().updateShotByProjectIdIfRevision(
+            targetProjectId,
+            shotId,
+            expectedRevision,
+            {
+              videoProgress: 0,
+              error: `${err.message} 已保留服务端任务，不重复创建。`,
+            },
+          );
         }
       } else {
-        useProjectStore.getState().setShotStatusByProjectId(
+        useProjectStore.getState().setShotStatusByProjectIdIfRevision(
           targetProjectId,
           shotId,
+          expectedRevision,
           "failed",
           err instanceof Error ? err.message : String(err),
         );

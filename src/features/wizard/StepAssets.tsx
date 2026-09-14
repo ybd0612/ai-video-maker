@@ -5,6 +5,7 @@
 // ────────────────────────────────────────────────────────────────────────────
 
 import { useState, useEffect } from "react";
+import type { Dispatch, SetStateAction } from "react";
 import {
   useProjectStore, selectActiveProject,
   type Asset,
@@ -18,7 +19,11 @@ import { CharacterEditor } from "@/features/characters/CharacterEditor";
 import { useWizardActions, hasActiveAssetTask } from "./useWizardActions";
 import { generateImage, aspectRatioToImageParams } from "@/services/imageService";
 import { Lightbox } from "@/components/ui/Lightbox";
-import { getStyleReferenceUrl } from "@/lib/promptComposer";
+import {
+  composeImageToImagePrompt,
+  getStylePrompt,
+  getStyleReferenceUrl,
+} from "@/lib/promptComposer";
 import { AiPolishField } from "@/components/ui/AiPolishField";
 import {
   SYSTEM_PROMPT_DESCRIPTION_ZH,
@@ -31,6 +36,7 @@ export function StepAssets() {
   const removeAsset = useProjectStore((s) => s.removeAsset);
   const addAsset = useProjectStore((s) => s.addAsset);
   const updateAsset = useProjectStore((s) => s.updateAsset);
+  const updateAssetByProjectIdIfRevision = useProjectStore((s) => s.updateAssetByProjectIdIfRevision);
   const setWizardStep = useProjectStore((s) => s.setWizardStep);
   const providerConfig = useSettingsStore((s) => s.providerConfig);
   const { generateAssetImages, generateStyleReference } = useWizardActions();
@@ -39,19 +45,21 @@ export function StepAssets() {
   const [showEditor, setShowEditor] = useState(false);
   const [generatingScenes, setGeneratingScenes] = useState<Set<string>>(new Set());
   const [generatingProducts, setGeneratingProducts] = useState<Set<string>>(new Set());
+  const [generatingProps, setGeneratingProps] = useState<Set<string>>(new Set());
   const [generatingStyle, setGeneratingStyle] = useState(false);
   const isGenerating = project?.assetGenerationStarted ?? false;
   // 本页任一生成请求进行中（批量 / 风格 / 单项场景 / 单项产品）：
   // 统一禁用所有生成按钮 —— 批量与单项可能重复提交同一资产（双倍配额消耗），
   // 且共用集中式限流器，逐个排队不如明确禁用直观。全部请求返回后恢复。
   const anyGenerating =
-    isGenerating || generatingStyle || generatingScenes.size > 0 || generatingProducts.size > 0;
+    isGenerating || generatingStyle || generatingScenes.size > 0 || generatingProducts.size > 0 || generatingProps.size > 0;
 
   const assets = project?.assets ?? [];
   const characters = assets.filter((a) => a.type === "character");
   const sceneReferences = assets.filter((a) => a.type === "scene");
   const products = assets.filter((a) => a.type === "product");
-  const styleReferenceUrl = project?.styleReferenceUrl;
+  const props = assets.filter((a) => a.type === "prop");
+  const styleReferenceUrl = project ? getStyleReferenceUrl(project) : undefined;
 
   // 刷新/中断后恢复：assetGenerationStarted 卡 true 且没有存活任务时重置，
   // 避免“生成全部”按钮永久禁用转圈（用户反馈过“资产第一个自动在加载”）。
@@ -89,27 +97,37 @@ export function StepAssets() {
   // ── Batch generate portraits ──────────────────────────────────────────
 
   const handleBatchPortraits = async () => {
-    await generateAssetImages({ generatePortraits: true, generateScenes: false, generateProducts: false, generateStyle: false });
+    await generateAssetImages({ generatePortraits: true, generateScenes: false, generateProducts: false, generateProps: false, generateStyle: false });
   };
 
   // ── Batch generate scene images ───────────────────────────────────────
 
   const handleBatchScenes = async () => {
-    await generateAssetImages({ generatePortraits: false, generateScenes: true, generateProducts: false, generateStyle: false });
+    await generateAssetImages({ generatePortraits: false, generateScenes: true, generateProducts: false, generateProps: false, generateStyle: false });
   };
 
   // ── Batch generate product images ─────────────────────────────────────
 
   const handleBatchProducts = async () => {
-    await generateAssetImages({ generatePortraits: false, generateScenes: false, generateProducts: true, generateStyle: false });
+    await generateAssetImages({ generatePortraits: false, generateScenes: false, generateProducts: true, generateProps: false, generateStyle: false });
   };
 
-  // ── Generate all assets ───────────────────────────────────────────────
+  // ── Batch generate prop images ─────────────────────────────────────────
+
+  const handleBatchProps = async () => {
+    await generateAssetImages({ generatePortraits: false, generateScenes: false, generateProducts: false, generateProps: true, generateStyle: false });
+  };
+
+  // ── Generate all assets ────────────────────────────────────────────────
 
   const handleGenerateAll = async () => {
-    await generateAssetImages({ generatePortraits: true, generateScenes: true, generateProducts: true, generateStyle: true });
-    // 资产生成完成后，自动进入分镜步骤
-    setWizardStep(3);
+    const targetProjectId = project?.id;
+    await generateAssetImages({ generatePortraits: true, generateScenes: true, generateProducts: true, generateProps: true, generateStyle: true });
+    // 半自动模式停留在资产页，等待用户审核；全自动模式才直接进入分镜。
+    const latest = useProjectStore.getState().projects.find((item) => item.id === targetProjectId);
+    if (latest?.automationMode === "auto" && useProjectStore.getState().activeProjectId === targetProjectId) {
+      setWizardStep(3);
+    }
   };
 
   // ── Scene reference handlers ──────────────────────────────────────────
@@ -119,33 +137,7 @@ export function StepAssets() {
   };
 
   const handleGenerateScene = async (scene: Asset) => {
-    if (!scene.prompt.trim() || !providerConfig.apiKey) return;
-    setGeneratingScenes((prev) => new Set(prev).add(scene.id));
-    try {
-      const { size, ratio } = aspectRatioToImageParams(project?.aspectRatio ?? "16:9");
-      const styleRef = project ? getStyleReferenceUrl(project) : undefined;
-      const styleInstruction = styleRef
-        ? "Match the art style, color palette and lighting mood of the reference image; do not copy its content or composition. "
-        : "";
-      const url = await generateImage({
-        apiKey: providerConfig.apiKey,
-        baseUrl: providerConfig.baseUrl,
-        prompt: `${styleInstruction}${scene.prompt}`,
-        size,
-        ratio,
-        ...(styleRef ? { referenceImageUrls: [styleRef] } : {}),
-      });
-      updateAsset(scene.id, { imageUrl: url, error: undefined });
-    } catch (err) {
-      updateAsset(scene.id, { error: err instanceof Error ? err.message : String(err) });
-      console.error("Failed to generate scene image:", err);
-    } finally {
-      setGeneratingScenes((prev) => {
-        const next = new Set(prev);
-        next.delete(scene.id);
-        return next;
-      });
-    }
+    await generateSingleAssetImage(scene, setGeneratingScenes, "scene");
   };
 
   // ── Product reference handlers ────────────────────────────────────────
@@ -154,34 +146,62 @@ export function StepAssets() {
     addAsset({ type: "product", name: "", prompt: "", description: "" });
   };
 
-  const handleGenerateProduct = async (product: Asset) => {
-    if (!product.prompt.trim() || !providerConfig.apiKey) return;
-    setGeneratingProducts((prev) => new Set(prev).add(product.id));
+  const generateSingleAssetImage = async (
+    asset: Asset,
+    setGenerating: Dispatch<SetStateAction<Set<string>>>,
+    kind: "scene" | "product" | "prop",
+  ) => {
+    const targetProjectId = project?.id;
+    if (!targetProjectId || !asset.prompt.trim() || !providerConfig.apiKey) return;
+    const expectedRevision = asset.renderRevision ?? 0;
+    setGenerating((prev) => new Set(prev).add(asset.id));
     try {
       const { size, ratio } = aspectRatioToImageParams(project?.aspectRatio ?? "16:9");
       const styleRef = project ? getStyleReferenceUrl(project) : undefined;
+      const stylePrompt = project ? getStylePrompt(project) : undefined;
       const styleInstruction = styleRef
-        ? "Match the art style, color palette and lighting mood of the reference image; do not copy its content or composition. "
-        : "";
+        ? "Match the art style, color palette and lighting mood of the reference image; do not copy its content or composition."
+        : "Render this asset as a clean consistency reference image";
       const url = await generateImage({
         apiKey: providerConfig.apiKey,
         baseUrl: providerConfig.baseUrl,
-        prompt: `${styleInstruction}${product.prompt}`,
+        prompt: composeImageToImagePrompt({
+          change: `${styleInstruction} Render the ${kind} below as a clean reference image`,
+          newStyle: stylePrompt,
+          keep: asset.prompt,
+        }),
         size,
         ratio,
         ...(styleRef ? { referenceImageUrls: [styleRef] } : {}),
       });
-      updateAsset(product.id, { imageUrl: url, error: undefined });
+      updateAssetByProjectIdIfRevision(targetProjectId, asset.id, expectedRevision, {
+        imageUrl: url,
+        error: undefined,
+      });
     } catch (err) {
-      updateAsset(product.id, { error: err instanceof Error ? err.message : String(err) });
-      console.error("Failed to generate product image:", err);
+      updateAssetByProjectIdIfRevision(targetProjectId, asset.id, expectedRevision, {
+        error: err instanceof Error ? err.message : String(err),
+      });
+      console.error(`Failed to generate ${kind} image:`, err);
     } finally {
-      setGeneratingProducts((prev) => {
+      setGenerating((prev) => {
         const next = new Set(prev);
-        next.delete(product.id);
+        next.delete(asset.id);
         return next;
       });
     }
+  };
+
+  const handleGenerateProduct = async (product: Asset) => {
+    await generateSingleAssetImage(product, setGeneratingProducts, "product");
+  };
+
+  const handleAddProp = () => {
+    addAsset({ type: "prop", name: "", prompt: "", description: "" });
+  };
+
+  const handleGenerateProp = async (prop: Asset) => {
+    await generateSingleAssetImage(prop, setGeneratingProps, "prop");
   };
 
   // ── Style reference handler ───────────────────────────────────────────
@@ -217,7 +237,7 @@ export function StepAssets() {
       </div>
 
       {/* 无资产提示：可直接下一步（等价跳过），但说明一致性影响 */}
-      {characters.length === 0 && sceneReferences.length === 0 && products.length === 0 && (
+      {characters.length === 0 && sceneReferences.length === 0 && products.length === 0 && props.length === 0 && (
         <p className="rounded-lg border border-warn/50 bg-warn-deep/20 px-3 py-2 text-center text-[0.6875rem] text-warn/90">
           {t("wizard.noAssetsContinueHint")}
         </p>
@@ -401,7 +421,7 @@ export function StepAssets() {
             <div className="flex shrink-0 flex-col gap-1 opacity-0 transition group-hover:opacity-100">
               <button
                 onClick={() => handleGenerateScene(scene)}
-                disabled={!scene.prompt.trim() || generatingScenes.has(scene.id)}
+                disabled={anyGenerating || !scene.prompt.trim() || generatingScenes.has(scene.id)}
                 className="rounded p-1.5 text-accent hover:bg-accent-deep/30 disabled:opacity-30"
                 title="生成场景图"
               >
@@ -516,7 +536,7 @@ export function StepAssets() {
             <div className="flex shrink-0 flex-col gap-1 opacity-0 transition group-hover:opacity-100">
               <button
                 onClick={() => handleGenerateProduct(product)}
-                disabled={!product.prompt.trim() || generatingProducts.has(product.id)}
+                disabled={anyGenerating || !product.prompt.trim() || generatingProducts.has(product.id)}
                 className="rounded p-1.5 text-accent hover:bg-accent-deep/30 disabled:opacity-30"
                 title="生成产品图"
               >
@@ -543,6 +563,108 @@ export function StepAssets() {
         >
           <Plus size={14} />
           {t("wizard.addProduct")}
+        </button>
+      </section>
+
+      {/* ── Props / key objects section ─────────────────────────────────── */}
+      <section className="flex flex-col gap-3">
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="text-sm font-semibold text-ink-2">
+              {t("wizard.propReferences")} ({props.length})
+            </h3>
+            <p className="mt-0.5 text-[0.6875rem] text-ink-5">
+              {t("wizard.propReferencesHint")}
+            </p>
+          </div>
+          {props.some((prop) => !prop.imageUrl && prop.prompt.trim()) && (
+            <button
+              onClick={handleBatchProps}
+              disabled={anyGenerating}
+              className="flex items-center gap-1.5 rounded px-2 py-1 text-[0.6875rem] text-accent transition hover:bg-accent-deep/30 disabled:opacity-50"
+            >
+              {isGenerating ? <Loader2 size={11} className="animate-spin" /> : <Wand2 size={11} />}
+              {t("wizard.generateAllProps")}
+            </button>
+          )}
+        </div>
+
+        {props.map((prop) => (
+          <div
+            key={prop.id}
+            className="group flex items-start gap-3 rounded-xl border border-line bg-raised/50 p-3 transition hover:border-line-strong"
+          >
+            <div className="h-16 w-24 shrink-0 overflow-hidden rounded-lg border border-line bg-raised">
+              {prop.imageUrl ? (
+                <Lightbox src={prop.imageUrl} alt={prop.name}>
+                  <img src={prop.imageUrl} alt={prop.name} className="h-full w-full object-cover" />
+                </Lightbox>
+              ) : (
+                <div className="flex h-full w-full items-center justify-center text-ink-5">
+                  <ImageIcon size={16} />
+                </div>
+              )}
+            </div>
+            <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+              <input
+                type="text"
+                value={prop.name}
+                onChange={(e) => updateAsset(prop.id, { name: e.target.value })}
+                placeholder={t("wizard.propNamePlaceholder")}
+                className="w-full bg-transparent text-sm font-medium text-ink placeholder:text-ink-5 focus:outline-none"
+              />
+              <AiPolishField
+                value={prop.description}
+                onChange={(v) => updateAsset(prop.id, { description: v })}
+                systemPrompt={SYSTEM_PROMPT_DESCRIPTION_ZH}
+                resetKey={prop.id}
+                placeholder="中文描述"
+                singleLine
+                bare
+                appearanceClass="bg-transparent text-xs text-ink-3 placeholder:text-ink-5"
+              />
+              <AiPolishField
+                value={prop.prompt}
+                onChange={(v) => updateAsset(prop.id, { prompt: v })}
+                systemPrompt={SYSTEM_PROMPT_VISUAL_PROMPT}
+                resetKey={prop.id}
+                placeholder="English prompt for image generation..."
+                rows={2}
+                bare
+                appearanceClass="bg-transparent text-xs text-ink-2 placeholder:text-ink-5"
+              />
+              {prop.error && (
+                <p className="truncate text-[0.625rem] text-danger" title={prop.error}>
+                  生成失败：{prop.error}
+                </p>
+              )}
+            </div>
+            <div className="flex shrink-0 flex-col gap-1 opacity-0 transition group-hover:opacity-100">
+              <button
+                onClick={() => handleGenerateProp(prop)}
+                disabled={anyGenerating || !prop.prompt.trim() || generatingProps.has(prop.id)}
+                className="rounded p-1.5 text-accent hover:bg-accent-deep/30 disabled:opacity-30"
+                title={t("wizard.propImageTitle")}
+              >
+                {generatingProps.has(prop.id) ? <Loader2 size={12} className="animate-spin" /> : <Wand2 size={12} />}
+              </button>
+              <button
+                onClick={() => removeAsset(prop.id)}
+                className="rounded p-1.5 text-ink-4 hover:bg-danger-deep hover:text-danger"
+                title="删除"
+              >
+                <Trash2 size={12} />
+              </button>
+            </div>
+          </div>
+        ))}
+
+        <button
+          onClick={handleAddProp}
+          className="flex items-center justify-center gap-2 rounded-xl border border-dashed border-line-strong bg-raised/30 px-4 py-2.5 text-xs text-ink-3 transition hover:border-success hover:text-success"
+        >
+          <Plus size={14} />
+          {t("wizard.addProp")}
         </button>
       </section>
 
@@ -584,7 +706,7 @@ export function StepAssets() {
             )}
             <button
               onClick={handleGenerateStyle}
-              disabled={generatingStyle}
+              disabled={anyGenerating}
               className="mt-2 flex items-center gap-1.5 rounded px-3 py-1.5 text-[0.6875rem] text-accent hover:bg-accent-deep/30 transition disabled:opacity-50"
             >
               {generatingStyle ? (
@@ -597,6 +719,24 @@ export function StepAssets() {
           </div>
         </div>
       </section>
+
+      {/* ── Asset review gate ──────────────────────────────────────────── */}
+      {project?.automationMode !== "auto" && (
+        <div className="rounded-xl border border-line bg-raised/50 p-4">
+          <h3 className="text-sm font-semibold text-ink">{t("review.assetsQualityCheck")}</h3>
+          <p className="mt-1 text-xs text-ink-3">{t("review.assetsHint")}</p>
+          <button
+            onClick={() => {
+              useProjectStore.getState().updateProject({ assetsReviewed: true });
+              setWizardStep(3);
+            }}
+            disabled={anyGenerating}
+            className="mt-3 rounded-lg bg-success-solid px-4 py-2 text-xs font-medium text-white transition hover:bg-success-solid disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {t("review.confirmAssets")}
+          </button>
+        </div>
+      )}
 
       {/* ── Generate all button ───────────────────────────────────────── */}
       <button

@@ -5,6 +5,7 @@
 
 export interface ChatParams {
   messages: Array<{ role: "system" | "user" | "assistant"; content: string }>;
+  /** 控制文本派生结果的随机性；角色外貌派生使用低温度保持稳定。 */
   temperature?: number;
   /**
    * 输出预算不可调：统一 MAX_OUTPUT_TOKENS（65536，见 lib/models.ts）。

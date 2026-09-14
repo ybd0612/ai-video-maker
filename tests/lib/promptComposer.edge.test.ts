@@ -148,6 +148,17 @@ describe("composePortraitPrompt 物种探测边界", () => {
     expect(out).not.toContain("SUBJECT SPECIES LOCK");
   });
 
+  it("猪角色命中 piglet 关键词 → 使用非人类物种锁定", () => {
+    const out = composePortraitPrompt({
+      appearancePrompt: "A cute chubby pink piglet with short legs and small ears",
+    });
+    expect(out).toContain("SUBJECT SPECIES LOCK");
+    expect(out).toContain("Never render it as a human");
+    expect(out).toContain("Normal pig anatomy");
+    expect(out).toContain("four legs");
+    expect(out).not.toContain("SUBJECT LOCK:");
+  });
+
   it("产品首句命中产品关键词 → 通用锁定（非动物句）", () => {
     const out = composePortraitPrompt({
       appearancePrompt: "A sleek product shot of a matte black water bottle",

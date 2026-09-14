@@ -401,6 +401,13 @@ const zh = {
   // Shot extras
   "shot.characters": "出场角色",
   "shot.selectCharacters": "选择本镜头出场角色",
+  "shot.scene": "场景",
+  "shot.noScene": "不指定场景",
+  "shot.products": "产品主体",
+  "shot.noProducts": "暂无产品",
+  "shot.props": "道具 / 关键物件",
+  "shot.noProps": "暂无道具",
+  "shot.unnamedAsset": "未命名资产",
   "shot.motionPrompt": "动态描述",
 
   // Wizard
@@ -424,6 +431,12 @@ const zh = {
   "wizard.productReferencesHint": "产品主体一致性锚点（如服装、商品），生成参考图保证各镜头主体一致",
   "wizard.addProduct": "添加产品",
   "wizard.generateAllProducts": "批量生成产品图",
+  "wizard.propReferences": "道具 / 关键物件",
+  "wizard.propReferencesHint": "会在特定镜头中反复出现、需要保持一致的关键物件，如钥匙、项链、武器或信件",
+  "wizard.addProp": "添加道具",
+  "wizard.generateAllProps": "批量生成道具图",
+  "wizard.propNamePlaceholder": "道具名称（如：旧铜钥匙）",
+  "wizard.propImageTitle": "生成道具图",
   "wizard.styleReference": "风格参考图",
   "wizard.styleReferenceHint": "生成一张整体风格锚点图，锁定画风",
   "wizard.styleAutoHint": "风格图将依据你的想法自动生成，作为角色 / 场景 / 产品与分镜图的画风锚点",
@@ -487,6 +500,9 @@ const zh = {
   "automation.autoHint": "全程自动，无需确认",
 
   // 审核卡点
+  "review.confirmAssets": "确认资产，进入分镜",
+  "review.assetsQualityCheck": "资产审核",
+  "review.assetsHint": "请确认角色、场景、产品、道具和风格方向符合预期；后续分镜与图片会严格引用这些资产。",
   "review.confirmImages": "确认图片，进入视频生成",
   "review.qualityCheck": "质量检查",
   "review.hint": "请确认所有图片质量符合预期，然后进入视频生成阶段。",
@@ -930,6 +946,13 @@ const en = {
   // Shot extras
   "shot.characters": "Characters",
   "shot.selectCharacters": "Select characters in this shot",
+  "shot.scene": "Scene",
+  "shot.noScene": "No scene selected",
+  "shot.products": "Products",
+  "shot.noProducts": "No products",
+  "shot.props": "Props / Key Objects",
+  "shot.noProps": "No props",
+  "shot.unnamedAsset": "Unnamed asset",
   "shot.motionPrompt": "Motion Prompt",
 
   // Wizard
@@ -953,6 +976,12 @@ const en = {
   "wizard.productReferencesHint": "Product consistency anchors (clothing, goods). Generate reference images to keep the subject consistent across shots",
   "wizard.addProduct": "Add Product",
   "wizard.generateAllProducts": "Generate All Product Images",
+  "wizard.propReferences": "Props / Key Objects",
+  "wizard.propReferencesHint": "Key objects that recur in specific shots and need visual consistency, such as keys, necklaces, weapons, or letters",
+  "wizard.addProp": "Add Prop",
+  "wizard.generateAllProps": "Generate All Prop Images",
+  "wizard.propNamePlaceholder": "Prop name (e.g. old brass key)",
+  "wizard.propImageTitle": "Generate Prop Image",
   "wizard.styleReference": "Style Reference",
   "wizard.styleReferenceHint": "Generate a style anchor image to lock the visual style",
   "wizard.styleAutoHint": "The style image is derived from your idea and anchors the art style for assets and shots",
@@ -1016,6 +1045,9 @@ const en = {
   "automation.autoHint": "Fully automatic, no confirmation needed",
 
   // Review checkpoints
+  "review.confirmAssets": "Confirm assets, proceed to storyboard",
+  "review.assetsQualityCheck": "Asset review",
+  "review.assetsHint": "Confirm that the characters, scenes, products, props, and visual direction are correct; later storyboard and image generation will reference these assets explicitly.",
   "review.confirmImages": "Confirm images, proceed to video generation",
   "review.qualityCheck": "Quality check",
   "review.hint": "Please confirm all images meet quality expectations before proceeding to video generation.",

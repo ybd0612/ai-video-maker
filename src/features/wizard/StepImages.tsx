@@ -18,6 +18,7 @@ export function StepImages() {
   const t = useT();
   const project = useProjectStore(selectActiveProject);
   const setWizardStep = useProjectStore((s) => s.setWizardStep);
+  const updateProject = useProjectStore((s) => s.updateProject);
   const { generateImagesForStep, rerollImage } = useWizardActions();
 
   const shots = project?.shots ?? [];
@@ -156,7 +157,10 @@ export function StepImages() {
       {allSettled && (
         <ReviewCheckpoint
           mode={project?.automationMode ?? "semi-auto"}
-          onConfirm={() => setWizardStep(5)}
+          onConfirm={() => {
+            updateProject({ imagesReviewed: true });
+            setWizardStep(5);
+          }}
           failedShots={shots
             .filter((s) => s.status === "failed")
             .map((s) => ({ index: s.index, error: s.error }))}

@@ -145,6 +145,8 @@ describe("composePortraitPrompt", () => {
     });
     expect(out).toContain("SUBJECT SPECIES LOCK");
     expect(out).toContain("Never render it as a human");
+    expect(out).toContain("Normal anatomy for the described animal");
+    expect(out).toContain("correct species-typical limb count and placement");
     expect(out).not.toContain("Portrait of");
     expect(out).not.toContain("head and shoulders");
     expect(out).not.toContain("looking at camera");
@@ -156,6 +158,10 @@ describe("composePortraitPrompt", () => {
     });
     expect(out).toContain("SUBJECT LOCK");
     expect(out).toContain("Full-body character design sheet, consistent identity, clean presentation");
+    expect(out).toContain("Normal anatomy for the described subject");
+    expect(out).toContain("correct limb count and placement");
+    expect(out).not.toContain("no extra or duplicated limbs");
+    expect(out).toContain("no duplicated or fused body parts");
     expect(out).not.toContain("head and shoulders");
   });
 

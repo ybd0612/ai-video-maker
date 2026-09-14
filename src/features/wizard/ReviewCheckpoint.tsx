@@ -82,7 +82,8 @@ export function ReviewCheckpoint({ mode, onConfirm, failedShots = [], onRetryFai
       <div className="mt-4">
         <button
           onClick={onConfirm}
-          className="rounded-lg bg-success-solid px-4 py-2 text-sm font-medium text-white transition hover:bg-success-solid"
+          disabled={failedShots.length > 0}
+          className="rounded-lg bg-success-solid px-4 py-2 text-sm font-medium text-white transition hover:bg-success-solid disabled:cursor-not-allowed disabled:opacity-50"
         >
           {t("review.confirmImages")}
         </button>

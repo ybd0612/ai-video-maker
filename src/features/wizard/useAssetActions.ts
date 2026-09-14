@@ -23,6 +23,7 @@ export interface AssetGenerationOptions {
   generatePortraits?: boolean;
   generateScenes?: boolean;
   generateProducts?: boolean;
+  generateProps?: boolean;
   generateStyle?: boolean;
 }
 
@@ -125,6 +126,8 @@ export function useAssetActions(): AssetActions {
         styleAsset = created;
       }
 
+      const styleAssetId = styleAsset.id;
+      let styleRevision = styleAsset.renderRevision ?? 0;
       if (!styleAsset.prompt.trim() && !styleAsset.derivation?.locked) {
         const derived = await deriveStylePrompt(
           latest.ideaPrompt ?? "",
@@ -132,10 +135,20 @@ export function useAssetActions(): AssetActions {
           providerConfig.apiKey,
           providerConfig.baseUrl,
         );
-        useProjectStore.getState().updateAssetByProjectId(pid, styleAsset.id, {
-          prompt: derived,
-        });
-        styleAsset = { ...styleAsset, prompt: derived };
+        const applied = useProjectStore.getState().updateAssetByProjectIdIfRevision(
+          pid,
+          styleAssetId,
+          styleRevision,
+          { prompt: derived },
+        );
+        if (!applied) return;
+        const refreshedStyleAsset = useProjectStore
+          .getState()
+          .projects.find((item) => item.id === pid)
+          ?.assets.find((asset) => asset.id === styleAssetId);
+        if (!refreshedStyleAsset) return;
+        styleAsset = refreshedStyleAsset;
+        styleRevision = refreshedStyleAsset.renderRevision ?? 0;
       }
 
       const stylePrompt = styleAsset.prompt.trim() || fallbackStylePrompt(latest.style.trim());
@@ -151,15 +164,18 @@ export function useAssetActions(): AssetActions {
         size,
         ratio,
       });
+      const applied = useProjectStore.getState().updateAssetByProjectIdIfRevision(
+        pid,
+        styleAssetId,
+        styleRevision,
+        { imageUrl: url, error: undefined },
+      );
+      if (!applied) return;
       useProjectStore.getState().updateProjectById(pid, (currentProject) => ({
         ...currentProject,
         styleReferenceUrl: url,
         styleReferenceError: undefined,
       }));
-      useProjectStore.getState().updateAssetByProjectId(pid, styleAsset.id, {
-        imageUrl: url,
-        error: undefined,
-      });
       useProjectStore.getState().addHistory("style_generated", { key: "history.styleGenerated" }, pid);
     } catch (err) {
       useProjectStore.getState().updateProjectById(pid, (currentProject) => ({
@@ -192,6 +208,7 @@ export function useAssetActions(): AssetActions {
     const generatePortraits = opts?.generatePortraits !== false;
     const generateScenes = opts?.generateScenes !== false;
     const generateProducts = opts?.generateProducts !== false;
+    const generateProps = opts?.generateProps !== false;
     const generateStyle = opts?.generateStyle !== false;
 
     // 阶段 1：风格参考图先行。风格失败不阻塞资产图，资产图会退化为文生图。
@@ -216,6 +233,7 @@ export function useAssetActions(): AssetActions {
             if (char.imageUrl) continue;
             tasks.push(async () => {
               if (signal.aborted) return;
+              const expectedRevision = char.renderRevision ?? 0;
               try {
                 const portraitPrompt = composePortraitPrompt({
                   appearancePrompt: char.appearancePrompt?.trim() || char.prompt.trim(),
@@ -229,14 +247,19 @@ export function useAssetActions(): AssetActions {
                   ratio: imageRatio,
                   ...(styleReferenceUrl ? { referenceImageUrls: [styleReferenceUrl] } : {}),
                 });
-                useProjectStore.getState().updateAssetByProjectId(targetProjectId, char.id, {
-                  imageUrl: url,
-                  error: undefined,
-                });
+                useProjectStore.getState().updateAssetByProjectIdIfRevision(
+                  targetProjectId,
+                  char.id,
+                  expectedRevision,
+                  { imageUrl: url, error: undefined },
+                );
               } catch (err) {
-                useProjectStore.getState().updateAssetByProjectId(targetProjectId, char.id, {
-                  error: err instanceof Error ? err.message : String(err),
-                });
+                useProjectStore.getState().updateAssetByProjectIdIfRevision(
+                  targetProjectId,
+                  char.id,
+                  expectedRevision,
+                  { error: err instanceof Error ? err.message : String(err) },
+                );
                 console.error(`Failed to generate portrait for ${char.name}:`, err);
               }
             });
@@ -248,6 +271,7 @@ export function useAssetActions(): AssetActions {
             if (scene.imageUrl) continue;
             tasks.push(async () => {
               if (signal.aborted) return;
+              const expectedRevision = scene.renderRevision ?? 0;
               try {
                 const url = await generateImage({
                   apiKey: providerConfig.apiKey,
@@ -263,14 +287,19 @@ export function useAssetActions(): AssetActions {
                   ratio: imageRatio,
                   ...(styleReferenceUrl ? { referenceImageUrls: [styleReferenceUrl] } : {}),
                 });
-                useProjectStore.getState().updateAssetByProjectId(targetProjectId, scene.id, {
-                  imageUrl: url,
-                  error: undefined,
-                });
+                useProjectStore.getState().updateAssetByProjectIdIfRevision(
+                  targetProjectId,
+                  scene.id,
+                  expectedRevision,
+                  { imageUrl: url, error: undefined },
+                );
               } catch (err) {
-                useProjectStore.getState().updateAssetByProjectId(targetProjectId, scene.id, {
-                  error: err instanceof Error ? err.message : String(err),
-                });
+                useProjectStore.getState().updateAssetByProjectIdIfRevision(
+                  targetProjectId,
+                  scene.id,
+                  expectedRevision,
+                  { error: err instanceof Error ? err.message : String(err) },
+                );
                 console.error(`Failed to generate scene image for ${scene.name}:`, err);
               }
             });
@@ -282,6 +311,7 @@ export function useAssetActions(): AssetActions {
             if (product.imageUrl) continue;
             tasks.push(async () => {
               if (signal.aborted) return;
+              const expectedRevision = product.renderRevision ?? 0;
               try {
                 const url = await generateImage({
                   apiKey: providerConfig.apiKey,
@@ -297,15 +327,60 @@ export function useAssetActions(): AssetActions {
                   ratio: imageRatio,
                   ...(styleReferenceUrl ? { referenceImageUrls: [styleReferenceUrl] } : {}),
                 });
-                useProjectStore.getState().updateAssetByProjectId(targetProjectId, product.id, {
-                  imageUrl: url,
-                  error: undefined,
-                });
+                useProjectStore.getState().updateAssetByProjectIdIfRevision(
+                  targetProjectId,
+                  product.id,
+                  expectedRevision,
+                  { imageUrl: url, error: undefined },
+                );
               } catch (err) {
-                useProjectStore.getState().updateAssetByProjectId(targetProjectId, product.id, {
-                  error: err instanceof Error ? err.message : String(err),
-                });
+                useProjectStore.getState().updateAssetByProjectIdIfRevision(
+                  targetProjectId,
+                  product.id,
+                  expectedRevision,
+                  { error: err instanceof Error ? err.message : String(err) },
+                );
                 console.error(`Failed to generate product image for ${product.name}:`, err);
+              }
+            });
+          }
+        }
+
+        if (generateProps) {
+          for (const prop of project.assets.filter((asset) => asset.type === "prop")) {
+            if (prop.imageUrl) continue;
+            tasks.push(async () => {
+              if (signal.aborted) return;
+              const expectedRevision = prop.renderRevision ?? 0;
+              try {
+                const url = await generateImage({
+                  apiKey: providerConfig.apiKey,
+                  baseUrl: providerConfig.baseUrl,
+                  prompt: composeImageToImagePrompt({
+                    change: styleInstruction
+                      ? `${styleInstruction.trim()} Render the prop below as a clean key-object reference image`
+                      : "Render the prop below as a clean key-object reference image",
+                    newStyle: stylePrompt,
+                    keep: prop.prompt,
+                  }),
+                  size: imageSize,
+                  ratio: imageRatio,
+                  ...(styleReferenceUrl ? { referenceImageUrls: [styleReferenceUrl] } : {}),
+                });
+                useProjectStore.getState().updateAssetByProjectIdIfRevision(
+                  targetProjectId,
+                  prop.id,
+                  expectedRevision,
+                  { imageUrl: url, error: undefined },
+                );
+              } catch (err) {
+                useProjectStore.getState().updateAssetByProjectIdIfRevision(
+                  targetProjectId,
+                  prop.id,
+                  expectedRevision,
+                  { error: err instanceof Error ? err.message : String(err) },
+                );
+                console.error(`Failed to generate prop image for ${prop.name}:`, err);
               }
             });
           }

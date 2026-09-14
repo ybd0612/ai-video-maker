@@ -7,7 +7,7 @@ import {
 } from "@/stores/projectStore";
 import { useSettingsStore } from "@/stores/settingsStore";
 import { generateImage, aspectRatioToImageParams } from "@/services/imageService";
-import { injectCharacterDescriptions } from "@/lib/characterUtils";
+import { injectShotAssetDescriptions } from "@/lib/characterUtils";
 import { composeVisualPrompt } from "@/lib/promptUtils";
 import { createBatchRunner } from "@/lib/batchRunner";
 import {
@@ -29,7 +29,7 @@ type ImageGenerationInput = {
 function describeReferenceRole(
   url: string,
   project: { assets: Asset[] },
-): "character" | "scene" | "product" | "style" {
+): "character" | "scene" | "product" | "prop" | "style" {
   const asset = project.assets.find((a) => a.imageUrl === url || a.avatarUrl === url);
   if (asset) return asset.type;
   return "style";
@@ -56,14 +56,7 @@ function buildImageGenerationInput(
   project: { style: string; assets: Asset[]; styleReferenceUrl?: string },
 ): ImageGenerationInput {
   const referenceImageUrls = pickShotReferences(shot, project);
-
-  let subject = injectCharacterDescriptions(
-    composeVisualPrompt(shot),
-    shot.activeCharacterIds ?? [],
-    project.assets,
-  );
-  const product = project.assets.find((a) => a.type === "product" && !!a.prompt.trim());
-  if (product) subject = `${product.prompt.trim()}. ${subject}`;
+  const subject = injectShotAssetDescriptions(composeVisualPrompt(shot), shot, project.assets);
 
   if (referenceImageUrls.length > 0) {
     const references = referenceImageUrls.map((url, i) => ({
@@ -110,6 +103,7 @@ const runImageBatch = createBatchRunner({
 
     return shotsNeedingImages.map((shot) => async () => {
       if (signal.aborted) return;
+      const expectedRevision = shot.renderRevision ?? 0;
       useProjectStore.getState().setShotStatusByProjectId(pid, shot.id, "imaging");
 
       try {
@@ -123,11 +117,17 @@ const runImageBatch = createBatchRunner({
           ...(referenceImageUrls.length > 0 ? { referenceImageUrls } : {}),
         });
 
-        useProjectStore.getState().updateShotByProjectId(pid, shot.id, { imageUrl, status: "imaged" });
-      } catch (err) {
-        useProjectStore.getState().setShotStatusByProjectId(
+        useProjectStore.getState().updateShotByProjectIdIfRevision(
           pid,
           shot.id,
+          expectedRevision,
+          { imageUrl, status: "imaged" },
+        );
+      } catch (err) {
+        useProjectStore.getState().setShotStatusByProjectIdIfRevision(
+          pid,
+          shot.id,
+          expectedRevision,
           "failed",
           err instanceof Error ? err.message : String(err),
         );
@@ -184,6 +184,7 @@ export function useImageActions(): ImageActions {
     const shot = project.shots.find((item) => item.id === shotId);
     if (!shot) return;
 
+    const expectedRevision = shot.renderRevision ?? 0;
     store.setShotStatusByProjectId(targetProjectId, shotId, "imaging");
 
     try {
@@ -199,7 +200,13 @@ export function useImageActions(): ImageActions {
         ...(referenceImageUrls.length > 0 ? { referenceImageUrls } : {}),
       });
 
-      store.updateShotByProjectId(targetProjectId, shotId, { imageUrl, status: "imaged" });
+      const applied = store.updateShotByProjectIdIfRevision(
+        targetProjectId,
+        shotId,
+        expectedRevision,
+        { imageUrl, status: "imaged" },
+      );
+      if (!applied) return;
       restoreProjectStatusIfReady(targetProjectId, (currentProject) =>
         currentProject.shots.every((item) => !!item.imageUrl),
       );
@@ -209,9 +216,10 @@ export function useImageActions(): ImageActions {
         targetProjectId,
       );
     } catch (err) {
-      store.setShotStatusByProjectId(
+      store.setShotStatusByProjectIdIfRevision(
         targetProjectId,
         shotId,
+        expectedRevision,
         "failed",
         err instanceof Error ? err.message : String(err),
       );

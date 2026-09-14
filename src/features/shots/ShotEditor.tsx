@@ -3,9 +3,10 @@
 // Right panel: edit the selected shot's script text and visual prompt.
 // ────────────────────────────────────────────────────────────────────────────
 
-import { useProjectStore, selectActiveProject, type Shot } from "@/stores/projectStore";
+import type { ReactNode } from "react";
+import { useProjectStore, selectActiveProject, type Asset, type Shot } from "@/stores/projectStore";
 import { useT } from "@/i18n";
-import { RefreshCw, X, RotateCcw, Users } from "lucide-react";
+import { RefreshCw, X, RotateCcw, Users, MapPin, Package, KeyRound } from "lucide-react";
 import { DialogueEditor } from "./DialogueEditor";
 import { AiPolishField } from "@/components/ui/AiPolishField";
 import {
@@ -29,14 +30,21 @@ export function ShotEditor({
 }: ShotEditorProps) {
   const updateShot = useProjectStore((s) => s.updateShot);
   const setActiveCharacters = useProjectStore((s) => s.setActiveCharacters);
+  const setActiveScene = useProjectStore((s) => s.setActiveScene);
+  const setActiveProducts = useProjectStore((s) => s.setActiveProducts);
+  const setActiveProps = useProjectStore((s) => s.setActiveProps);
   const project = useProjectStore(selectActiveProject);
   const t = useT();
-  const characters = (project?.assets ?? []).filter((a) => a.type === "character");
+  const assets = project?.assets ?? [];
+  const characters = assets.filter((a) => a.type === "character");
+  const scenes = assets.filter((a) => a.type === "scene");
+  const products = assets.filter((a) => a.type === "product");
+  const props = assets.filter((a) => a.type === "prop");
 
   if (!shot) {
     return (
       <div className="flex flex-1 items-center justify-center p-4">
-        <p className="text-xs text-ink-5 text-center">
+        <p className="text-center text-xs text-ink-5">
           {t("pipeline.selectShot")}
         </p>
       </div>
@@ -56,44 +64,62 @@ export function ShotEditor({
         </button>
       </div>
 
-      {/* Character selector (both modes) */}
       {characters.length > 0 && (
+        <AssetToggleGroup
+          icon={<Users size={10} />}
+          label={t("shot.characters")}
+          assets={characters}
+          activeIds={shot.activeCharacterIds}
+          onChange={(ids) => setActiveCharacters(shot.id, ids)}
+          emptyLabel={t("shot.unnamedAsset")}
+        />
+      )}
+
+      {scenes.length > 0 && (
         <div className="space-y-1.5">
           <label className="flex items-center gap-1 text-[0.6875rem] font-medium text-ink-4">
-            <Users size={10} />
-            {t("shot.characters")}
+            <MapPin size={10} />
+            {t("shot.scene")}
           </label>
-          <div className="flex flex-wrap gap-1">
-            {characters.map((char) => {
-              const isActive = shot.activeCharacterIds.includes(char.id);
-              return (
-                <button
-                  key={char.id}
-                  onClick={() => {
-                    const newIds = isActive
-                      ? shot.activeCharacterIds.filter((id) => id !== char.id)
-                      : [...shot.activeCharacterIds, char.id];
-                    setActiveCharacters(shot.id, newIds);
-                  }}
-                  className={`rounded-full px-2 py-0.5 text-[0.625rem] font-medium transition ${
-                    isActive
-                      ? "bg-success-deep/50 text-success border border-success"
-                      : "bg-raised text-ink-4 border border-line hover:border-line-strong"
-                  }`}
-                >
-                  {char.name}
-                </button>
-              );
-            })}
-          </div>
+          <select
+            value={shot.activeSceneId ?? ""}
+            onChange={(e) => setActiveScene(shot.id, e.target.value || undefined)}
+            className="w-full rounded-md border border-line bg-raised px-2 py-1.5 text-xs text-ink-2 focus:border-info focus:outline-none"
+          >
+            <option value="">{t("shot.noScene")}</option>
+            {scenes.map((scene) => (
+              <option key={scene.id} value={scene.id}>
+                {scene.name || t("shot.unnamedAsset")}
+              </option>
+            ))}
+          </select>
         </div>
       )}
 
-      {characters.length > 0 && (
-        <DialogueEditor shotId={shot.id} />
+      {products.length > 0 && (
+        <AssetToggleGroup
+          icon={<Package size={10} />}
+          label={t("shot.products")}
+          assets={products}
+          activeIds={shot.activeProductIds}
+          onChange={(ids) => setActiveProducts(shot.id, ids)}
+          emptyLabel={t("shot.unnamedAsset")}
+        />
       )}
 
-      {/* Script text */}
+      {props.length > 0 && (
+        <AssetToggleGroup
+          icon={<KeyRound size={10} />}
+          label={t("shot.props")}
+          assets={props}
+          activeIds={shot.activePropIds ?? []}
+          onChange={(ids) => setActiveProps(shot.id, ids)}
+          emptyLabel={t("shot.unnamedAsset")}
+        />
+      )}
+
+      {characters.length > 0 && <DialogueEditor shotId={shot.id} />}
+
       <div className="space-y-1">
         <label className="text-[0.6875rem] font-medium text-ink-4">
           {t("pipeline.scriptText")}
@@ -108,7 +134,6 @@ export function ShotEditor({
         />
       </div>
 
-      {/* Visual prompt (text-to-image) */}
       <div className="space-y-1">
         <label className="text-[0.6875rem] font-medium text-ink-4">
           {t("pipeline.visualPrompt")}
@@ -123,7 +148,6 @@ export function ShotEditor({
         />
       </div>
 
-      {/* Motion prompt (image-to-video) */}
       <div className="space-y-1">
         <label className="text-[0.6875rem] font-medium text-ink-4">
           {t("pipeline.motionPrompt")}
@@ -138,7 +162,6 @@ export function ShotEditor({
         />
       </div>
 
-      {/* Duration */}
       <div className="space-y-1">
         <div className="flex items-center justify-between">
           <label className="text-[0.6875rem] font-medium text-ink-4">
@@ -159,9 +182,7 @@ export function ShotEditor({
         </select>
       </div>
 
-      {/* Actions */}
       <div className="flex flex-col gap-2 pt-2">
-        {/* Retry button for failed shots */}
         {isFailed && (
           <button
             onClick={() => {
@@ -192,12 +213,54 @@ export function ShotEditor({
         </button>
       </div>
 
-      {/* Error */}
       {shot.error && (
         <div className="rounded-md border border-danger bg-danger-deep/30 p-2 text-[0.6875rem] text-danger">
           {shot.error}
         </div>
       )}
+    </div>
+  );
+}
+
+function AssetToggleGroup({
+  icon,
+  label,
+  assets,
+  activeIds,
+  onChange,
+  emptyLabel,
+}: {
+  icon: ReactNode;
+  label: string;
+  assets: Asset[];
+  activeIds: string[];
+  onChange: (ids: string[]) => void;
+  emptyLabel: string;
+}) {
+  return (
+    <div className="space-y-1.5">
+      <label className="flex items-center gap-1 text-[0.6875rem] font-medium text-ink-4">
+        {icon}
+        {label}
+      </label>
+      <div className="flex flex-wrap gap-1">
+        {assets.map((asset) => {
+          const isActive = activeIds.includes(asset.id);
+          return (
+            <button
+              key={asset.id}
+              onClick={() => onChange(isActive ? activeIds.filter((id) => id !== asset.id) : [...activeIds, asset.id])}
+              className={`rounded-full border px-2 py-0.5 text-[0.625rem] font-medium transition ${
+                isActive
+                  ? "border-success bg-success-deep/50 text-success"
+                  : "border-line bg-raised text-ink-4 hover:border-line-strong"
+              }`}
+            >
+              {asset.name || emptyLabel}
+            </button>
+          );
+        })}
+      </div>
     </div>
   );
 }

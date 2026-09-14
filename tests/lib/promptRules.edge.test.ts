@@ -209,6 +209,8 @@ describe("buildCharacterAppearancePrompt", () => {
     const out = buildCharacterAppearancePrompt();
     expect(out).toContain("never change the subject's identity");
     expect(out).toContain("A rabbit stays a rabbit");
+    expect(out).toContain("normal anatomy");
+    expect(out).toContain("one head, one body");
     expect(out).toContain("Return ONLY the appearance description");
     // 不残留未替换占位符
     expect(out).not.toContain("{{rules}}");

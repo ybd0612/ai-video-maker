@@ -58,6 +58,9 @@ export function pickShotFields(
     motionSpeedDesc: shot.motionSpeedDesc,
     negativeMotionPrompt: shot.negativeMotionPrompt,
     firstFrameUrl: shot.firstFrameUrl,
+    activeSceneId: shot.activeSceneId,
+    activeProductIds: shot.activeProductIds,
+    activePropIds: shot.activePropIds,
     derivation: shot.derivation,
   };
 }

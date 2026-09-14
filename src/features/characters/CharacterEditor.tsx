@@ -7,7 +7,11 @@
 // ────────────────────────────────────────────────────────────────────────────
 
 import { useState, useCallback, useEffect, useRef } from "react";
-import { useProjectStore, type Asset } from "@/stores/projectStore";
+import {
+  useProjectStore,
+  selectActiveProject,
+  type Asset,
+} from "@/stores/projectStore";
 import { useSettingsStore } from "@/stores/settingsStore";
 import { useT } from "@/i18n";
 import { ArrowLeft, Sparkles, Loader2, RefreshCw, ImageIcon } from "lucide-react";
@@ -21,6 +25,8 @@ import { generateImage, aspectRatioToImageParams } from "@/services/imageService
 import { generateAssetNamespace, generateFullPrompt } from "@/lib/assetNamespace";
 import {
   composePortraitPrompt,
+  getStylePrompt,
+  getStyleReferenceUrl,
   normalizeCharacterDescription,
   parseCharacterDescription,
 } from "@/lib/promptComposer";
@@ -43,6 +49,7 @@ export function CharacterEditor({ character, onClose }: CharacterEditorProps) {
   const t = useT();
   const addAsset = useProjectStore((s) => s.addAsset);
   const updateAsset = useProjectStore((s) => s.updateAsset);
+  const project = useProjectStore(selectActiveProject);
   const providerConfig = useSettingsStore((s) => s.providerConfig);
   const autoRegeneratePortrait = useSettingsStore((s) => s.autoRegeneratePortrait);
   const setAutoRegeneratePortrait = useSettingsStore((s) => s.setAutoRegeneratePortrait);
@@ -83,6 +90,8 @@ export function CharacterEditor({ character, onClose }: CharacterEditorProps) {
         const result = await chatCompletion({
           apiKey: providerConfig.apiKey,
           baseUrl: providerConfig.baseUrl,
+          // 外貌提示词是角色一致性锚点：降低随机性，避免同一描述每次派生出不同英文。
+          temperature: 0.2,
           messages: [
             { role: "system", content: buildCharacterAppearancePrompt() },
             {
@@ -116,17 +125,26 @@ export function CharacterEditor({ character, onClose }: CharacterEditorProps) {
       setIsGeneratingPortrait(true);
       setError(null);
       try {
-        // 物种锁定拼装器（与批量链路一致）；替换旧版 "Portrait photo of ... photorealistic" 人像语汇
-        const prompt = composePortraitPrompt({ appearancePrompt: effectiveAppearance });
+        // 物种锁定拼装器（与批量链路一致）；同时继承项目级视觉方向，
+        // 让手动生成与批量生成的角色定妆照使用同一套风格约束与参考图。
+        const stylePrompt = project ? getStylePrompt(project) : undefined;
+        const styleReferenceUrl = project ? getStyleReferenceUrl(project) : undefined;
+        const prompt = composePortraitPrompt({
+          appearancePrompt: effectiveAppearance,
+          stylePrompt,
+        });
         // 统一档位串参数（1K 档 + 1:1 画幅）；随机 seed 保证每次重新生成效果不同
         const { size, ratio } = aspectRatioToImageParams("1:1");
         const url = await generateImage({
           apiKey: providerConfig.apiKey,
           baseUrl: providerConfig.baseUrl,
-          prompt,
+          prompt: styleReferenceUrl
+            ? `Match the art style, color palette and lighting mood of the reference image; do not copy its content or composition. ${prompt}`
+            : prompt,
           size,
           ratio,
           seed: randomSeed(),
+          ...(styleReferenceUrl ? { referenceImageUrls: [styleReferenceUrl] } : {}),
         });
         // Save portrait to character（统一资产 imageUrl 字段）
         if (character) {
@@ -139,7 +157,7 @@ export function CharacterEditor({ character, onClose }: CharacterEditorProps) {
         setIsGeneratingPortrait(false);
       }
     },
-    [providerConfig, character, updateAsset],
+    [providerConfig, project, character, updateAsset],
   );
 
   /**
@@ -226,9 +244,9 @@ export function CharacterEditor({ character, onClose }: CharacterEditorProps) {
   }, [descHistory]);
 
   /**
-   * 手动重新生成定妆照：描述有未保存变更（或英文为空但描述非空）时，
-   * 先派生新英文外貌提示词再生成——保证「改完描述直接点重新生成」用的是新描述，
-   * 而非停留在旧英文；生图与写回委托给 generatePortraitFrom。
+   * 手动重新生成定妆照：仅在英文外貌提示词为空或明确标记为过期时重新派生，
+   * 否则直接复用当前已展示的英文提示词，避免同一次 AI 修改后的二次改写；
+   * 生图与写回委托给 generatePortraitFrom。
    */
   const handleGeneratePortrait = useCallback(async () => {
     if (!providerConfig.apiKey || !providerConfig.baseUrl) return;
@@ -239,15 +257,15 @@ export function CharacterEditor({ character, onClose }: CharacterEditorProps) {
     setError(null);
     try {
       let effectiveAppearance = appearancePrompt.trim();
-      const descriptionChanged = character
-        ? trimmedDescription !== (character.description ?? "").trim()
-        : true;
-      if (descriptionChanged && trimmedDescription) {
-        // 描述有变：先派生新英文；派生失败则中止（用旧提示词生成只会误导）
+      // 只有英文派生物为空或明确标记为过期时才重新调用文本模型。
+      // AI 修改成功后 appearancePrompt 已经是当前描述的最新派生物，不能再拿持久化角色的旧 description 比较，
+      // 否则用户刚看到的新英文提示词会在点击“重新生成”时被无意义地二次改写。
+      if ((appearanceStale || !effectiveAppearance) && trimmedDescription) {
         const derived = await deriveAppearance(trimmedDescription, name.trim() || "（未命名）");
         if (!derived) throw new Error(t("characters.portraitDeriveFailed"));
         effectiveAppearance = derived;
         setAppearancePrompt(derived);
+        setAppearanceStale(false);
       }
       await generatePortraitFrom(effectiveAppearance);
     } catch (err) {
@@ -255,7 +273,7 @@ export function CharacterEditor({ character, onClose }: CharacterEditorProps) {
     } finally {
       setIsGeneratingPortrait(false);
     }
-  }, [appearancePrompt, description, character, providerConfig, name, deriveAppearance, generatePortraitFrom, t]);
+  }, [appearancePrompt, appearanceStale, description, providerConfig, name, deriveAppearance, generatePortraitFrom, t]);
 
   /**
    * Save：描述有变且英文尚未跟随（即时派生失败/跳过）→ 保存时兜底重派生（不耗图片配额）；

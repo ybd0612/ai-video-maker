@@ -13,7 +13,7 @@
 import type { Asset, Project, Shot } from "@/stores/projectStore";
 
 /** 多图合成中参考图的角色语义 */
-export type ReferenceRole = "scene" | "character" | "product" | "style";
+export type ReferenceRole = "scene" | "character" | "product" | "prop" | "style";
 
 /** 风格参考图读取所需的最小项目形状（兼容旧字段，零新列） */
 type StyleRefProject = Pick<Project, "assets" | "styleReferenceUrl">;
@@ -122,6 +122,7 @@ export function composeMultiReferencePrompt(i: {
   // 图像关系：参考图只作锚点，勿复制内容/构图
   parts.push(
     "The reference images only anchor art style, color palette and character identity; do not copy their content or composition.",
+    "Scene, product and prop references anchor only the named asset identity and appearance; do not copy their layout.",
   );
 
   return parts.join(", ");
@@ -134,7 +135,7 @@ const ANIMAL_KEYWORDS = [
   "animal", "rabbit", "bunny", "hare", "cat", "kitten", "dog", "puppy",
   "fox", "bird", "owl", "wolf", "tiger", "lion", "bear", "panda", "deer",
   "horse", "pony", "monkey", "mouse", "squirrel", "dragon", "turtle",
-  "penguin", "elephant", "creature", "fish",
+  "penguin", "elephant", "creature", "fish", "pig", "piglet", "boar",
 ] as const;
 
 /** 产品/实物关键词（同样按首句匹配） */
@@ -160,6 +161,18 @@ function detectSpecies(text: string): "animal" | "product" | "humanoid" {
 /** 通用定妆照尾部（全身设定，禁止半身像/看镜头） */
 const PORTRAIT_TAIL =
   "Full-body character design sheet, consistent identity, clean presentation";
+
+/** 按主体补充正向解剖约束；猪单独写明物种典型结构，避免模型把“正确肢体数量”理解得过于宽泛。 */
+function anatomyConstraint(text: string): string {
+  const sentence = firstSentence(text).toLowerCase();
+  if (/\b(?:pig|piglet|boar)\b/.test(sentence)) {
+    return "Normal pig anatomy: one head, one body, four legs, two ears and one snout; no extra or duplicated limbs, no duplicated or fused body parts";
+  }
+  if (ANIMAL_KEYWORDS.some((keyword) => sentence.includes(keyword))) {
+    return "Normal anatomy for the described animal: one head, one body, correct species-typical limb count and placement; no extra or duplicated limbs, no duplicated or fused body parts";
+  }
+  return "Normal anatomy for the described subject: one head, one body, correct limb count and placement; no duplicated or fused body parts";
+}
 
 /**
  * 定妆照专用提示词：物种词前置 + 物种锁定语汇 + 全身角色设定。
@@ -187,7 +200,7 @@ export function composePortraitPrompt(i: {
       ? `SUBJECT SPECIES LOCK: this subject is a non-human animal (${firstSentence(appearance).toLowerCase()}). Never render it as a human, never add human faces or hands. `
       : "SUBJECT LOCK: strictly preserve the subject type and identity described below; never swap the subject. ";
 
-  return `${lock}${appearance}${stylePart}. ${PORTRAIT_TAIL}`;
+  return `${lock}${appearance}${stylePart}. ${anatomyConstraint(appearance)}. ${PORTRAIT_TAIL}`;
 }
 
 /* ── 分镜图多参考选取 ────────────────────────────────────────────────────── */
@@ -195,11 +208,11 @@ export function composePortraitPrompt(i: {
 /**
  * 分镜图参考图选取（有序去重，总上限 3 张）。
  * 槽位规则（主理人裁决：风格图必须恒保留）：
- * - 场景参考 + 角色定妆照 + 产品图 合计最多取 2 张（按优先级顺序）；
+ * - 场景参考 + 角色定妆照 + 产品图 + 道具图 合计最多取 2 张（按优先级顺序）；
  * - 风格图（getStyleReferenceUrl 结果）恒占末位预留槽：只要有就必保留，
  *   即使非风格参考已满 2 张也会挤掉最后一个非风格项（即非风格项最多 2 张）。
- * 优先级：场景参考（sceneDesc 匹配 → 首个有图场景）→ 角色定妆照
- * （activeCharacterIds 命中）→ 产品图 → 风格图。
+ * 优先级：显式场景 → 文本匹配场景 → 角色定妆照
+ * （activeCharacterIds 命中）→ 显式产品 → 显式道具 → 风格图。
  */
 export function pickShotReferences(
   shot: Shot,
@@ -212,9 +225,11 @@ export function pickShotReferences(
     if (url && !out.includes(url) && out.length < 2) out.push(url);
   };
 
-  // 1. 场景参考：sceneDesc 匹配场景名 → 首个有图场景
+  // 1. 场景参考：优先使用镜头显式场景，其次才用旧数据的文本匹配/首个场景兜底。
   const scenes = project.assets.filter((a) => a.type === "scene");
-  if (shot.sceneDesc?.trim() && scenes.length > 0) {
+  const explicitScene = scenes.find((scene) => scene.id === shot.activeSceneId);
+  if (explicitScene?.imageUrl) pushNonStyle(explicitScene.imageUrl);
+  if (!explicitScene && shot.sceneDesc?.trim() && scenes.length > 0) {
     const shotScene = shot.sceneDesc.toLowerCase();
     const matched = scenes.find(
       (s) => s.imageUrl && shotScene.includes(s.name.toLowerCase()),
@@ -229,10 +244,17 @@ export function pickShotReferences(
     pushNonStyle(c?.imageUrl ?? c?.avatarUrl);
   }
 
-  // 3. 产品图（全局主体锚点，取首个有图产品）
-  pushNonStyle(project.assets.find((a) => a.type === "product" && !!a.imageUrl)?.imageUrl);
+  // 3. 产品图：只使用镜头显式引用，避免把全局产品污染到无关镜头。
+  for (const id of shot.activeProductIds ?? []) {
+    pushNonStyle(project.assets.find((a) => a.id === id && a.type === "product")?.imageUrl);
+  }
 
-  // 4. 风格图：恒占末位预留槽（有则必保留，总上限 3 由非风格 cap=2 保证）
+  // 4. 道具图：只使用镜头显式引用。
+  for (const id of shot.activePropIds ?? []) {
+    pushNonStyle(project.assets.find((a) => a.id === id && a.type === "prop")?.imageUrl);
+  }
+
+  // 5. 风格图：恒占末位预留槽（有则必保留，总上限 3 由非风格 cap=2 保证）
   const styleUrl = getStyleReferenceUrl(project);
   if (styleUrl && !out.includes(styleUrl)) out.push(styleUrl);
 

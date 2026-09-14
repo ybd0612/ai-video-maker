@@ -3,6 +3,8 @@ import { confirmDialog } from "@/components/ui/ConfirmDialog";
 import {
   useProjectStore,
   selectActiveProject,
+  type Asset,
+  type AssetType,
   type Shot,
 } from "@/stores/projectStore";
 import { useSettingsStore } from "@/stores/settingsStore";
@@ -25,12 +27,27 @@ export function useScriptActions(
       generatePortraits?: boolean;
       generateScenes?: boolean;
       generateProducts?: boolean;
+      generateProps?: boolean;
       generateStyle?: boolean;
     },
     projectIdOverride?: string,
   ) => Promise<void>,
 ): ScriptActions {
   const t = useT();
+
+  const resolveAssetId = (ref: string | undefined, assets: Asset[], type: AssetType): string | undefined => {
+    if (!ref?.trim()) return undefined;
+    const candidates = assets.filter((asset) => asset.type === type);
+    const direct = candidates.find((asset) => asset.id === ref);
+    if (direct) return direct.id;
+    const normalized = ref.trim().toLocaleLowerCase();
+    return candidates.find((asset) => asset.name.trim().toLocaleLowerCase() === normalized)?.id;
+  };
+
+  const resolveAssetIds = (refs: string[], assets: Asset[], type: AssetType): string[] =>
+    refs
+      .map((ref) => resolveAssetId(ref, assets, type))
+      .filter((id): id is string => !!id);
 
   /**
    * Step 1→2: Extract characters from idea, advance to assets step.
@@ -78,11 +95,13 @@ export function useScriptActions(
 
       const newCharacters = extractNewAssets(project.assets, result.characters, "character", manualAssets);
       const newProducts = extractNewAssets(project.assets, result.products, "product", manualAssets);
+      const newProps = extractNewAssets(project.assets, result.props, "prop", manualAssets);
       const newScenes = extractNewAssets(project.assets, result.scenes, "scene", manualAssets);
       const newStyles = extractNewAssets(project.assets, result.styles, "style", manualAssets);
       const newAssets = [
         ...newCharacters.assets,
         ...newProducts.assets,
+        ...newProps.assets,
         ...newScenes.assets,
         ...newStyles.assets,
       ];
@@ -100,6 +119,7 @@ export function useScriptActions(
         wizardStep: 2,
         styleReferenceUrl: undefined,
         styleReferenceError: undefined,
+        assetsReviewed: false,
       }));
 
       // 后台生成链路仍按原顺序执行：先风格参考图，再生成角色/场景/产品图。
@@ -151,13 +171,22 @@ export function useScriptActions(
         result.characters,
         "character",
       );
+      const newProducts = extractNewAssets(project.assets, result.products, "product").assets;
+      const newProps = extractNewAssets(project.assets, result.props, "prop").assets;
+      const newScenes = extractNewAssets(project.assets, result.scenes, "scene").assets;
+      const newStyles = extractNewAssets(project.assets, result.styles, "style").assets;
+      const newAssets = [...newCharacters, ...newProducts, ...newProps, ...newScenes, ...newStyles];
+      const assetsForResolution = [...project.assets, ...newAssets];
+
       for (const c of newCharacters) idByName.set(c.name.trim().toLocaleLowerCase(), c.id);
 
       const resolveCharacterId = (ref: string): string | null => {
         const normalized = ref.trim().toLocaleLowerCase();
         const matched = idByName.get(normalized);
         if (matched) return matched;
-        return existingCharacters.some((c) => c.id === ref) ? ref : null;
+        return assetsForResolution.some((asset) => asset.type === "character" && asset.id === ref)
+          ? ref
+          : null;
       };
 
       const shots: Shot[] = result.shots.map((s, i) => ({
@@ -168,6 +197,9 @@ export function useScriptActions(
         activeCharacterIds: (s.activeCharacterIds ?? [])
           .map(resolveCharacterId)
           .filter((x): x is string => x !== null),
+        activeSceneId: resolveAssetId(s.activeSceneId, assetsForResolution, "scene"),
+        activeProductIds: resolveAssetIds(s.activeProductIds ?? [], assetsForResolution, "product"),
+        activePropIds: resolveAssetIds(s.activePropIds ?? [], assetsForResolution, "prop"),
         dialogues: (s.dialogues ?? []).map((d) => ({
           ...d,
           characterId: d.characterId ? resolveCharacterId(d.characterId) : null,
@@ -176,10 +208,6 @@ export function useScriptActions(
 
       store.setShotsByProjectId(targetProjectId, shots);
 
-      const newProducts = extractNewAssets(project.assets, result.products, "product").assets;
-      const newScenes = extractNewAssets(project.assets, result.scenes, "scene").assets;
-      const newStyles = extractNewAssets(project.assets, result.styles, "style").assets;
-      const newAssets = [...newCharacters, ...newProducts, ...newScenes, ...newStyles];
       if (newAssets.length > 0) {
         useProjectStore.getState().updateProjectById(targetProjectId, (p) => ({
           ...p,
@@ -247,8 +275,13 @@ export function useScriptActions(
           if (matched) return matched;
           return existingCharacters.some((c) => c.id === ref) ? ref : null;
         };
+        const resolveRerollAssetId = (ref: string | undefined, type: AssetType): string | undefined =>
+          resolveAssetId(ref, project.assets, type);
         store.updateShotByProjectId(targetProjectId, shotId, {
           ...pickShotFields(newShot),
+          activeSceneId: resolveRerollAssetId(newShot.activeSceneId, "scene"),
+          activeProductIds: resolveAssetIds(newShot.activeProductIds ?? [], project.assets, "product"),
+          activePropIds: resolveAssetIds(newShot.activePropIds ?? [], project.assets, "prop"),
           dialogues: (newShot.dialogues ?? []).map((d) => ({
             ...d,
             characterId: d.characterId ? resolveCharacterId(d.characterId) : null,

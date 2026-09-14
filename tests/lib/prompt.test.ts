@@ -130,17 +130,17 @@ describe("composeVisualPrompt", () => {
     );
   });
 
-  it("visualPrompt 为空时回退到子字段拼装，跳过空字段", () => {
+  it("visualPrompt 为空时回退到带语义标签的子字段，跳过空字段", () => {
     const shot = asShot({
       visualPrompt: "   ",
       subjectDesc: "A woman",
       sceneDesc: "  ",
       detailDesc: "a hat",
     });
-    expect(composeVisualPrompt(shot)).toBe("A woman, a hat");
+    expect(composeVisualPrompt(shot)).toBe("Subject: A woman; Details: a hat");
   });
 
-  it("子字段按 主体/场景/细节/光影/风格 顺序拼装", () => {
+  it("子字段按 主体/场景/细节/光影/风格 顺序拼装，并保留字段语义", () => {
     const shot = asShot({
       subjectDesc: "A woman",
       sceneDesc: "in a cafe",
@@ -148,12 +148,23 @@ describe("composeVisualPrompt", () => {
       lightingDesc: "warm light",
       styleDesc: "8k",
     });
-    expect(composeVisualPrompt(shot)).toBe("A woman, in a cafe, a hat, warm light, 8k");
+    expect(composeVisualPrompt(shot)).toBe(
+      "Subject: A woman; Scene / background: in a cafe; Details: a hat; Lighting / color: warm light; Art style: 8k",
+    );
   });
 
-  it("已知行为：visualPrompt 为纯空白且无子字段时，返回未 trim 的原值", () => {
-    // 兜底分支 `return shot.visualPrompt ?? ""` 不做 trim，纯空白会被原样返回。
-    expect(composeVisualPrompt(asShot({ visualPrompt: "   " }))).toBe("   ");
+  it("完整 visualPrompt 存在时，结构化子字段作为用户约束追加，避免被静默丢弃", () => {
+    const shot = asShot({
+      visualPrompt: "A woman walks through a cafe",
+      sceneDesc: "warm morning light",
+    });
+    expect(composeVisualPrompt(shot)).toBe(
+      "A woman walks through a cafe. User constraints: Scene / background: warm morning light",
+    );
+  });
+
+  it("纯空白 visualPrompt 且无子字段时返回空串", () => {
+    expect(composeVisualPrompt(asShot({ visualPrompt: "   " }))).toBe("");
   });
 
   it("visualPrompt 缺失且无子字段时返回空串", () => {
@@ -166,19 +177,28 @@ describe("composeMotionPrompt", () => {
     expect(composeMotionPrompt(asShot({ motionPrompt: "  camera pans  " }))).toBe("camera pans");
   });
 
-  it("回退时按 动作/运镜/环境变化/速度 顺序拼装", () => {
+  it("回退时按 动作/运镜/环境变化/速度 顺序拼装，并保留字段语义", () => {
     const shot = asShot({
       actionDesc: "turns",
       cameraDesc: "dolly in",
       envChangeDesc: "steam rises",
       motionSpeedDesc: "slow motion",
     });
-    expect(composeMotionPrompt(shot)).toBe("turns, dolly in, steam rises, slow motion");
+    expect(composeMotionPrompt(shot)).toBe(
+      "Action: turns; Camera: dolly in; Environment changes: steam rises; Motion speed: slow motion",
+    );
   });
 
   it("空 motionPrompt 时跳过空子字段", () => {
     const shot = asShot({ motionPrompt: "", actionDesc: "turns", cameraDesc: "dolly in" });
-    expect(composeMotionPrompt(shot)).toBe("turns, dolly in");
+    expect(composeMotionPrompt(shot)).toBe("Action: turns; Camera: dolly in");
+  });
+
+  it("完整 motionPrompt 存在时，结构化动态字段作为用户约束追加", () => {
+    const shot = asShot({ motionPrompt: "The subject walks", actionDesc: "turns slowly" });
+    expect(composeMotionPrompt(shot)).toBe(
+      "The subject walks. User motion constraints: Action: turns slowly",
+    );
   });
 
   it("全部缺失时返回空串", () => {

@@ -62,6 +62,9 @@ export const SKELETONS: Record<PromptTask, { zh: string; en: string }> = {
   "products": [
     { "name": "产品名", "description": "产品简介（类型、用途）", "appearancePrompt": "外观描述（英文，用于 AI 绘图，包含款式、颜色、材质、logo 等）" }
   ],
+  "props": [
+    { "name": "道具名", "description": "道具简介（用途、关键外观特征）", "appearancePrompt": "道具外观描述（英文，用于 AI 绘图，包含材质、颜色、形状、关键细节）" }
+  ],
   "scenes": [
     { "name": "场景名", "description": "场景简介（中文）", "appearancePrompt": "场景英文描述（环境、光线、氛围）" }
   ],
@@ -89,6 +92,9 @@ export const SKELETONS: Record<PromptTask, { zh: string; en: string }> = {
   ],
   "products": [
     { "name": "Product name", "description": "Brief description", "appearancePrompt": "Appearance description in English (style, color, material, logo, etc.)" }
+  ],
+  "props": [
+    { "name": "Prop name", "description": "Brief description (purpose and key visual traits)", "appearancePrompt": "Appearance description in English (material, color, shape and distinctive details)" }
   ],
   "scenes": [
     { "name": "Scene name", "description": "Brief description", "appearancePrompt": "English scene description (environment, lighting, atmosphere)" }
@@ -149,6 +155,9 @@ Examples:
   "shots": [
     {
       "activeCharacterIds": ["char_xxx"],
+      "activeSceneId": "scene_xxx",
+      "activeProductIds": ["product_xxx"],
+      "activePropIds": ["prop_xxx"],
       "dialogues": [
         { "characterId": null, "text": "旁白文本", "delivery": "平静" },
         { "characterId": "char_xxx", "text": "角色台词", "delivery": "温柔地" }
@@ -206,6 +215,13 @@ Return strictly in this JSON format, no other text:
       "appearancePrompt": "Appearance description in English (style, color, material, details, logo, etc. for AI image generation)"
     }
   ],
+  "props": [
+    {
+      "name": "Prop name",
+      "description": "Brief description (purpose and key visual traits)",
+      "appearancePrompt": "Appearance description in English (material, color, shape and distinctive details)"
+    }
+  ],
   "scenes": [
     {
       "name": "Scene name",
@@ -219,6 +235,9 @@ Return strictly in this JSON format, no other text:
   "shots": [
     {
       "activeCharacterIds": ["char_xxx"],
+      "activeSceneId": "scene_xxx",
+      "activeProductIds": ["product_xxx"],
+      "activePropIds": ["prop_xxx"],
       "dialogues": [
         { "characterId": null, "text": "Narrator text", "delivery": "calm" },
         { "characterId": "char_xxx", "text": "Character dialogue", "delivery": "gently" }
@@ -555,6 +574,17 @@ export const BUILTIN_RULES: PromptRule[] = [
     source: "builtin",
   },
   {
+    id: "extract.assets-props",
+    task: "extractAssets",
+    section: "rules",
+    content: {
+      zh: "- props：仅提取会在多个镜头中反复出现、且需要保持外观一致的关键物件（如钥匙、项链、武器、信件）；普通一次性背景物件不要填入",
+      en: "- props: extract only recurring key objects that need visual consistency across shots (such as keys, necklaces, weapons or letters); do not extract incidental background objects",
+    },
+    enabled: true,
+    source: "builtin",
+  },
+  {
     id: "extract.assets-scenes",
     task: "extractAssets",
     section: "rules",
@@ -596,6 +626,17 @@ export const BUILTIN_RULES: PromptRule[] = [
     content: {
       zh: "- products 数组：仅当某个实物是内容的**核心展示主体**（如带货商品、产品广告的主角）时才填写；角色手中/身边的普通道具（如小兔子抱着的胡萝卜）不要填入",
       en: "- products array: ONLY fill when a physical item is the CORE subject being showcased (e.g. a product for an ad). Everyday props held by characters (e.g. a carrot a rabbit hugs) do NOT belong here",
+    },
+    enabled: true,
+    source: "builtin",
+  },
+  {
+    id: "storyboard.assets-props",
+    task: "storyboard",
+    section: "rules",
+    content: {
+      zh: "- props 数组：仅提取会在多个镜头中反复出现、且需要保持外观一致的关键物件（如钥匙、项链、武器、信件）；普通一次性背景物件不要填入",
+      en: "- props array: extract only recurring key objects that need visual consistency across shots (such as keys, necklaces, weapons or letters); do not extract incidental background objects",
     },
     enabled: true,
     source: "builtin",
@@ -752,8 +793,8 @@ export const BUILTIN_RULES: PromptRule[] = [
     task: "characterAppearance",
     section: "rules",
     content: {
-      zh: "- 严格保留用户给定的物种 / 类型 / 主体。兔子就是兔子，猫就是猫，机器人就是机器人，产品就是该产品。\n- 绝不把非人类主体变成人类，也绝不擅自加入未被要求的人类。\n- 保留主体的角色与场景设定（如故事主角）——你只描述它的外观。",
-      en: "- STRICTLY keep the species / type / subject given by the user. A rabbit stays a rabbit, a cat stays a cat, a robot stays a robot, a product stays that product.\n- NEVER turn a non-human subject into a human, and never introduce humans that were not requested.\n- Keep the subject's role and setting (e.g. a story protagonist) — you only describe how it LOOKS.",
+      zh: "- 严格保留用户给定的物种 / 类型 / 主体。兔子就是兔子，猫就是猫，机器人就是机器人，产品就是该产品。\n- 绝不把非人类主体变成人类，也绝不擅自加入未被要求的人类。\n- 除非描述明确要求虚构例外，否则保持主体的正常解剖结构：一个头、一个身体、符合物种的肢体数量与位置；绝不凭空增加头、肢体、尾巴，也不生成重复或融合的身体部位。\n- 保留主体的角色与场景设定（如故事主角）——你只描述它的外观。",
+      en: "- STRICTLY keep the species / type / subject given by the user. A rabbit stays a rabbit, a cat stays a cat, a robot stays a robot, a product stays that product.\n- NEVER turn a non-human subject into a human, and never introduce humans that were not requested.\n- Unless the description explicitly requests a fictional exception, preserve normal anatomy: one head, one body, and the correct number and placement of limbs for the species; never invent extra heads, limbs or tails, or duplicated/fused body parts.\n- Keep the subject's role and setting (e.g. a story protagonist) — you only describe how it LOOKS.",
     },
     enabled: true,
     source: "builtin",

@@ -29,11 +29,13 @@ export function CreationWizard() {
   const canAdvance = (() => {
     switch (currentStep) {
       case 1: return !!project?.ideaPrompt?.trim();
-      // 步骤 2 无资产也可直接下一步（等价跳过）：纯想法项目无需资产，
-      // 与显式“跳过”按钮语义一致，消除“下一步禁用 + 跳过可用”的矛盾。
-      case 2: return true;
-      case 3: return shots.length > 0 && shots.every((s) => s.scriptText.trim());
-      case 4: return shots.length > 0 && shots.every((s) => !!s.imageUrl);
+      // 半自动流程必须通过 StepAssets 自己的审核卡点进入分镜；
+      // 这里也保留门禁，防止外部导航或恢复旧状态绕过审核。
+      case 2: return project?.automationMode === "auto" || project?.assetsReviewed === true;
+      case 3: return shots.length > 0 && shots.every((s) => s.scriptText.trim()) &&
+        (project?.automationMode === "auto" || project?.storyboardReviewed === true);
+      case 4: return shots.length > 0 && shots.every((s) => !!s.imageUrl) &&
+        (project?.automationMode === "auto" || project?.imagesReviewed === true);
       case 5: return shots.length > 0 && shots.every((s) => !!s.videoUrl);
       case 6: return false; // last step
       default: return false;

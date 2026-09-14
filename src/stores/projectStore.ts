@@ -40,7 +40,7 @@ export type AutomationMode = 'auto' | 'semi-auto';
 /* ── Asset model（角色/场景/产品统一为资产） ────────────────────────────── */
 
 /** 资产类型：style 为整体风格锚点（B 方案新增，复用现有字段零新列） */
-export type AssetType = "character" | "scene" | "product" | "style";
+export type AssetType = "character" | "scene" | "product" | "prop" | "style";
 
 /** 资产派生元数据（懒派生 dirty + 锁定）。缺省视为 { locked: false, dirty: false } */
 export interface AssetDerivation {
@@ -88,6 +88,8 @@ export interface Asset {
   source?: "extracted" | "manual";
   /** L2 派生元数据（懒派生 dirty + 锁定）。缺省视为 { locked: false, dirty: false } */
   derivation?: AssetDerivation;
+  /** 资产渲染输入版本；用于丢弃修改发生后返回的过期异步生成结果 */
+  renderRevision?: number;
 }
 
 export interface DialogueLine {
@@ -104,6 +106,12 @@ export interface Shot {
   motionPrompt: string;
   dialogues: DialogueLine[];
   activeCharacterIds: string[];
+  /** 镜头显式引用的场景（一个镜头通常只有一个主场景） */
+  activeSceneId?: string;
+  /** 镜头显式引用的产品主体 */
+  activeProductIds: string[];
+  /** 镜头显式引用的道具 / 关键物件 */
+  activePropIds: string[];
   duration: number;
   status: ShotStatus;
   imageUrl?: string;
@@ -130,6 +138,8 @@ export interface Shot {
   useDualFrame: boolean;
   /** 提示词派生锁定（画面/动态各自独立，B 方案新增） */
   derivation?: ShotDerivation;
+  /** 画面/动态输入版本；用于丢弃修改发生后返回的过期异步生成结果 */
+  renderRevision?: number;
 }
 
 export interface ChatTurn {
@@ -157,6 +167,12 @@ export interface Project {
   ideaChatHistory?: ChatTurn[];
   /** Step 2: overall style reference image URL */
   styleReferenceUrl?: string;
+  /** semi-auto 模式下用户是否已审核资产；缺省视为未审核 */
+  assetsReviewed?: boolean;
+  /** semi-auto 模式下用户是否已审核分镜；缺省视为未审核 */
+  storyboardReviewed?: boolean;
+  /** semi-auto 模式下用户是否已审核图片；缺省视为未审核 */
+  imagesReviewed?: boolean;
   /** 风格参考图生成失败原因 */
   styleReferenceError?: string;
   /** 步骤级生成标记：防止导航切换后重复触发 */
@@ -212,7 +228,7 @@ interface ProjectState {
   /* Project actions */
   createProject: (title: string) => Project;
   switchProject: (id: string) => void;
-  updateProject: (updates: Partial<Pick<Project, "title" | "aspectRatio" | "style" | "language" | "ideaPrompt" | "ideaChatHistory" | "assets" | "styleReferenceUrl" | "assetGenerationStarted" | "imageGenerationStarted" | "videoGenerationStarted">>) => void;
+  updateProject: (updates: Partial<Pick<Project, "title" | "aspectRatio" | "style" | "language" | "ideaPrompt" | "ideaChatHistory" | "assets" | "styleReferenceUrl" | "assetsReviewed" | "storyboardReviewed" | "imagesReviewed" | "assetGenerationStarted" | "imageGenerationStarted" | "videoGenerationStarted">>) => void;
   /** 按 ID 更新指定项目（用于异步操作完成后写回发起项目，而非当前活跃项目，避免跨项目污染） */
   updateProjectById: (projectId: string, updater: (p: Project) => Project) => void;
   deleteProject: (id: string) => void;
@@ -227,15 +243,37 @@ interface ProjectState {
   addShot: (shot: Omit<Shot, "id" | "index" | "status">) => Shot;
   updateShot: (id: string, updates: Partial<Omit<Shot, "id" | "index">>) => void;
   updateShotByProjectId: (projectId: string, id: string, updates: Partial<Omit<Shot, "id" | "index">>) => void;
+  /** 仅当镜头输入版本未变化时写回异步结果；返回是否成功写入。 */
+  updateShotByProjectIdIfRevision: (
+    projectId: string,
+    id: string,
+    expectedRevision: number,
+    updates: Partial<Omit<Shot, "id" | "index">>,
+  ) => boolean;
   removeShot: (id: string) => void;
   reorderShots: (fromIndex: number, toIndex: number) => void;
   setShotStatus: (id: string, status: ShotStatus, error?: string) => void;
   setShotStatusByProjectId: (projectId: string, id: string, status: ShotStatus, error?: string) => void;
+  /** 仅当镜头输入版本未变化时写回异步状态。 */
+  setShotStatusByProjectIdIfRevision: (
+    projectId: string,
+    id: string,
+    expectedRevision: number,
+    status: ShotStatus,
+    error?: string,
+  ) => boolean;
 
   /* Asset actions（角色/场景/产品统一资产） */
   addAsset: (asset: Omit<Asset, "id">) => Asset;
   updateAsset: (id: string, updates: Partial<Omit<Asset, "id">>) => void;
   updateAssetByProjectId: (projectId: string, id: string, updates: Partial<Omit<Asset, "id">>) => void;
+  /** 仅当资产输入版本未变化时写回异步结果；返回是否成功写入。 */
+  updateAssetByProjectIdIfRevision: (
+    projectId: string,
+    id: string,
+    expectedRevision: number,
+    updates: Partial<Omit<Asset, "id">>,
+  ) => boolean;
   removeAsset: (id: string) => void;
 
   /* Wizard step */
@@ -250,6 +288,9 @@ interface ProjectState {
   removeDialogueLine: (shotId: string, lineId: string) => void;
   reorderDialogueLines: (shotId: string, fromIndex: number, toIndex: number) => void;
   setActiveCharacters: (shotId: string, characterIds: string[]) => void;
+  setActiveScene: (shotId: string, sceneId: string | undefined) => void;
+  setActiveProducts: (shotId: string, productIds: string[]) => void;
+  setActiveProps: (shotId: string, propIds: string[]) => void;
 
   /* Generation started flags */
   setAssetGenerationStarted: (v: boolean) => void;
@@ -275,10 +316,197 @@ function updateActive(
   return projects.map((p) => (p.id === activeProjectId ? updater(p) : p));
 }
 
+type ShotUpdates = Partial<Omit<Shot, "id" | "index">>;
+type AssetUpdates = Partial<Omit<Asset, "id">>;
+
+const VISUAL_SHOT_FIELDS = [
+  "scriptText",
+  "visualPrompt",
+  "subjectDesc",
+  "sceneDesc",
+  "detailDesc",
+  "lightingDesc",
+  "styleDesc",
+  "negativePrompt",
+  "activeCharacterIds",
+  "activeSceneId",
+  "activeProductIds",
+  "activePropIds",
+] as const;
+
+const MOTION_SHOT_FIELDS = [
+  "motionPrompt",
+  "actionDesc",
+  "cameraDesc",
+  "envChangeDesc",
+  "motionSpeedDesc",
+  "negativeMotionPrompt",
+  "duration",
+  "useDualFrame",
+  "firstFrameUrl",
+  "lastFrameUrl",
+] as const;
+
+const STORYBOARD_SHOT_FIELDS = [
+  ...VISUAL_SHOT_FIELDS,
+  ...MOTION_SHOT_FIELDS,
+  "dialogues",
+] as const;
+
+function hasAnyField(updates: object, fields: readonly string[]): boolean {
+  return fields.some((field) => field in updates);
+}
+
+function hasShotScript(shot: Pick<Shot, "scriptText">): boolean {
+  return typeof shot.scriptText === "string" && shot.scriptText.trim().length > 0;
+}
+
+/**
+ * 用户修改分镜内容后，只使受影响的下游产物失效：
+ * - 画面字段变化：图片和视频都必须重做；
+ * - 动态字段变化：保留图片，只使视频失效。
+ * 生成器只写 imageUrl/videoUrl/status 等产物字段时不会触发这里的失效逻辑。
+ */
+export function applyShotUpdates(shot: Shot, updates: ShotUpdates): Shot {
+  const visualChanged = hasAnyField(updates, VISUAL_SHOT_FIELDS);
+  const motionChanged = hasAnyField(updates, MOTION_SHOT_FIELDS);
+  const outputChanged =
+    ("imageUrl" in updates && updates.imageUrl !== shot.imageUrl) ||
+    ("videoUrl" in updates && updates.videoUrl !== shot.videoUrl);
+  const renderChanged = visualChanged || motionChanged || outputChanged;
+  const next = {
+    ...shot,
+    ...updates,
+    ...(renderChanged
+      ? { renderRevision: (shot.renderRevision ?? 0) + 1 }
+      : {}),
+  };
+
+  // 写入新图片后，旧视频已经不再对应当前画面；生成器通常只传
+  // imageUrl + status，因此这里统一清理旧视频产物和旧错误状态。
+  if ("imageUrl" in updates && !("videoUrl" in updates)) {
+    return {
+      ...next,
+      videoUrl: undefined,
+      videoProgress: undefined,
+      videoRetryCount: undefined,
+      error: "error" in updates ? next.error : undefined,
+    };
+  }
+
+  // 写入新视频后，进度/重试次数属于运行时字段，不应残留到完成结果。
+  if ("videoUrl" in updates) {
+    return {
+      ...next,
+      videoProgress: undefined,
+      videoRetryCount: undefined,
+      error: "error" in updates ? next.error : undefined,
+    };
+  }
+
+  if (visualChanged) {
+    return {
+      ...next,
+      imageUrl: undefined,
+      videoUrl: undefined,
+      videoProgress: undefined,
+      videoRetryCount: undefined,
+      status: hasShotScript(next) ? "scripted" : "idle",
+      error: undefined,
+    };
+  }
+
+  if (motionChanged) {
+    return {
+      ...next,
+      videoUrl: undefined,
+      videoProgress: undefined,
+      videoRetryCount: undefined,
+      status: next.imageUrl
+        ? "imaged"
+        : hasShotScript(next)
+          ? "scripted"
+          : "idle",
+      error: undefined,
+    };
+  }
+
+  return next;
+}
+
+function shotUsesAsset(shot: Shot, asset: Asset): boolean {
+  if (asset.type === "style") return true;
+  if (asset.type === "character") return (shot.activeCharacterIds ?? []).includes(asset.id);
+  if (asset.type === "scene") return shot.activeSceneId === asset.id;
+  if (asset.type === "product") return (shot.activeProductIds ?? []).includes(asset.id);
+  return (shot.activePropIds ?? []).includes(asset.id);
+}
+
+function assetRenderFieldsChanged(asset: Asset, updates: AssetUpdates): boolean {
+  const fields: Array<keyof Omit<Asset, "id">> = [
+    "type",
+    "name",
+    "description",
+    "prompt",
+    "appearancePrompt",
+    "imageUrl",
+    "avatarUrl",
+    "multiViewUrl",
+  ];
+  return fields.some((field) => field in updates && updates[field] !== asset[field]);
+}
+
+function invalidateShotForAsset(shot: Shot): Shot {
+  return {
+    ...shot,
+    renderRevision: (shot.renderRevision ?? 0) + 1,
+    imageUrl: undefined,
+    videoUrl: undefined,
+    videoProgress: undefined,
+    videoRetryCount: undefined,
+    status: hasShotScript(shot) ? "scripted" : "idle",
+    error: undefined,
+  };
+}
+
+export function applyAssetUpdate(project: Project, id: string, updates: AssetUpdates): Project {
+  const currentAsset = project.assets.find((asset) => asset.id === id);
+  if (!currentAsset) return project;
+
+  const shouldInvalidate = assetRenderFieldsChanged(currentAsset, updates);
+  const nextAsset = {
+    ...currentAsset,
+    ...updates,
+    ...(shouldInvalidate
+      ? { renderRevision: (currentAsset.renderRevision ?? 0) + 1 }
+      : {}),
+  };
+  const nextType = nextAsset.type;
+  const nextProject = {
+    ...project,
+    assets: project.assets.map((asset) => (asset.id === id ? nextAsset : asset)),
+    assetsReviewed: shouldInvalidate ? false : project.assetsReviewed,
+    imagesReviewed: shouldInvalidate ? false : project.imagesReviewed,
+    storyboardReviewed: shouldInvalidate ? false : project.storyboardReviewed,
+  };
+
+  if (!shouldInvalidate) return nextProject;
+
+  return {
+    ...nextProject,
+    shots: project.shots.map((shot) =>
+      shotUsesAsset(shot, currentAsset) ||
+      (nextType !== currentAsset.type && shotUsesAsset(shot, nextAsset))
+        ? invalidateShotForAsset(shot)
+        : shot,
+    ),
+  };
+}
+
 /* ── Persisted-state migration（导出纯函数，便于单测） ───────────────────── */
 
 /**
- * persist 存储迁移主体（纯函数）：v1→v10 全链路迁移。
+ * persist 存储迁移主体（纯函数）：v1→v11 全链路迁移。
  * 与 store 实例解耦，tests/stores/projectMigrate.test.ts 可直接调用；
  * 对缺字段/坏结构不抛错，重复执行幂等。
  */
@@ -315,6 +543,8 @@ export function migratePersistedState(
             ...s,
             dialogues: [],
             activeCharacterIds: [],
+            activeProductIds: [],
+            activePropIds: [],
           }),
         ),
       }));
@@ -478,6 +708,40 @@ export function migratePersistedState(
     }
   }
 
+  // Migrate from v10 to v11: normalize shot reference arrays introduced by
+  // the explicit scene/product/prop reference contract. Persisted v10 data
+  // may have been written before those optional arrays existed.
+  if (version < 11) {
+    const projects = state.projects;
+    if (Array.isArray(projects)) {
+      state.projects = (projects as unknown[]).map((p) => {
+        if (!p || typeof p !== "object") return p;
+        const project = p as Record<string, unknown>;
+        if (!Array.isArray(project.shots)) return p;
+        return {
+          ...project,
+          shots: (project.shots as unknown[]).map((s) => {
+            if (!s || typeof s !== "object") return s;
+            const shot = s as Record<string, unknown>;
+            return {
+              ...shot,
+              dialogues: Array.isArray(shot.dialogues) ? shot.dialogues : [],
+              activeCharacterIds: Array.isArray(shot.activeCharacterIds)
+                ? shot.activeCharacterIds
+                : [],
+              activeProductIds: Array.isArray(shot.activeProductIds)
+                ? shot.activeProductIds
+                : [],
+              activePropIds: Array.isArray(shot.activePropIds)
+                ? shot.activePropIds
+                : [],
+            };
+          }),
+        };
+      });
+    }
+  }
+
   return state;
 }
 
@@ -508,6 +772,9 @@ export const useProjectStore = create<ProjectState>()(
           assetGenerationStarted: false,
           imageGenerationStarted: false,
           videoGenerationStarted: false,
+          assetsReviewed: false,
+          storyboardReviewed: false,
+          imagesReviewed: false,
           createdAt: now,
           updatedAt: now,
         };
@@ -630,6 +897,8 @@ export const useProjectStore = create<ProjectState>()(
           projects: updateActive(s.projects, s.activeProjectId, (p) => ({
             ...p,
             shots: shots.map((sh, i) => ({ ...sh, index: i })),
+            storyboardReviewed: false,
+            imagesReviewed: false,
             updatedAt: Date.now(),
           })),
         })),
@@ -638,7 +907,13 @@ export const useProjectStore = create<ProjectState>()(
         set((s) => ({
           projects: s.projects.map((p) =>
             p.id === projectId
-              ? { ...p, shots: shots.map((sh, i) => ({ ...sh, index: i })), updatedAt: Date.now() }
+              ? {
+                  ...p,
+                  shots: shots.map((sh, i) => ({ ...sh, index: i })),
+                  storyboardReviewed: false,
+                  imagesReviewed: false,
+                  updatedAt: Date.now(),
+                }
               : p,
           ),
         })),
@@ -654,6 +929,8 @@ export const useProjectStore = create<ProjectState>()(
           projects: updateActive(s.projects, s.activeProjectId, (p) => ({
             ...p,
             shots: [...p.shots, newShot],
+            storyboardReviewed: false,
+            imagesReviewed: false,
             updatedAt: Date.now(),
           })),
         }));
@@ -665,8 +942,14 @@ export const useProjectStore = create<ProjectState>()(
           projects: updateActive(s.projects, s.activeProjectId, (p) => ({
             ...p,
             shots: p.shots.map((sh) =>
-              sh.id === id ? { ...sh, ...updates } : sh,
+              sh.id === id ? applyShotUpdates(sh, updates) : sh,
             ),
+            storyboardReviewed: hasAnyField(updates, STORYBOARD_SHOT_FIELDS)
+              ? false
+              : p.storyboardReviewed,
+            imagesReviewed: hasAnyField(updates, VISUAL_SHOT_FIELDS) || "imageUrl" in updates
+              ? false
+              : p.imagesReviewed,
             updatedAt: Date.now(),
           })),
         })),
@@ -677,12 +960,46 @@ export const useProjectStore = create<ProjectState>()(
             p.id === projectId
               ? {
                   ...p,
-                  shots: p.shots.map((sh) => sh.id === id ? { ...sh, ...updates } : sh),
+                  shots: p.shots.map((sh) =>
+                    sh.id === id ? applyShotUpdates(sh, updates) : sh,
+                  ),
+                  storyboardReviewed: hasAnyField(updates, STORYBOARD_SHOT_FIELDS)
+                    ? false
+                    : p.storyboardReviewed,
+                  imagesReviewed: hasAnyField(updates, VISUAL_SHOT_FIELDS) || "imageUrl" in updates
+                    ? false
+                    : p.imagesReviewed,
                   updatedAt: Date.now(),
                 }
               : p,
           ),
         })),
+
+      updateShotByProjectIdIfRevision: (projectId, id, expectedRevision, updates) => {
+        let updated = false;
+        set((s) => ({
+          projects: s.projects.map((p) => {
+            if (p.id !== projectId) return p;
+            const shot = p.shots.find((item) => item.id === id);
+            if (!shot || (shot.renderRevision ?? 0) !== expectedRevision) return p;
+            updated = true;
+            return {
+              ...p,
+              shots: p.shots.map((sh) =>
+                sh.id === id ? applyShotUpdates(sh, updates) : sh,
+              ),
+              storyboardReviewed: hasAnyField(updates, STORYBOARD_SHOT_FIELDS)
+                ? false
+                : p.storyboardReviewed,
+              imagesReviewed: hasAnyField(updates, VISUAL_SHOT_FIELDS) || "imageUrl" in updates
+                ? false
+                : p.imagesReviewed,
+              updatedAt: Date.now(),
+            };
+          }),
+        }));
+        return updated;
+      },
 
       removeShot: (id) =>
         set((s) => ({
@@ -691,6 +1008,8 @@ export const useProjectStore = create<ProjectState>()(
             shots: p.shots
               .filter((sh) => sh.id !== id)
               .map((sh, i) => ({ ...sh, index: i })),
+            storyboardReviewed: false,
+            imagesReviewed: false,
             updatedAt: Date.now(),
           })),
         })),
@@ -705,6 +1024,8 @@ export const useProjectStore = create<ProjectState>()(
             return {
               ...p,
               shots: shots.map((sh, i) => ({ ...sh, index: i })),
+              storyboardReviewed: false,
+              imagesReviewed: false,
               updatedAt: Date.now(),
             };
           }),
@@ -734,6 +1055,24 @@ export const useProjectStore = create<ProjectState>()(
           ),
         })),
 
+      setShotStatusByProjectIdIfRevision: (projectId, id, expectedRevision, status, error) => {
+        let updated = false;
+        set((s) => ({
+          projects: s.projects.map((p) => {
+            if (p.id !== projectId) return p;
+            const shot = p.shots.find((item) => item.id === id);
+            if (!shot || (shot.renderRevision ?? 0) !== expectedRevision) return p;
+            updated = true;
+            return {
+              ...p,
+              shots: p.shots.map((sh) => sh.id === id ? { ...sh, status, error } : sh),
+              updatedAt: Date.now(),
+            };
+          }),
+        }));
+        return updated;
+      },
+
       /* ── Asset actions（角色/场景/产品统一资产） ─────────────────────── */
 
       addAsset: (asset) => {
@@ -743,6 +1082,7 @@ export const useProjectStore = create<ProjectState>()(
           projects: updateActive(s.projects, s.activeProjectId, (p) => ({
             ...p,
             assets: [...p.assets, newAsset],
+            assetsReviewed: false,
             updatedAt: Date.now(),
           })),
         }));
@@ -752,10 +1092,7 @@ export const useProjectStore = create<ProjectState>()(
       updateAsset: (id, updates) =>
         set((s) => ({
           projects: updateActive(s.projects, s.activeProjectId, (p) => ({
-            ...p,
-            assets: p.assets.map((a) =>
-              a.id === id ? { ...a, ...updates } : a,
-            ),
+            ...applyAssetUpdate(p, id, updates),
             updatedAt: Date.now(),
           })),
         })),
@@ -764,24 +1101,53 @@ export const useProjectStore = create<ProjectState>()(
         set((s) => ({
           projects: s.projects.map((p) =>
             p.id === projectId
-              ? { ...p, assets: p.assets.map((a) => a.id === id ? { ...a, ...updates } : a), updatedAt: Date.now() }
+              ? { ...applyAssetUpdate(p, id, updates), updatedAt: Date.now() }
               : p,
           ),
         })),
+
+      updateAssetByProjectIdIfRevision: (projectId, id, expectedRevision, updates) => {
+        let updated = false;
+        set((s) => ({
+          projects: s.projects.map((p) => {
+            if (p.id !== projectId) return p;
+            const asset = p.assets.find((item) => item.id === id);
+            if (!asset || (asset.renderRevision ?? 0) !== expectedRevision) return p;
+            updated = true;
+            return { ...applyAssetUpdate(p, id, updates), updatedAt: Date.now() };
+          }),
+        }));
+        return updated;
+      },
 
       removeAsset: (id) =>
         set((s) => ({
           projects: updateActive(s.projects, s.activeProjectId, (p) => ({
             ...p,
             assets: p.assets.filter((a) => a.id !== id),
-            // 删除角色时清理其对白引用与镜头角色选择（产品/场景无引用关系）
-            shots: p.shots.map((sh) => ({
-              ...sh,
-              activeCharacterIds: sh.activeCharacterIds.filter((cid) => cid !== id),
-              dialogues: sh.dialogues.map((d) =>
-                d.characterId === id ? { ...d, characterId: null } : d,
-              ),
-            })),
+            // 删除资产时清理镜头引用；受影响镜头的图片/视频也必须失效，避免继续使用已删除的参考图。
+            assetsReviewed: false,
+            storyboardReviewed: false,
+            imagesReviewed: false,
+            shots: p.shots.map((sh) => {
+              const nextShot = {
+                ...sh,
+                activeCharacterIds: (sh.activeCharacterIds ?? []).filter((cid) => cid !== id),
+                activeSceneId: sh.activeSceneId === id ? undefined : sh.activeSceneId,
+                activeProductIds: (sh.activeProductIds ?? []).filter((assetId) => assetId !== id),
+                activePropIds: (sh.activePropIds ?? []).filter((assetId) => assetId !== id),
+                dialogues: (sh.dialogues ?? []).map((d) =>
+                  d.characterId === id ? { ...d, characterId: null } : d,
+                ),
+              };
+              return nextShot.activeCharacterIds.length !== (sh.activeCharacterIds ?? []).length ||
+                nextShot.activeSceneId !== sh.activeSceneId ||
+                nextShot.activeProductIds.length !== (sh.activeProductIds ?? []).length ||
+                nextShot.activePropIds.length !== (sh.activePropIds ?? []).length ||
+                nextShot.dialogues.some((line, index) => line.characterId !== sh.dialogues?.[index]?.characterId)
+                ? invalidateShotForAsset(nextShot)
+                : nextShot;
+            }),
             updatedAt: Date.now(),
           })),
         })),
@@ -813,9 +1179,11 @@ export const useProjectStore = create<ProjectState>()(
             ...p,
             shots: p.shots.map((sh) =>
               sh.id === shotId
-                ? { ...sh, dialogues: [...sh.dialogues, newLine] }
+                ? applyShotUpdates(sh, { dialogues: [...(sh.dialogues ?? []), newLine] })
                 : sh,
             ),
+            storyboardReviewed: false,
+            imagesReviewed: false,
             updatedAt: Date.now(),
           })),
         }));
@@ -827,14 +1195,15 @@ export const useProjectStore = create<ProjectState>()(
             ...p,
             shots: p.shots.map((sh) =>
               sh.id === shotId
-                ? {
-                    ...sh,
-                    dialogues: sh.dialogues.map((d) =>
+                ? applyShotUpdates(sh, {
+                    dialogues: (sh.dialogues ?? []).map((d) =>
                       d.id === lineId ? { ...d, ...updates } : d,
                     ),
-                  }
+                  })
                 : sh,
             ),
+            storyboardReviewed: false,
+            imagesReviewed: false,
             updatedAt: Date.now(),
           })),
         })),
@@ -845,27 +1214,36 @@ export const useProjectStore = create<ProjectState>()(
             ...p,
             shots: p.shots.map((sh) =>
               sh.id === shotId
-                ? { ...sh, dialogues: sh.dialogues.filter((d) => d.id !== lineId) }
+                ? applyShotUpdates(sh, { dialogues: (sh.dialogues ?? []).filter((d) => d.id !== lineId) })
                 : sh,
             ),
+            storyboardReviewed: false,
+            imagesReviewed: false,
             updatedAt: Date.now(),
           })),
         })),
 
       reorderDialogueLines: (shotId, fromIndex, toIndex) =>
         set((s) => ({
-          projects: updateActive(s.projects, s.activeProjectId, (p) => ({
-            ...p,
-            shots: p.shots.map((sh) => {
+          projects: updateActive(s.projects, s.activeProjectId, (p) => {
+            let changed = false;
+            const shots = p.shots.map((sh) => {
               if (sh.id !== shotId) return sh;
-              const lines = [...sh.dialogues];
+              const lines = [...(sh.dialogues ?? [])];
               const [moved] = lines.splice(fromIndex, 1);
               if (!moved) return sh;
               lines.splice(toIndex, 0, moved);
-              return { ...sh, dialogues: lines };
-            }),
-            updatedAt: Date.now(),
-          })),
+              changed = true;
+              return applyShotUpdates(sh, { dialogues: lines });
+            });
+            return {
+              ...p,
+              shots,
+              storyboardReviewed: changed ? false : p.storyboardReviewed,
+              imagesReviewed: changed ? false : p.imagesReviewed,
+              updatedAt: Date.now(),
+            };
+          }),
         })),
 
       setActiveCharacters: (shotId, characterIds) =>
@@ -873,8 +1251,49 @@ export const useProjectStore = create<ProjectState>()(
           projects: updateActive(s.projects, s.activeProjectId, (p) => ({
             ...p,
             shots: p.shots.map((sh) =>
-              sh.id === shotId ? { ...sh, activeCharacterIds: characterIds } : sh,
+              sh.id === shotId ? applyShotUpdates(sh, { activeCharacterIds: characterIds }) : sh,
             ),
+            storyboardReviewed: false,
+            imagesReviewed: false,
+            updatedAt: Date.now(),
+          })),
+        })),
+
+      setActiveScene: (shotId, sceneId) =>
+        set((s) => ({
+          projects: updateActive(s.projects, s.activeProjectId, (p) => ({
+            ...p,
+            shots: p.shots.map((sh) =>
+              sh.id === shotId ? applyShotUpdates(sh, { activeSceneId: sceneId }) : sh,
+            ),
+            storyboardReviewed: false,
+            imagesReviewed: false,
+            updatedAt: Date.now(),
+          })),
+        })),
+
+      setActiveProducts: (shotId, productIds) =>
+        set((s) => ({
+          projects: updateActive(s.projects, s.activeProjectId, (p) => ({
+            ...p,
+            shots: p.shots.map((sh) =>
+              sh.id === shotId ? applyShotUpdates(sh, { activeProductIds: productIds }) : sh,
+            ),
+            storyboardReviewed: false,
+            imagesReviewed: false,
+            updatedAt: Date.now(),
+          })),
+        })),
+
+      setActiveProps: (shotId, propIds) =>
+        set((s) => ({
+          projects: updateActive(s.projects, s.activeProjectId, (p) => ({
+            ...p,
+            shots: p.shots.map((sh) =>
+              sh.id === shotId ? applyShotUpdates(sh, { activePropIds: propIds }) : sh,
+            ),
+            storyboardReviewed: false,
+            imagesReviewed: false,
             updatedAt: Date.now(),
           })),
         })),
@@ -938,7 +1357,7 @@ export const useProjectStore = create<ProjectState>()(
     }),
     {
       name: "wxhb-project",
-      version: 10,
+      version: 11,
       // 迁移主体提取为导出纯函数 migratePersistedState（见文件上方），便于单测
       migrate: (persisted: unknown, version: number) =>
         migratePersistedState(persisted, version),
