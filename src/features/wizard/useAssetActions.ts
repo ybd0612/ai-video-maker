@@ -56,6 +56,14 @@ async function deriveStylePrompt(
   styleDescription: string,
   apiKey: string,
   baseUrl: string,
+  visualDirection?: {
+    mediumMaterial: string;
+    colorPalette: string;
+    lightingMood: string;
+    cameraTexture: string;
+    composition: string;
+    emotion: string;
+  },
 ): Promise<string> {
   const idea = ideaPrompt.trim();
   const zhStyle = styleDescription.trim();
@@ -65,6 +73,16 @@ async function deriveStylePrompt(
       const userContent = [
         idea ? `Story idea: ${idea.slice(0, 600)}` : "",
         zhStyle ? `Desired style (Chinese): ${zhStyle}` : "",
+        visualDirection
+          ? [
+              `Medium and material: ${visualDirection.mediumMaterial}`,
+              `Color palette: ${visualDirection.colorPalette}`,
+              `Lighting and mood: ${visualDirection.lightingMood}`,
+              `Camera texture: ${visualDirection.cameraTexture}`,
+              `Composition: ${visualDirection.composition}`,
+              `Emotion: ${visualDirection.emotion}`,
+            ].filter((value) => !value.endsWith(": ")).join("\n")
+          : "",
       ]
         .filter(Boolean)
         .join("\n");
@@ -134,6 +152,7 @@ export function useAssetActions(): AssetActions {
           styleAsset.description.trim() || latest.style.trim(),
           providerConfig.apiKey,
           providerConfig.baseUrl,
+          latest.visualDirection,
         );
         const applied = useProjectStore.getState().updateAssetByProjectIdIfRevision(
           pid,
@@ -188,7 +207,7 @@ export function useAssetActions(): AssetActions {
     }
   }, []);
 
-  /** Step 2: Generate asset images (character portraits + scene/product references). */
+  /** Step 2: Generate asset images immediately after asset extraction (character portraits + scene/product references). */
   const generateAssetImages = useCallback(async (
     opts?: AssetGenerationOptions,
     projectIdOverride?: string,

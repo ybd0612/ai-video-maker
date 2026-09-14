@@ -37,6 +37,19 @@ export type WizardStep = 1 | 2 | 3 | 4 | 5 | 6;
 
 export type AutomationMode = 'auto' | 'semi-auto';
 
+/** 项目级视觉方向：资产与分镜共享的视觉母版。旧项目通过 style 字段兼容。 */
+export interface VisualDirection {
+  name: string;
+  mediumMaterial: string;
+  colorPalette: string;
+  lightingMood: string;
+  cameraTexture: string;
+  composition: string;
+  emotion: string;
+  revision: number;
+  status: "draft" | "confirmed" | "stale";
+}
+
 /* ── Asset model（角色/场景/产品统一为资产） ────────────────────────────── */
 
 /** 资产类型：style 为整体风格锚点（B 方案新增，复用现有字段零新列） */
@@ -155,6 +168,8 @@ export interface Project {
   assets: Asset[];
   aspectRatio: AspectRatio;
   style: string;
+  /** 结构化视觉方向；style 与 style 资产仅作为历史兼容字段。 */
+  visualDirection?: VisualDirection;
   language: "zh" | "en";
   shots: Shot[];
   status: ProjectStatus;
@@ -228,7 +243,7 @@ interface ProjectState {
   /* Project actions */
   createProject: (title: string) => Project;
   switchProject: (id: string) => void;
-  updateProject: (updates: Partial<Pick<Project, "title" | "aspectRatio" | "style" | "language" | "ideaPrompt" | "ideaChatHistory" | "assets" | "styleReferenceUrl" | "assetsReviewed" | "storyboardReviewed" | "imagesReviewed" | "assetGenerationStarted" | "imageGenerationStarted" | "videoGenerationStarted">>) => void;
+  updateProject: (updates: Partial<Pick<Project, "title" | "aspectRatio" | "style" | "visualDirection" | "language" | "ideaPrompt" | "ideaChatHistory" | "assets" | "styleReferenceUrl" | "assetsReviewed" | "storyboardReviewed" | "imagesReviewed" | "assetGenerationStarted" | "imageGenerationStarted" | "videoGenerationStarted">>) => void;
   /** 按 ID 更新指定项目（用于异步操作完成后写回发起项目，而非当前活跃项目，避免跨项目污染） */
   updateProjectById: (projectId: string, updater: (p: Project) => Project) => void;
   deleteProject: (id: string) => void;
@@ -704,6 +719,23 @@ export function migratePersistedState(
             return description === asset.description ? a : { ...asset, description };
           }),
         };
+      });
+    }
+  }
+
+  // Migrate from v11 to v12: preserve the new optional visualDirection field.
+  // No value is synthesized here; legacy projects continue using style/style asset.
+  if (version < 12) {
+    const projects = state.projects;
+    if (Array.isArray(projects)) {
+      state.projects = (projects as unknown[]).map((p) => {
+        if (!p || typeof p !== "object") return p;
+        const project = p as Record<string, unknown>;
+        const direction = project.visualDirection;
+        if (!direction || typeof direction !== "object" || Array.isArray(direction)) {
+          return { ...project, visualDirection: undefined };
+        }
+        return project;
       });
     }
   }
@@ -1357,7 +1389,7 @@ export const useProjectStore = create<ProjectState>()(
     }),
     {
       name: "wxhb-project",
-      version: 11,
+      version: 12,
       // 迁移主体提取为导出纯函数 migratePersistedState（见文件上方），便于单测
       migrate: (persisted: unknown, version: number) =>
         migratePersistedState(persisted, version),

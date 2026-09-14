@@ -59,6 +59,7 @@ export function StepAssets() {
   const sceneReferences = assets.filter((a) => a.type === "scene");
   const products = assets.filter((a) => a.type === "product");
   const props = assets.filter((a) => a.type === "prop");
+  const styleAsset = assets.find((a) => a.type === "style");
   const styleReferenceUrl = project ? getStyleReferenceUrl(project) : undefined;
 
   // 刷新/中断后恢复：assetGenerationStarted 卡 true 且没有存活任务时重置，
@@ -242,6 +243,44 @@ export function StepAssets() {
           {t("wizard.noAssetsContinueHint")}
         </p>
       )}
+
+      {/* ── Visual direction section: upstream of all assets ───────────── */}
+      <section className="flex flex-col gap-3">
+        <div>
+          <h3 className="text-sm font-semibold text-ink-2">{t("wizard.visualDirectionTitle" as any)}</h3>
+          <p className="text-[0.6875rem] text-ink-5 mt-0.5">{t("wizard.visualDirectionHint" as any)}</p>
+        </div>
+        <div className="rounded-xl border border-accent/40 bg-accent-deep/10 p-3">
+          <div className="flex items-start gap-3">
+            <div className="h-20 w-32 shrink-0 overflow-hidden rounded-lg border border-line bg-raised">
+              {styleReferenceUrl ? (
+                <Lightbox src={styleReferenceUrl} alt="Visual direction reference">
+                  <img src={styleReferenceUrl} alt="Visual direction reference" className="h-full w-full object-cover" />
+                </Lightbox>
+              ) : <div className="flex h-full w-full items-center justify-center text-ink-5"><ImageIcon size={20} /></div>}
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-medium text-ink">{project?.visualDirection?.name || styleAsset?.name || project?.style || t("wizard.visualDirectionUnset" as any)}</p>
+              <p className="mt-1 text-xs text-ink-3">{styleAsset?.description || t("wizard.visualDirectionDescription" as any)}</p>
+              {project?.visualDirection && (
+                <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-[0.6875rem] text-ink-4">
+                  <span>画风与材质：{project.visualDirection.mediumMaterial || "—"}</span>
+                  <span>主色调：{project.visualDirection.colorPalette || "—"}</span>
+                  <span>光影氛围：{project.visualDirection.lightingMood || "—"}</span>
+                  <span>镜头质感：{project.visualDirection.cameraTexture || "—"}</span>
+                  <span>构图倾向：{project.visualDirection.composition || "—"}</span>
+                  <span>整体情绪：{project.visualDirection.emotion || "—"}</span>
+                </div>
+              )}
+              {project?.styleReferenceError && <p className="mt-1 truncate text-[0.625rem] text-danger" title={project?.styleReferenceError}>{project?.styleReferenceError}</p>}
+              <button onClick={handleGenerateStyle} disabled={anyGenerating} className="mt-2 flex items-center gap-1.5 rounded px-3 py-1.5 text-[0.6875rem] text-accent hover:bg-accent-deep/30 transition disabled:opacity-50">
+                {generatingStyle ? <Loader2 size={11} className="animate-spin" /> : <Wand2 size={11} />}
+                {styleReferenceUrl ? t("wizard.regenerateVisualDirection" as any) : t("wizard.generateVisualDirection" as any)}
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
 
       {/* ── Characters section ────────────────────────────────────────── */}
       <section className="flex flex-col gap-3">
@@ -668,57 +707,6 @@ export function StepAssets() {
         </button>
       </section>
 
-      {/* ── Style reference section ───────────────────────────────────── */}
-      <section className="flex flex-col gap-3">
-        <div>
-          <h3 className="text-sm font-semibold text-ink-2">
-            {t("wizard.styleReference")}
-          </h3>
-          <p className="text-[0.6875rem] text-ink-5 mt-0.5">
-            {t("wizard.styleReferenceHint")}
-          </p>
-        </div>
-
-        <div className="flex items-start gap-3 rounded-xl border border-line bg-raised/50 p-3">
-          <div className="h-20 w-32 shrink-0 overflow-hidden rounded-lg border border-line bg-raised">
-            {styleReferenceUrl ? (
-              <Lightbox src={styleReferenceUrl} alt="Style reference">
-                <img
-                  src={styleReferenceUrl}
-                  alt="Style reference"
-                  className="h-full w-full object-cover"
-                />
-              </Lightbox>
-            ) : (
-              <div className="flex h-full w-full items-center justify-center text-ink-5">
-                <ImageIcon size={20} />
-              </div>
-            )}
-          </div>
-          <div className="flex-1">
-            <p className="text-xs text-ink-3">
-              {project?.style || t("wizard.styleAutoHint")}
-            </p>
-            {project?.styleReferenceError && (
-              <p className="mt-1 truncate text-[0.625rem] text-danger" title={project.styleReferenceError}>
-                生成失败：{project.styleReferenceError}
-              </p>
-            )}
-            <button
-              onClick={handleGenerateStyle}
-              disabled={anyGenerating}
-              className="mt-2 flex items-center gap-1.5 rounded px-3 py-1.5 text-[0.6875rem] text-accent hover:bg-accent-deep/30 transition disabled:opacity-50"
-            >
-              {generatingStyle ? (
-                <Loader2 size={11} className="animate-spin" />
-              ) : (
-                <Wand2 size={11} />
-              )}
-              {styleReferenceUrl ? t("wizard.regenerateStyleRef") : t("wizard.generateStyleRef")}
-            </button>
-          </div>
-        </div>
-      </section>
 
       {/* ── Asset review gate ──────────────────────────────────────────── */}
       {project?.automationMode !== "auto" && (

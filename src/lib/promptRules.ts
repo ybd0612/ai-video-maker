@@ -20,6 +20,7 @@ import { useSettingsStore } from "@/stores/settingsStore";
 /** 规则所属任务（决定该条目参与哪个 system prompt 的渲染） */
 export type PromptTask =
   | "extractAssets"
+  | "visualDirection"
   | "storyboard"
   | "characterAppearance"
   | "styleRef"
@@ -52,6 +53,28 @@ export interface PromptRule {
  * - {{assets}} 裸占位符：动态资产上下文，由服务层（scriptService）函数内拼装替换。
  */
 export const SKELETONS: Record<PromptTask, { zh: string; en: string }> = {
+  visualDirection: {
+    zh: `你是一位视觉指导。请从用户的视频想法中提炼项目级视觉方向，只返回 JSON：
+{
+  "name": "视觉方向名称",
+  "mediumMaterial": "画风与材质",
+  "colorPalette": "主色调与明暗关系",
+  "lightingMood": "光影氛围",
+  "cameraTexture": "镜头质感",
+  "composition": "构图倾向",
+  "emotion": "整体情绪"
+}`,
+    en: `You are a visual director. Extract a project-level visual direction from the user's video idea. Return JSON only:
+{
+  "name": "Visual direction name",
+  "mediumMaterial": "Medium and material",
+  "colorPalette": "Color palette and contrast",
+  "lightingMood": "Lighting and mood",
+  "cameraTexture": "Camera texture",
+  "composition": "Composition tendency",
+  "emotion": "Overall emotion"
+}`,
+  },
   /* ── 步骤 1 轻量资产提取（scriptService.extractAssetsFromIdea） ── */
   extractAssets: {
     zh: `你是一位专业的视频资产提取助手。用户会给你一个视频主题或想法，请提取其中的资产信息，严格按以下 JSON 格式返回，不要包含任何其他文字：
@@ -69,7 +92,16 @@ export const SKELETONS: Record<PromptTask, { zh: string; en: string }> = {
     { "name": "场景名", "description": "场景简介（中文）", "appearancePrompt": "场景英文描述（环境、光线、氛围）" }
   ],
   "styles": [
-    { "name": "风格名", "description": "整体画面风格描述（中文：画种/媒介、色调、光照氛围，贴合故事本身）" }
+    {
+      "name": "风格名",
+      "description": "视觉方向摘要（中文）",
+      "mediumMaterial": "画风与材质",
+      "colorPalette": "主色调与明暗关系",
+      "lightingMood": "光影氛围",
+      "cameraTexture": "镜头质感",
+      "composition": "构图倾向",
+      "emotion": "整体情绪"
+    }
   ]
 }
 {{assets}}
@@ -100,7 +132,16 @@ export const SKELETONS: Record<PromptTask, { zh: string; en: string }> = {
     { "name": "Scene name", "description": "Brief description", "appearancePrompt": "English scene description (environment, lighting, atmosphere)" }
   ],
   "styles": [
-    { "name": "Style name", "description": "Overall visual style description (medium, color palette, lighting atmosphere, fitting the story)" }
+    {
+      "name": "Style name",
+      "description": "Visual direction summary",
+      "mediumMaterial": "Medium and material",
+      "colorPalette": "Color palette and contrast",
+      "lightingMood": "Lighting and mood",
+      "cameraTexture": "Camera texture",
+      "composition": "Composition tendency",
+      "emotion": "Overall emotion"
+    }
   ]
 }
 {{assets}}

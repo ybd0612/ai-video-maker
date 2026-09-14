@@ -77,6 +77,12 @@ interface RawScene {
 export interface RawStyle {
   name: string;
   description: string;
+  mediumMaterial?: string;
+  colorPalette?: string;
+  lightingMood?: string;
+  cameraTexture?: string;
+  composition?: string;
+  emotion?: string;
 }
 
 export interface GenerateScriptResult {
@@ -460,8 +466,37 @@ function buildExtractAssetsContext(language: "zh" | "en", assets?: Asset[]): str
  * 轻量资产提取：只返回 characters/products/scenes，不生成分镜。
  * 供步骤 1「AI 提取角色/产品并继续」使用，避免完整分镜生成（8192 tokens）的浪费。
  */
+export async function extractVisualDirectionFromIdea(
+  opts: GenerateScriptOptions,
+): Promise<RawStyle> {
+  const systemPrompt = buildTaskSystemPrompt("visualDirection", opts.language, getActiveRules());
+  const service = createAIService({ provider: "openai", apiKey: opts.apiKey, baseUrl: opts.baseUrl });
+  const result = await service.chatCompletion({
+    messages: [
+      { role: "system", content: systemPrompt },
+      { role: "user", content: opts.prompt },
+    ],
+    temperature: 0.3,
+    enableThinking: false,
+  });
+  const jsonStr = extractJsonFromResponse(result.content);
+  if (!jsonStr) throw new Error("无法从模型响应中提取视觉方向 JSON。");
+  const parsed = JSON.parse(jsonStr) as Partial<RawStyle>;
+  return {
+    name: parsed.name ?? "",
+    description: parsed.description ?? parsed.name ?? "",
+    mediumMaterial: parsed.mediumMaterial ?? "",
+    colorPalette: parsed.colorPalette ?? "",
+    lightingMood: parsed.lightingMood ?? "",
+    cameraTexture: parsed.cameraTexture ?? "",
+    composition: parsed.composition ?? "",
+    emotion: parsed.emotion ?? "",
+  };
+}
+
 export async function extractAssetsFromIdea(
   opts: GenerateScriptOptions,
+  visualDirection?: RawStyle,
 ): Promise<{ characters: RawCharacter[]; products: RawProduct[]; props: RawProp[]; scenes: RawScene[]; styles: RawStyle[] }> {
   const systemPrompt = buildTaskSystemPrompt(
     "extractAssets",
@@ -478,7 +513,16 @@ export async function extractAssetsFromIdea(
   const result = await service.chatCompletion({
     messages: [
       { role: "system", content: systemPrompt },
-      { role: "user", content: opts.prompt },
+      {
+        role: "user",
+        content: [
+          opts.prompt,
+          visualDirection
+            ? `Confirmed visual direction:\n${JSON.stringify(visualDirection)}`
+            : "",
+          "Design assets according to the confirmed visual direction. Asset appearance prompts describe the subject only; do not redefine the global art style.",
+        ].filter(Boolean).join("\n\n"),
+      },
     ],
     temperature: 0.3,
     // 输出预算走 MAX_OUTPUT_TOKENS（65536），9 行角色描述 + 多资产不再有触顶风险
@@ -529,6 +573,12 @@ export async function extractAssetsFromIdea(
       ? arr.slice(0, 1).map((s) => ({
           name: s.name ?? "",
           description: s.description ?? "",
+          mediumMaterial: s.mediumMaterial ?? "",
+          colorPalette: s.colorPalette ?? "",
+          lightingMood: s.lightingMood ?? "",
+          cameraTexture: s.cameraTexture ?? "",
+          composition: s.composition ?? "",
+          emotion: s.emotion ?? "",
         }))
       : [];
 

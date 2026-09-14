@@ -20,6 +20,12 @@ export interface RawAsset {
   name: string;
   description: string;
   appearancePrompt?: string;
+  mediumMaterial?: string;
+  colorPalette?: string;
+  lightingMood?: string;
+  cameraTexture?: string;
+  composition?: string;
+  emotion?: string;
 }
 
 /**

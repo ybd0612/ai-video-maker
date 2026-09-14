@@ -9,7 +9,7 @@ import {
 } from "@/stores/projectStore";
 import { useSettingsStore } from "@/stores/settingsStore";
 import { useT } from "@/i18n";
-import { extractAssetsFromIdea, generateScript } from "@/services/scriptService";
+import { extractAssetsFromIdea, extractVisualDirectionFromIdea, generateScript } from "@/services/scriptService";
 import { extractNewAssets } from "@/lib/extractAssets";
 import { pickShotFields } from "@/lib/shotFields";
 import { restoreProjectStatusIfReady } from "./wizardActionUtils";
@@ -84,7 +84,7 @@ export function useScriptActions(
     useProjectStore.getState().setProjectStatusById(targetProjectId, "scripting");
 
     try {
-      const result = await extractAssetsFromIdea({
+      const visualDirectionResult = await extractVisualDirectionFromIdea({
         apiKey: providerConfig.apiKey,
         baseUrl: providerConfig.baseUrl,
         prompt,
@@ -92,6 +92,27 @@ export function useScriptActions(
         aspectRatio: project.aspectRatio,
         assets: project.assets,
       });
+      const visualDirection = {
+        name: visualDirectionResult.name,
+        mediumMaterial: visualDirectionResult.mediumMaterial ?? "",
+        colorPalette: visualDirectionResult.colorPalette ?? "",
+        lightingMood: visualDirectionResult.lightingMood ?? "",
+        cameraTexture: visualDirectionResult.cameraTexture ?? "",
+        composition: visualDirectionResult.composition ?? "",
+        emotion: visualDirectionResult.emotion ?? "",
+        revision: (project.visualDirection?.revision ?? 0) + 1,
+        status: "draft" as const,
+      };
+      useProjectStore.getState().updateProjectById(targetProjectId, (p) => ({ ...p, visualDirection }));
+
+      const result = await extractAssetsFromIdea({
+        apiKey: providerConfig.apiKey,
+        baseUrl: providerConfig.baseUrl,
+        prompt,
+        language: project.language,
+        aspectRatio: project.aspectRatio,
+        assets: project.assets,
+      }, visualDirectionResult);
 
       const newCharacters = extractNewAssets(project.assets, result.characters, "character", manualAssets);
       const newProducts = extractNewAssets(project.assets, result.products, "product", manualAssets);
@@ -99,13 +120,12 @@ export function useScriptActions(
       const newScenes = extractNewAssets(project.assets, result.scenes, "scene", manualAssets);
       const newStyles = extractNewAssets(project.assets, result.styles, "style", manualAssets);
       const newAssets = [
+        ...newStyles.assets,
         ...newCharacters.assets,
+        ...newScenes.assets,
         ...newProducts.assets,
         ...newProps.assets,
-        ...newScenes.assets,
-        ...newStyles.assets,
       ];
-
       const manualNames = new Set(manualAssets.map((a) => a.name.trim().toLocaleLowerCase()));
       const dedupedNew = newAssets.filter(
         (a) => !manualNames.has(a.name.trim().toLocaleLowerCase()),
@@ -114,6 +134,7 @@ export function useScriptActions(
       useProjectStore.getState().updateProjectById(targetProjectId, (p) => ({
         ...p,
         assets: [...manualAssets, ...dedupedNew],
+        visualDirection,
         status: "idle",
         error: undefined,
         wizardStep: 2,
