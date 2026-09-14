@@ -126,7 +126,7 @@ export function AssetEditor({ asset, onClose, onGenerate, generating }: AssetEdi
 
         <div className="flex flex-col gap-1 @md:w-2/5">
           <label className="text-[0.6875rem] font-medium text-ink-4">参考图</label>
-          {asset.imageUrl ? <Lightbox src={asset.imageUrl} alt={asset.name}><img src={asset.imageUrl} alt={asset.name} className="aspect-square w-full rounded-lg border border-line object-cover" /></Lightbox> : <div className="flex aspect-square items-center justify-center rounded-lg border border-dashed border-line text-ink-5"><ImageIcon size={24} /></div>}
+          {asset.imageUrl ? <Lightbox src={asset.imageUrl} alt={asset.name}><div className="flex h-48 w-full items-center justify-center overflow-hidden rounded-lg border border-line bg-raised @md:h-56"><img src={asset.imageUrl} alt={asset.name} className="h-full w-full object-contain" /></div></Lightbox> : <div className="flex h-48 w-full items-center justify-center rounded-lg border border-dashed border-line text-ink-5 @md:h-56"><ImageIcon size={24} /></div>}
           <button onClick={() => void onGenerate({ ...asset, ...draft })} disabled={busy || generating || !draft.prompt.trim() || !providerConfig.apiKey} className="flex w-full items-center justify-center gap-1 rounded border border-line px-1.5 py-1 text-[0.625rem] text-accent hover:bg-accent-deep/30 disabled:opacity-50">
             {generating ? <Loader2 size={10} className="animate-spin" /> : <ImageIcon size={10} />}
             {asset.imageUrl ? "重新生成参考图" : "生成参考图"}

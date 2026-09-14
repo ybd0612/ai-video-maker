@@ -286,7 +286,7 @@ export function StepAssets() {
               {styleReferenceUrl ? (
               <div onClick={(e) => e.stopPropagation()}>
                 <Lightbox src={styleReferenceUrl} alt="Visual direction reference">
-                  <img src={styleReferenceUrl} alt="Visual direction reference" className="h-full w-full object-cover" />
+                  <img src={styleReferenceUrl} alt="Visual direction reference" className="h-full w-full object-contain" />
                 </Lightbox>
               </div>
               ) : <div className="flex h-full w-full items-center justify-center text-ink-5"><ImageIcon size={20} /></div>}
@@ -349,13 +349,13 @@ export function StepAssets() {
                 title={t("characters.edit")}
                 className="group flex cursor-pointer items-start gap-3 rounded-xl border border-line bg-raised/50 p-3 transition hover:border-line-strong focus:border-success focus:outline-none"
               >
-                <div className="h-12 w-12 shrink-0 overflow-hidden rounded-full border border-line bg-raised">
+                <div className="h-16 w-24 shrink-0 overflow-hidden rounded-lg border border-line bg-raised">
                   {(char.imageUrl || char.avatarUrl) ? (
                     <Lightbox src={char.imageUrl || char.avatarUrl} alt={char.name}>
                       <img
                         src={char.imageUrl || char.avatarUrl}
                         alt={char.name}
-                        className="h-full w-full object-cover"
+                        className="h-full w-full object-contain"
                       />
                     </Lightbox>
                   ) : (
@@ -446,7 +446,7 @@ export function StepAssets() {
                   <img
                     src={scene.imageUrl}
                     alt={scene.name}
-                    className="h-full w-full object-cover"
+                    className="h-full w-full object-contain"
                   />
                 </Lightbox>
               ) : (
@@ -535,7 +535,7 @@ export function StepAssets() {
                   <img
                     src={product.imageUrl}
                     alt={product.name}
-                    className="h-full w-full object-cover"
+                    className="h-full w-full object-contain"
                   />
                 </Lightbox>
               ) : (
@@ -620,7 +620,7 @@ export function StepAssets() {
             <div className="h-16 w-24 shrink-0 overflow-hidden rounded-lg border border-line bg-raised" onClick={(e) => e.stopPropagation()}>
               {prop.imageUrl ? (
                 <Lightbox src={prop.imageUrl} alt={prop.name}>
-                  <img src={prop.imageUrl} alt={prop.name} className="h-full w-full object-cover" />
+                  <img src={prop.imageUrl} alt={prop.name} className="h-full w-full object-contain" />
                 </Lightbox>
               ) : (
                 <div className="flex h-full w-full items-center justify-center text-ink-5">

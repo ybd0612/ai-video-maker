@@ -479,13 +479,13 @@ export function CharacterEditor({ character, onClose }: CharacterEditorProps) {
             {t("characters.portrait")}
           </label>
           {portraitUrl ? (
-            <div className="aspect-square w-full @md:aspect-auto @md:min-h-0 @md:flex-1">
+            <div className="h-48 w-full @md:h-56">
               <Lightbox src={portraitUrl} alt={t("characters.portrait")}>
                 <div className="relative h-full w-full overflow-hidden rounded-lg border border-line bg-raised">
                   <img
                     src={portraitUrl}
                     alt={t("characters.portrait")}
-                    className="h-full w-full object-cover"
+                    className="h-full w-full object-contain"
                   />
                 </div>
               </Lightbox>

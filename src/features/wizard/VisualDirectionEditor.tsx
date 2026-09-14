@@ -169,7 +169,7 @@ export function VisualDirectionEditor({ onClose }: VisualDirectionEditorProps) {
           <label className="text-[0.6875rem] font-medium text-ink-4">{t("wizard.visualDirectionReference" as any)}</label>
           {referenceUrl ? (
             <Lightbox src={referenceUrl} alt={t("wizard.visualDirectionReference" as any)}>
-              <img src={referenceUrl} alt={t("wizard.visualDirectionReference" as any)} className="aspect-square w-full rounded-lg border border-line object-cover" />
+              <div className="flex h-48 w-full items-center justify-center overflow-hidden rounded-lg border border-line bg-raised @md:h-56"><img src={referenceUrl} alt={t("wizard.visualDirectionReference" as any)} className="h-full w-full object-contain" /></div>
             </Lightbox>
           ) : (
             <div className="flex aspect-square items-center justify-center rounded-lg border border-dashed border-line text-ink-5">—</div>
