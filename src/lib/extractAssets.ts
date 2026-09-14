@@ -11,15 +11,17 @@
 //   （实测事故：提取明明返回 2 个角色，写回后一个都不剩）。
 // ────────────────────────────────────────────────────────────────────────────
 
-import { newId, type Asset, type AssetType } from "@/stores/projectStore";
+import { newId, type Asset, type AssetDetails, type AssetType } from "@/stores/projectStore";
 import { generateAssetNamespace, generateFullPrompt } from "@/lib/assetNamespace";
 import { normalizeCharacterDescription } from "@/lib/promptComposer";
+import { normalizeAssetDetails } from "@/lib/assetDetails";
 
 /** 模型输出的资产条目（提取/分镜共用的原始形态；style 仅 name+description） */
 export interface RawAsset {
   name: string;
   description: string;
   appearancePrompt?: string;
+  details?: AssetDetails;
   mediumMaterial?: string;
   colorPalette?: string;
   lightingMood?: string;
@@ -65,6 +67,9 @@ export function extractNewAssets(
         ? normalizeCharacterDescription(description)
         : description,
       prompt: type === "style" ? "" : appearancePrompt,
+      ...(type !== "style"
+        ? { details: normalizeAssetDetails({ type, description }, item.details) }
+        : {}),
       ...(type === "character"
         ? {
             appearancePrompt,

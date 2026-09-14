@@ -80,16 +80,16 @@ export const SKELETONS: Record<PromptTask, { zh: string; en: string }> = {
     zh: `你是一位专业的视频资产提取助手。用户会给你一个视频主题或想法，请提取其中的资产信息，严格按以下 JSON 格式返回，不要包含任何其他文字：
 {
   "characters": [
-    { "name": "角色名", "description": "完整角色描述（中文，共 9 行：第 1 行为一句话总述（无前缀），第 2-9 行为 8 个要素，每行「要素名：内容」，顺序：物种 → 身份 → 年龄 → 性格 → 外貌 → 服饰 → 记忆点 → 背景）", "appearancePrompt": "外貌描述（英文，用于 AI 绘图）" }
+    { "name": "角色名", "description": "一句话总述", "details": { "species": "物种", "role": "身份", "age": "年龄阶段", "personality": "性格与行为倾向", "appearance": "体型、比例、五官、颜色、材质", "outfit": "服饰与配饰", "signature": "跨镜头识别特征", "background": "来历与角色关系" }, "appearancePrompt": "完整英文外观提示词" }
   ],
   "products": [
-    { "name": "产品名", "description": "产品简介（类型、用途）", "appearancePrompt": "外观描述（英文，用于 AI 绘图，包含款式、颜色、材质、logo 等）" }
+    { "name": "产品名", "description": "一句话定位", "details": { "category": "产品类型", "purpose": "核心用途", "silhouette": "整体轮廓与比例", "dimensions": "尺寸与比例", "color": "颜色", "material": "材质", "structure": "结构组成", "surfaceDetails": "表面细节", "branding": "品牌或 Logo", "signature": "不可改变的识别特征", "usageState": "使用状态" }, "appearancePrompt": "完整英文产品外观提示词" }
   ],
   "props": [
-    { "name": "道具名", "description": "道具简介（用途、关键外观特征）", "appearancePrompt": "道具外观描述（英文，用于 AI 绘图，包含材质、颜色、形状、关键细节）" }
+    { "name": "道具名", "description": "一句话定位", "details": { "purpose": "道具用途", "storyRole": "故事作用", "objectType": "物件类型", "shape": "整体形状", "dimensions": "尺寸与比例", "material": "材质", "color": "颜色", "structure": "结构细节", "wear": "磨损与使用痕迹", "signature": "特殊标记或识别特征", "usage": "在镜头中的使用方式" }, "appearancePrompt": "完整英文道具外观提示词" }
   ],
   "scenes": [
-    { "name": "场景名", "description": "场景简介（中文）", "appearancePrompt": "场景英文描述（环境、光线、氛围）" }
+    { "name": "场景名", "description": "一句话定位", "details": { "settingType": "空间类型", "environment": "地理与环境", "time": "时间", "weather": "天气", "elements": "主要元素", "spatialLayers": "前景、中景、背景与空间层次", "lighting": "光线方向与质量", "paletteMood": "色彩与氛围", "storyUse": "可用于哪些剧情" }, "appearancePrompt": "完整英文场景外观提示词" }
   ],
   "styles": [
     {
@@ -172,22 +172,33 @@ Examples:
   "characters": [
     {
       "name": "角色名",
-      "description": "完整角色描述（中文，共 9 行：第 1 行为一句话总述（无前缀），第 2-9 行为 8 个要素，每行「要素名：内容」，顺序：物种 → 身份 → 年龄 → 性格 → 外貌 → 服饰 → 记忆点 → 背景；动物/拟人角色同样适用）",
-      "appearancePrompt": "外貌描述（英文，用于 AI 绘图；人物写年龄体型发型服饰，动物写物种体型毛色特征等）"
+      "description": "一句话定位（中文）",
+      "details": { "kind": "character", "species": "物种或类型", "role": "身份与故事功能", "age": "年龄阶段", "personality": "性格与行为倾向", "appearance": "体型比例、五官、颜色、材质", "outfit": "服饰与配饰", "signature": "跨镜头识别特征", "background": "背景经历与角色关系" },
+      "appearancePrompt": "完整英文外观提示词，覆盖 details 的可视化特征"
     }
   ],
   "products": [
     {
       "name": "产品名",
-      "description": "产品简介（类型、用途）",
-      "appearancePrompt": "外观描述（英文，用于 AI 绘图，包含款式、颜色、材质、细节、logo 等）"
+      "description": "一句话定位（中文）",
+      "details": { "kind": "product", "category": "产品类型", "purpose": "核心用途", "silhouette": "整体轮廓", "dimensions": "尺寸与比例", "color": "颜色", "material": "材质", "structure": "结构组成", "surfaceDetails": "表面细节", "branding": "品牌或 Logo", "signature": "不可改变的识别特征", "usageState": "使用状态" },
+      "appearancePrompt": "完整英文产品外观提示词，覆盖 details 的可视化特征"
+    }
+  ],
+  "props": [
+    {
+      "name": "道具名",
+      "description": "一句话定位（中文）",
+      "details": { "kind": "prop", "purpose": "道具用途", "storyRole": "故事作用", "objectType": "物件类型", "shape": "整体形状", "dimensions": "尺寸与比例", "material": "材质", "color": "颜色", "structure": "结构细节", "wear": "磨损与使用痕迹", "signature": "特殊标记或识别特征", "usage": "在镜头中的使用方式" },
+      "appearancePrompt": "完整英文道具外观提示词，覆盖 details 的可视化特征"
     }
   ],
   "scenes": [
     {
       "name": "场景名",
-      "description": "场景简介（中文）",
-      "appearancePrompt": "场景英文描述（用于 AI 绘图：环境、光线、氛围）"
+      "description": "一句话定位（中文）",
+      "details": { "kind": "scene", "settingType": "空间类型", "environment": "地理与环境", "time": "时间", "weather": "天气", "elements": "主要元素", "spatialLayers": "前景、中景、背景与空间层次", "lighting": "光线方向与质量", "paletteMood": "色彩与氛围", "storyUse": "可用于哪些剧情" },
+      "appearancePrompt": "完整英文场景外观提示词，覆盖 details 的可视化特征"
     }
   ],
   "styles": [
@@ -245,29 +256,33 @@ Return strictly in this JSON format, no other text:
   "characters": [
     {
       "name": "Character name",
-      "description": "Full character description in Chinese (exactly 9 lines: line 1 is a one-sentence summary without prefix; lines 2-9 are 8 elements, each line prefixed with the element name + colon, in order: species → role → age → personality → looks → outfit → signature → background; applies to animals/anthropomorphic subjects too)",
-      "appearancePrompt": "Appearance description in English (humans: age, build, hair, clothing; animals: species, body shape, fur color, features, etc.)"
+      "description": "One-sentence identity summary in Chinese",
+      "details": { "kind": "character", "species": "species or type", "role": "identity and story function", "age": "age stage", "personality": "personality and behavior", "appearance": "body proportions, facial features, colors and materials", "outfit": "clothing and accessories", "signature": "cross-shot identity features", "background": "background and relationships" },
+      "appearancePrompt": "Complete English appearance prompt covering the details"
     }
   ],
   "products": [
     {
       "name": "Product name",
-      "description": "Brief description (type, purpose)",
-      "appearancePrompt": "Appearance description in English (style, color, material, details, logo, etc. for AI image generation)"
+      "description": "One-sentence identity summary",
+      "details": { "kind": "product", "category": "product type", "purpose": "core purpose", "silhouette": "silhouette", "dimensions": "dimensions and proportions", "color": "color", "material": "material", "structure": "components", "surfaceDetails": "surface details", "branding": "brand or logo", "signature": "immutable identity features", "usageState": "usage state" },
+      "appearancePrompt": "Complete English product appearance prompt covering the details"
     }
   ],
   "props": [
     {
       "name": "Prop name",
-      "description": "Brief description (purpose and key visual traits)",
-      "appearancePrompt": "Appearance description in English (material, color, shape and distinctive details)"
+      "description": "One-sentence identity summary",
+      "details": { "kind": "prop", "purpose": "purpose", "storyRole": "story role", "objectType": "object type", "shape": "shape", "dimensions": "dimensions and proportions", "material": "material", "color": "color", "structure": "structural details", "wear": "wear and use marks", "signature": "distinctive marks", "usage": "how it is used in shots" },
+      "appearancePrompt": "Complete English prop appearance prompt covering the details"
     }
   ],
   "scenes": [
     {
       "name": "Scene name",
-      "description": "Brief description of the scene",
-      "appearancePrompt": "English scene description (environment, lighting, atmosphere for AI image generation)"
+      "description": "One-sentence setting identity",
+      "details": { "kind": "scene", "settingType": "setting type", "environment": "geography and environment", "time": "time", "weather": "weather", "elements": "main elements", "spatialLayers": "foreground, midground, background and depth", "lighting": "light direction and quality", "paletteMood": "palette and mood", "storyUse": "story uses" },
+      "appearancePrompt": "Complete English scene appearance prompt covering the details"
     }
   ],
   "styles": [
@@ -512,8 +527,10 @@ export const SYSTEM_PROMPT_DESCRIPTION_ZH = `你是一位 AI 视觉创作的描�
 - 用中文，长度与原文相当，不要扩写成段落
 - 直接返回润色后的描述，不要任何解释说明`;
 
-export const SYSTEM_PROMPT_ASSET_EDIT_ZH = `你是一位视频资产设计师。用户会给你一个资产的名称、中文描述、英文绘图提示词和修改要求，请只返回修改后的完整 JSON，不要解释、不要 Markdown 代码块。
-JSON 必须严格包含 name、description、prompt 三个字段。description 用中文，prompt 用英文；只修改用户明确要求的内容，其他信息保持不变。不要把整个项目的视觉方向写进资产 prompt，资产 prompt 只描述这个资产本身。
+export const SYSTEM_PROMPT_ASSET_EDIT_ZH = `你是一位视频资产设定设计师。用户会给你一个资产的完整设定和修改要求，请只返回修改后的完整 JSON，不要解释、不要 Markdown 代码块。
+JSON 必须严格包含 name、description、details、prompt 四个字段。description 是一句话摘要，details 必须保留当前资产类型对应的全部字段并逐项填写，prompt 用英文且必须覆盖 details 中的可视化特征。
+角色 details 固定包含 kind、species、role、age、personality、appearance、outfit、signature、background；场景 details 固定包含 kind、settingType、environment、time、weather、elements、spatialLayers、lighting、paletteMood、storyUse；产品 details 固定包含 kind、category、purpose、silhouette、dimensions、color、material、structure、surfaceDetails、branding、signature、usageState；道具 details 固定包含 kind、purpose、storyRole、objectType、shape、dimensions、material、color、structure、wear、signature、usage。
+只修改用户明确要求的内容，其他信息保持不变；缺失细节要根据当前故事和视觉方向合理补全。不要把整个项目的视觉方向写进资产 prompt，资产 prompt 只描述这个资产本身。
 
 `;
 

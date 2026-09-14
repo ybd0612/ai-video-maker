@@ -5,6 +5,8 @@ import { useSettingsStore } from "@/stores/settingsStore";
 import { useT } from "@/i18n";
 import { chatCompletion } from "@/services/chatService";
 import { SYSTEM_PROMPT_ASSET_EDIT_ZH } from "@/lib/promptRules";
+import { createDefaultAssetDetails } from "@/lib/assetDetails";
+import type { AssetDetails } from "@/stores/projectStore";
 import { Lightbox } from "@/components/ui/Lightbox";
 import { AssetDetailLayout, AssetPreviewFrame } from "./AssetDetailLayout";
 
@@ -15,13 +17,18 @@ interface AssetEditorProps {
   generating: boolean;
 }
 
-function parseAsset(content: string): Pick<Asset, "name" | "description" | "prompt"> | null {
+function parseAsset(content: string, fallbackDetails: AssetDetails | undefined): Pick<Asset, "name" | "description" | "prompt" | "details"> | null {
   const match = content.match(/\{[\s\S]*\}/);
   if (!match) return null;
   try {
     const parsed = JSON.parse(match[0]) as Partial<Asset>;
     if (typeof parsed.name !== "string" || typeof parsed.description !== "string" || typeof parsed.prompt !== "string") return null;
-    return { name: parsed.name.trim(), description: parsed.description.trim(), prompt: parsed.prompt.trim() };
+    return {
+      name: parsed.name.trim(),
+      description: parsed.description.trim(),
+      prompt: parsed.prompt.trim(),
+      details: parsed.details ?? fallbackDetails,
+    };
   } catch {
     return null;
   }
@@ -33,12 +40,25 @@ function assetLabel(type: Asset["type"]): string {
   return "道具 / 关键物件";
 }
 
+const detailLabels: Record<string, string> = {
+  species: "物种", role: "身份", age: "年龄阶段", personality: "性格与行为倾向", appearance: "外貌与比例", outfit: "服饰与配饰", signature: "跨镜头识别特征", background: "背景与角色关系",
+  settingType: "空间类型", environment: "地理与环境", time: "时间", weather: "天气", elements: "主要元素", spatialLayers: "空间层次", lighting: "光线方向与质量", paletteMood: "色彩与氛围", storyUse: "剧情用途",
+  category: "产品类型", purpose: "核心用途", silhouette: "整体轮廓", dimensions: "尺寸与比例", color: "颜色", material: "材质", structure: "结构组成", surfaceDetails: "表面细节", branding: "品牌或 Logo", usageState: "使用状态",
+  storyRole: "故事作用", objectType: "物件类型", shape: "整体形状", wear: "磨损与使用痕迹", usage: "镜头中的使用方式",
+};
+
+function detailEntries(details: AssetDetails | undefined): Array<[string, string]> {
+  if (!details) return [];
+  return Object.entries(details).filter(([key]) => key !== "kind") as Array<[string, string]>;
+}
+
 export function AssetEditor({ asset, onClose, onGenerate, generating }: AssetEditorProps) {
   const t = useT();
   const updateAsset = useProjectStore((s) => s.updateAsset);
   const providerConfig = useSettingsStore((s) => s.providerConfig);
   const autoRegenerateAssetImages = useSettingsStore((s) => s.autoRegenerateAssetImages);
-  const [draft, setDraft] = useState({ name: asset.name, description: asset.description, prompt: asset.prompt });
+  const initialDetails = asset.details ?? createDefaultAssetDetails(asset);
+  const [draft, setDraft] = useState({ name: asset.name, description: asset.description, prompt: asset.prompt, details: initialDetails });
   const [instruction, setInstruction] = useState("");
   const [history, setHistory] = useState<Array<typeof draft>>([]);
   const [busy, setBusy] = useState(false);
@@ -74,10 +94,15 @@ export function AssetEditor({ asset, onClose, onGenerate, generating }: AssetEdi
           },
         ],
       });
-      const next = parseAsset(result.content);
+      const next = parseAsset(result.content, draft.details);
       if (!next) throw new Error(t("wizard.assetInvalidResponse" as any));
       setHistory((items) => [...items, draft]);
-      setDraft(next);
+      setDraft({
+        name: next.name,
+        description: next.description,
+        prompt: next.prompt,
+        details: next.details ?? draft.details,
+      });
       setInstruction("");
       if (autoRegenerateAssetImages) {
         await onGenerate({ ...asset, ...next });
@@ -127,9 +152,25 @@ export function AssetEditor({ asset, onClose, onGenerate, generating }: AssetEdi
             <input value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} className="w-full rounded-md border border-line bg-raised px-2 py-1.5 text-xs text-ink focus:border-accent focus:outline-none" />
           </div>
           <div className="space-y-1">
-            <label className="text-[0.6875rem] font-medium text-ink-4">中文描述</label>
-            <div className="whitespace-pre-wrap rounded-md border border-line bg-raised px-2 py-1.5 text-xs leading-relaxed text-ink select-text">{draft.description || "—"}</div>
+            <label className="text-[0.6875rem] font-medium text-ink-4">一句话定位</label>
+            <textarea value={draft.description} onChange={(e) => setDraft({ ...draft, description: e.target.value })} rows={2} className="w-full resize-y rounded-md border border-line bg-raised px-2 py-1.5 text-xs leading-relaxed text-ink focus:border-accent focus:outline-none" />
           </div>
+          {draft.details && (
+            <div className="space-y-2 rounded-md border border-line-soft bg-surface p-2">
+              <label className="text-[0.6875rem] font-medium text-ink-4">完整设定</label>
+              {detailEntries(draft.details).map(([key, value]) => (
+                <div key={key} className="space-y-1">
+                  <label className="text-[0.625rem] text-ink-4">{detailLabels[key] ?? key}</label>
+                  <textarea
+                    value={value}
+                    onChange={(e) => setDraft({ ...draft, details: { ...draft.details!, [key]: e.target.value } as AssetDetails })}
+                    rows={2}
+                    className="w-full resize-y rounded-md border border-line bg-raised px-2 py-1.5 text-xs leading-relaxed text-ink focus:border-accent focus:outline-none"
+                  />
+                </div>
+              ))}
+            </div>
+          )}
           <div className="space-y-1">
             <label className="text-[0.6875rem] font-medium text-ink-4">英文绘图提示词</label>
             <div className="whitespace-pre-wrap rounded-md border border-line bg-raised px-2 py-1.5 text-xs leading-relaxed text-ink-2 select-text">{draft.prompt || "—"}</div>

@@ -9,6 +9,7 @@ import { persist } from "zustand/middleware";
 // 仅类型导入（verbatimModuleSyntax 下运行时零依赖，无循环加载风险）
 import type { L10nText } from "@/i18n";
 import { normalizeCharacterDescription } from "@/lib/promptComposer";
+import { normalizeAssetDetails } from "@/lib/assetDetails";
 
 /* ── Status enums ───────────────────────────────────────────────────────── */
 
@@ -63,6 +64,67 @@ export interface AssetDerivation {
   dirty?: boolean;
 }
 
+/**
+ * 资产完整设定：不同资产保留自己的语义字段，不再把所有信息压缩进 description。
+ * summary 仍保留在 Asset.description 中，便于旧链路和列表摘要兼容。
+ */
+export interface CharacterDetails {
+  kind: "character";
+  species: string;
+  role: string;
+  age: string;
+  personality: string;
+  appearance: string;
+  outfit: string;
+  signature: string;
+  background: string;
+}
+
+export interface SceneDetails {
+  kind: "scene";
+  settingType: string;
+  environment: string;
+  time: string;
+  weather: string;
+  elements: string;
+  spatialLayers: string;
+  lighting: string;
+  paletteMood: string;
+  storyUse: string;
+}
+
+export interface ProductDetails {
+  kind: "product";
+  category: string;
+  purpose: string;
+  silhouette: string;
+  dimensions: string;
+  color: string;
+  material: string;
+  structure: string;
+  surfaceDetails: string;
+  branding: string;
+  signature: string;
+  usageState: string;
+}
+
+export interface PropDetails {
+  kind: "prop";
+  purpose: string;
+  storyRole: string;
+  objectType: string;
+  shape: string;
+  dimensions: string;
+  material: string;
+  color: string;
+  structure: string;
+  wear: string;
+  signature: string;
+  usage: string;
+}
+
+export type AssetDetails = CharacterDetails | SceneDetails | ProductDetails | PropDetails;
+
 /** 分镜派生锁定（画面/动态提示词各自独立） */
 export interface ShotDerivation {
   visualLocked?: boolean;
@@ -84,6 +146,8 @@ export interface Asset {
   imageUrl?: string;
   /** 参考图生成失败原因（便于 UI 展示重试入口） */
   error?: string;
+  /** 结构化完整设定；旧数据缺省时由迁移/读取层按 description 兼容 */
+  details?: AssetDetails;
   /** 以下仅 character 类型使用 */
   appearancePrompt?: string;
   /** 资产一致性优化 - 用于标识角色在提示词中的命名空间 */
@@ -737,6 +801,33 @@ export function migratePersistedState(
           return { ...project, visualDirection: undefined };
         }
         return project;
+      });
+    }
+  }
+
+  // Migrate from v12 to v13: materialize structured details for all non-style assets.
+  // Legacy descriptions remain intact as summaries; missing fields are backfilled
+  // from the existing labeled description without overwriting user data.
+  if (version < 13) {
+    const projects = state.projects;
+    if (Array.isArray(projects)) {
+      state.projects = (projects as unknown[]).map((p) => {
+        if (!p || typeof p !== "object") return p;
+        const project = p as Record<string, unknown>;
+        if (!Array.isArray(project.assets)) return p;
+        return {
+          ...project,
+          assets: (project.assets as unknown[]).map((raw) => {
+            if (!raw || typeof raw !== "object") return raw;
+            const asset = raw as Record<string, unknown>;
+            if (asset.type === "style" || typeof asset.type !== "string" || typeof asset.description !== "string") return raw;
+            const details = normalizeAssetDetails(
+              { type: asset.type as Asset["type"], description: asset.description },
+              asset.details as AssetDetails | undefined,
+            );
+            return details ? { ...asset, details } : raw;
+          }),
+        };
       });
     }
   }
@@ -1416,7 +1507,7 @@ export const useProjectStore = create<ProjectState>()(
     }),
     {
       name: "wxhb-project",
-      version: 12,
+      version: 13,
       // 迁移主体提取为导出纯函数 migratePersistedState（见文件上方），便于单测
       migrate: (persisted: unknown, version: number) =>
         migratePersistedState(persisted, version),

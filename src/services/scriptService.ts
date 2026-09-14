@@ -4,7 +4,7 @@
 // Unified prompt — no mode branching. AI auto-detects characters in content.
 // ────────────────────────────────────────────────────────────────────────────
 
-import type { Shot, Asset } from "@/stores/projectStore";
+import type { Shot, Asset, AssetDetails } from "@/stores/projectStore";
 import { createAIService } from "@/services/ai/factory";
 import {
   buildSystemPrompt as buildTaskSystemPrompt,
@@ -48,6 +48,7 @@ interface RawShot {
 interface RawCharacter {
   name: string;
   description: string;
+  details?: Extract<AssetDetails, { kind: "character" }>;
   appearancePrompt: string;
 }
 
@@ -55,6 +56,7 @@ interface RawCharacter {
 interface RawProduct {
   name: string;
   description: string;
+  details?: Extract<AssetDetails, { kind: "product" }>;
   appearancePrompt: string;
 }
 
@@ -62,6 +64,7 @@ interface RawProduct {
 interface RawProp {
   name: string;
   description: string;
+  details?: Extract<AssetDetails, { kind: "prop" }>;
   appearancePrompt: string;
 }
 
@@ -69,6 +72,7 @@ interface RawProp {
 interface RawScene {
   name: string;
   description: string;
+  details?: Extract<AssetDetails, { kind: "scene" }>;
   appearancePrompt: string;
 }
 
@@ -347,6 +351,7 @@ export async function generateScript(
         ? parsed.characters.map((c) => ({
             name: c.name ?? "",
             description: c.description ?? "",
+            details: c.details,
             appearancePrompt: c.appearancePrompt ?? "",
           }))
         : [];
@@ -356,6 +361,7 @@ export async function generateScript(
         ? parsed.products.map((c) => ({
             name: c.name ?? "",
             description: c.description ?? "",
+            details: c.details,
             appearancePrompt: c.appearancePrompt ?? "",
           }))
         : [];
@@ -365,6 +371,7 @@ export async function generateScript(
         ? parsed.props.map((c) => ({
             name: c.name ?? "",
             description: c.description ?? "",
+            details: c.details,
             appearancePrompt: c.appearancePrompt ?? "",
           }))
         : [];
@@ -374,6 +381,7 @@ export async function generateScript(
         ? parsed.scenes.map((c) => ({
             name: c.name ?? "",
             description: c.description ?? "",
+            details: c.details,
             appearancePrompt: c.appearancePrompt ?? "",
           }))
         : [];
@@ -559,11 +567,20 @@ export async function extractAssetsFromIdea(
     styles?: RawStyle[];
   };
 
-  const map = (arr: RawCharacter[] | undefined) =>
+  const map = <T extends RawCharacter | RawProduct | RawProp | RawScene, D>(
+    arr: T[] | undefined,
+    getDetails: (item: T) => D | undefined,
+  ): Array<{
+    name: string;
+    description: string;
+    details?: D;
+    appearancePrompt: string;
+  }> =>
     Array.isArray(arr)
       ? arr.map((c) => ({
           name: c.name ?? "",
           description: c.description ?? "",
+          details: getDetails(c),
           appearancePrompt: c.appearancePrompt ?? "",
         }))
       : [];
@@ -583,10 +600,10 @@ export async function extractAssetsFromIdea(
       : [];
 
   return {
-    characters: map(parsed.characters),
-    products: map(parsed.products),
-    props: map(parsed.props),
-    scenes: map(parsed.scenes),
+    characters: map(parsed.characters, (item) => item.details),
+    products: map(parsed.products, (item) => item.details),
+    props: map(parsed.props, (item) => item.details),
+    scenes: map(parsed.scenes, (item) => item.details),
     styles: mapStyles(parsed.styles),
   };
 }
