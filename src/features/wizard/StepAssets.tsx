@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { CharacterEditor } from "@/features/characters/CharacterEditor";
 import { VisualDirectionEditor } from "./VisualDirectionEditor";
+import { AssetEditor } from "./AssetEditor";
 import { useWizardActions, hasActiveAssetTask } from "./useWizardActions";
 import { generateImage, aspectRatioToImageParams } from "@/services/imageService";
 import { Lightbox } from "@/components/ui/Lightbox";
@@ -25,18 +26,12 @@ import {
   getStylePrompt,
   getStyleReferenceUrl,
 } from "@/lib/promptComposer";
-import { AiPolishField } from "@/components/ui/AiPolishField";
-import {
-  SYSTEM_PROMPT_DESCRIPTION_ZH,
-  SYSTEM_PROMPT_VISUAL_PROMPT,
-} from "@/services/chatService";
 
 export function StepAssets() {
   const t = useT();
   const project = useProjectStore(selectActiveProject);
   const removeAsset = useProjectStore((s) => s.removeAsset);
   const addAsset = useProjectStore((s) => s.addAsset);
-  const updateAsset = useProjectStore((s) => s.updateAsset);
   const updateAssetByProjectIdIfRevision = useProjectStore((s) => s.updateAssetByProjectIdIfRevision);
   const setWizardStep = useProjectStore((s) => s.setWizardStep);
   const providerConfig = useSettingsStore((s) => s.providerConfig);
@@ -45,6 +40,7 @@ export function StepAssets() {
   const [editingChar, setEditingChar] = useState<Asset | null>(null);
   const [showEditor, setShowEditor] = useState(false);
   const [showVisualDirectionEditor, setShowVisualDirectionEditor] = useState(false);
+  const [editingAsset, setEditingAsset] = useState<Asset | null>(null);
   const [generatingScenes, setGeneratingScenes] = useState<Set<string>>(new Set());
   const [generatingProducts, setGeneratingProducts] = useState<Set<string>>(new Set());
   const [generatingProps, setGeneratingProps] = useState<Set<string>>(new Set());
@@ -96,6 +92,8 @@ export function StepAssets() {
     setShowEditor(false);
     setEditingChar(null);
   };
+
+  const handleAssetEditorClose = () => setEditingAsset(null);
 
   // ── Batch generate portraits ──────────────────────────────────────────
 
@@ -225,6 +223,20 @@ export function StepAssets() {
 
   if (showVisualDirectionEditor) {
     return <VisualDirectionEditor onClose={() => setShowVisualDirectionEditor(false)} />;
+  }
+
+  if (editingAsset) {
+    const generating = editingAsset.type === "scene"
+      ? generatingScenes.has(editingAsset.id)
+      : editingAsset.type === "product"
+        ? generatingProducts.has(editingAsset.id)
+        : generatingProps.has(editingAsset.id);
+    const regenerate = async (asset: Asset) => {
+      if (asset.type === "scene") await handleGenerateScene(asset);
+      if (asset.type === "product") await handleGenerateProduct(asset);
+      if (asset.type === "prop") await handleGenerateProp(asset);
+    };
+    return <AssetEditor asset={editingAsset} onClose={handleAssetEditorClose} onGenerate={regenerate} generating={generating} />;
   }
 
   if (showEditor) {
@@ -421,10 +433,14 @@ export function StepAssets() {
         {sceneReferences.map((scene) => (
           <div
             key={scene.id}
-            className="group flex items-start gap-3 rounded-xl border border-line bg-raised/50 p-3 transition hover:border-line-strong"
+            role="button"
+            tabIndex={0}
+            onClick={() => setEditingAsset(scene)}
+            onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setEditingAsset(scene); } }}
+            className="group flex cursor-pointer items-start gap-3 rounded-xl border border-line bg-raised/50 p-3 transition hover:border-line-strong focus:border-accent focus:outline-none"
           >
             {/* Scene image preview（点击放大查看） */}
-            <div className="h-16 w-24 shrink-0 overflow-hidden rounded-lg border border-line bg-raised">
+            <div className="h-16 w-24 shrink-0 overflow-hidden rounded-lg border border-line bg-raised" onClick={(e) => e.stopPropagation()}>
               {scene.imageUrl ? (
                 <Lightbox src={scene.imageUrl} alt={scene.name}>
                   <img
@@ -440,44 +456,14 @@ export function StepAssets() {
               )}
             </div>
 
-            {/* Scene fields */}
-            <div className="min-w-0 flex-1 flex flex-col gap-1.5">
-              <input
-                type="text"
-                value={scene.name}
-                onChange={(e) => updateAsset(scene.id, { name: e.target.value })}
-                placeholder="场景名称 (如: 城市街道)"
-                className="w-full bg-transparent text-sm font-medium text-ink placeholder:text-ink-5 focus:outline-none"
-              />
-              <AiPolishField
-                value={scene.description}
-                onChange={(v) => updateAsset(scene.id, { description: v })}
-                systemPrompt={SYSTEM_PROMPT_DESCRIPTION_ZH}
-                resetKey={scene.id}
-                placeholder="中文描述"
-                singleLine
-                bare
-                appearanceClass="bg-transparent text-xs text-ink-3 placeholder:text-ink-5"
-              />
-              <AiPolishField
-                value={scene.prompt}
-                onChange={(v) => updateAsset(scene.id, { prompt: v })}
-                systemPrompt={SYSTEM_PROMPT_VISUAL_PROMPT}
-                resetKey={scene.id}
-                placeholder="English prompt for image generation..."
-                rows={2}
-                bare
-                appearanceClass="bg-transparent text-xs text-ink-2 placeholder:text-ink-5"
-              />
-              {scene.error && (
-                <p className="truncate text-[0.625rem] text-danger" title={scene.error}>
-                  生成失败：{scene.error}
-                </p>
-              )}
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-medium text-ink">{scene.name || "未命名场景"}</p>
+              <p className="mt-0.5 line-clamp-2 text-xs text-ink-4">{scene.description || scene.prompt || "—"}</p>
+              {scene.error && <p className="mt-0.5 truncate text-[0.625rem] text-danger" title={scene.error}>生成失败：{scene.error}</p>}
             </div>
 
             {/* Actions */}
-            <div className="flex shrink-0 flex-col gap-1 opacity-0 transition group-hover:opacity-100">
+            <div className="flex shrink-0 flex-col gap-1 opacity-0 transition group-hover:opacity-100" onClick={(e) => e.stopPropagation()}>
               <button
                 onClick={() => handleGenerateScene(scene)}
                 disabled={anyGenerating || !scene.prompt.trim() || generatingScenes.has(scene.id)}
@@ -536,10 +522,14 @@ export function StepAssets() {
         {products.map((product) => (
           <div
             key={product.id}
-            className="group flex items-start gap-3 rounded-xl border border-line bg-raised/50 p-3 transition hover:border-line-strong"
+            role="button"
+            tabIndex={0}
+            onClick={() => setEditingAsset(product)}
+            onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setEditingAsset(product); } }}
+            className="group flex cursor-pointer items-start gap-3 rounded-xl border border-line bg-raised/50 p-3 transition hover:border-line-strong focus:border-accent focus:outline-none"
           >
             {/* Product image preview（点击放大查看） */}
-            <div className="h-16 w-24 shrink-0 overflow-hidden rounded-lg border border-line bg-raised">
+            <div className="h-16 w-24 shrink-0 overflow-hidden rounded-lg border border-line bg-raised" onClick={(e) => e.stopPropagation()}>
               {product.imageUrl ? (
                 <Lightbox src={product.imageUrl} alt={product.name}>
                   <img
@@ -555,44 +545,14 @@ export function StepAssets() {
               )}
             </div>
 
-            {/* Product fields */}
-            <div className="min-w-0 flex-1 flex flex-col gap-1.5">
-              <input
-                type="text"
-                value={product.name}
-                onChange={(e) => updateAsset(product.id, { name: e.target.value })}
-                placeholder="产品名称 (如: 白色羽绒服)"
-                className="w-full bg-transparent text-sm font-medium text-ink placeholder:text-ink-5 focus:outline-none"
-              />
-              <AiPolishField
-                value={product.description}
-                onChange={(v) => updateAsset(product.id, { description: v })}
-                systemPrompt={SYSTEM_PROMPT_DESCRIPTION_ZH}
-                resetKey={product.id}
-                placeholder="中文描述"
-                singleLine
-                bare
-                appearanceClass="bg-transparent text-xs text-ink-3 placeholder:text-ink-5"
-              />
-              <AiPolishField
-                value={product.prompt}
-                onChange={(v) => updateAsset(product.id, { prompt: v })}
-                systemPrompt={SYSTEM_PROMPT_VISUAL_PROMPT}
-                resetKey={product.id}
-                placeholder="English prompt for image generation..."
-                rows={2}
-                bare
-                appearanceClass="bg-transparent text-xs text-ink-2 placeholder:text-ink-5"
-              />
-              {product.error && (
-                <p className="truncate text-[0.625rem] text-danger" title={product.error}>
-                  生成失败：{product.error}
-                </p>
-              )}
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-medium text-ink">{product.name || "未命名主体"}</p>
+              <p className="mt-0.5 line-clamp-2 text-xs text-ink-4">{product.description || product.prompt || "—"}</p>
+              {product.error && <p className="mt-0.5 truncate text-[0.625rem] text-danger" title={product.error}>生成失败：{product.error}</p>}
             </div>
 
             {/* Actions */}
-            <div className="flex shrink-0 flex-col gap-1 opacity-0 transition group-hover:opacity-100">
+            <div className="flex shrink-0 flex-col gap-1 opacity-0 transition group-hover:opacity-100" onClick={(e) => e.stopPropagation()}>
               <button
                 onClick={() => handleGenerateProduct(product)}
                 disabled={anyGenerating || !product.prompt.trim() || generatingProducts.has(product.id)}
@@ -651,9 +611,13 @@ export function StepAssets() {
         {props.map((prop) => (
           <div
             key={prop.id}
-            className="group flex items-start gap-3 rounded-xl border border-line bg-raised/50 p-3 transition hover:border-line-strong"
+            role="button"
+            tabIndex={0}
+            onClick={() => setEditingAsset(prop)}
+            onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setEditingAsset(prop); } }}
+            className="group flex cursor-pointer items-start gap-3 rounded-xl border border-line bg-raised/50 p-3 transition hover:border-line-strong focus:border-accent focus:outline-none"
           >
-            <div className="h-16 w-24 shrink-0 overflow-hidden rounded-lg border border-line bg-raised">
+            <div className="h-16 w-24 shrink-0 overflow-hidden rounded-lg border border-line bg-raised" onClick={(e) => e.stopPropagation()}>
               {prop.imageUrl ? (
                 <Lightbox src={prop.imageUrl} alt={prop.name}>
                   <img src={prop.imageUrl} alt={prop.name} className="h-full w-full object-cover" />
@@ -664,41 +628,12 @@ export function StepAssets() {
                 </div>
               )}
             </div>
-            <div className="flex min-w-0 flex-1 flex-col gap-1.5">
-              <input
-                type="text"
-                value={prop.name}
-                onChange={(e) => updateAsset(prop.id, { name: e.target.value })}
-                placeholder={t("wizard.propNamePlaceholder")}
-                className="w-full bg-transparent text-sm font-medium text-ink placeholder:text-ink-5 focus:outline-none"
-              />
-              <AiPolishField
-                value={prop.description}
-                onChange={(v) => updateAsset(prop.id, { description: v })}
-                systemPrompt={SYSTEM_PROMPT_DESCRIPTION_ZH}
-                resetKey={prop.id}
-                placeholder="中文描述"
-                singleLine
-                bare
-                appearanceClass="bg-transparent text-xs text-ink-3 placeholder:text-ink-5"
-              />
-              <AiPolishField
-                value={prop.prompt}
-                onChange={(v) => updateAsset(prop.id, { prompt: v })}
-                systemPrompt={SYSTEM_PROMPT_VISUAL_PROMPT}
-                resetKey={prop.id}
-                placeholder="English prompt for image generation..."
-                rows={2}
-                bare
-                appearanceClass="bg-transparent text-xs text-ink-2 placeholder:text-ink-5"
-              />
-              {prop.error && (
-                <p className="truncate text-[0.625rem] text-danger" title={prop.error}>
-                  生成失败：{prop.error}
-                </p>
-              )}
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-medium text-ink">{prop.name || "未命名道具"}</p>
+              <p className="mt-0.5 line-clamp-2 text-xs text-ink-4">{prop.description || prop.prompt || "—"}</p>
+              {prop.error && <p className="mt-0.5 truncate text-[0.625rem] text-danger" title={prop.error}>生成失败：{prop.error}</p>}
             </div>
-            <div className="flex shrink-0 flex-col gap-1 opacity-0 transition group-hover:opacity-100">
+            <div className="flex shrink-0 flex-col gap-1 opacity-0 transition group-hover:opacity-100" onClick={(e) => e.stopPropagation()}>
               <button
                 onClick={() => handleGenerateProp(prop)}
                 disabled={anyGenerating || !prop.prompt.trim() || generatingProps.has(prop.id)}

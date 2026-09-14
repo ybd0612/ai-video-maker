@@ -512,6 +512,11 @@ export const SYSTEM_PROMPT_DESCRIPTION_ZH = `你是一位 AI 视觉创作的描�
 - 用中文，长度与原文相当，不要扩写成段落
 - 直接返回润色后的描述，不要任何解释说明`;
 
+export const SYSTEM_PROMPT_ASSET_EDIT_ZH = `你是一位视频资产设计师。用户会给你一个资产的名称、中文描述、英文绘图提示词和修改要求，请只返回修改后的完整 JSON，不要解释、不要 Markdown 代码块。
+JSON 必须严格包含 name、description、prompt 三个字段。description 用中文，prompt 用英文；只修改用户明确要求的内容，其他信息保持不变。不要把整个项目的视觉方向写进资产 prompt，资产 prompt 只描述这个资产本身。
+
+`;
+
 export const SYSTEM_PROMPT_VISUAL_DIRECTION_EDIT_ZH = `你是一位短视频项目的视觉指导。用户会给你一个项目级视觉方向和修改要求，请只返回修改后的完整 JSON，不要解释、不要 Markdown 代码块。
 JSON 必须严格包含以下字段：name、mediumMaterial、colorPalette、lightingMood、cameraTexture、composition、emotion。
 只修改用户明确要求的内容，其他字段保持原意；保证六个视觉维度具体、互相协调，并且服务于同一个项目。
