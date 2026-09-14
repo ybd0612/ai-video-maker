@@ -28,15 +28,12 @@ Idea → Visual Direction → Character/Scene/Product/Prop Assets → Storyboard
 
 The UI presents this as a six-step wizard. Visual direction and asset preparation are handled inside Step 2:
 
-| Step | Name | Current responsibility |
-|---|---|---|
-| 1 | Idea | Enter the topic, story idea, and aspect ratio; optionally refine it through AI chat |
-| 2 | Assets | Define the project visual direction, extract characters/scenes/products/props, and generate asset reference images immediately |
-| 3 | Storyboard | Generate and edit storyboard scripts, visual prompts, motion prompts, and durations |
-| 4 | Images | Generate a reference image for each shot and retry individual shots |
-| 5 | Videos | Generate video clips from storyboard and shot images, including optional first/last-frame mode |
-| 6 | Assembly | Concatenate clips in the browser with FFmpeg.wasm and download the final video |
-```
+1. **Idea**: Enter the topic, story idea, and aspect ratio; optionally refine it through AI chat.
+2. **Assets**: Define the project visual direction, extract characters/scenes/products/props, and generate asset reference images immediately.
+3. **Storyboard**: Generate and edit storyboard scripts, visual prompts, motion prompts, and durations.
+4. **Images**: Generate a reference image for each shot and retry individual shots.
+5. **Videos**: Generate video clips from storyboard and shot images, including optional first/last-frame mode.
+6. **Assembly**: Concatenate clips in the browser with FFmpeg.wasm and download the final video.
 
 ### Asset model
 
@@ -49,20 +46,18 @@ The UI presents this as a six-step wizard. Visual direction and asset preparatio
 
 ## Features
 
-| Feature | Current behavior |
-|---|---|
-| Six-step wizard | Idea → Assets → Storyboard → Images → Videos → Assembly |
-| Visual direction | A reusable project visual master for assets and shots |
-| Structured assets | Dedicated full settings for characters, scenes, products, and props |
-| AI editing | Modify asset and storyboard content through AI instructions, with undo support |
-| Reference images | Generate style, character, scene, product, and prop references during asset preparation |
-| Storyboard generation | Generate structured shots with separate visual and motion prompts |
-| Video generation | Async creation and polling; 720P, 4–12 seconds, and first/last-frame mode |
-| Final assembly | Concatenate shot videos in the browser with FFmpeg.wasm |
-| Multi-project management | Create, switch, duplicate, and delete projects with local persistence |
-| Plan-based limits | RPM throttling and Token Plan quota tracking |
-| Bilingual UI | Built-in Chinese/English translations |
-| Light/dark themes | Semantic token-based light and dark themes |
+- **Six-step wizard**: Idea → Assets → Storyboard → Images → Videos → Assembly.
+- **Visual direction**: A reusable project visual master for assets and shots.
+- **Structured assets**: Dedicated full settings for characters, scenes, products, and props.
+- **AI editing**: Modify asset and storyboard content through AI instructions, with undo support.
+- **Reference images**: Generate style, character, scene, product, and prop references during asset preparation.
+- **Storyboard generation**: Generate structured shots with separate visual and motion prompts.
+- **Video generation**: Async creation and polling; 720P, 4–12 seconds, and first/last-frame mode.
+- **Final assembly**: Concatenate shot videos in the browser with FFmpeg.wasm.
+- **Multi-project management**: Create, switch, duplicate, and delete projects with local persistence.
+- **Plan-based limits**: RPM throttling and Token Plan quota tracking.
+- **Bilingual UI**: Built-in Chinese/English translations.
+- **Light/dark themes**: Semantic token-based light and dark themes.
 
 ## Known Limitations
 
@@ -134,7 +129,7 @@ Supported plan identifiers currently include:
 - `starter` / `plus` / `pro`: Token Plan tiers
 
 | Model type | default | enterprise | Token Plan |
-|---|---:|---:|---:|
+| --- | ---: | ---: | ---: |
 | Text | 20 RPM | 40 RPM | 1000 RPM |
 | Image (1K) | 20 RPM | 40 RPM | 100 RPM |
 | Video | 1 RPM | 2 RPM | 5 RPM |
