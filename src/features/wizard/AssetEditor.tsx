@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { ArrowLeft, ImageIcon, Loader2, Sparkles, Undo2 } from "lucide-react";
 import { useProjectStore, type Asset } from "@/stores/projectStore";
 import { useSettingsStore } from "@/stores/settingsStore";
@@ -42,6 +42,14 @@ export function AssetEditor({ asset, onClose, onGenerate, generating }: AssetEdi
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape" && !busy && !generating) onClose();
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [busy, generating, onClose]);
+
   const applyInstruction = useCallback(async () => {
     if (busy || !providerConfig.apiKey || !providerConfig.baseUrl) return;
     setBusy(true);
@@ -84,12 +92,16 @@ export function AssetEditor({ asset, onClose, onGenerate, generating }: AssetEdi
 
   return (
     <div className="flex flex-col gap-3 p-3">
-      <div className="flex items-center gap-2">
-        <button onClick={onClose} disabled={busy || generating} className="rounded p-1 text-ink-4 hover:bg-raised disabled:opacity-50" title={t("dialog.cancel")}>
-          <ArrowLeft size={14} />
-        </button>
-        <span className="text-xs font-medium text-ink-2">编辑{assetLabel(asset.type)}</span>
-      </div>
+      <button
+        type="button"
+        onClick={onClose}
+        disabled={busy || generating}
+        className="flex w-fit items-center gap-2 rounded p-1 text-xs font-medium text-ink-2 transition hover:bg-raised disabled:opacity-50"
+        title={t("dialog.cancel")}
+      >
+        <ArrowLeft size={14} />
+        <span>编辑{assetLabel(asset.type)}</span>
+      </button>
 
       <div className="flex flex-col gap-3 @md:flex-row">
         <div className="min-w-0 flex-1 space-y-3">

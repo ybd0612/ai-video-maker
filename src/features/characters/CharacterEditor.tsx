@@ -336,20 +336,27 @@ export function CharacterEditor({ character, onClose }: CharacterEditorProps) {
   // 覆盖自动链路全程（AI 改描述 → 派生英文 → 生成定妆照），避免中途操作产生竞态或重复计费。
   const busy = isApplyingInstruction || isDerivingAppearance || isGeneratingPortrait;
 
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape" && !busy) onClose();
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [busy, onClose]);
+
   return (
     <div className="@container flex flex-col gap-3 p-3">
       {/* Header */}
-      <div className="flex items-center gap-2">
-        <button
-          onClick={onClose}
-          className="rounded p-1 text-ink-4 hover:bg-raised hover:text-ink-2"
-        >
-          <ArrowLeft size={14} />
-        </button>
-        <span className="text-xs font-medium text-ink-2">
-          {character ? t("characters.edit") : t("characters.add")}
-        </span>
-      </div>
+      <button
+        type="button"
+        onClick={onClose}
+        disabled={busy}
+        className="flex w-fit items-center gap-2 rounded p-1 text-xs font-medium text-ink-2 transition hover:bg-raised hover:text-ink-2 disabled:opacity-50"
+        title={t("dialog.cancel")}
+      >
+        <ArrowLeft size={14} />
+        <span>{character ? t("characters.edit") : t("characters.add")}</span>
+      </button>
 
       {/* 主体：左列文字(3) / 右列定妆照(2) ≈ 6:4，右列高度 stretch 撑满与左列齐平（容器宽 <32rem 时回退上下布局，适配窄侧边栏） */}
       <div className="flex flex-col gap-3 @md:flex-row @md:items-stretch">
