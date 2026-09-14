@@ -2,230 +2,183 @@
 
 # 🎬 AI Video Maker
 
-**AI-Powered Short Video Production Tool**
+**AI-powered short video production tool**
 
 English | [中文](./README.md)
 
-A wizard-based short video production tool: enter a topic, and the AI automatically completes character extraction, storyboard scripting, reference images, video clip generation, and concatenation into a final video. Integrates Agnes AI's text, image, and video models.
-
-![React](https://img.shields.io/badge/React-19-61DAFB?logo=react)
-![TypeScript](https://img.shields.io/badge/TypeScript-6-3178C6?logo=typescript)
-![Vite](https://img.shields.io/badge/Vite-8-646CFF?logo=vite)
-![TailwindCSS](https://img.shields.io/badge/TailwindCSS-4-06B6D4?logo=tailwindcss)
-![FFmpeg.wasm](https://img.shields.io/badge/FFmpeg.wasm-0.12-007808)
-![License](https://img.shields.io/badge/License-MIT-green)
-
 </div>
 
----
+> ⚠️ **Project status: Development**
+>
+> This project is still under active development and currently has known bugs, unfinished interactions, and unstable edge cases. **Do not use it in production or for important content yet.** AI generation results, asynchronous task recovery, automation, and final video assembly may fail. Keep important prompts and assets backed up, and verify behavior in the local environment.
 
-## ✨ Features
+## Overview
 
-| Feature | Description |
-|---------|-------------|
-| 🧭 **6-Step Wizard** | Idea → Assets (characters/scenes/products) → Storyboard → Images → Videos → Assembly, each step controllable and independently retryable |
-| 🎬 **Auto Pipeline** | Auto mode: from topic to final video in one run (script → image → video → concat) |
-| 🤖 **Smart Storyboard** | `agnes-3.0-flash` — generates 4-6 shots with dual prompts (text-to-image + image-to-video) |
-| 🎨 **Image Generation** | `agnes-image-2.5-flash` — reference images from visual prompts (concurrency: 3) |
-| 🎥 **Video Generation** | `agnes-video-2.5-flash` — 720P / 4-12s, async task + polling (with model_name), rate-limited by plan, auto-retry & recovery |
-| 🎞️ **Dual-Frame Control** | Optional first-frame + last-frame (image-to-video) for better motion consistency |
-| ✂️ **Video Concatenation** | FFmpeg.wasm client-side concat demuxer for final MP4 output |
-| ✨ **AI Polish** | One-click polish inside any input field, with undo back to the previous version |
-| 🚦 **Plan-Based Rate Limits** | 5 tiers (Free / Enterprise / Starter / Plus / Pro), RPM throttling + Token Plan quotas |
-| 🔄 **Idempotent & Reliable** | Module-level idempotency guards: no duplicate server tasks, no killing in-flight tasks, auto-recovery on refresh/switch |
-| 📋 **Multi-Project** | Create / switch / delete / duplicate projects, localStorage persistence |
-| 📊 **History Log** | Last 200 operation records, grouped by date |
-| 📐 **Aspect Ratios** | 16:9 (landscape), 9:16 (portrait), 1:1 (square) |
-| 🌐 **i18n** | Built-in lightweight i18n — switch between Chinese and English instantly |
-| 🔧 **Swappable Models** | Centralized model identifiers — swap models by editing the `MODELS` constant |
+AI Video Maker is a React-based AI short video production tool. Starting from one creative idea, users can progressively define a visual direction, build characters and other assets, generate storyboards, create shot images and video clips, and assemble the final video.
 
-## 🚀 Quick Start
+The project primarily uses Agnes AI text, image, and video models, while keeping an OpenAI-compatible service structure. It is a frontend application: project data and settings are mainly stored in browser `localStorage`, while generated images and videos are stored as URLs returned by the service.
+
+## Current Product Flow
+
+The current pipeline is:
+
+```text
+Idea → Visual Direction → Character/Scene/Product/Prop Assets → Storyboard → Shot Images → Videos → Assembly
+```
+
+The UI presents this as a six-step wizard. Visual direction and asset preparation are handled inside Step 2:
+
+| Step | Name | Current responsibility |
+|---|---|---|
+| 1 | Idea | Enter the topic, story idea, and aspect ratio; optionally refine it through AI chat |
+| 2 | Assets | Define the project visual direction, extract characters/scenes/products/props, and generate asset reference images immediately |
+| 3 | Storyboard | Generate and edit storyboard scripts, visual prompts, motion prompts, and durations |
+| 4 | Images | Generate a reference image for each shot and retry individual shots |
+| 5 | Videos | Generate video clips from storyboard and shot images, including optional first/last-frame mode |
+| 6 | Assembly | Concatenate clips in the browser with FFmpeg.wasm and download the final video |
+```
+
+### Asset model
+
+- **Visual Direction** is a project-level visual master containing medium/material, color palette, lighting mood, camera texture, composition, and overall emotion.
+- **Characters, scenes, products, and props** are structured assets with dedicated detail fields, not just plain descriptions.
+- Each asset has a one-line summary and a complete type-specific setting.
+- Asset cards open a shared detail editor with a consistent split layout, fixed-ratio preview, and AI-instruction editing.
+- Asset reference images are generated during the asset step; shot images and videos are generated later in their respective steps.
+- Deleting assets, characters, projects, and other sensitive data requires confirmation.
+
+## Features
+
+| Feature | Current behavior |
+|---|---|
+| Six-step wizard | Idea → Assets → Storyboard → Images → Videos → Assembly |
+| Visual direction | A reusable project visual master for assets and shots |
+| Structured assets | Dedicated full settings for characters, scenes, products, and props |
+| AI editing | Modify asset and storyboard content through AI instructions, with undo support |
+| Reference images | Generate style, character, scene, product, and prop references during asset preparation |
+| Storyboard generation | Generate structured shots with separate visual and motion prompts |
+| Video generation | Async creation and polling; 720P, 4–12 seconds, and first/last-frame mode |
+| Final assembly | Concatenate shot videos in the browser with FFmpeg.wasm |
+| Multi-project management | Create, switch, duplicate, and delete projects with local persistence |
+| Plan-based limits | RPM throttling and Token Plan quota tracking |
+| Bilingual UI | Built-in Chinese/English translations |
+| Light/dark themes | Semantic token-based light and dark themes |
+
+## Known Limitations
+
+These are real development-stage boundaries and are not presented as fully solved:
+
+- AI output depends on external models; structured JSON, prompt quality, and image/video consistency can still be unstable.
+- Image and video generation are asynchronous network tasks and may fail, time out, queue, or require recovery after a refresh.
+- Video generation on the free plan has a low RPM limit, so multi-shot jobs usually wait in a queue.
+- Auto mode advances through several steps without manual checkpoints and may still encounter state synchronization, recovery, or gate issues.
+- Model response fields can differ between implementations. The service layer includes compatibility parsing, but cannot guarantee every response shape.
+- FFmpeg.wasm depends on browser memory, cross-origin resources, and the local runtime environment; some videos may fail to assemble.
+- Project state is currently stored mainly in `localStorage`, so the app is not designed for collaboration, cloud synchronization, or large media libraries.
+- UI details, edge states, and error messages are still being refined.
+
+When reporting an issue, include the project status, current wizard step, model response, browser console error, and whether the project was refreshed or switched during generation.
+
+## Quick Start
 
 ### Prerequisites
 
-- Node.js ^20.19.0 or >= 22.12.0 (required by Vite 8)
-- npm >= 9
+- Node.js `^20.19.0` or `>=22.12.0`
+- npm `>=9`
 
-### Install & Run
+### Install and run
 
 ```bash
-# Clone the repo
-git clone https://github.com/ybd0612/ai-video-maker.git
-cd ai-video-maker
-
-# Install dependencies
 npm install
-
-# Start dev server (default: http://127.0.0.1:5173)
 npm run dev
+```
 
-# Build for production (TypeScript check + Vite build)
+Default development URL: `http://127.0.0.1:5173`
+
+### Common commands
+
+```bash
+# TypeScript check and production build
 npm run build
 
-# Preview production build (port 5180)
-npm run preview
-
-# Run unit tests (Vitest, pure logic — no browser)
+# Run Vitest unit tests
 npm run test
+
+# Watch unit tests
+npm run test:watch
+
+# Preview the production build
+npm run preview
 ```
 
-### Configure API Key
+The project currently maintains code-level unit tests with Vitest. Browser/E2E tests are not part of the development verification workflow. UI behavior and real AI generation flows should be checked manually in a local environment.
 
-1. Launch the app and click **Settings**
-2. Enter your **API Key** (Agnes AI or any OpenAI-compatible key)
-3. Verify the **API Base URL** (default China endpoint: `https://api.agnes-ai.cn/v1`)
-4. Select your **Plan** (default: Free; upgrade to lift usage limits)
-5. Save settings
+## API Configuration
 
-> 💡 API keys are stored in browser localStorage and only sent to the configured endpoint when making API calls.
+1. Start the application and open **Settings**.
+2. Enter an Agnes AI or OpenAI-compatible API key.
+3. Check the API Base URL. The default China endpoint is `https://api.agnes-ai.cn/v1`.
+4. Select the current access plan.
+5. Save the settings before generating content.
 
-## 📖 Usage Guide
+API keys and project settings are stored in the current browser's `localStorage` and are sent only to the configured endpoint when requests are made. Never commit keys or include them in public screenshots.
 
-### 6-Step Wizard
+## Plans and Rate Limits
 
-| Step | Page | Description |
-|------|------|-------------|
-| 1️⃣ | **Idea** | Describe the topic, pick 16:9 / 9:16 / 1:1 ratio, refine via multi-turn AI chat |
-| 2️⃣ | **Assets** | Auto-extracted characters/products/scenes, generate portraits, scene references, product references, style reference |
-| 3️⃣ | **Storyboard** | 4-6 shots (copy / visual prompt / motion prompt / duration), edit & re-roll per shot |
-| 4️⃣ | **Images** | Generate reference image per shot, re-roll individually |
-| 5️⃣ | **Videos** | Generate video per shot (optional dual-frame), re-roll individually |
-| 6️⃣ | **Assembly** | Validate all clips, concat with FFmpeg.wasm, download MP4 |
+The single source of truth for plans and quotas is `src/lib/plans.ts`. Requests are controlled by the rate limiter in `src/services/rateLimit.ts`.
 
-- **semi-auto (default)**: confirm storyboard/images before proceeding, go back and edit anytime
-- **auto**: all steps advance automatically to the final video
-- Free plan generates videos at about **1/min** (RPM=1); multiple shots queue with an estimated wait shown in the UI
+Supported plan identifiers currently include:
 
-### UI Layout
+- `default`: Free
+- `enterprise`: Enterprise
+- `starter` / `plus` / `pro`: Token Plan tiers
 
-```
-┌────────────┬────────────────────────┬──────────────────┐
-│ Left Panel │      Wizard / Preview  │   Right Editor   │
-│            │                        │                  │
-│ · Projects │  · 6-step wizard       │  · Prompt fields │
-│ · Shots    │  · Shot cards + badges │  · Duration      │
-│ · Characters│ · Image/Video preview  │  · AI assist ✨   │
-│ · History  │  · Final video + DL    │  · Retry button  │
-└────────────┴────────────────────────┴──────────────────┘
-```
-
-## 💳 Plans & Rate Limits
-
-The service targets free users; official access types have RPM and Token Plan subscription quotas. The app intercepts before real API calls to avoid 429 / quota overruns.
-
-- **5 plan tiers**: `default` (Free), `enterprise`, `starter` / `plus` / `pro` (Token Plan)
-- **Single source of truth**: `PLANS` constant in `src/lib/plans.ts` (adjust limits here only)
-- **Central rate limiter**: singleton `rateLimiter` in `src/services/rateLimit.ts`; all three real entry points call `await rateLimiter.acquire(kind, opts)` before hitting the API
-- **RPM throttling**: 60s sliding window per model kind (images further split by 1K/2K/3K/4K tier); waits automatically when the limit is reached
-- **Subscription quotas** (Token Plan only): text (per 5h / per week), images (per day), video seconds (per day) — persisted to localStorage, survive refresh; exhausted quota raises a terminal error (not auto-retried)
-
-| Model | default | enterprise | Token Plan |
-|-------|---------|-----------|------------|
+| Model type | default | enterprise | Token Plan |
+|---|---:|---:|---:|
 | Text | 20 RPM | 40 RPM | 1000 RPM |
-| Image(1K) | 20 RPM | 40 RPM | 100 RPM |
+| Image (1K) | 20 RPM | 40 RPM | 100 RPM |
 | Video | 1 RPM | 2 RPM | 5 RPM |
 
-## 🔒 Video Reliability Design
+Image-size limits, subscription windows, and daily quotas should be read from the current implementation in `src/lib/plans.ts`.
 
-- **Async tasks**: `POST /videos` creates a task → `GET /agnesapi?video_id=` polls (5s interval, 30-min per-task timeout, 2-min task registration wait)
-- **Idempotency guard**: batch generation tracked in a module-level registry — no duplicate starts per project, preventing duplicate server tasks (and double token spend)
-- **Independent cancellation**: each batch uses its own AbortController; stuck "generating" states after refresh are reset and re-adopted
-- **Per-project writes**: async results write back by the originating project ID — switching projects mid-generation never cross-writes
-- **Failure grading**: only explicit failed/cancelled states turn red; tasks that may still be running keep waiting instead of false-failing
+## Technology Stack
 
-## 🏗️ Project Structure
+- React 19 + TypeScript
+- Vite 8
+- Zustand 5 for state and persistence
+- Tailwind CSS 4 + Framer Motion
+- FFmpeg.wasm 0.12
+- Vitest 4
+- Lucide React
 
-```
+## Project Structure
+
+```text
 src/
-├── i18n/                          # Lightweight i18n (zero dependencies)
-│   └── index.ts                   # zh/en translation dict + useT hook
-├── pages/
-│   └── ProjectWorkspace.tsx       # Main shell (3-column: sidebar | wizard | editor)
+├── components/       # Settings, dialogs, lightbox, and shared UI
 ├── features/
-│   ├── wizard/                    # 6-step wizard (main flow)
-│   │   ├── CreationWizard.tsx     # Wizard container (step routing + state machine)
-│   │   ├── StepIdea.tsx           # Step 1: idea + aspect ratio + AI chat
-│   │   ├── StepAssets.tsx         # Step 2: character/scene/style assets
-│   │   ├── StepStoryboard.tsx     # Step 3: storyboard scripts
-│   │   ├── StepImages.tsx         # Step 4: shot images
-│   │   ├── StepVideos.tsx         # Step 5: video generation
-│   │   ├── StepAssembly.tsx       # Step 6: final assembly
-│   │   ├── useWizardActions.ts    # Action orchestration (idempotency registries)
-│   │   ├── ShotCard.tsx           # Shot card (status badge + expandable detail)
-│   │   ├── PromptSubFields.tsx    # Prompt sub-field editor
-│   │   ├── DualFrameToggle.tsx    # First/last frame toggle
-│   │   └── ReviewCheckpoint.tsx   # Review checkpoint
-│   ├── characters/                # Character editor / panel
-│   ├── projects/                  # Project management panel
-│   └── history/                   # Operation history panel
-├── services/                      # Service layer
-│   ├── rateLimit.ts               # Central rate limiter (RPM + quotas, singleton)
-│   ├── scriptService.ts           # Text model call, structured storyboard (dual prompts)
-│   ├── imageService.ts            # Image generation
-│   ├── videoService.ts            # Video generation (async create + polling + result parsing)
-│   ├── chatService.ts             # Multi-turn chat API (AI prompt optimization)
-│   ├── renderService.ts           # FFmpeg.wasm video concatenation
-│   └── ai/                        # Unified AI entry (OpenAI-compatible)
-│       ├── factory.ts             # Service factory
-│       ├── openai.ts              # chatCompletion / generateImage implementations
-│       └── index.ts
-├── stores/                        # Zustand stores
-│   ├── projectStore.ts            # Multi-project management (localStorage, v1→v2 migration)
-│   └── settingsStore.ts           # Global settings (apiKey/baseUrl/plan/language)
-├── lib/
-│   ├── models.ts                  # AI model identifier constants
-│   ├── plans.ts                   # Plan & usage limits single source of truth
-│   ├── fetchWithRetry.ts          # Unified fetch (timeout + exponential backoff retry)
-│   ├── promptUtils.ts             # Visual/motion prompt composition
-│   ├── characterUtils.ts          # Character description injection
-│   ├── assetNamespace.ts          # Character namespace & full prompt
-│   ├── resolveBaseUrl.ts          # API URL resolver
-│   └── validation.ts              # Validation utilities (frame calc, prompt sanitize)
-├── components/
-│   ├── SettingsDialog.tsx         # Settings dialog (API Key / Base URL / Plan / Language)
-│   ├── ApiKeyBanner.tsx           # API key missing banner
-│   └── ui/                        # Shared UI components (AiPolishField / ConfirmDialog / Lightbox, etc.)
-├── styles/
-│   └── globals.css                # Global styles
-├── App.tsx                        # Root component
-└── main.tsx                       # Entry point
+│   ├── wizard/       # Six-step wizard, assets, storyboard, images, videos, assembly
+│   ├── characters/   # Character panel and editor
+│   ├── projects/     # Project management
+│   └── history/      # Operation history
+├── services/         # Text, image, video, chat, and rendering services
+├── stores/           # projectStore and settingsStore
+├── lib/              # Models, plans, prompts, asset details, and validation
+├── i18n/             # Chinese/English translations
+└── styles/           # Global theme and semantic colors
+
+tests/                # Vitest unit tests
 ```
 
-## 🔧 Swapping Models
+## Development Conventions
 
-Model identifiers are centralized in `src/lib/models.ts`:
+- This is an experimental development project. Check the existing data model, async task guards, and write-back paths before changing behavior.
+- Keep models, plans, prompt rules, and protocol parameters in their single sources of truth rather than hard-coding them in page components.
+- Async generation must avoid duplicate submissions, accidental cancellation, and cross-project writes.
+- Sensitive operations such as deletion must require confirmation.
+- Add user-facing text to both Chinese and English translation dictionaries.
+- Before committing, run `npm run test`, `npm run build`, and `git diff --check`.
 
-```typescript
-export const MODELS = {
-  text: "agnes-3.0-flash",
-  image: "agnes-image-2.5-flash",
-  video: "agnes-video-2.5-flash",
-} as const;
-```
-
-To swap models, simply edit this constant. All services (scriptService / imageService / videoService) reference models from here automatically.
-
-## 🛠️ Tech Stack
-
-| Category | Technology |
-|----------|------------|
-| Framework | React 19 + TypeScript 6 |
-| Build | Vite 8 |
-| State | Zustand v5 (localStorage persistence) |
-| Styles | TailwindCSS v4 + Framer Motion |
-| Video | FFmpeg.wasm 0.12 |
-| Icons | Lucide React |
-
-## 📄 License
+## License
 
 MIT License
-
-## 🤝 Contributing
-
-Issues and pull requests are welcome!
-
-1. Fork the repository
-2. Create a feature branch: `git checkout -b feature/amazing-feature`
-3. Commit your changes: `git commit -m 'feat: add amazing feature'`
-4. Push to the branch: `git push origin feature/amazing-feature`
-5. Open a Pull Request

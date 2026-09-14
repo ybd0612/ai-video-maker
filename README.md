@@ -6,226 +6,177 @@
 
 [English](./README_EN.md) | 中文
 
-基于 6 步向导的短视频自动创作工具：输入主题，AI 自动完成角色提取、分镜脚本、参考图、视频片段生成并拼接为成片。集成 Agnes AI 的文本、图像、视频三大模型。
-
-![React](https://img.shields.io/badge/React-19-61DAFB?logo=react)
-![TypeScript](https://img.shields.io/badge/TypeScript-6-3178C6?logo=typescript)
-![Vite](https://img.shields.io/badge/Vite-8-646CFF?logo=vite)
-![TailwindCSS](https://img.shields.io/badge/TailwindCSS-4-06B6D4?logo=tailwindcss)
-![FFmpeg.wasm](https://img.shields.io/badge/FFmpeg.wasm-0.12-007808)
-![License](https://img.shields.io/badge/License-MIT-green)
-
 </div>
 
----
+> ⚠️ **项目状态：开发阶段（Development）**
+>
+> 当前版本仍在快速迭代，存在较多已知问题和未完成体验，**不建议用于生产环境或重要内容制作**。生成结果、异步任务恢复、自动化流程和成片拼接都可能出现异常。使用前请保留重要提示词和素材，并以本地实际运行结果为准。
 
-## ✨ 功能特性
+## 项目简介
 
-| 特性 | 说明 |
-|------|------|
-| 🧭 **6 步向导** | 想法 → 资产（角色/场景/产品） → 分镜 → 图片 → 视频 → 成片，每步可控、可单独重试 |
-| 🎬 **一键成片** | 全自动模式：输入主题后流水线直出成片（脚本 → 图片 → 视频 → 拼接） |
-| 🤖 **智能分镜** | `agnes-3.0-flash` — 生成 4-6 个分镜，同时产出文生图 + 图生视频两套提示词 |
-| 🎨 **图像生成** | `agnes-image-2.5-flash` — 按画面描述生成参考图（并发 3） |
-| 🎥 **视频生成** | `agnes-video-2.5-flash` — 720P / 4-12 秒，异步任务 + 轮询（带 model_name），按套餐自动限速，失败自动重试与恢复 |
-| 🎞️ **首尾帧控制** | 分镜可选双图流（首帧 + 尾帧）生成，运动一致性更好 |
-| ✂️ **视频拼接** | FFmpeg.wasm 客户端 concat demuxer 拼接为最终 MP4 |
-| ✨ **AI 润色** | 任意输入框内一键润色当前内容，可撤销回上一步 |
-| 🚦 **套餐限流** | 5 档套餐（免费 / 企业 / Starter / Plus / Pro），RPM 节流 + Token Plan 配额，防止超额调用 |
-| 🔄 **幂等可靠** | 批量任务模块级幂等守卫：不重复创建服务端任务、不误杀进行中任务，刷新/切换自动恢复 |
-| 📋 **多项目管理** | 创建 / 切换 / 删除 / 复制项目，localStorage 持久化 |
-| 📊 **操作历史** | 最近 200 条操作记录，按日期分组展示 |
-| 📐 **多比例支持** | 16:9（横屏）、9:16（竖屏）、1:1（方形） |
-| 🌐 **中英文切换** | 内置轻量 i18n 系统，一键切换中文 / English |
-| 🔧 **模型可替换** | 模型标识符集中管理，替换只需修改 `MODELS` 常量 |
+AI Video Maker 是一个基于 React 的 AI 短视频制作工具。用户从一句创作想法开始，通过向导逐步完成视觉方向、角色与其他资产、分镜、镜头图片、视频片段和最终成片。
 
-## 🚀 快速开始
+项目当前以 **Agnes AI 的文本、图像、视频模型**为主要 AI 能力来源，同时保留 OpenAI 兼容接口的调用结构。应用是纯前端工具，项目数据和设置主要保存在浏览器 `localStorage` 中，生成的图片和视频以服务端返回的 URL 保存。
+
+## 当前产品流程
+
+主流程共 6 步：
+
+```text
+想法 → 视觉方向 → 角色/场景/产品/道具资产 → 分镜 → 镜头图片 → 视频 → 成片
+```
+
+界面中仍使用 6 个向导步骤承载这条流程，其中“视觉方向”和资产属于第 2 步：
+
+| 步骤 | 名称 | 当前职责 |
+|---|---|---|
+| 1 | 想法 | 输入主题、故事想法、画幅比例，并可使用 AI 对话完善内容 |
+| 2 | 资产 | 先确定项目级视觉方向，再提取角色、场景、产品、道具；资产参考图可在资产阶段生成 |
+| 3 | 分镜 | 生成和编辑分镜脚本、画面提示词、运动提示词和时长 |
+| 4 | 图片 | 根据分镜生成每个镜头的参考图，可单独重试 |
+| 5 | 视频 | 根据分镜和镜头图片生成视频片段，支持首尾帧模式 |
+| 6 | 成片 | 使用 FFmpeg.wasm 在浏览器端拼接视频并下载 |
+```
+
+### 资产模型
+
+- **视觉方向**是项目级视觉母版，包含画风与材质、主色调、光影氛围、镜头质感、构图倾向和整体情绪。
+- **角色、场景、产品、道具**均是可进入详情编辑的结构化资产，不再只是简单的一段描述。
+- 每类资产都有“一句话描述”和专属的完整详情字段。
+- 资产卡片支持整卡进入编辑器；详情页采用统一的左右布局、固定比例预览和 AI 指令修改方式。
+- 资产参考图属于资产阶段的即时产物；分镜图片和视频仍在后续步骤生成。
+- 删除资产、角色、项目等敏感操作需要经过确认对话框。
+
+## 主要功能
+
+| 功能 | 当前说明 |
+|---|---|
+| 6 步创作向导 | 想法 → 资产 → 分镜 → 图片 → 视频 → 成片 |
+| 视觉方向 | 为项目建立可复用的视觉母版，指导资产和分镜生成 |
+| 结构化资产 | 角色、场景、产品、道具分别维护完整设定 |
+| AI 编辑 | 通过 AI 指令修改资产和分镜内容，支持撤销 |
+| 参考图生成 | 在资产阶段生成风格、角色、场景、产品和道具参考图 |
+| 分镜生成 | 文本模型生成结构化分镜，并分别维护画面/运动提示词 |
+| 视频生成 | 异步创建与轮询，支持 720P、4–12 秒和首尾帧模式 |
+| 成片拼接 | 使用 FFmpeg.wasm 在客户端拼接镜头视频 |
+| 多项目管理 | 创建、切换、复制和删除项目，数据持久化到 localStorage |
+| 套餐限流 | 根据套餐执行 RPM 限制和 Token Plan 配额控制 |
+| 中英文切换 | 内置轻量级中文/英文翻译系统 |
+| 黑白主题 | 支持浅色和深色主题 |
+
+## 当前已知限制
+
+以下内容是开发阶段的真实边界，不代表已全部解决：
+
+- AI 输出依赖外部模型，结构化 JSON、提示词质量和图片/视频一致性仍可能不稳定。
+- 图片和视频生成是异步网络任务，可能失败、超时、排队或在刷新后需要恢复。
+- 免费套餐的视频 RPM 较低，多镜头生成通常需要排队等待。
+- 自动模式会连续推进多个步骤，当前仍可能遇到状态同步、恢复或门禁异常。
+- 不同模型的实际响应字段可能存在差异，服务层包含兼容解析，但不能保证覆盖所有响应格式。
+- FFmpeg.wasm 受浏览器内存、跨域资源和本地运行环境影响，部分视频可能无法正常拼接。
+- 当前主要使用 `localStorage` 保存项目状态，不适合多人协作、云端同步或大规模素材管理。
+- UI 和交互仍在调整中，部分文案、边界状态和错误提示可能需要继续完善。
+
+遇到问题时，请优先记录：项目状态、当前向导步骤、模型响应、浏览器控制台错误和是否刷新/切换过项目，再提交 Issue 或反馈。
+
+## 快速开始
 
 ### 环境要求
 
-- Node.js ^20.19.0 或 >= 22.12.0（Vite 8 要求）
-- npm >= 9
+- Node.js `^20.19.0` 或 `>=22.12.0`
+- npm `>=9`
 
 ### 安装与运行
 
 ```bash
-# 克隆仓库
-git clone https://github.com/ybd0612/ai-video-maker.git
-cd ai-video-maker
-
-# 安装依赖
 npm install
-
-# 启动开发服务器（默认 http://127.0.0.1:5173）
 npm run dev
+```
 
-# 构建生产版本（TypeScript 检查 + Vite 构建）
+默认开发地址：`http://127.0.0.1:5173`
+
+### 常用命令
+
+```bash
+# TypeScript 检查并构建生产包
 npm run build
 
-# 预览生产版本（端口 5180）
-npm run preview
-
-# 运行单元测试（Vitest，纯代码逻辑，不使用浏览器）
+# 运行 Vitest 单元测试
 npm run test
+
+# 单元测试监听模式
+npm run test:watch
+
+# 预览生产构建
+npm run preview
 ```
 
-### 配置 API Key
+项目当前只维护代码单元测试（Vitest），不把浏览器/E2E 测试作为开发验证方式。界面效果和真实 AI 生成链路需要在本地手动确认。
 
-1. 启动应用后，点击 **设置** 按钮
-2. 填入 **API Key**（Agnes AI 或兼容的 OpenAI 格式密钥）
-3. 确认 **API Base URL**（默认中国站：`https://api.agnes-ai.cn/v1`）
-4. 选择 **访问套餐**（默认免费档；升级后切换以解除用量限制）
-5. 保存设置
+## 配置 API
 
-> 💡 API Key 存储在浏览器本地（localStorage），仅在发起 API 请求时发送到配置的服务端地址。
+1. 启动应用后打开“设置”。
+2. 填写 Agnes AI 或兼容 OpenAI 接口的 API Key。
+3. 检查 API Base URL，默认中国站地址为 `https://api.agnes-ai.cn/v1`。
+4. 选择当前访问套餐。
+5. 保存设置后再开始生成。
 
-## 📖 使用指南
+API Key 和项目设置保存在当前浏览器的 `localStorage` 中，仅在发起请求时发送到配置的服务端地址。请勿将密钥提交到 Git 仓库或公开截图中。
 
-### 6 步向导工作流
+## 套餐与限流
 
-| 步骤 | 页面 | 说明 |
-|------|------|------|
-| 1️⃣ | **输入想法** | 描述视频主题，可选 16:9 / 9:16 / 1:1 比例，可与 AI 多轮对话打磨想法 |
-| 2️⃣ | **角色资产** | AI 自动提取角色/产品/场景，可生成角色定妆照、场景参考图、产品参考图、风格参考图 |
-| 3️⃣ | **分镜脚本** | 生成 4-6 个分镜（文案 / 画面描述 / 动态描述 / 时长），可逐条编辑重roll |
-| 4️⃣ | **镜头图片** | 为每个分镜生成参考图，可单张重roll |
-| 5️⃣ | **生成视频** | 为每个分镜生成视频片段（可选首尾帧），可单条重roll |
-| 6️⃣ | **成片拼接** | 校验所有镜头后 FFmpeg.wasm 拼接为 MP4 并下载 |
+套餐和配额的单一事实源位于 `src/lib/plans.ts`，实际请求由 `src/services/rateLimit.ts` 的限流器统一控制。当前代码支持：
 
-- **semi-auto（默认）**：分镜/图片生成后确认，再进入后续生成，可随时回头修改
-- **auto**：所有步骤自动推进，直出成片
-- 免费档视频生成约 **1 条/分钟**（RPM=1），多个镜头会排队并在界面显示预计等待
+- `default`：免费档
+- `enterprise`：企业档
+- `starter` / `plus` / `pro`：Token Plan 档位
 
-### 界面布局
-
-```
-┌────────────┬────────────────────────┬──────────────────┐
-│ 左侧面板    │      中央向导/预览       │    右侧编辑器      │
-│            │                        │                  │
-│ · 项目列表  │  · 6 步向导步骤          │  · 提示词字段      │
-│ · 分镜列表  │  · 分镜卡片 + 状态徽标    │  · 时长设置        │
-│ · 角色管理  │  · 图片/视频预览         │  · AI 辅助优化 ✨  │
-│ · 操作历史  │  · 成片预览 + 下载       │  · 重试按钮        │
-└────────────┴────────────────────────┴──────────────────┘
-```
-
-## 💳 套餐与用量限制
-
-服务面向免费用户，官方对各访问类型有 RPM 与 Token Plan 订阅配额限制。应用在真实 API 调用前统一拦截，避免触发 429 / 配额超限。
-
-- **5 档套餐**：`default`（免费）、`enterprise`（企业认证）、`starter` / `plus` / `pro`（Token Plan）
-- **配置单一事实源**：`src/lib/plans.ts` 的 `PLANS` 常量（调整限制只改此处）
-- **集中式限流器**：`src/services/rateLimit.ts` 单例 `rateLimiter`，三类真实入口统一在调用前 `await rateLimiter.acquire(kind, opts)`
-- **RPM 节流**：60 秒滑动窗口，按模型种类（图片再按 1K/2K/3K/4K 档位）限制；达到上限自动等待
-- **订阅配额**（仅 Token Plan）：文本（每 5h / 每周）、图片（每日张数）、视频（每日秒数）持久化到 localStorage，刷新不丢失；用尽抛终态错误，不会误入自动重试
-
-| 模型 | default | enterprise | Token Plan |
-|------|---------|-----------|------------|
+| 模型类型 | default | enterprise | Token Plan |
+|---|---:|---:|---:|
 | 文本 | 20 RPM | 40 RPM | 1000 RPM |
-| 图片(1K) | 20 RPM | 40 RPM | 100 RPM |
+| 图片（1K） | 20 RPM | 40 RPM | 100 RPM |
 | 视频 | 1 RPM | 2 RPM | 5 RPM |
 
-## 🔒 视频生成可靠性设计
+具体图片尺寸、订阅周期和每日配额以 `src/lib/plans.ts` 的当前实现为准。
 
-- **异步任务**：`POST /videos` 创建任务 → `GET /agnesapi?video_id=` 轮询（5s 间隔，单任务 30 分钟超时，任务注册等待 2 分钟）
-- **幂等守卫**：批量生成用模块级注册表记录运行中任务，同项目不重复启动，杜绝服务端任务重复创建（避免 token 双倍消耗）
-- **独立取消**：每个批量任务独立 AbortController，互不误杀；刷新后残留的“生成中”状态自动重置并重新接管
-- **按项目写回**：异步结果按发起项目 ID 写回，生成中切换项目不会串写
-- **失败分级**：明确失败（failed/cancelled）才标红；服务端任务仍可能运行的状态保持等待，不误报
+## 技术栈
 
-## 🏗️ 项目结构
+- React 19 + TypeScript
+- Vite 8
+- Zustand 5（状态管理和持久化）
+- Tailwind CSS 4 + Framer Motion
+- FFmpeg.wasm 0.12
+- Vitest 4
+- Lucide React
 
-```
+## 目录结构
+
+```text
 src/
-├── i18n/                          # 轻量 i18n 系统（无第三方依赖）
-│   └── index.ts                   # zh/en 翻译字典 + useT hook
-├── pages/
-│   └── ProjectWorkspace.tsx       # 主页面外壳（三栏：侧边栏 | 向导 | 编辑器）
+├── components/       # 设置、确认框、灯箱和通用 UI
 ├── features/
-│   ├── wizard/                    # 6 步向导（主流程）
-│   │   ├── CreationWizard.tsx     # 向导容器（步骤路由 + 状态机）
-│   │   ├── StepIdea.tsx           # 步骤1：想法 + 画幅比例 + AI 对话
-│   │   ├── StepAssets.tsx         # 步骤2：角色/场景/风格资产
-│   │   ├── StepStoryboard.tsx     # 步骤3：分镜脚本
-│   │   ├── StepImages.tsx         # 步骤4：镜头图片
-│   │   ├── StepVideos.tsx         # 步骤5：视频生成
-│   │   ├── StepAssembly.tsx       # 步骤6：成片拼接
-│   │   ├── useWizardActions.ts    # 向导操作编排（含幂等守卫注册表）
-│   │   ├── ShotCard.tsx           # 分镜卡片（状态徽标 + 展开详情）
-│   │   ├── PromptSubFields.tsx    # 提示词子字段编辑
-│   │   ├── DualFrameToggle.tsx    # 首尾帧开关
-│   │   └── ReviewCheckpoint.tsx   # 审核卡点
-│   ├── characters/                # 角色编辑器 / 面板
-│   ├── projects/                  # 项目管理面板
-│   └── history/                   # 操作历史面板
-├── services/                      # 服务层
-│   ├── rateLimit.ts               # 集中式用量限制器（RPM + 配额，单例）
-│   ├── scriptService.ts           # 文本模型调用，生成结构化分镜（双提示词）
-│   ├── imageService.ts            # 图片生成
-│   ├── videoService.ts            # 视频生成（异步创建 + 轮询 + 完成响应解析）
-│   ├── chatService.ts             # 多轮对话 API（AI 辅助提示词优化）
-│   ├── renderService.ts           # FFmpeg.wasm 视频拼接
-│   └── ai/                        # AI 服务统一入口（openai 兼容）
-│       ├── factory.ts             # 服务工厂
-│       ├── openai.ts              # chatCompletion / generateImage 实现
-│       └── index.ts
-├── stores/                        # Zustand stores
-│   ├── projectStore.ts            # 多项目管理（localStorage 持久化，v1→v2 迁移）
-│   └── settingsStore.ts           # 全局设置（apiKey/baseUrl/plan/language）
-├── lib/
-│   ├── models.ts                  # AI 模型标识符常量（集中管理）
-│   ├── plans.ts                   # 套餐与用量限制单一事实源
-│   ├── fetchWithRetry.ts          # fetch 统一封装（超时 + 指数退避重试）
-│   ├── promptUtils.ts             # 画面/运动提示词组合
-│   ├── characterUtils.ts          # 角色描述注入
-│   ├── assetNamespace.ts          # 角色命名空间与完整提示词
-│   ├── resolveBaseUrl.ts          # API 地址解析
-│   └── validation.ts              # 校验工具（帧数计算、prompt 清理）
-├── components/
-│   ├── SettingsDialog.tsx         # 设置对话框（API Key / Base URL / 套餐 / 语言）
-│   ├── ApiKeyBanner.tsx           # API Key 缺失提示横幅
-│   └── ui/                        # 通用 UI 组件（AiPolishField / ConfirmDialog / Lightbox 等）
-├── styles/
-│   └── globals.css                # 全局样式
-├── App.tsx                        # 根组件
-└── main.tsx                       # 入口文件
+│   ├── wizard/       # 6 步向导、资产编辑、分镜、图片、视频、成片
+│   ├── characters/   # 角色面板和角色编辑器
+│   ├── projects/     # 项目管理
+│   └── history/      # 操作历史
+├── services/         # 文本、图片、视频、对话和渲染服务
+├── stores/           # projectStore、settingsStore
+├── lib/              # 模型、套餐、提示词、资产详情和校验工具
+├── i18n/             # 中文/英文翻译
+└── styles/           # 全局主题和语义色
+
+tests/                # Vitest 单元测试
 ```
 
-## 🔧 模型替换
+## 开发约定
 
-模型标识符集中定义在 `src/lib/models.ts`：
+- 这是开发中的实验性项目，修改功能前先核对现有数据模型、异步任务和状态写回逻辑。
+- 模型、套餐、提示词规则和协议参数应维护在对应的单一事实源中，不要在页面组件内重复硬编码。
+- 异步生成必须避免重复提交、错误取消和跨项目写回。
+- 删除等敏感操作必须先确认，不能直接执行。
+- 新增用户可见文案时，同时维护中文和英文翻译。
+- 提交前至少运行 `npm run test`、`npm run build` 和 `git diff --check`。
 
-```typescript
-export const MODELS = {
-  text: "agnes-3.0-flash",
-  image: "agnes-image-2.5-flash",
-  video: "agnes-video-2.5-flash",
-} as const;
-```
-
-替换模型只需修改此常量，服务层（scriptService / imageService / videoService）会自动引用新模型。
-
-## 🛠️ 技术栈
-
-| 类别 | 技术 |
-|------|------|
-| 框架 | React 19 + TypeScript 6 |
-| 构建 | Vite 8 |
-| 状态 | Zustand v5（localStorage 持久化） |
-| 样式 | TailwindCSS v4 + Framer Motion |
-| 视频拼接 | FFmpeg.wasm 0.12 |
-| 图标 | Lucide React |
-
-## 📄 许可证
+## 许可证
 
 MIT License
-
-## 🤝 贡献
-
-欢迎提交 Issue 和 Pull Request！
-
-1. Fork 本仓库
-2. 创建特性分支：`git checkout -b feature/amazing-feature`
-3. 提交更改：`git commit -m 'feat: add amazing feature'`
-4. 推送分支：`git push origin feature/amazing-feature`
-5. 提交 Pull Request
