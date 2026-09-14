@@ -153,22 +153,21 @@ export function AssetEditor({ asset, onClose, onGenerate, generating }: AssetEdi
           </div>
           <div className="space-y-1">
             <label className="text-[0.6875rem] font-medium text-ink-4">一句话定位</label>
-            <textarea value={draft.description} onChange={(e) => setDraft({ ...draft, description: e.target.value })} rows={2} className="w-full resize-y rounded-md border border-line bg-raised px-2 py-1.5 text-xs leading-relaxed text-ink focus:border-accent focus:outline-none" />
+            <div className="w-full rounded-md border border-line bg-raised px-2 py-1.5 text-xs leading-relaxed text-ink select-text">
+              {draft.description || "—"}
+            </div>
           </div>
           {draft.details && (
             <div className="space-y-2 rounded-md border border-line-soft bg-surface p-2">
               <label className="text-[0.6875rem] font-medium text-ink-4">完整设定</label>
-              {detailEntries(draft.details).map(([key, value]) => (
-                <div key={key} className="space-y-1">
-                  <label className="text-[0.625rem] text-ink-4">{detailLabels[key] ?? key}</label>
-                  <textarea
-                    value={value}
-                    onChange={(e) => setDraft({ ...draft, details: { ...draft.details!, [key]: e.target.value } as AssetDetails })}
-                    rows={2}
-                    className="w-full resize-y rounded-md border border-line bg-raised px-2 py-1.5 text-xs leading-relaxed text-ink focus:border-accent focus:outline-none"
-                  />
-                </div>
-              ))}
+              <div className="space-y-1.5 rounded-md border border-line bg-raised px-2 py-1.5 text-xs leading-relaxed">
+                {detailEntries(draft.details).map(([key, value]) => (
+                  <div key={key} className="flex gap-2">
+                    <span className="w-20 shrink-0 font-medium text-ink-3">{detailLabels[key] ?? key}</span>
+                    <span className="min-w-0 flex-1 whitespace-pre-wrap text-ink select-text">{value || "—"}</span>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
           <div className="space-y-1">
