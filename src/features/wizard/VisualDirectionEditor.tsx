@@ -145,7 +145,7 @@ export function VisualDirectionEditor({ onClose, onGenerate, generating = false 
       )}
       footer={(
         <div className="flex justify-end gap-2 border-t border-line-soft pt-3">
-          <button onClick={onClose} disabled={busy} className="rounded-md border border-line px-3 py-1.5 text-xs text-ink-3 hover:bg-raised disabled:opacity-50">{t("common.cancel" as any)}</button>
+          <button onClick={onClose} disabled={busy} className="rounded-md border border-line px-3 py-1.5 text-xs text-ink-3 hover:bg-raised disabled:opacity-50">{t("dialog.cancel")}</button>
           <button onClick={() => { updateVisualDirection({ name: draft.name, mediumMaterial: draft.mediumMaterial, colorPalette: draft.colorPalette, lightingMood: draft.lightingMood, cameraTexture: draft.cameraTexture, composition: draft.composition, emotion: draft.emotion }); onClose(); }} disabled={busy || !draft.name.trim()} className="rounded-md bg-success px-3 py-1.5 text-xs font-medium text-white hover:opacity-90 disabled:opacity-50">{t("wizard.saveVisualDirection" as any)}</button>
         </div>
       )}

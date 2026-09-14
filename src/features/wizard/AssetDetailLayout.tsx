@@ -44,7 +44,7 @@ export function AssetDetailLayout({
 
 export function AssetPreviewFrame({ children }: { children: ReactNode }) {
   return (
-    <div className="flex aspect-video w-full items-center justify-center overflow-hidden rounded-lg border border-line bg-raised">
+    <div className="flex aspect-video w-full items-center justify-center overflow-hidden rounded-lg border border-line bg-app">
       {children}
     </div>
   );

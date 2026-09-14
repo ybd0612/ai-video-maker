@@ -30,6 +30,7 @@ import {
   normalizeCharacterDescription,
   parseCharacterDescription,
 } from "@/lib/promptComposer";
+import { normalizeAssetDetails } from "@/lib/assetDetails";
 
 interface CharacterEditorProps {
   character: Asset | null; // null = creating new
@@ -321,6 +322,7 @@ export function CharacterEditor({ character, onClose }: CharacterEditorProps) {
       imageUrl: portraitUrl || undefined,
       assetNamespace: namespace,
       fullPrompt,
+      details: normalizeAssetDetails({ type: "character", description: trimmedDescription }, character?.details),
     };
     if (character) {
       // avatarUrl 已不在编辑器暴露：保存时沿用原值，避免误清
@@ -486,9 +488,9 @@ export function CharacterEditor({ character, onClose }: CharacterEditorProps) {
             {t("characters.portrait")}
           </label>
           {portraitUrl ? (
-            <div className="aspect-video w-full">
+            <div className="flex aspect-video w-full items-center justify-center overflow-hidden rounded-lg border border-line bg-surface">
               <Lightbox src={portraitUrl} alt={t("characters.portrait")}>
-                <div className="relative h-full w-full overflow-hidden rounded-lg border border-line bg-raised">
+                <div className="relative h-full w-full">
                   <img
                     src={portraitUrl}
                     alt={t("characters.portrait")}

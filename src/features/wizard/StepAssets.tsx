@@ -119,18 +119,6 @@ export function StepAssets() {
     await generateAssetImages({ generatePortraits: false, generateScenes: false, generateProducts: false, generateProps: true, generateStyle: false });
   };
 
-  // ── Generate all assets ────────────────────────────────────────────────
-
-  const handleGenerateAll = async () => {
-    const targetProjectId = project?.id;
-    await generateAssetImages({ generatePortraits: true, generateScenes: true, generateProducts: true, generateProps: true, generateStyle: true });
-    // 半自动模式停留在资产页，等待用户审核；全自动模式才直接进入分镜。
-    const latest = useProjectStore.getState().projects.find((item) => item.id === targetProjectId);
-    if (latest?.automationMode === "auto" && useProjectStore.getState().activeProjectId === targetProjectId) {
-      setWizardStep(3);
-    }
-  };
-
   // ── Scene reference handlers ──────────────────────────────────────────
 
   const handleAddScene = () => {
@@ -282,7 +270,7 @@ export function StepAssets() {
           className="cursor-pointer rounded-xl border border-accent/40 bg-accent-deep/10 p-3 transition hover:border-accent focus:border-accent focus:outline-none"
         >
           <div className="flex items-start gap-3">
-            <div className="h-20 w-32 shrink-0 overflow-hidden rounded-lg border border-line bg-raised">
+            <div className="flex h-20 w-32 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-line bg-app">
               {styleReferenceUrl ? (
               <div onClick={(e) => e.stopPropagation()}>
                 <Lightbox src={styleReferenceUrl} alt="Visual direction reference">
@@ -349,7 +337,7 @@ export function StepAssets() {
                 title={t("characters.edit")}
                 className="group flex cursor-pointer items-start gap-3 rounded-xl border border-line bg-raised/50 p-3 transition hover:border-line-strong focus:border-success focus:outline-none"
               >
-                <div className="h-16 w-24 shrink-0 overflow-hidden rounded-lg border border-line bg-raised">
+                <div className="flex h-16 w-24 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-line bg-app">
                   {(char.imageUrl || char.avatarUrl) ? (
                     <Lightbox src={char.imageUrl || char.avatarUrl} alt={char.name}>
                       <img
@@ -440,7 +428,7 @@ export function StepAssets() {
             className="group flex cursor-pointer items-start gap-3 rounded-xl border border-line bg-raised/50 p-3 transition hover:border-line-strong focus:border-accent focus:outline-none"
           >
             {/* Scene image preview（点击放大查看） */}
-            <div className="h-16 w-24 shrink-0 overflow-hidden rounded-lg border border-line bg-raised" onClick={(e) => e.stopPropagation()}>
+            <div className="flex h-16 w-24 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-line bg-app" onClick={(e) => e.stopPropagation()}>
               {scene.imageUrl ? (
                 <Lightbox src={scene.imageUrl} alt={scene.name}>
                   <img
@@ -458,7 +446,7 @@ export function StepAssets() {
 
             <div className="min-w-0 flex-1">
               <p className="text-sm font-medium text-ink">{scene.name || "未命名场景"}</p>
-              <p className="mt-0.5 line-clamp-2 text-xs text-ink-4">{scene.description || scene.prompt || "—"}</p>
+              <p className="mt-0.5 line-clamp-2 text-xs text-ink-4">{(scene.description || scene.prompt || "—").split("\n")[0]}</p>
               {scene.error && <p className="mt-0.5 truncate text-[0.625rem] text-danger" title={scene.error}>生成失败：{scene.error}</p>}
             </div>
 
@@ -529,7 +517,7 @@ export function StepAssets() {
             className="group flex cursor-pointer items-start gap-3 rounded-xl border border-line bg-raised/50 p-3 transition hover:border-line-strong focus:border-accent focus:outline-none"
           >
             {/* Product image preview（点击放大查看） */}
-            <div className="h-16 w-24 shrink-0 overflow-hidden rounded-lg border border-line bg-raised" onClick={(e) => e.stopPropagation()}>
+            <div className="flex h-16 w-24 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-line bg-app" onClick={(e) => e.stopPropagation()}>
               {product.imageUrl ? (
                 <Lightbox src={product.imageUrl} alt={product.name}>
                   <img
@@ -547,7 +535,7 @@ export function StepAssets() {
 
             <div className="min-w-0 flex-1">
               <p className="text-sm font-medium text-ink">{product.name || "未命名主体"}</p>
-              <p className="mt-0.5 line-clamp-2 text-xs text-ink-4">{product.description || product.prompt || "—"}</p>
+              <p className="mt-0.5 line-clamp-2 text-xs text-ink-4">{(product.description || product.prompt || "—").split("\n")[0]}</p>
               {product.error && <p className="mt-0.5 truncate text-[0.625rem] text-danger" title={product.error}>生成失败：{product.error}</p>}
             </div>
 
@@ -617,7 +605,7 @@ export function StepAssets() {
             onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setEditingAsset(prop); } }}
             className="group flex cursor-pointer items-start gap-3 rounded-xl border border-line bg-raised/50 p-3 transition hover:border-line-strong focus:border-accent focus:outline-none"
           >
-            <div className="h-16 w-24 shrink-0 overflow-hidden rounded-lg border border-line bg-raised" onClick={(e) => e.stopPropagation()}>
+            <div className="flex h-16 w-24 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-line bg-app" onClick={(e) => e.stopPropagation()}>
               {prop.imageUrl ? (
                 <Lightbox src={prop.imageUrl} alt={prop.name}>
                   <img src={prop.imageUrl} alt={prop.name} className="h-full w-full object-contain" />
@@ -630,7 +618,7 @@ export function StepAssets() {
             </div>
             <div className="min-w-0 flex-1">
               <p className="text-sm font-medium text-ink">{prop.name || "未命名道具"}</p>
-              <p className="mt-0.5 line-clamp-2 text-xs text-ink-4">{prop.description || prop.prompt || "—"}</p>
+              <p className="mt-0.5 line-clamp-2 text-xs text-ink-4">{(prop.description || prop.prompt || "—").split("\n")[0]}</p>
               {prop.error && <p className="mt-0.5 truncate text-[0.625rem] text-danger" title={prop.error}>生成失败：{prop.error}</p>}
             </div>
             <div className="flex shrink-0 flex-col gap-1 opacity-0 transition group-hover:opacity-100" onClick={(e) => e.stopPropagation()}>
@@ -680,20 +668,6 @@ export function StepAssets() {
           </button>
         </div>
       )}
-
-      {/* ── Generate all button ───────────────────────────────────────── */}
-      <button
-        onClick={handleGenerateAll}
-        disabled={anyGenerating}
-        className="mx-auto flex items-center gap-2 rounded-xl bg-success-solid px-6 py-2.5 text-sm font-medium text-white transition hover:bg-success-solid disabled:opacity-50"
-      >
-        {isGenerating ? (
-          <Loader2 size={16} className="animate-spin" />
-        ) : (
-          <Wand2 size={16} />
-        )}
-        {isGenerating ? t("wizard.generating") : t("wizard.assetsReady")}
-      </button>
     </div>
   );
 }
