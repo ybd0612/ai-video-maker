@@ -246,6 +246,7 @@ interface ProjectState {
   updateProject: (updates: Partial<Pick<Project, "title" | "aspectRatio" | "style" | "visualDirection" | "language" | "ideaPrompt" | "ideaChatHistory" | "assets" | "styleReferenceUrl" | "assetsReviewed" | "storyboardReviewed" | "imagesReviewed" | "assetGenerationStarted" | "imageGenerationStarted" | "videoGenerationStarted">>) => void;
   /** 按 ID 更新指定项目（用于异步操作完成后写回发起项目，而非当前活跃项目，避免跨项目污染） */
   updateProjectById: (projectId: string, updater: (p: Project) => Project) => void;
+  updateVisualDirection: (updates: Partial<VisualDirection>) => void;
   deleteProject: (id: string) => void;
   duplicateProject: (id: string) => Project | null;
   setProjectStatus: (status: ProjectStatus, error?: string) => void;
@@ -839,6 +840,32 @@ export const useProjectStore = create<ProjectState>()(
           projects: s.projects.map((p) =>
             p.id === projectId ? { ...updater(p), updatedAt: Date.now() } : p,
           ),
+        })),
+
+      updateVisualDirection: (updates) =>
+        set((s) => ({
+          projects: updateActive(s.projects, s.activeProjectId, (p) => {
+            if (!p.visualDirection) return p;
+            const nextDirection: VisualDirection = {
+              ...p.visualDirection,
+              ...updates,
+              revision: p.visualDirection.revision + 1,
+              status: "stale",
+            };
+            return {
+              ...p,
+              visualDirection: nextDirection,
+              styleReferenceUrl: undefined,
+              styleReferenceError: undefined,
+              assetsReviewed: false,
+              assets: p.assets.map((asset) =>
+                asset.type === "style"
+                  ? { ...asset, imageUrl: undefined, prompt: "" }
+                  : { ...asset, imageUrl: undefined },
+              ),
+              updatedAt: Date.now(),
+            };
+          }),
         })),
 
       deleteProject: (id) => {

@@ -16,6 +16,7 @@ import {
   UserPlus, Trash2, ImageIcon, Loader2, Plus, Wand2,
 } from "lucide-react";
 import { CharacterEditor } from "@/features/characters/CharacterEditor";
+import { VisualDirectionEditor } from "./VisualDirectionEditor";
 import { useWizardActions, hasActiveAssetTask } from "./useWizardActions";
 import { generateImage, aspectRatioToImageParams } from "@/services/imageService";
 import { Lightbox } from "@/components/ui/Lightbox";
@@ -43,6 +44,7 @@ export function StepAssets() {
 
   const [editingChar, setEditingChar] = useState<Asset | null>(null);
   const [showEditor, setShowEditor] = useState(false);
+  const [showVisualDirectionEditor, setShowVisualDirectionEditor] = useState(false);
   const [generatingScenes, setGeneratingScenes] = useState<Set<string>>(new Set());
   const [generatingProducts, setGeneratingProducts] = useState<Set<string>>(new Set());
   const [generatingProps, setGeneratingProps] = useState<Set<string>>(new Set());
@@ -221,6 +223,10 @@ export function StepAssets() {
 
   // ── Editor mode ───────────────────────────────────────────────────────
 
+  if (showVisualDirectionEditor) {
+    return <VisualDirectionEditor onClose={() => setShowVisualDirectionEditor(false)} />;
+  }
+
   if (showEditor) {
     return <CharacterEditor character={editingChar} onClose={handleEditorClose} />;
   }
@@ -250,13 +256,27 @@ export function StepAssets() {
           <h3 className="text-sm font-semibold text-ink-2">{t("wizard.visualDirectionTitle" as any)}</h3>
           <p className="text-[0.6875rem] text-ink-5 mt-0.5">{t("wizard.visualDirectionHint" as any)}</p>
         </div>
-        <div className="rounded-xl border border-accent/40 bg-accent-deep/10 p-3">
+        <div
+          role="button"
+          tabIndex={0}
+          onClick={() => project?.visualDirection && setShowVisualDirectionEditor(true)}
+          onKeyDown={(e) => {
+            if ((e.key === "Enter" || e.key === " ") && project?.visualDirection) {
+              e.preventDefault();
+              setShowVisualDirectionEditor(true);
+            }
+          }}
+          title={project?.visualDirection ? (t("wizard.editVisualDirection" as any) as string) : undefined}
+          className="cursor-pointer rounded-xl border border-accent/40 bg-accent-deep/10 p-3 transition hover:border-accent focus:border-accent focus:outline-none"
+        >
           <div className="flex items-start gap-3">
             <div className="h-20 w-32 shrink-0 overflow-hidden rounded-lg border border-line bg-raised">
               {styleReferenceUrl ? (
+              <div onClick={(e) => e.stopPropagation()}>
                 <Lightbox src={styleReferenceUrl} alt="Visual direction reference">
                   <img src={styleReferenceUrl} alt="Visual direction reference" className="h-full w-full object-cover" />
                 </Lightbox>
+              </div>
               ) : <div className="flex h-full w-full items-center justify-center text-ink-5"><ImageIcon size={20} /></div>}
             </div>
             <div className="min-w-0 flex-1">
@@ -273,7 +293,7 @@ export function StepAssets() {
                 </div>
               )}
               {project?.styleReferenceError && <p className="mt-1 truncate text-[0.625rem] text-danger" title={project?.styleReferenceError}>{project?.styleReferenceError}</p>}
-              <button onClick={handleGenerateStyle} disabled={anyGenerating} className="mt-2 flex items-center gap-1.5 rounded px-3 py-1.5 text-[0.6875rem] text-accent hover:bg-accent-deep/30 transition disabled:opacity-50">
+              <button onClick={(e) => { e.stopPropagation(); void handleGenerateStyle(); }} disabled={anyGenerating} className="mt-2 flex items-center gap-1.5 rounded px-3 py-1.5 text-[0.6875rem] text-accent hover:bg-accent-deep/30 transition disabled:opacity-50">
                 {generatingStyle ? <Loader2 size={11} className="animate-spin" /> : <Wand2 size={11} />}
                 {styleReferenceUrl ? t("wizard.regenerateVisualDirection" as any) : t("wizard.generateVisualDirection" as any)}
               </button>

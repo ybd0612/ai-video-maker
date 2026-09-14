@@ -512,7 +512,14 @@ export const SYSTEM_PROMPT_DESCRIPTION_ZH = `你是一位 AI 视觉创作的描�
 - 用中文，长度与原文相当，不要扩写成段落
 - 直接返回润色后的描述，不要任何解释说明`;
 
-export const SYSTEM_PROMPT_CHARACTER_DESCRIPTION_ZH = `你是一位 AI 角色设定专家，服务于短视频、短剧、长视频等各类视频创作。用户会给你一个角色名和现有描述（可能不完整），请输出这个角色的**完整角色描述**，作为该角色唯一的事实源（后续英文绘图提示词与分镜创作都将由它派生）。
+export const SYSTEM_PROMPT_VISUAL_DIRECTION_EDIT_ZH = `你是一位短视频项目的视觉指导。用户会给你一个项目级视觉方向和修改要求，请只返回修改后的完整 JSON，不要解释、不要 Markdown 代码块。
+JSON 必须严格包含以下字段：name、mediumMaterial、colorPalette、lightingMood、cameraTexture、composition、emotion。
+只修改用户明确要求的内容，其他字段保持原意；保证六个视觉维度具体、互相协调，并且服务于同一个项目。
+
+示例格式：
+{"name":"温暖治愈 3D 动画风","mediumMaterial":"柔和 3D 动画、毛绒与软陶质感","colorPalette":"金黄、暖橙、淡紫，低对比度","lightingMood":"柔和夕阳光，温暖、低对比度","cameraTexture":"轻电影感、浅景深、细腻柔和","composition":"平视与低机位，主体明确，保留环境留白","emotion":"温暖、治愈、具有陪伴感"}`;
+
+export const SYSTEM_PROMPT_CHARACTER_DESCRIPTION_ZH = `你是一位 AI 角色设定专家，服务于短视频、短剧、长视频等各类视频创作。用户会给你一个角色名和现有描述（可能不完整），请输出这个角色的**完整角色描述**，作为该角色的唯一事实源（后续英文绘图提示词与分镜创作都将由它派生）。
 
 完整角色描述的格式固定为 **1 行总述 + 8 行要素**，共 9 行：
 第 1 行：一句话总述（不超过 30 字，概括这个角色是谁、在做什么，无前缀无冒号）
