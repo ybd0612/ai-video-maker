@@ -24,6 +24,7 @@ import { Lightbox } from "@/components/ui/Lightbox";
 import { confirmDialog } from "@/components/ui/ConfirmDialog";
 import {
   composeImageToImagePrompt,
+  assetImageBoundary,
   getStylePrompt,
   getStyleReferenceUrl,
 } from "@/lib/promptComposer";
@@ -46,12 +47,11 @@ export function StepAssets() {
   const [generatingProducts, setGeneratingProducts] = useState<Set<string>>(new Set());
   const [generatingProps, setGeneratingProps] = useState<Set<string>>(new Set());
   const [generatingStyle, setGeneratingStyle] = useState(false);
-  const isGenerating = project?.assetGenerationStarted ?? false;
   // 本页任一生成请求进行中（批量 / 风格 / 单项场景 / 单项产品）：
   // 统一禁用所有生成按钮 —— 批量与单项可能重复提交同一资产（双倍配额消耗），
   // 且共用集中式限流器，逐个排队不如明确禁用直观。全部请求返回后恢复。
   const anyGenerating =
-    isGenerating || generatingStyle || generatingScenes.size > 0 || generatingProducts.size > 0 || generatingProps.size > 0;
+    project?.assetGenerationStarted === true || generatingStyle || generatingScenes.size > 0 || generatingProducts.size > 0 || generatingProps.size > 0;
 
   const assets = project?.assets ?? [];
   const characters = assets.filter((a) => a.type === "character");
@@ -60,6 +60,15 @@ export function StepAssets() {
   const props = assets.filter((a) => a.type === "prop");
   const styleAsset = assets.find((a) => a.type === "style");
   const styleReferenceUrl = project ? getStyleReferenceUrl(project) : undefined;
+  const assetGroups = [
+    { count: characters.length, ready: characters.filter((char) => Boolean(char.imageUrl || char.avatarUrl)).length },
+    { count: sceneReferences.length, ready: sceneReferences.filter((scene) => Boolean(scene.imageUrl)).length },
+    { count: products.length, ready: products.filter((product) => Boolean(product.imageUrl)).length },
+    { count: props.length, ready: props.filter((prop) => Boolean(prop.imageUrl)).length },
+  ];
+  const totalAssetCount = assetGroups.reduce((sum, group) => sum + group.count, 0);
+  const readyAssetCount = assetGroups.reduce((sum, group) => sum + group.ready, 0);
+  const hasMissingAssets = !styleReferenceUrl || assetGroups.some((group) => group.ready < group.count);
 
   // 刷新/中断后恢复：assetGenerationStarted 卡 true 且没有存活任务时重置，
   // 避免“生成全部”按钮永久禁用转圈（用户反馈过“资产第一个自动在加载”）。
@@ -112,26 +121,20 @@ export function StepAssets() {
 
   // ── Batch generate portraits ──────────────────────────────────────────
 
-  const handleBatchPortraits = async () => {
-    await generateAssetImages({ generatePortraits: true, generateScenes: false, generateProducts: false, generateProps: false, generateStyle: false });
-  };
-
   // ── Batch generate scene images ───────────────────────────────────────
-
-  const handleBatchScenes = async () => {
-    await generateAssetImages({ generatePortraits: false, generateScenes: true, generateProducts: false, generateProps: false, generateStyle: false });
-  };
 
   // ── Batch generate product images ─────────────────────────────────────
 
-  const handleBatchProducts = async () => {
-    await generateAssetImages({ generatePortraits: false, generateScenes: false, generateProducts: true, generateProps: false, generateStyle: false });
-  };
-
   // ── Batch generate prop images ─────────────────────────────────────────
 
-  const handleBatchProps = async () => {
-    await generateAssetImages({ generatePortraits: false, generateScenes: false, generateProducts: false, generateProps: true, generateStyle: false });
+  const handleFillMissing = async () => {
+    await generateAssetImages({
+      generatePortraits: characters.some((char) => !char.imageUrl && !char.avatarUrl),
+      generateScenes: sceneReferences.some((scene) => !scene.imageUrl && scene.prompt.trim()),
+      generateProducts: products.some((product) => !product.imageUrl && product.prompt.trim()),
+      generateProps: props.some((prop) => !prop.imageUrl && prop.prompt.trim()),
+      generateStyle: !styleReferenceUrl,
+    });
   };
 
   // ── Scene reference handlers ──────────────────────────────────────────
@@ -170,7 +173,7 @@ export function StepAssets() {
         apiKey: providerConfig.apiKey,
         baseUrl: providerConfig.baseUrl,
         prompt: composeImageToImagePrompt({
-          change: `${styleInstruction} Render the ${kind} below as a clean reference image`,
+          change: `${assetImageBoundary(kind)} ${styleInstruction}`,
           newStyle: stylePrompt,
           keep: asset.prompt,
         }),
@@ -194,10 +197,6 @@ export function StepAssets() {
         return next;
       });
     }
-  };
-
-  const handleGenerateProduct = async (product: Asset) => {
-    await generateSingleAssetImage(product, setGeneratingProducts, "product");
   };
 
   const handleAddProp = () => {
@@ -236,7 +235,7 @@ export function StepAssets() {
         : generatingProps.has(editingAsset.id);
     const regenerate = async (asset: Asset) => {
       if (asset.type === "scene") await handleGenerateScene(asset);
-      if (asset.type === "product") await handleGenerateProduct(asset);
+      if (asset.type === "product") await generateSingleAssetImage(asset, setGeneratingProducts, "product");
       if (asset.type === "prop") await handleGenerateProp(asset);
     };
     return <AssetEditor asset={editingAsset} onClose={handleAssetEditorClose} onGenerate={regenerate} generating={generating} />;
@@ -249,13 +248,10 @@ export function StepAssets() {
   return (
     <div className="mx-auto flex w-full max-w-4xl flex-col gap-6 px-4 py-8">
       {/* Title */}
-      <div className="text-center">
-        <h2 className="text-lg font-bold text-ink">
-          {t("wizard.stepAssets")}
-        </h2>
-        <p className="mt-1 text-xs text-ink-4">
-          {t("wizard.assetsHint")}
-        </p>
+      <div>
+        <p className="text-[0.6875rem] font-medium uppercase tracking-[0.14em] text-accent">{t("wizard.stepAssets")}</p>
+        <h2 className="mt-1 text-xl font-bold text-ink">{t("wizard.assetWorkbenchTitle" as any)}</h2>
+        <p className="mt-1 max-w-2xl text-xs text-ink-4">{t("wizard.assetWorkbenchHint" as any)}</p>
       </div>
 
       {/* 无资产提示：可直接下一步（等价跳过），但说明一致性影响 */}
@@ -266,41 +262,68 @@ export function StepAssets() {
       )}
 
       {/* ── Visual direction section: upstream of all assets ───────────── */}
-      <section className="flex flex-col gap-3">
-        <div>
-          <h3 className="text-sm font-semibold text-ink-2">{t("wizard.visualDirectionTitle" as any)}</h3>
-          <p className="text-[0.6875rem] text-ink-5 mt-0.5">{t("wizard.visualDirectionHint" as any)}</p>
-        </div>
-        <div
-          role="button"
-          tabIndex={0}
-          onClick={() => project?.visualDirection && setShowVisualDirectionEditor(true)}
-          onKeyDown={(e) => {
-            if ((e.key === "Enter" || e.key === " ") && project?.visualDirection) {
-              e.preventDefault();
-              setShowVisualDirectionEditor(true);
-            }
-          }}
-          title={project?.visualDirection ? (t("wizard.editVisualDirection" as any) as string) : undefined}
-          className="cursor-pointer rounded-xl border border-accent/40 bg-accent-deep/10 p-3 transition hover:border-accent focus:border-accent focus:outline-none"
-        >
-          <div className="flex items-start gap-3">
-            <div className="flex h-20 w-32 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-line bg-app">
-              {styleReferenceUrl ? (
-              <div onClick={(e) => e.stopPropagation()}>
-                <Lightbox src={styleReferenceUrl} alt="Visual direction reference">
-                  <img src={styleReferenceUrl} alt="Visual direction reference" className="h-full w-full object-contain" />
-                </Lightbox>
+      <section className="rounded-2xl border border-accent/40 bg-accent-deep/10 p-4">
+        <div className="flex items-start gap-4">
+          <div
+            role="button"
+            tabIndex={0}
+            onClick={() => project?.visualDirection && setShowVisualDirectionEditor(true)}
+            onKeyDown={(e) => {
+              if ((e.key === "Enter" || e.key === " ") && project?.visualDirection) {
+                e.preventDefault();
+                setShowVisualDirectionEditor(true);
+              }
+            }}
+            className="flex h-24 w-36 shrink-0 cursor-pointer items-center justify-center overflow-hidden rounded-xl border border-accent/30 bg-app focus:border-accent focus:outline-none"
+            title={project?.visualDirection ? (t("wizard.editVisualDirection" as any) as string) : undefined}
+          >
+            {styleReferenceUrl ? (
+              <Lightbox src={styleReferenceUrl} alt="Visual direction reference">
+                <img src={styleReferenceUrl} alt="Visual direction reference" className="h-full w-full object-cover" />
+              </Lightbox>
+            ) : <ImageIcon size={20} className="text-ink-5" />}
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-[0.6875rem] font-medium uppercase tracking-[0.12em] text-accent">{t("wizard.visualDirectionTitle" as any)}</p>
+                <p className="mt-1 text-base font-semibold text-ink">{project?.visualDirection?.name || styleAsset?.name || project?.style || t("wizard.visualDirectionUnset" as any)}</p>
               </div>
-              ) : <div className="flex h-full w-full items-center justify-center text-ink-5"><ImageIcon size={20} /></div>}
+              <button onClick={() => setShowVisualDirectionEditor(true)} className="shrink-0 rounded-lg border border-accent/40 px-2.5 py-1.5 text-[0.6875rem] text-accent transition hover:bg-accent-deep/30">{t("wizard.editVisualDirection" as any)}</button>
             </div>
-            <div className="min-w-0 flex-1">
-              <p className="text-sm font-medium text-ink">{project?.visualDirection?.name || styleAsset?.name || project?.style || t("wizard.visualDirectionUnset" as any)}</p>
-              <p className="mt-1 text-xs text-ink-3">{styleAsset?.description || t("wizard.visualDirectionDescription" as any)}</p>
-              {project?.styleReferenceError && <p className="mt-1 truncate text-[0.625rem] text-danger" title={project?.styleReferenceError}>{project?.styleReferenceError}</p>}
-            </div>
+            <p className="mt-1 text-xs text-ink-3">{styleAsset?.description || t("wizard.visualDirectionDescription" as any)}</p>
+            <p className="mt-2 text-[0.6875rem] text-ink-5">{t("wizard.visualDirectionHint" as any)}</p>
+            {project?.styleReferenceError && <p className="mt-1 truncate text-[0.625rem] text-danger" title={project.styleReferenceError}>{project.styleReferenceError}</p>}
           </div>
         </div>
+      </section>
+
+      {/* ── Readiness overview ─────────────────────────────────────────── */}
+      <section className="rounded-xl border border-line bg-raised/30 p-4">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <h3 className="text-sm font-semibold text-ink">{t("wizard.assetReadinessTitle" as any)}</h3>
+            <p className="mt-0.5 text-[0.6875rem] text-ink-5">{t("wizard.assetReadinessHint" as any)}</p>
+          </div>
+          <button onClick={() => void handleFillMissing()} disabled={anyGenerating || !hasMissingAssets} className="flex shrink-0 items-center gap-1.5 rounded-lg bg-accent-solid px-3 py-2 text-[0.6875rem] font-medium text-white transition hover:bg-accent-solid disabled:cursor-not-allowed disabled:opacity-50">
+            {anyGenerating ? <Loader2 size={12} className="animate-spin" /> : <Wand2 size={12} />}
+            {t("wizard.fillMissingAssets" as any)}
+          </button>
+        </div>
+        <div className="mt-3 grid grid-cols-2 gap-2 md:grid-cols-4">
+          {[
+            [t("characters.title" as any), characters.length, characters.filter((char) => Boolean(char.imageUrl || char.avatarUrl)).length],
+            [t("wizard.worldScenes" as any), sceneReferences.length, sceneReferences.filter((scene) => Boolean(scene.imageUrl)).length],
+            [t("wizard.coreSubject" as any), products.length, products.filter((product) => Boolean(product.imageUrl)).length],
+            [t("wizard.keyObjects" as any), props.length, props.filter((prop) => Boolean(prop.imageUrl)).length],
+          ].map(([label, count, ready]) => (
+            <div key={String(label)} className="rounded-lg border border-line-soft bg-app/60 px-3 py-2">
+              <p className="text-xs font-medium text-ink-2">{label}</p>
+              <p className="mt-1 text-[0.6875rem] text-ink-5">{ready} / {count} {t("wizard.readyCount" as any)}</p>
+            </div>
+          ))}
+        </div>
+        <p className="mt-3 text-[0.6875rem] text-ink-4">{t("wizard.readinessSummary" as any, { ready: readyAssetCount, total: totalAssetCount })}</p>
       </section>
 
       {/* ── Characters section ────────────────────────────────────────── */}
@@ -309,16 +332,6 @@ export function StepAssets() {
           <h3 className="text-sm font-semibold text-ink-2">
             {t("characters.title" as any) || "角色"} ({characters.length})
           </h3>
-          {characters.some((c) => !c.imageUrl) && (
-            <button
-              onClick={handleBatchPortraits}
-              disabled={anyGenerating}
-              className="flex items-center gap-1.5 rounded px-2 py-1 text-[0.6875rem] text-accent hover:bg-accent-deep/30 transition disabled:opacity-50"
-            >
-              {isGenerating ? <Loader2 size={11} className="animate-spin" /> : <Wand2 size={11} />}
-              {t("wizard.generateAllPortraits")}
-            </button>
-          )}
         </div>
 
         {characters.length > 0 ? (
@@ -336,9 +349,9 @@ export function StepAssets() {
                   }
                 }}
                 title={t("characters.edit")}
-                className="group relative flex cursor-pointer flex-col overflow-hidden rounded-xl border border-line bg-raised/50 transition hover:border-line-strong focus:border-success focus:outline-none"
+                className="group relative flex cursor-pointer items-center gap-3 overflow-hidden rounded-xl border border-line bg-raised/50 p-2.5 transition hover:border-line-strong focus:border-success focus:outline-none"
               >
-                <div className="relative flex aspect-video w-full shrink-0 items-center justify-center overflow-hidden border-b border-line bg-app">
+                <div className="relative flex h-16 w-24 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-line bg-app">
                   {(char.imageUrl || char.avatarUrl) ? (
                     <Lightbox src={char.imageUrl || char.avatarUrl} alt={char.name}>
                       <img
@@ -353,7 +366,7 @@ export function StepAssets() {
                     </div>
                   )}
                 </div>
-                <div className="min-w-0 flex-1 p-3">
+                <div className="min-w-0 flex-1 py-1 pr-1">
                   <p className="text-sm font-medium text-ink">{char.name}</p>
                   <p className="mt-0.5 text-xs text-ink-4 line-clamp-2">
                     {(char.description || char.appearancePrompt || "—").split("\n")[0]}
@@ -407,16 +420,6 @@ export function StepAssets() {
               {t("wizard.sceneReferencesHint")}
             </p>
           </div>
-          {sceneReferences.some((s) => !s.imageUrl && s.prompt.trim()) && (
-            <button
-              onClick={handleBatchScenes}
-              disabled={anyGenerating}
-              className="flex items-center gap-1.5 rounded px-2 py-1 text-[0.6875rem] text-accent hover:bg-accent-deep/30 transition disabled:opacity-50"
-            >
-              {isGenerating ? <Loader2 size={11} className="animate-spin" /> : <Wand2 size={11} />}
-              {t("wizard.generateAllScenes")}
-            </button>
-          )}
         </div>
 
         <div className="grid gap-3 md:grid-cols-2">
@@ -427,10 +430,10 @@ export function StepAssets() {
             tabIndex={0}
             onClick={() => setEditingAsset(scene)}
             onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setEditingAsset(scene); } }}
-            className="group relative flex cursor-pointer flex-col overflow-hidden rounded-xl border border-line bg-raised/50 transition hover:border-line-strong focus:border-accent focus:outline-none"
+            className="group relative flex cursor-pointer items-center gap-3 overflow-hidden rounded-xl border border-line bg-raised/50 p-2.5 transition hover:border-line-strong focus:border-accent focus:outline-none"
           >
             {/* Scene image preview（点击放大查看） */}
-            <div className="relative flex aspect-video w-full shrink-0 items-center justify-center overflow-hidden border-b border-line bg-app" onClick={(e) => e.stopPropagation()}>
+            <div className="relative flex h-16 w-24 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-line bg-app" onClick={(e) => e.stopPropagation()}>
               {scene.imageUrl ? (
                 <Lightbox src={scene.imageUrl} alt={scene.name}>
                   <img
@@ -446,7 +449,7 @@ export function StepAssets() {
               )}
             </div>
 
-            <div className="min-w-0 flex-1 p-3">
+            <div className="min-w-0 flex-1 py-1 pr-1">
               <p className="text-sm font-medium text-ink">{scene.name || "未命名场景"}</p>
               <p className="mt-0.5 line-clamp-2 text-xs text-ink-4">{(scene.description || scene.prompt || "—").split("\n")[0]}</p>
               {scene.error && <p className="mt-0.5 truncate text-[0.625rem] text-danger" title={scene.error}>生成失败：{scene.error}</p>}
@@ -486,16 +489,6 @@ export function StepAssets() {
               {t("wizard.productReferencesHint")}
             </p>
           </div>
-          {products.some((p) => !p.imageUrl && p.prompt.trim()) && (
-            <button
-              onClick={handleBatchProducts}
-              disabled={anyGenerating}
-              className="flex items-center gap-1.5 rounded px-2 py-1 text-[0.6875rem] text-accent hover:bg-accent-deep/30 transition disabled:opacity-50"
-            >
-              {isGenerating ? <Loader2 size={11} className="animate-spin" /> : <Wand2 size={11} />}
-              {t("wizard.generateAllProducts")}
-            </button>
-          )}
         </div>
 
         <div className="grid gap-3 md:grid-cols-2">
@@ -506,10 +499,10 @@ export function StepAssets() {
             tabIndex={0}
             onClick={() => setEditingAsset(product)}
             onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setEditingAsset(product); } }}
-            className="group relative flex cursor-pointer flex-col overflow-hidden rounded-xl border border-line bg-raised/50 transition hover:border-line-strong focus:border-accent focus:outline-none"
+            className="group relative flex cursor-pointer items-center gap-3 overflow-hidden rounded-xl border border-line bg-raised/50 p-2.5 transition hover:border-line-strong focus:border-accent focus:outline-none"
           >
             {/* Product image preview（点击放大查看） */}
-            <div className="relative flex aspect-video w-full shrink-0 items-center justify-center overflow-hidden border-b border-line bg-app" onClick={(e) => e.stopPropagation()}>
+            <div className="relative flex h-16 w-24 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-line bg-app" onClick={(e) => e.stopPropagation()}>
               {product.imageUrl ? (
                 <Lightbox src={product.imageUrl} alt={product.name}>
                   <img
@@ -525,7 +518,7 @@ export function StepAssets() {
               )}
             </div>
 
-            <div className="min-w-0 flex-1 p-3">
+            <div className="min-w-0 flex-1 py-1 pr-1">
               <p className="text-sm font-medium text-ink">{product.name || "未命名主体"}</p>
               <p className="mt-0.5 line-clamp-2 text-xs text-ink-4">{(product.description || product.prompt || "—").split("\n")[0]}</p>
               {product.error && <p className="mt-0.5 truncate text-[0.625rem] text-danger" title={product.error}>生成失败：{product.error}</p>}
@@ -565,16 +558,6 @@ export function StepAssets() {
               {t("wizard.propReferencesHint")}
             </p>
           </div>
-          {props.some((prop) => !prop.imageUrl && prop.prompt.trim()) && (
-            <button
-              onClick={handleBatchProps}
-              disabled={anyGenerating}
-              className="flex items-center gap-1.5 rounded px-2 py-1 text-[0.6875rem] text-accent transition hover:bg-accent-deep/30 disabled:opacity-50"
-            >
-              {isGenerating ? <Loader2 size={11} className="animate-spin" /> : <Wand2 size={11} />}
-              {t("wizard.generateAllProps")}
-            </button>
-          )}
         </div>
 
         <div className="grid gap-3 md:grid-cols-2">
@@ -585,9 +568,9 @@ export function StepAssets() {
             tabIndex={0}
             onClick={() => setEditingAsset(prop)}
             onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setEditingAsset(prop); } }}
-            className="group relative flex cursor-pointer flex-col overflow-hidden rounded-xl border border-line bg-raised/50 transition hover:border-line-strong focus:border-accent focus:outline-none"
+            className="group relative flex cursor-pointer items-center gap-3 overflow-hidden rounded-xl border border-line bg-raised/50 p-2.5 transition hover:border-line-strong focus:border-accent focus:outline-none"
           >
-            <div className="relative flex aspect-video w-full shrink-0 items-center justify-center overflow-hidden border-b border-line bg-app" onClick={(e) => e.stopPropagation()}>
+            <div className="relative flex h-16 w-24 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-line bg-app" onClick={(e) => e.stopPropagation()}>
               {prop.imageUrl ? (
                 <Lightbox src={prop.imageUrl} alt={prop.name}>
                   <img src={prop.imageUrl} alt={prop.name} className="h-full w-full object-contain" />
@@ -598,7 +581,7 @@ export function StepAssets() {
                 </div>
               )}
             </div>
-            <div className="min-w-0 flex-1 p-3">
+            <div className="min-w-0 flex-1 py-1 pr-1">
               <p className="text-sm font-medium text-ink">{prop.name || "未命名道具"}</p>
               <p className="mt-0.5 line-clamp-2 text-xs text-ink-4">{(prop.description || prop.prompt || "—").split("\n")[0]}</p>
               {prop.error && <p className="mt-0.5 truncate text-[0.625rem] text-danger" title={prop.error}>生成失败：{prop.error}</p>}
