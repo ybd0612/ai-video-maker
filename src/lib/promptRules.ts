@@ -96,8 +96,8 @@ A style prompt is valid ONLY when it describes reusable visual language carried 
 2. It describes story actions, narrative scenes or concrete objects.
 3. It implies a recognizable subject silhouette.
 4. It would make the image model render a concrete entity as the frame's subject — an animal, creature, character, person, face, product, vehicle, readable landscape or room — EVEN IF that entity is not on the list. Judge by what the language forces the model to draw, not only by named entities: "fine fur textures" together with "extreme tenderness and pure healing emotion" reads as a fluffy animal even though no animal is named, and a soft diffuse-material passage with no renderable content makes the model invent a subject. Missing entity names do not make a prompt clean.
-5. It uses a subject-bound material word (fur, hair, feather, plush, skin, scale) as bare overall style language instead of as an abstract material sample attached to a carrier.
-6. It names no abstract carrier for the visual language (material / texture swatch, colour palette chips, lighting or gradient study, brush or rendering sample).
+5. It uses a subject-bound material word (fur, hair, feather, plush, skin, scale) as bare overall style language instead of as abstract material handling attached to a carrier.
+6. It carries any sheet/board composition wording (sample sheet, swatches, colour chips, grid, carrier, symmetric layout on a board) — this prompt is appended to every image call, so carrier composition must stay out; it belongs only to the style-master assembly layer.
 
 Valid output describes only reusable visual language on an explicit abstract carrier.
 
@@ -115,8 +115,8 @@ A style prompt is valid ONLY when it describes reusable visual language carried 
 2. It describes story actions, narrative scenes or concrete objects.
 3. It implies a recognizable subject silhouette.
 4. It would make the image model render a concrete entity as the frame's subject — an animal, creature, character, person, face, product, vehicle, readable landscape or room — EVEN IF that entity is not on the list. Judge by what the language forces the model to draw, not only by named entities: "fine fur textures" together with "extreme tenderness and pure healing emotion" reads as a fluffy animal even though no animal is named, and a soft diffuse-material passage with no renderable content makes the model invent a subject. Missing entity names do not make a prompt clean.
-5. It uses a subject-bound material word (fur, hair, feather, plush, skin, scale) as bare overall style language instead of as an abstract material sample attached to a carrier.
-6. It names no abstract carrier for the visual language (material / texture swatch, colour palette chips, lighting or gradient study, brush or rendering sample).
+5. It uses a subject-bound material word (fur, hair, feather, plush, skin, scale) as bare overall style language instead of as abstract material handling attached to a carrier.
+6. It carries any sheet/board composition wording (sample sheet, swatches, colour chips, grid, carrier, symmetric layout on a board) — this prompt is appended to every image call, so carrier composition must stay out; it belongs only to the style-master assembly layer.
 
 Valid output describes only reusable visual language on an explicit abstract carrier.
 
@@ -126,7 +126,7 @@ Return JSON only:
   "reason": "why it overreaches (empty string when clean is true)",
   "rewritten": "if clean is false, return the rewritten pure-style prompt (one to three sentences, English); empty string when clean is true"
 }
-The rewritten prompt must keep the original overall style tone, carry the visual language on an abstract sample sheet (material / texture swatch, colour chips, lighting study, brush sample), and convert subject-bound material words into abstract material samples attached to a carrier (e.g. "fur-like fibre texture swatch"); it must not introduce new subjects or plot.`,
+The rewritten prompt must keep the original overall style tone, stay as PURE reusable visual language (medium, colour, lighting, material handling, camera texture, mood) with NO sheet/board composition wording, and convert subject-bound material words into abstract material handling (e.g. "fur-like fibre texture"); it must not introduce new subjects or plot.`,
   },
 
   /* ── 视觉方向自检（校验/重写视觉方向，判断权归模型） ── */
@@ -507,9 +507,9 @@ The prompt MUST describe ONLY reusable visual language:
 - atmosphere / material / texture
 - composition and camera treatment
 
-CARRIER RULE (critical): a text-to-image model cannot render an empty frame. A style-only prompt with no renderable content gets silently filled with an invented subject drawn from its own priors. So the prompt MUST name an explicit abstract carrier that the model can render: material and texture swatches, colour palette chips, lighting and gradient studies, brushwork or rendering samples. Describe that carrier — never a scene, poster or illustration.
+CARRIER RULE (critical, 2026-09-15 revised): this prompt will be appended to EVERY image call in the project (asset images, shot images), not only the style master. So it must be PURE reusable visual language — medium, colour relationships, lighting, material handling, camera texture and mood. It must NOT carry any sheet/board composition words (sample sheet, swatches, colour chips, grid, carrier, symmetric layout on a board): that carrier composition belongs ONLY to the style-master assembly layer and will otherwise make every asset image render swatch-board squares.
 
-SUBJECT-BOUND MATERIAL RULE: words that normally belong to a living subject (fur, hair, feather, plush, skin, scale, fin) may be used ONLY as an abstract material sample attached to a carrier — e.g. "fur-like fibre texture swatch" or "plush-surface material sample". Never leave them bare as overall style language ("fine fur textures"), because a bare material word plus a soft/healing mood reads to the image model as an animal.
+SUBJECT-BOUND MATERIAL RULE: words that normally belong to a living subject (fur, hair, feather, plush, skin, scale, fin) must be worded as abstract material handling (e.g. "fur-like fibre texture", "plush-surface material feel"), never left as a bare overall style word ("fine fur textures"), because a bare material word plus a soft/healing mood reads to the image model as an animal.
 
 NEVER let any concrete entity become the frame's subject: no animal, no creature, no character, no person, no face, no product, no vehicle, no readable landscape or room, no narrative action, no text, no watermark.
 
@@ -531,9 +531,9 @@ The prompt MUST describe ONLY reusable visual language:
 - atmosphere / material / texture
 - composition and camera treatment
 
-CARRIER RULE (critical): a text-to-image model cannot render an empty frame. A style-only prompt with no renderable content gets silently filled with an invented subject drawn from its own priors. So the prompt MUST name an explicit abstract carrier that the model can render: material and texture swatches, colour palette chips, lighting and gradient studies, brushwork or rendering samples. Describe that carrier — never a scene, poster or illustration.
+CARRIER RULE (critical, 2026-09-15 revised): this prompt will be appended to EVERY image call in the project (asset images, shot images), not only the style master. So it must be PURE reusable visual language — medium, colour relationships, lighting, material handling, camera texture and mood. It must NOT carry any sheet/board composition words (sample sheet, swatches, colour chips, grid, carrier, symmetric layout on a board): that carrier composition belongs ONLY to the style-master assembly layer and will otherwise make every asset image render swatch-board squares.
 
-SUBJECT-BOUND MATERIAL RULE: words that normally belong to a living subject (fur, hair, feather, plush, skin, scale, fin) may be used ONLY as an abstract material sample attached to a carrier — e.g. "fur-like fibre texture swatch" or "plush-surface material sample". Never leave them bare as overall style language ("fine fur textures"), because a bare material word plus a soft/healing mood reads to the image model as an animal.
+SUBJECT-BOUND MATERIAL RULE: words that normally belong to a living subject (fur, hair, feather, plush, skin, scale, fin) must be worded as abstract material handling (e.g. "fur-like fibre texture", "plush-surface material feel"), never left as a bare overall style word ("fine fur textures"), because a bare material word plus a soft/healing mood reads to the image model as an animal.
 
 NEVER let any concrete entity become the frame's subject: no animal, no creature, no character, no person, no face, no product, no vehicle, no readable landscape or room, no narrative action, no text, no watermark.
 
@@ -1015,8 +1015,8 @@ export const BUILTIN_RULES: PromptRule[] = [
     task: "styleRef",
     section: "rules",
     content: {
-      zh: "- 只使用纯视觉语言：媒介、色彩、光影、材质、镜头质感、构图规律与氛围\n- 风格图是纯风格母版，必须落在**抽象样张载体**上（材质/肌理样张、色卡、光影研究、笔触或渲染样张），而不是场景、海报或插画\n- 不出现核心主体、不暗示任何可识别实体、不叙述故事或借用故事主体/场景/构图\n- 主体绑定材质词（毛发、皮肤、羽毛、绒毛、鳞片）只能挂在抽象载体的材质样本上（如 \"fur-like fibre texture swatch\"），不得裸写为整体画风，否则会被图像模型理解成一只动物\n- 画面中不要出现文字与水印",
-      en: "- Use only pure visual language: medium, color, lighting, material, camera texture, composition patterns and atmosphere\n- The style sheet is a pure style master and must sit on an ABSTRACT CARRIER (material / texture swatches, colour chips, lighting studies, brush or rendering samples) — never a scene, poster or illustration\n- No core subject, no recognizable entity, no story or borrowed subjects/setting/composition\n- Subject-bound material words (fur, hair, feather, plush, skin, scale) may only be attached to an abstract material sample (e.g. \"fur-like fibre texture swatch\"); never leave them bare as overall style language, or the image model reads them as an animal\n- No text or watermark in the image",
+      zh: "- 只使用纯视觉语言：媒介、色彩、光影、材质、镜头质感、构图规律与氛围\n- stylePrompt 会被拼进项目里每一张图：必须是**不含画面构图词**的纯视觉语言，禁止出现样张板/色卡/拼贴/载体/对称排布等词（那属于风格母版拼装层，写了会让所有资产图画出方块）\n- 不出现核心主体、不暗示任何可识别实体、不叙述故事或借用故事主体/场景/构图\n- 主体绑定材质词（毛发、皮肤、羽毛、绒毛、鳞片）只能写成抽象材质描述（如 \"fur-like fibre texture\"），不得裸写为整体画风，否则会被图像模型理解成一只动物\n- 画面中不要出现文字与水印",
+      en: "- Use only pure visual language: medium, color, lighting, material, camera texture, composition patterns and atmosphere\n- The stylePrompt is appended to EVERY image call in the project: it must be pure visual language with NO sheet/board composition wording (sample sheet, swatches, colour chips, grid, carrier, layout) — that belongs only to the style-master assembly layer, otherwise every asset image renders swatch-board squares\n- No core subject, no recognizable entity, no story or borrowed subjects/setting/composition\n- Subject-bound material words (fur, hair, feather, plush, skin, scale) may only be worded as abstract material handling (e.g. \"fur-like fibre texture\"); never leave them bare as overall style language, or the image model reads them as an animal\n- No text or watermark in the image",
     },
     enabled: true,
     source: "builtin",
