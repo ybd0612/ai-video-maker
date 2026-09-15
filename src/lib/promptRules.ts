@@ -390,13 +390,16 @@ Return ONLY the appearance description, with no explanations and no bullet point
 
   /* ── 风格提示词派生（useWizardActions.deriveStylePrompt） ── */
   styleRef: {
-    zh: `You are a visual style director. Based on the given story idea and desired style, produce ONE English image-style prompt that will be used to generate a style reference / mood board image.
+    zh: `You are a visual style director. Based only on the desired visual direction fields, produce ONE English image-style prompt that will be used to generate a style reference / mood board image.
 
 The prompt MUST describe ONLY:
 - medium / art form (e.g. 2D animation, watercolor illustration, cinematic photography, 3D render)
 - color palette
 - lighting mood
 - atmosphere / texture
+- abstract material, color and lighting studies
+
+The output is a style-only board, not a scene or poster. It must have no core subject and must not imply any recognizable entity.
 
 {{#rules}}
 {{rules}}
@@ -407,13 +410,16 @@ Examples:
 {{/examples}}
 
 Output ONLY the prompt text itself, one or two sentences, no quotes, no explanation.`,
-    en: `You are a visual style director. Based on the given story idea and desired style, produce ONE English image-style prompt that will be used to generate a style reference / mood board image.
+    en: `You are a visual style director. Based only on the desired visual direction fields, produce ONE English image-style prompt that will be used to generate a style reference / mood board image.
 
 The prompt MUST describe ONLY:
 - medium / art form (e.g. 2D animation, watercolor illustration, cinematic photography, 3D render)
 - color palette
 - lighting mood
 - atmosphere / texture
+- abstract material, color and lighting studies
+
+The output is a style-only board, not a scene or poster. It must have no core subject and must not imply any recognizable entity.
 
 {{#rules}}
 {{rules}}
@@ -893,8 +899,8 @@ export const BUILTIN_RULES: PromptRule[] = [
     task: "styleRef",
     section: "rules",
     content: {
-      zh: "- 绝不提及任何角色、人物、人类、动物、生物、面孔、身体或产品——只使用纯风格词汇\n- 不要叙述故事；只描述贴合故事的视觉风格\n- 画面中不要出现文字与水印",
-      en: "- NEVER mention any character, person, human, animal, creature, face, body, or product — pure style vocabulary only\n- Do not narrate the story; describe only the visual style that fits it\n- No text, no watermark in the image",
+      zh: "- 绝不提及任何角色、人物、人类、动物、生物、面孔、身体、产品或具体物件——只使用纯风格词汇\n- 风格图必须是抽象材质、色块、光影和纹理研究，不得有核心主体，不得暗示任何可识别实体\n- 不要叙述故事；只描述视觉语言，不要从故事中借用主体、场景或构图\n- 画面中不要出现文字与水印",
+      en: "- NEVER mention any character, person, human, animal, creature, face, body, product or specific object — pure style vocabulary only\n- The style board must be abstract material, color, lighting and texture studies with no central subject and no recognizable entity\n- Do not narrate the story or borrow its subjects, setting or composition; describe only reusable visual language\n- No text, no watermark in the image",
     },
     enabled: true,
     source: "builtin",

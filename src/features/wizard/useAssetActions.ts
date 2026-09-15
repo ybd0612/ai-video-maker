@@ -54,7 +54,6 @@ function fallbackStylePrompt(style: string): string {
  * 派生失败（网络/内容过滤/空输出）走兜底链，不阻塞风格图生成。
  */
 async function deriveStylePrompt(
-  ideaPrompt: string,
   styleDescription: string,
   apiKey: string,
   baseUrl: string,
@@ -67,13 +66,11 @@ async function deriveStylePrompt(
     emotion: string;
   },
 ): Promise<string> {
-  const idea = ideaPrompt.trim();
   const zhStyle = styleDescription.trim();
-  if (idea || zhStyle) {
+  if (zhStyle || visualDirection) {
     try {
       const service = createAIService({ provider: "openai", apiKey, baseUrl });
       const userContent = [
-        idea ? `Story idea: ${idea.slice(0, 600)}` : "",
         zhStyle ? `Desired style (Chinese): ${zhStyle}` : "",
         visualDirection
           ? [
@@ -148,10 +145,9 @@ export function useAssetActions(): AssetActions {
 
       const styleAssetId = styleAsset.id;
       let styleRevision = styleAsset.renderRevision ?? 0;
-      if (!styleAsset.prompt.trim() && !styleAsset.derivation?.locked) {
+      if ((force || !styleAsset.prompt.trim()) && (!styleAsset.derivation?.locked || force)) {
         const derived = await deriveStylePrompt(
-          latest.ideaPrompt ?? "",
-          styleAsset.description.trim() || latest.style.trim(),
+          latest.style.trim(),
           providerConfig.apiKey,
           providerConfig.baseUrl,
           latest.visualDirection,

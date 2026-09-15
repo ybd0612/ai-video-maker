@@ -109,8 +109,9 @@ describe("资产主体边界与视觉方向", () => {
   it("视觉方向参考图只强调可复用视觉语言", () => {
     const prompt = composeStyleReferencePrompt("soft 3D cartoon rendering");
     expect(prompt).toContain("soft 3D cartoon rendering");
-    expect(prompt).toContain("Pure visual style board");
-    expect(prompt).toContain("no recognizable subject");
+    expect(prompt).toContain("abstract visual style board");
+    expect(prompt).toContain("no central subject");
+    expect(prompt).toContain("recognizable entity");
   });
 });
 

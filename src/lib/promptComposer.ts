@@ -99,7 +99,7 @@ export function assetImageBoundary(type: "scene" | "product" | "prop"): string {
 
 /** 视觉方向图只呈现风格语言，不让故事主体进入共享风格参考图。 */
 export function composeStyleReferencePrompt(stylePrompt: string): string {
-  return `${stylePrompt.trim()}. Pure visual style board showing only medium, material, color, lighting and texture; no recognizable subject, character, creature, product or narrative content.`;
+  return `${stylePrompt.trim()}. Generate an abstract visual style board with material swatches, color fields, lighting studies and texture samples only; no central subject, recognizable entity, character, creature, product, prop or narrative scene.`;
 }
 
 /* ── 多图合成（分镜图） ──────────────────────────────────────────────────── */

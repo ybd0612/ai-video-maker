@@ -951,7 +951,7 @@ export const useProjectStore = create<ProjectState>()(
               assetsReviewed: false,
               assets: p.assets.map((asset) =>
                 asset.type === "style"
-                  ? { ...asset, imageUrl: undefined, prompt: "" }
+                  ? { ...asset, imageUrl: undefined, prompt: "", derivation: { ...asset.derivation, locked: false, dirty: true } }
                   : { ...asset, imageUrl: undefined },
               ),
               updatedAt: Date.now(),
