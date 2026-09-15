@@ -10,7 +10,15 @@ import {
 } from "@/stores/projectStore";
 import { useSettingsStore } from "@/stores/settingsStore";
 import { useT } from "@/i18n";
-import { extractAssetsFromIdea, extractVisualDirectionFromIdea, generateScript, auditVisualDirection, type RawVisualDirection } from "@/services/scriptService";
+import {
+  auditVisualDirection,
+  extractAssetsByType,
+  extractVisualDirectionFromIdea,
+  generateStoryboardOutline,
+  generateStoryboardShot,
+  type ExtractableAssetType,
+  type RawVisualDirection,
+} from "@/services/scriptService";
 import { extractNewAssets } from "@/lib/extractAssets";
 import { collectSubjectVocabulary } from "@/lib/promptComposer";
 import { refineWithAudit } from "@/lib/refineContent";
@@ -21,10 +29,25 @@ import { restoreProjectStatusIfReady } from "./wizardActionUtils";
 /** 视觉方向自检轮数上限（2026-09-15 由 2 → 1：审计+重写已合一，第 2 轮边际收益低于 ~40s 耗时）。 */
 const VISUAL_DIRECTION_MAX_ROUNDS = 1;
 
+/** 逐镜头生成的并发上限（文本 RPM 由 rateLimiter 统一节流） */
+const SHOT_CONCURRENCY = 3;
+
 export interface ScriptActions {
   extractCharactersFromIdea: (prompt: string) => Promise<boolean>;
   generateStoryboard: (prompt: string) => Promise<void>;
   rerollShot: (shotId: string) => Promise<void>;
+}
+
+/** 简单并发池：按 limit 同时执行 tasks，全部 settle 后返回 */
+async function runWithConcurrency(tasks: Array<() => Promise<void>>, limit: number): Promise<void> {
+  let cursor = 0;
+  const workers = Array.from({ length: Math.max(1, Math.min(limit, tasks.length)) }, async () => {
+    while (cursor < tasks.length) {
+      const task = tasks[cursor++];
+      await task;
+    }
+  });
+  await Promise.all(workers);
 }
 
 export function useScriptActions(
@@ -59,6 +82,10 @@ export function useScriptActions(
   /**
    * Step 1→2: Extract characters from idea, advance to assets step.
    * 返回 false 表示用户在确认弹窗中取消了重新提取。
+   *
+   * 两链并行 + 资产分类型提取（2026-09-15）：
+   * - 链 A：视觉方向（提取 → 自检 → 写回），完成即切步骤 2（渐进解锁）
+   * - 链 B：资产按类型并行提取（5 路小请求），每类完成即写回（卡片逐类蹦出）
    */
   const extractCharactersFromIdea = useCallback(async (prompt: string): Promise<boolean> => {
     const { providerConfig } = useSettingsStore.getState();
@@ -113,8 +140,7 @@ export function useScriptActions(
       };
 
       // 链 A：视觉方向（提取 → 自检 → 写回）。
-      // 完成即写回并切到步骤 2：用户 ~35-55s 就能看到/编辑视觉方向，
-      // 不必等资产提取（~53s）与后续图片链路全部结束。
+      // 完成即写回并切到步骤 2：用户可立即查看/编辑视觉方向，资产卡片随后逐类出现。
       const directionTask = (async () => {
         const refined = await refineWithAudit<RawVisualDirection>({
           produce: () => extractVisualDirectionFromIdea(baseOpts),
@@ -145,39 +171,43 @@ export function useScriptActions(
         return visualDirection;
       })();
 
-      // 链 B：资产提取。与链 A 并行（视觉方向参数可省——资产 prompt 的风格一致性
-      // 由生图时的 stylePrompt 文本兜底）；成功后整体替换旧 auto 资产。
+      // 链 B：资产按类型并行提取（5 路小请求）。单类完成即写回；
+      // 单类失败不拖垮整体（该类资产缺失，用户可重试），全部失败才算失败。
       const assetsTask = (async () => {
-        const result = await extractAssetsFromIdea(baseOpts);
+        const types: ExtractableAssetType[] = ["style", "character", "scene", "product", "prop"];
+        let added = 0;
+        const failures: Array<{ type: ExtractableAssetType; error: unknown }> = [];
 
-        const newCharacters = extractNewAssets(project.assets, result.characters, "character", manualAssets);
-        const newProducts = extractNewAssets(project.assets, result.products, "product", manualAssets);
-        const newProps = extractNewAssets(project.assets, result.props, "prop", manualAssets);
-        const newScenes = extractNewAssets(project.assets, result.scenes, "scene", manualAssets);
-        const newStyles = extractNewAssets(project.assets, result.styles, "style", manualAssets);
-        const newAssets = [
-          ...newStyles.assets,
-          ...newCharacters.assets,
-          ...newScenes.assets,
-          ...newProducts.assets,
-          ...newProps.assets,
-        ];
-        const manualNames = new Set(manualAssets.map((a) => a.name.trim().toLocaleLowerCase()));
-        const dedupedNew = newAssets.filter(
-          (a) => !manualNames.has(a.name.trim().toLocaleLowerCase()),
-        );
-
-        // 提取成功才替换旧 auto 资产（失败时保留现状供用户重试）；
-        // 旧风格图对应旧 style 资产，一并作废
-        useProjectStore.getState().updateProjectById(targetProjectId, (p) => ({
-          ...p,
-          assets: [...manualAssets, ...dedupedNew],
-          styleReferenceUrl: undefined,
-          styleReferenceError: undefined,
-          assetsReviewed: false,
-          error: undefined,
+        await Promise.all(types.map(async (type) => {
+          try {
+            const result = await extractAssetsByType(baseOpts, type);
+            const list =
+              type === "character" ? result.characters
+              : type === "scene" ? result.scenes
+              : type === "product" ? result.products
+              : type === "prop" ? result.props
+              : result.styles;
+            const built = extractNewAssets(project.assets, list as never, type, manualAssets).assets;
+            const manualNames = new Set(manualAssets.map((a) => a.name.trim().toLocaleLowerCase()));
+            const deduped = built.filter(
+              (a) => !manualNames.has(a.name.trim().toLocaleLowerCase()),
+            );
+            if (deduped.length === 0) return;
+            added += deduped.length;
+            useProjectStore.getState().updateProjectById(targetProjectId, (p) => ({
+              ...p,
+              assets: [...p.assets, ...deduped],
+            }));
+          } catch (err) {
+            failures.push({ type, error: err });
+          }
         }));
-        return dedupedNew.length;
+
+        if (added === 0 && failures.length > 0) {
+          const first = failures[0]!.error;
+          throw first instanceof Error ? first : new Error(String(first));
+        }
+        return added;
       })();
 
       // 两链并行；任一失败保留另一链已写回的内容并按失败收尾（用户重试走原确认弹窗）
@@ -214,7 +244,11 @@ export function useScriptActions(
     }
   }, [generateAssetImages, generateStyleReference, t]);
 
-  /** Step 3: Generate storyboard shots using asset context. */
+  /**
+   * Step 3: Generate storyboard shots — 两阶段（大纲 → 逐镜头并发）。
+   * 阶段 1 产出镜头计划；阶段 2 并发逐镜头生成，单个完成即写回（卡片逐个亮起），
+   * 单镜头失败只标记该镜头（可用单镜头重摇恢复），不拖垮整组。
+   */
   const generateStoryboard = useCallback(async (prompt: string) => {
     const { providerConfig } = useSettingsStore.getState();
     if (!providerConfig.apiKey || !providerConfig.baseUrl) {
@@ -229,7 +263,8 @@ export function useScriptActions(
     store.setProjectStatusById(targetProjectId, "scripting");
 
     try {
-      const result = await generateScript({
+      // 阶段 1：大纲（轻量请求）
+      const outline = await generateStoryboardOutline({
         apiKey: providerConfig.apiKey,
         baseUrl: providerConfig.baseUrl,
         prompt,
@@ -238,58 +273,85 @@ export function useScriptActions(
         assets: project.assets,
       });
 
-      const existingCharacters = project.assets.filter((a) => a.type === "character");
-      const idByName = new Map<string, string>();
-      for (const c of existingCharacters) idByName.set(c.name.trim().toLocaleLowerCase(), c.id);
-
-      const { assets: newCharacters } = extractNewAssets(
-        project.assets,
-        result.characters,
-        "character",
-      );
-      const newProducts = extractNewAssets(project.assets, result.products, "product").assets;
-      const newProps = extractNewAssets(project.assets, result.props, "prop").assets;
-      const newScenes = extractNewAssets(project.assets, result.scenes, "scene").assets;
-      const newStyles = extractNewAssets(project.assets, result.styles, "style").assets;
-      const newAssets = [...newCharacters, ...newProducts, ...newProps, ...newScenes, ...newStyles];
-      const assetsForResolution = [...project.assets, ...newAssets];
-
-      for (const c of newCharacters) idByName.set(c.name.trim().toLocaleLowerCase(), c.id);
-
-      const resolveCharacterId = (ref: string): string | null => {
-        const normalized = ref.trim().toLocaleLowerCase();
-        const matched = idByName.get(normalized);
-        if (matched) return matched;
-        return assetsForResolution.some((asset) => asset.type === "character" && asset.id === ref)
-          ? ref
-          : null;
-      };
-
-      const shots: Shot[] = result.shots.map((s, i) => ({
-        id: `shot_${Date.now()}_${i}`,
-        index: i,
-        status: "scripted" as const,
-        ...s,
-        activeCharacterIds: (s.activeCharacterIds ?? [])
-          .map(resolveCharacterId)
-          .filter((x): x is string => x !== null),
-        activeSceneId: resolveAssetId(s.activeSceneId, assetsForResolution, "scene"),
-        activeProductIds: resolveAssetIds(s.activeProductIds ?? [], assetsForResolution, "product"),
-        activePropIds: resolveAssetIds(s.activePropIds ?? [], assetsForResolution, "prop"),
-        dialogues: (s.dialogues ?? []).map((d) => ({
-          ...d,
-          characterId: d.characterId ? resolveCharacterId(d.characterId) : null,
-        })),
-      }));
-
-      store.setShotsByProjectId(targetProjectId, shots);
-
+      // 大纲阶段发现的新资产先补建入库（逐镜头请求的上下文需要它们的设定）
+      const currentAssets = useProjectStore.getState().projects.find((p) => p.id === targetProjectId)?.assets ?? [];
+      const manualNow = currentAssets.filter((a) => a.source === "manual");
+      const builtChars = extractNewAssets(currentAssets, outline.newCharacters, "character", manualNow).assets;
+      const builtScenes = extractNewAssets(currentAssets, outline.newScenes, "scene", manualNow).assets;
+      const newAssets = [...builtChars, ...builtScenes];
       if (newAssets.length > 0) {
         useProjectStore.getState().updateProjectById(targetProjectId, (p) => ({
           ...p,
           assets: [...p.assets, ...newAssets],
         }));
       }
+
+      // 阶段 2 准备：写入占位镜头（status scripting）——卡片立刻全部出现并显示生成中
+      const assetsForShots = useProjectStore.getState().projects.find((p) => p.id === targetProjectId)?.assets ?? [];
+      const outlineJson = JSON.stringify(outline.shots);
+      const placeholderShots: Shot[] = outline.shots.map((_, i) => ({
+        id: `shot_${Date.now()}_${i}`,
+        index: i,
+        status: "scripting" as const,
+        scriptText: "",
+        visualPrompt: "",
+        motionPrompt: "",
+        dialogues: [],
+        activeCharacterIds: [],
+        activeProductIds: [],
+        activePropIds: [],
+        duration: 5,
+        useDualFrame: false,
+      }));
+      useProjectStore.getState().setShotsByProjectId(targetProjectId, placeholderShots);
+
+      // 阶段 2：并发逐镜头生成，单个完成即写回；单镜头失败只标记该镜头
+      const tasks = outline.shots.map((item, i) => async () => {
+        const shot = placeholderShots[i];
+        try {
+          const raw = await generateStoryboardShot({
+            apiKey: providerConfig.apiKey,
+            baseUrl: providerConfig.baseUrl,
+            prompt,
+            language: project.language,
+            aspectRatio: project.aspectRatio,
+            assets: assetsForShots,
+            outline: outlineJson,
+            item,
+            index: i,
+            total: placeholderShots.length,
+          });
+          // 名字/引用 → 资产 ID 解析（用最新 assets，含大纲补建的新资产）
+          const latestAssets = useProjectStore.getState().projects.find((p) => p.id === targetProjectId)?.assets ?? [];
+          const resolvedDialogues = (raw.dialogues ?? []).map((d) => ({
+            id: `dlg_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+            characterId: d.characterId ? resolveAssetId(d.characterId, latestAssets, "character") ?? null : null,
+            text: d.text ?? "",
+            delivery: d.delivery,
+          }));
+          useProjectStore.getState().updateShotByProjectId(targetProjectId, shot.id, {
+            ...pickShotFields({ ...raw, dialogues: resolvedDialogues, activeCharacterIds: raw.activeCharacterIds ?? [], activeProductIds: raw.activeProductIds ?? [], activePropIds: raw.activePropIds ?? [], useDualFrame: raw.useDualFrame ?? false }),
+            activeCharacterIds: (raw.activeCharacterIds ?? [])
+              .map((ref) => resolveAssetId(ref, latestAssets, "character"))
+              .filter((x): x is string => !!x),
+            activeSceneId: resolveAssetId(raw.activeSceneId, latestAssets, "scene"),
+            activeProductIds: (raw.activeProductIds ?? [])
+              .map((ref) => resolveAssetId(ref, latestAssets, "product"))
+              .filter((x): x is string => !!x),
+            activePropIds: (raw.activePropIds ?? [])
+              .map((ref) => resolveAssetId(ref, latestAssets, "prop"))
+              .filter((x): x is string => !!x),
+            dialogues: resolvedDialogues,
+            status: "scripted" as const,
+          });
+        } catch (err) {
+          useProjectStore.getState().updateShotByProjectId(targetProjectId, shot.id, {
+            status: "failed",
+            error: err instanceof Error ? err.message : String(err),
+          });
+        }
+      });
+      await runWithConcurrency(tasks, SHOT_CONCURRENCY);
 
       useProjectStore.getState().setProjectStatusById(targetProjectId, "idle");
     } catch (err) {
@@ -302,7 +364,7 @@ export function useScriptActions(
     }
   }, []);
 
-  /** Re-roll a single shot's script. */
+  /** Re-roll a single shot's script（单镜头重摇 = 阶段 2 的单请求） */
   const rerollShot = useCallback(async (shotId: string) => {
     const { providerConfig } = useSettingsStore.getState();
     if (!providerConfig.apiKey || !providerConfig.baseUrl) return;
@@ -321,53 +383,48 @@ export function useScriptActions(
       const characterNames = project.assets
         .filter((a) => a.type === "character")
         .map((c) => c.name);
-      const contextParts = [
-        `Regenerate this shot: ${shot.scriptText}`,
-        project.ideaPrompt?.trim() ? `Original idea: ${project.ideaPrompt.trim()}` : "",
-        characterNames.length > 0 ? `Characters: ${characterNames.join(", ")}` : "",
-      ].filter(Boolean);
-      const result = await generateScript({
+      const item = {
+        title: shot.scriptText.trim().slice(0, 60) || `Shot ${shot.index + 1}`,
+        summary: shot.scriptText.trim() || "Regenerate this shot with a fresh take.",
+        characterNames,
+        sceneName: undefined,
+      };
+      const raw = await generateStoryboardShot({
         apiKey: providerConfig.apiKey,
         baseUrl: providerConfig.baseUrl,
-        prompt: contextParts.join("\n"),
+        prompt: project.ideaPrompt?.trim() || shot.scriptText.trim(),
         language: project.language,
         aspectRatio: project.aspectRatio,
         assets: project.assets,
+        outline: "",
+        item,
+        index: shot.index,
+        total: Math.max(project.shots.length, 1),
+        variationOf: { scriptText: shot.scriptText, visualPrompt: shot.visualPrompt },
       });
 
-      if (result.shots.length > 0) {
-        const newShot = result.shots[0];
-        const existingCharacters = project.assets.filter((a) => a.type === "character");
-        const idByName = new Map(
-          existingCharacters.map((c) => [c.name.trim().toLocaleLowerCase(), c.id]),
-        );
-        const resolveCharacterId = (ref: string): string | null => {
-          const matched = idByName.get(ref.trim().toLocaleLowerCase());
-          if (matched) return matched;
-          return existingCharacters.some((c) => c.id === ref) ? ref : null;
-        };
-        const resolveRerollAssetId = (ref: string | undefined, type: AssetType): string | undefined =>
-          resolveAssetId(ref, project.assets, type);
-        store.updateShotByProjectId(targetProjectId, shotId, {
-          ...pickShotFields(newShot),
-          activeSceneId: resolveRerollAssetId(newShot.activeSceneId, "scene"),
-          activeProductIds: resolveAssetIds(newShot.activeProductIds ?? [], project.assets, "product"),
-          activePropIds: resolveAssetIds(newShot.activePropIds ?? [], project.assets, "prop"),
-          dialogues: (newShot.dialogues ?? []).map((d) => ({
-            ...d,
-            characterId: d.characterId ? resolveCharacterId(d.characterId) : null,
-          })),
-          activeCharacterIds: (newShot.activeCharacterIds ?? [])
-            .map(resolveCharacterId)
-            .filter((x): x is string => x !== null),
-          status: "scripted",
-          error: undefined,
-        });
-        restoreProjectStatusIfReady(
-          targetProjectId,
-          (p) => p.shots.every((s) => s.status !== "failed"),
-        );
-      }
+      const resolvedDialogues = (raw.dialogues ?? []).map((d) => ({
+        id: `dlg_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+        characterId: d.characterId ? resolveAssetId(d.characterId, project.assets, "character") ?? null : null,
+        text: d.text ?? "",
+        delivery: d.delivery,
+      }));
+      useProjectStore.getState().updateShotByProjectId(targetProjectId, shotId, {
+        ...pickShotFields({ ...raw, dialogues: resolvedDialogues, activeCharacterIds: raw.activeCharacterIds ?? [], activeProductIds: raw.activeProductIds ?? [], activePropIds: raw.activePropIds ?? [], useDualFrame: raw.useDualFrame ?? false }),
+        activeSceneId: resolveAssetId(raw.activeSceneId, project.assets, "scene"),
+        activeProductIds: resolveAssetIds(raw.activeProductIds ?? [], project.assets, "product"),
+        activePropIds: resolveAssetIds(raw.activePropIds ?? [], project.assets, "prop"),
+        dialogues: resolvedDialogues,
+        activeCharacterIds: (raw.activeCharacterIds ?? [])
+          .map((ref) => resolveAssetId(ref, project.assets, "character"))
+          .filter((x): x is string => !!x),
+        status: "scripted",
+        error: undefined,
+      });
+      restoreProjectStatusIfReady(
+        targetProjectId,
+        (p) => p.shots.every((s) => s.status !== "failed"),
+      );
     } catch (err) {
       store.setShotStatusByProjectId(
         targetProjectId,

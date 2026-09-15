@@ -28,6 +28,7 @@ export type GenerationPurpose =
   | "visualDirectionAudit"
   | "assetExtraction"
   | "storyboard"
+  | "storyboardOutline"
   | "shotReroll"
   | "styleRef"
   | "stylePromptAudit"

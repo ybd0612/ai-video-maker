@@ -55,7 +55,7 @@ function PlanLimitSummary({
 /* ── 提示词规则设置（T05） ─────────────────────────────────────────────────── */
 
 const RULE_TASKS: PromptTask[] = [
-  "extractAssets", "storyboard", "characterAppearance",
+  "extractAssets", "storyboardShot", "characterAppearance",
   "styleRef", "composeShot", "negativeStrategy", "polish",
 ];
 const RULE_SECTIONS: RuleSection[] = ["rules", "examples", "safety"];
@@ -91,7 +91,7 @@ function PromptRulesSettings({
   const effective = mergeRules(BUILTIN_RULES, stored ?? []);
   const storedIds = new Set((stored ?? []).map((r) => r.id));
 
-  const [newTask, setNewTask] = useState<PromptTask>("storyboard");
+  const [newTask, setNewTask] = useState<PromptTask>("storyboardShot");
   const [newSection, setNewSection] = useState<RuleSection>("rules");
   const [newContent, setNewContent] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);

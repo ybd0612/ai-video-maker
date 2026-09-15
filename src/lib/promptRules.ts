@@ -22,7 +22,8 @@ export type PromptTask =
   | "extractAssets"
   | "visualDirection"
   | "visualDirectionAudit"
-  | "storyboard"
+  | "storyboardOutline"
+  | "storyboardShot"
   | "characterAppearance"
   | "styleRef"
   | "stylePromptAudit"
@@ -273,80 +274,14 @@ Examples:
 - Do NOT generate storyboard shots; return only the JSON above`,
   },
 
-  /* ── 步骤 3 完整分镜生成（scriptService.generateScript） ── */
-  storyboard: {
-    zh: `你是一位专业的视频分镜策划师。用户会给你一个主题或想法，你需要：
-1. 将其拆分为 4-8 个分镜镜头
-2. 如果内容中有人物角色，提取角色信息
-3. 如果内容是产品/商品/实物主体，提取产品信息
-4. 如果内容涉及具体场景，提取场景信息
+  /* ── 步骤 3 分镜大纲（scriptService.generateStoryboardOutline） ── */
+  storyboardOutline: {
+    zh: `你是一位专业的视频分镜策划师。用户会给你一个主题或想法。你的任务是把想法规划为镜头大纲（先规划、后细化，不要写具体提示词）：
+1. 将其拆分为 4-8 个镜头，每个镜头 4-8 秒，保持叙事连贯、有情绪节奏
+2. 每个镜头给出一句话内容概括（发生了什么、关键画面、情绪节拍）
+3. 指出该镜头涉及的角色名与场景名（必须使用"已有资产清单"中的原名；涉及才列，不涉及为空）
+4. 仅当想法明确需要清单中没有的新角色/新场景时，在 newCharacters/newScenes 中给出完整资产（结构同资产提取），否则给空数组
 {{assets}}
-严格按以下 JSON 格式返回，不要包含任何其他文字：
-{
-  "characters": [
-    {
-      "name": "角色名",
-      "description": "一句话定位（中文）",
-      "details": { "kind": "character", "species": "物种或类型", "role": "身份与故事功能", "age": "年龄阶段", "personality": "性格与行为倾向", "appearance": "体型比例、五官、颜色、材质", "outfit": "服饰与配饰", "signature": "跨镜头识别特征", "background": "背景经历与角色关系" },
-      "appearancePrompt": "完整英文外观提示词，覆盖 details 的可视化特征"
-    }
-  ],
-  "products": [
-    {
-      "name": "产品名",
-      "description": "一句话定位（中文）",
-      "details": { "kind": "product", "category": "产品类型", "purpose": "核心用途", "silhouette": "整体轮廓", "dimensions": "尺寸与比例", "color": "颜色", "material": "材质", "structure": "结构组成", "surfaceDetails": "表面细节", "branding": "品牌或 Logo", "signature": "不可改变的识别特征", "usageState": "使用状态" },
-      "appearancePrompt": "完整英文产品外观提示词，覆盖 details 的可视化特征"
-    }
-  ],
-  "props": [
-    {
-      "name": "道具名",
-      "description": "一句话定位（中文）",
-      "details": { "kind": "prop", "purpose": "道具用途", "storyRole": "故事作用", "objectType": "物件类型", "shape": "整体形状", "dimensions": "尺寸与比例", "material": "材质", "color": "颜色", "structure": "结构细节", "wear": "磨损与使用痕迹", "signature": "特殊标记或识别特征", "usage": "在镜头中的使用方式" },
-      "appearancePrompt": "完整英文道具外观提示词，覆盖 details 的可视化特征"
-    }
-  ],
-  "scenes": [
-    {
-      "name": "场景名",
-      "description": "一句话定位（中文）",
-      "details": { "kind": "scene", "settingType": "空间类型", "environment": "地理与环境", "time": "时间", "weather": "天气", "elements": "主要元素", "spatialLayers": "前景、中景、背景与空间层次", "lighting": "光线方向与质量", "paletteMood": "色彩与氛围", "storyUse": "可用于哪些剧情" },
-      "appearancePrompt": "完整英文场景外观提示词，覆盖 details 的可视化特征"
-    }
-  ],
-  "styles": [
-    { "name": "风格名", "description": "一句话视觉方向简介", "details": { "mediumMaterial": "媒介与材质", "colorPalette": "主色调与明暗关系", "lightingMood": "光影氛围", "cameraTexture": "镜头质感与景深", "composition": "构图规律与留白", "emotion": "整体情绪氛围" } }
-  ],
-  "shots": [
-    {
-      "activeCharacterIds": ["char_xxx"],
-      "activeSceneId": "scene_xxx",
-      "activeProductIds": ["product_xxx"],
-      "activePropIds": ["prop_xxx"],
-      "dialogues": [
-        { "characterId": null, "text": "旁白文本", "delivery": "平静" },
-        { "characterId": "char_xxx", "text": "角色台词", "delivery": "温柔地" }
-      ],
-      "scriptText": "该镜头旁白/文案（中文，简短有力）",
-      "visualPrompt": "文生图英文提示词（完整描述，如有角色出场必须包含角色外貌）",
-      "motionPrompt": "图生视频英文提示词（完整动态描述）",
-      "subjectDesc": "主体描述（中文）",
-      "sceneDesc": "场景/背景描述（中文）",
-      "detailDesc": "细节/服饰描述（中文）",
-      "lightingDesc": "光影/色调（中文）",
-      "styleDesc": "艺术风格（中文）",
-      "negativePrompt": "负向提示词（中文）",
-      "actionDesc": "主体动作（中文）",
-      "cameraDesc": "镜头运镜（中文）",
-      "envChangeDesc": "环境变化（中文）",
-      "motionSpeedDesc": "运动速率（中文）",
-      "negativeMotionPrompt": "负向动态提示（中文）",
-      "duration": 5
-    }
-  ]
-}
-
 {{#rules}}
 重要规则：
 {{rules}}
@@ -358,79 +293,21 @@ Examples:
 {{#safety}}
 ⚠️ 内容安全要求：
 {{safety}}
-{{/safety}}`,
-    en: `You are a professional video storyboard planner. The user will give you a topic or idea. You need to:
-1. Break it into 4-8 shot scenes
-2. If the content involves ANY character/subject (humans, animals like a little rabbit, anthropomorphic creatures, robots), extract character info
-3. If a physical item is the CORE showcased subject (e.g. a product ad), extract product info
-4. If the content involves concrete scenes, extract scene info
-{{assets}}
-Return strictly in this JSON format, no other text:
+{{/safety}}
+严格按以下 JSON 格式返回，不要包含任何其他文字：
 {
-  "characters": [
-    {
-      "name": "Character name",
-      "description": "One-sentence identity summary in Chinese",
-      "details": { "kind": "character", "species": "species or type", "role": "identity and story function", "age": "age stage", "personality": "personality and behavior", "appearance": "body proportions, facial features, colors and materials", "outfit": "clothing and accessories", "signature": "cross-shot identity features", "background": "background and relationships" },
-      "appearancePrompt": "Complete English appearance prompt covering the details"
-    }
-  ],
-  "products": [
-    {
-      "name": "Product name",
-      "description": "One-sentence identity summary",
-      "details": { "kind": "product", "category": "product type", "purpose": "core purpose", "silhouette": "silhouette", "dimensions": "dimensions and proportions", "color": "color", "material": "material", "structure": "components", "surfaceDetails": "surface details", "branding": "brand or logo", "signature": "immutable identity features", "usageState": "usage state" },
-      "appearancePrompt": "Complete English product appearance prompt covering the details"
-    }
-  ],
-  "props": [
-    {
-      "name": "Prop name",
-      "description": "One-sentence identity summary",
-      "details": { "kind": "prop", "purpose": "purpose", "storyRole": "story role", "objectType": "object type", "shape": "shape", "dimensions": "dimensions and proportions", "material": "material", "color": "color", "structure": "structural details", "wear": "wear and use marks", "signature": "distinctive marks", "usage": "how it is used in shots" },
-      "appearancePrompt": "Complete English prop appearance prompt covering the details"
-    }
-  ],
-  "scenes": [
-    {
-      "name": "Scene name",
-      "description": "One-sentence setting identity",
-      "details": { "kind": "scene", "settingType": "setting type", "environment": "geography and environment", "time": "time", "weather": "weather", "elements": "main elements", "spatialLayers": "foreground, midground, background and depth", "lighting": "light direction and quality", "paletteMood": "palette and mood", "storyUse": "story uses" },
-      "appearancePrompt": "Complete English scene appearance prompt covering the details"
-    }
-  ],
-  "styles": [
-    { "name": "Style name", "description": "Overall visual style description (medium, color palette, lighting atmosphere, fitting the story)" }
-  ],
   "shots": [
-    {
-      "activeCharacterIds": ["char_xxx"],
-      "activeSceneId": "scene_xxx",
-      "activeProductIds": ["product_xxx"],
-      "activePropIds": ["prop_xxx"],
-      "dialogues": [
-        { "characterId": null, "text": "Narrator text", "delivery": "calm" },
-        { "characterId": "char_xxx", "text": "Character dialogue", "delivery": "gently" }
-      ],
-      "scriptText": "Shot narration (short, punchy)",
-      "visualPrompt": "Text-to-image English prompt (full description, must include character appearance if characters appear)",
-      "motionPrompt": "Image-to-video English prompt (full motion description)",
-      "subjectDesc": "Subject description",
-      "sceneDesc": "Scene/background",
-      "detailDesc": "Details/clothing",
-      "lightingDesc": "Lighting/color",
-      "styleDesc": "Art style",
-      "negativePrompt": "Negative prompt",
-      "actionDesc": "Subject action",
-      "cameraDesc": "Camera movement",
-      "envChangeDesc": "Environment changes",
-      "motionSpeedDesc": "Motion speed",
-      "negativeMotionPrompt": "Negative motion prompt",
-      "duration": 5
-    }
-  ]
-}
-
+    { "title": "镜头小标题", "summary": "一句话内容概括", "characterNames": ["角色名"], "sceneName": "场景名" }
+  ],
+  "newCharacters": [],
+  "newScenes": []
+}`,
+    en: `You are a professional video storyboard planner. The user gives you a topic or idea. Plan the shot breakdown (plan first, details come later — do NOT write image prompts):
+1. Break it into 4-8 shots, each 4-8 seconds, with coherent narrative and emotional pacing
+2. For each shot give a one-sentence summary (what happens, the key visual, the emotional beat)
+3. Name the characters and scene involved in each shot (use EXACT names from the "existing assets" list; leave empty when not involved)
+4. Only when the idea clearly requires characters/scenes missing from the list, provide full assets in newCharacters/newScenes (same schema as asset extraction); otherwise use empty arrays
+{{assets}}
 {{#rules}}
 Important rules:
 {{rules}}
@@ -442,7 +319,59 @@ Examples:
 {{#safety}}
 Content safety:
 {{safety}}
-{{/safety}}`,
+{{/safety}}
+Return strict JSON in exactly this format, no other text:
+{
+  "shots": [
+    { "title": "shot title", "summary": "one-sentence summary", "characterNames": ["name"], "sceneName": "scene name" }
+  ],
+  "newCharacters": [],
+  "newScenes": []
+}`,
+  },
+
+  /* ── 步骤 3 单镜头细化（scriptService.generateStoryboardShot） ── */
+  storyboardShot: {
+    zh: `你是一位专业的视频分镜设计师。你会拿到分镜大纲与其中一个镜头的计划，你的任务是把这一个镜头写完整：
+1. scriptText：该镜头的叙事脚本（含动作与情绪，语言随用户输入）
+2. visualPrompt：完整英文画面提示词——主体外观（直接沿用所给资产的英文外观描述）、动作、环境、构图与镜头；只描述该镜头
+3. motionPrompt：完整英文运动提示词——主体动作、镜头运动、环境变化
+4. 其余描述字段（sceneDesc/detailDesc/lightingDesc/styleDesc/actionDesc/cameraDesc/envChangeDesc/motionSpeedDesc/negativePrompt/negativeMotionPrompt）逐项填写
+5. dialogues 按需给对白（characterId 用角色名），activeCharacterIds/activeSceneId 用涉及资产的原名，duration 从 4/5/8 中选
+{{assets}}
+{{#rules}}
+重要规则：
+{{rules}}
+{{/rules}}
+{{#examples}}
+参考示例：
+{{examples}}
+{{/examples}}
+{{#safety}}
+⚠️ 内容安全要求：
+{{safety}}
+{{/safety}}
+只输出这一个镜头的 JSON 对象（不是数组），不要包含任何其他文字。所有字段都必须非空（negativePrompt 可以是简短的质量负面词）。`,
+    en: `You are a professional video storyboard designer. You get the storyboard outline and the plan of ONE shot. Write that single shot completely:
+1. scriptText: the narrative script for this shot (action and emotion, follow the user's language)
+2. visualPrompt: a complete ENGLISH image prompt — subject appearance (reuse the provided asset appearance descriptions verbatim), action, environment, composition and camera; describe only this shot
+3. motionPrompt: a complete ENGLISH motion prompt — subject motion, camera movement, environmental changes
+4. Fill every other description field (sceneDesc/detailDesc/lightingDesc/styleDesc/actionDesc/cameraDesc/envChangeDesc/motionSpeedDesc/negativePrompt/negativeMotionPrompt)
+5. dialogues when needed (characterId = character name); activeCharacterIds/activeSceneId use exact asset names; duration from 4/5/8
+{{assets}}
+{{#rules}}
+Important rules:
+{{rules}}
+{{/rules}}
+{{#examples}}
+Examples:
+{{examples}}
+{{/examples}}
+{{#safety}}
+Content safety:
+{{safety}}
+{{/safety}}
+Output ONLY this single shot as a JSON object (not an array), no other text. Every field must be non-empty (negativePrompt may be a short quality negative).`,
   },
 
   /* ── 角色外貌生成（CharacterEditor 外貌 AI 生成） ──
@@ -808,7 +737,7 @@ export const BUILTIN_RULES: PromptRule[] = [
   /* ── storyboard（步骤 3 完整分镜生成；顺序 = 原「重要规则」段顺序） ── */
   {
     id: "storyboard.assets-animals",
-    task: "storyboard",
+    task: "extractAssets",
     section: "rules",
     content: {
       zh: "- characters 数组：涵盖故事中的**一切角色主体**——人物、动物（如小兔子、小猫）、拟人化角色、机器人等，只要是故事的主角/配角就必须填入；仅纯风景内容才返回空数组 []\n- 每个角色 description 必须严格保留 9 行：第 1 行一句话总述，后面按顺序逐行输出物种、身份、年龄、性格、外貌、服饰、记忆点、背景；禁止用句号/分号压成一行",
@@ -819,7 +748,7 @@ export const BUILTIN_RULES: PromptRule[] = [
   },
   {
     id: "storyboard.assets-products",
-    task: "storyboard",
+    task: "extractAssets",
     section: "rules",
     content: {
       zh: "- products 数组：仅当某个实物是内容的**核心展示主体**（如带货商品、产品广告的主角）时才填写；角色手中/身边的普通道具（如小兔子抱着的胡萝卜）不要填入",
@@ -830,7 +759,7 @@ export const BUILTIN_RULES: PromptRule[] = [
   },
   {
     id: "storyboard.assets-props",
-    task: "storyboard",
+    task: "extractAssets",
     section: "rules",
     content: {
       zh: "- props 数组：仅提取会在多个镜头中反复出现、且需要保持外观一致的关键物件（如钥匙、项链、武器、信件）；普通一次性背景物件不要填入",
@@ -841,7 +770,7 @@ export const BUILTIN_RULES: PromptRule[] = [
   },
   {
     id: "storyboard.assets-scenes",
-    task: "storyboard",
+    task: "extractAssets",
     section: "rules",
     content: {
       zh: "- scenes 数组：故事提到任何环境/地点（森林、城市、室内、梦境空间等）就必须至少提取一个场景；仅纯抽象内容才返回空数组 []",
@@ -852,7 +781,7 @@ export const BUILTIN_RULES: PromptRule[] = [
   },
   {
     id: "storyboard.assets-styles",
-    task: "storyboard",
+    task: "extractAssets",
     section: "rules",
     content: {
       zh: "- styles 数组：提取最贴合故事的整体视觉风格（画种、色调、光照氛围），最多 1 个；描述用中文",
@@ -863,7 +792,7 @@ export const BUILTIN_RULES: PromptRule[] = [
   },
   {
     id: "storyboard.reuse-ids",
-    task: "storyboard",
+    task: "storyboardShot",
     section: "rules",
     content: {
       zh: "- 如有已有角色，复用其 ID（不要重复创建）；如是新角色，生成新的 ID",
@@ -874,7 +803,7 @@ export const BUILTIN_RULES: PromptRule[] = [
   },
   {
     id: "storyboard.prompt-english",
-    task: "storyboard",
+    task: "storyboardShot",
     section: "rules",
     content: {
       zh: "- visualPrompt 和 motionPrompt 必须用英文（直接用于 AI API）",
@@ -885,7 +814,7 @@ export const BUILTIN_RULES: PromptRule[] = [
   },
   {
     id: "storyboard.character-appearance",
-    task: "storyboard",
+    task: "storyboardShot",
     section: "rules",
     content: {
       zh: "- 如有角色出场，visualPrompt 必须包含角色完整外貌描述",
@@ -896,7 +825,7 @@ export const BUILTIN_RULES: PromptRule[] = [
   },
   {
     id: "storyboard.product-appearance",
-    task: "storyboard",
+    task: "storyboardShot",
     section: "rules",
     content: {
       zh: "- 如有产品主体，visualPrompt 必须包含产品完整外观描述（款式、颜色、材质）",
@@ -907,7 +836,7 @@ export const BUILTIN_RULES: PromptRule[] = [
   },
   {
     id: "storyboard.subfields-language",
-    task: "storyboard",
+    task: "storyboardShot",
     section: "rules",
     content: {
       zh: "- 中文子字段给用户在界面上看，用中文填写",
@@ -918,7 +847,7 @@ export const BUILTIN_RULES: PromptRule[] = [
   },
   {
     id: "storyboard.dialogues",
-    task: "storyboard",
+    task: "storyboardShot",
     section: "rules",
     content: {
       zh: "- dialogues：characterId 为 null 表示旁白",
@@ -929,7 +858,7 @@ export const BUILTIN_RULES: PromptRule[] = [
   },
   {
     id: "storyboard.duration",
-    task: "storyboard",
+    task: "storyboardShot",
     section: "rules",
     content: {
       zh: "- 每镜头 duration 为 4、5 或 8 秒（视频模型支持 4-12 秒）",
@@ -940,7 +869,7 @@ export const BUILTIN_RULES: PromptRule[] = [
   },
   {
     id: "storyboard.shot-count",
-    task: "storyboard",
+    task: "storyboardOutline",
     section: "rules",
     content: {
       zh: "- 总镜头数 4-8 个，节奏有起承转合",
@@ -953,7 +882,7 @@ export const BUILTIN_RULES: PromptRule[] = [
   /* ── storyboard 安全条目（原「⚠️ 内容安全要求」段） ── */
   {
     id: "safety.age-wording",
-    task: "storyboard",
+    task: "storyboardShot",
     section: "safety",
     content: {
       zh: "- 用 \"young man/young woman/teenager\" 代替 \"boy/girl/child\"",
@@ -964,7 +893,7 @@ export const BUILTIN_RULES: PromptRule[] = [
   },
   {
     id: "safety.content",
-    task: "storyboard",
+    task: "storyboardShot",
     section: "safety",
     content: {
       zh: "- 不要暴力、血腥、裸露等敏感内容\n- 不要真人政治人物、名人肖像",
@@ -975,7 +904,7 @@ export const BUILTIN_RULES: PromptRule[] = [
   },
   {
     id: "safety.clothing",
-    task: "storyboard",
+    task: "storyboardShot",
     section: "safety",
     content: {
       zh: "- 服饰描述得体，适合全年龄段",

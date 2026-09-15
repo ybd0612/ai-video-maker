@@ -61,8 +61,8 @@ describe("mergeRules 边界", () => {
     expect(merged.some((r) => r.id === "custom.typo-task")).toBe(true);
 
     // 不抛错，且未知 task 条目内容不会渲染进其他任务的 system prompt
-    expect(() => buildSystemPrompt("storyboard", "zh", merged)).not.toThrow();
-    expect(buildSystemPrompt("storyboard", "zh", merged)).not.toContain(
+    expect(() => buildSystemPrompt("storyboardShot", "zh", merged)).not.toThrow();
+    expect(buildSystemPrompt("storyboardShot", "zh", merged)).not.toContain(
       "未知任务条目内容",
     );
   });
@@ -71,13 +71,13 @@ describe("mergeRules 边界", () => {
     const stored = [
       makeRule({
         id: "custom.dup",
-        task: "storyboard",
+        task: "storyboardShot",
         section: "rules",
         content: { zh: "第一版", en: "v1" },
       }),
       makeRule({
         id: "custom.dup",
-        task: "storyboard",
+        task: "storyboardShot",
         section: "rules",
         content: { zh: "第二版", en: "v2" },
       }),
@@ -96,19 +96,19 @@ describe("mergeRules 边界", () => {
 describe("buildSystemPrompt 边界", () => {
   it("某 section 全部 disabled：整块连同 header 移除，其他 section 不受影响", () => {
     const allRulesDisabled = BUILTIN_RULES.map((r) =>
-      r.task === "storyboard" && r.section === "rules"
+      r.task === "storyboardShot" && r.section === "rules"
         ? { ...r, enabled: false }
         : r,
     );
 
-    const zh = buildSystemPrompt("storyboard", "zh", allRulesDisabled);
+    const zh = buildSystemPrompt("storyboardShot", "zh", allRulesDisabled);
     expect(zh).not.toContain("重要规则：");
     expect(zh).not.toContain("总镜头数 4-8 个");
     // safety section 条目仍启用 → header 与内容保留
     expect(zh).toContain("⚠️ 内容安全要求：");
     expect(zh).toContain("服饰描述得体");
 
-    const en = buildSystemPrompt("storyboard", "en", allRulesDisabled);
+    const en = buildSystemPrompt("storyboardShot", "en", allRulesDisabled);
     expect(en).not.toContain("Important rules:");
     expect(en).toContain("Content safety:");
   });
@@ -119,7 +119,7 @@ describe("buildSystemPrompt 边界", () => {
     const broken: PromptRule[] = [
       {
         id: "custom.missing-en",
-        task: "storyboard",
+        task: "storyboardShot",
         section: "rules",
         content: { zh: "- 中文规则仍在" } as PromptRule["content"],
         enabled: true,
@@ -131,14 +131,14 @@ describe("buildSystemPrompt 边界", () => {
     let zhOut = "";
     let enOut = "";
     expect(() => {
-      zhOut = buildSystemPrompt("storyboard", "zh", broken);
-      enOut = buildSystemPrompt("storyboard", "en", broken);
+      zhOut = buildSystemPrompt("storyboardShot", "zh", broken);
+      enOut = buildSystemPrompt("storyboardShot", "en", broken);
     }).not.toThrow();
 
     expect(zhOut).toContain("- 中文规则仍在");
     expect(enOut).not.toContain("- 中文规则仍在");
-    // en 渲染其余条目正常
-    expect(enOut).toContain("4-8 shots total");
+    // en 渲染其余条目正常（shot-count 已迁至 storyboardOutline，改用骨架固定文案断言）
+    expect(enOut).toContain("Write that single shot completely");
   });
 });
 

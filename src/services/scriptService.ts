@@ -121,17 +121,6 @@ export interface GenerateScriptResult {
 
 const MAX_SCRIPT_RETRIES = 2;
 
-/* ── Unified system prompt ───────────────────────────────────────────────── */
-
-function buildSystemPrompt(
-  language: "zh" | "en",
-  assets?: Asset[],
-): string {
-  // 规则注册表渲染：骨架（JSON 格式）+ BUILTIN_RULES + 用户覆盖条目
-  const base = buildTaskSystemPrompt("storyboard", language, getActiveRules());
-  // 资产上下文段是动态数据，不入条目，函数内拼装后注入 {{assets}} 槽
-  return base.replace("{{assets}}", () => buildAssetsContext(language, assets));
-}
 
 /** 资产上下文段（动态数据：已有角色/场景/产品列表，供模型复用 ID 与保持一致性） */
 function buildAssetsContext(language: "zh" | "en", assets?: Asset[]): string {
@@ -233,10 +222,32 @@ function buildAssetsContext(language: "zh" | "en", assets?: Asset[]): string {
  * Generate structured shots + extracted characters from a user prompt.
  * Returns both shots and characters — characters may be empty if content has no人物.
  */
-export async function generateScript(
+/**
+ * 两阶段分镜（2026-09-15 重构）：
+ *   阶段 1 大纲 —— 一次轻量调用规划全部镜头（标题 + 一句话内容 + 涉及资产名）；
+ *   阶段 2 逐镜头 —— 每个镜头独立请求填充完整字段（并发受编排层控制），
+ *   单请求输出从数千 token 降到数百，规避超时线并支持渐进式 UI。
+ * 连贯性由大纲锁定：逐镜头请求都携带大纲全文作上下文。
+ */
+export interface StoryboardOutlineItem {
+  title: string;
+  summary: string;
+  characterNames: string[];
+  sceneName?: string;
+}
+
+export interface StoryboardOutlineResult {
+  shots: StoryboardOutlineItem[];
+  /** 想法需要但项目里还没有的新资产（编排层先补建入库，再发逐镜头请求） */
+  newCharacters: RawCharacter[];
+  newScenes: RawScene[];
+}
+
+export async function generateStoryboardOutline(
   opts: GenerateScriptOptions,
-): Promise<GenerateScriptResult> {
-  const systemPrompt = buildSystemPrompt(opts.language, opts.assets);
+): Promise<StoryboardOutlineResult> {
+  const systemPrompt = buildTaskSystemPrompt("storyboardOutline", opts.language, getActiveRules())
+    .replace("{{assets}}", () => buildAssetsContext(opts.language, opts.assets));
 
   const service = createAIService({
     provider: "openai",
@@ -244,197 +255,174 @@ export async function generateScript(
     baseUrl: opts.baseUrl,
   });
 
-  // 采样参数由模型按用途决定（代码不预设温度）
+  const params = await resolveGenerationParams({
+    purpose: "storyboardOutline",
+    apiKey: opts.apiKey,
+    baseUrl: opts.baseUrl,
+    context: [
+      "Task: plan a shot breakdown (titles + one-sentence summaries + involved asset names) as strict JSON.",
+      `Language: ${opts.language}`,
+    ].join("\n"),
+  });
+
+  const result = await service.chatCompletion({
+    messages: [
+      { role: "system", content: systemPrompt },
+      { role: "user", content: opts.prompt },
+    ],
+    temperature: params.temperature,
+    ...(params.topP === undefined ? {} : { topP: params.topP }),
+    enableThinking: params.enableThinking,
+  });
+
+  const parsed = parseJsonFromResponse<{
+    shots?: Array<{ title?: string; summary?: string; characterNames?: string[]; sceneName?: string }>;
+    characters?: RawCharacter[];
+    scenes?: RawScene[];
+  }>(result.content);
+  if (!parsed || !Array.isArray(parsed.shots) || parsed.shots.length === 0) {
+    throw new Error(getTranslation("error.shotsInvalid"));
+  }
+
+  return {
+    shots: parsed.shots.map((s) => ({
+      title: s.title ?? "",
+      summary: s.summary ?? "",
+      characterNames: Array.isArray(s.characterNames) ? s.characterNames : [],
+      sceneName: s.sceneName ?? undefined,
+    })),
+    newCharacters: Array.isArray(parsed.characters) ? parsed.characters : [],
+    newScenes: Array.isArray(parsed.scenes) ? parsed.scenes : [],
+  };
+}
+
+/** 单镜头输出归一化：字段补默认 + 空 prompt 兜底（跨阶段共享） */
+function normalizeRawShot(s: RawShot): RawShot {
+  const shot: RawShot = {
+    ...s,
+    scriptText: s.scriptText ?? "",
+    visualPrompt: s.visualPrompt ?? "",
+    motionPrompt: s.motionPrompt ?? "",
+    dialogues: (s.dialogues ?? []).map((d) => ({
+      id: `dlg_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+      characterId: d.characterId ?? null,
+      text: d.text ?? "",
+      delivery: d.delivery,
+    })),
+    activeCharacterIds: s.activeCharacterIds ?? [],
+    activeSceneId: s.activeSceneId,
+    activeProductIds: s.activeProductIds ?? [],
+    activePropIds: s.activePropIds ?? [],
+    subjectDesc: s.subjectDesc ?? "",
+    sceneDesc: s.sceneDesc ?? "",
+    detailDesc: s.detailDesc ?? "",
+    lightingDesc: s.lightingDesc ?? "",
+    styleDesc: s.styleDesc ?? "",
+    negativePrompt: s.negativePrompt ?? "",
+    actionDesc: s.actionDesc ?? "",
+    cameraDesc: s.cameraDesc ?? "",
+    envChangeDesc: s.envChangeDesc ?? "",
+    motionSpeedDesc: s.motionSpeedDesc ?? "",
+    negativeMotionPrompt: s.negativeMotionPrompt ?? "",
+    duration: [4, 5, 8].includes(s.duration) ? s.duration : 5,
+    useDualFrame: s.useDualFrame ?? false,
+  };
+  if (!shot.visualPrompt.trim() && shot.scriptText.trim()) {
+    shot.visualPrompt = `Cinematic shot: ${shot.scriptText.trim()}, professional lighting, high quality, detailed composition, photorealistic, 8k`;
+  }
+  if (!shot.motionPrompt.trim() && shot.scriptText.trim()) {
+    shot.motionPrompt = `Slow cinematic camera movement, gentle ambient motion, subtle environmental changes, natural physics`;
+  }
+  return shot;
+}
+
+/**
+ * 阶段 2：为单个镜头生成完整字段。
+ * 输入携带大纲全文（保持镜头间连贯）与该镜头计划；输出单镜头结构。
+ */
+export async function generateStoryboardShot(
+  opts: GenerateScriptOptions & {
+    /** 大纲 JSON 字符串（全部镜头的计划），供模型保持叙事连贯 */
+    outline: string;
+    item: StoryboardOutlineItem;
+    index: number;
+    total: number;
+    /** 重摇场景：给出该镜头上一版内容，要求变化出新一版 */
+    variationOf?: { scriptText: string; visualPrompt: string };
+  },
+): Promise<RawShot> {
+  const systemPrompt = buildTaskSystemPrompt("storyboardShot", opts.language, getActiveRules())
+    .replace("{{assets}}", () => buildAssetsContext(opts.language, opts.assets));
+
+  const service = createAIService({
+    provider: "openai",
+    apiKey: opts.apiKey,
+    baseUrl: opts.baseUrl,
+  });
+
   const params = await resolveGenerationParams({
     purpose: "storyboard",
     apiKey: opts.apiKey,
     baseUrl: opts.baseUrl,
     context: [
-      `Task: generate a complete storyboard (shots + assets) as strict JSON.`,
+      "Task: write ONE complete storyboard shot (script + English visual/motion prompts) as strict JSON.",
       `Language: ${opts.language}`,
       `Aspect ratio: ${opts.aspectRatio}`,
-      `Known assets: ${opts.assets?.length ?? 0}`,
+      `Shot ${opts.index + 1}/${opts.total}`,
     ].join("\n"),
   });
 
-  let lastError: Error | null = null;
+  const userContent = [
+    `Storyboard outline (for continuity, do not repeat other shots):\n${opts.outline}`,
+    `Now write ONLY shot ${opts.index + 1}/${opts.total}:`,
+    `Title: ${opts.item.title}`,
+    `Plan: ${opts.item.summary}`,
+    opts.item.characterNames.length > 0
+      ? `Characters appearing in this shot (use these names): ${opts.item.characterNames.join(", ")}`
+      : "",
+    opts.item.sceneName ? `Scene: ${opts.item.sceneName}` : "",
+    opts.variationOf
+      ? `Variation request — improve on this previous version of the same shot (keep its intent, change the execution):\nscript: ${opts.variationOf.scriptText}\nvisual: ${opts.variationOf.visualPrompt}`
+      : "",
+    "Output the complete shot as strict JSON (single object, no array).",
+  ].filter(Boolean).join("\n\n");
 
+  let lastError: Error | null = null;
   for (let attempt = 0; attempt <= MAX_SCRIPT_RETRIES; attempt++) {
     const result = await service.chatCompletion({
       messages: [
         { role: "system", content: systemPrompt },
-        { role: "user", content: opts.prompt },
+        { role: "user", content: userContent },
       ],
       temperature: params.temperature,
       ...(params.topP === undefined ? {} : { topP: params.topP }),
       enableThinking: params.enableThinking,
     });
-    const content = result.content;
 
-    const jsonStr = extractJsonFromResponse(content);
+    const jsonStr = extractJsonFromResponse(result.content);
     if (!jsonStr) {
-      // Unified chatCompletion already validates non-empty content. Keep
-      // diagnostics focused on malformed JSON and preserve retry behavior.
-      const detail = content.trim().length === 0
-        ? getTranslation("error.scriptEmptyContent")
-        : getTranslation("error.scriptNotJson", { body: content.slice(0, 200) });
       lastError = new Error(
-        `${getTranslation("error.scriptJsonExtractFailed", { attempt: attempt + 1 })} ${detail}`,
+        `${getTranslation("error.scriptJsonExtractFailed", { attempt: attempt + 1 })} ${getTranslation("error.scriptNotJson", { body: result.content.slice(0, 200) })}`,
       );
       if (attempt < MAX_SCRIPT_RETRIES) continue;
       throw lastError;
     }
 
     try {
-      const parsed = parseJsonFromResponse<{
-        shots: RawShot[];
-        characters?: RawCharacter[];
-        products?: RawProduct[];
-        props?: RawProp[];
-        scenes?: RawScene[];
-        styles?: RawStyle[];
-      }>(content);
-      if (!parsed || !Array.isArray(parsed.shots) || parsed.shots.length === 0) {
-        throw new Error(getTranslation("error.shotsInvalid"));
+      const parsed = parseJsonFromResponse<RawShot>(result.content);
+      if (!parsed) throw new Error(getTranslation("error.shotsInvalid"));
+      const shot = normalizeRawShot(parsed);
+      if (!shot.visualPrompt.trim() || !shot.motionPrompt.trim()) {
+        throw new Error(getTranslation("error.shotMissingPromptRetry"));
       }
-
-      const shots = parsed.shots.map((s) => ({
-        scriptText: s.scriptText ?? "",
-        visualPrompt: s.visualPrompt ?? "",
-        motionPrompt: s.motionPrompt ?? "",
-        dialogues: (s.dialogues ?? []).map((d) => ({
-          id: `dlg_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
-          characterId: d.characterId ?? null,
-          text: d.text ?? "",
-          delivery: d.delivery,
-        })),
-        activeCharacterIds: s.activeCharacterIds ?? [],
-        activeSceneId: s.activeSceneId,
-        activeProductIds: s.activeProductIds ?? [],
-        activePropIds: s.activePropIds ?? [],
-        subjectDesc: s.subjectDesc ?? "",
-        sceneDesc: s.sceneDesc ?? "",
-        detailDesc: s.detailDesc ?? "",
-        lightingDesc: s.lightingDesc ?? "",
-        styleDesc: s.styleDesc ?? "",
-        negativePrompt: s.negativePrompt ?? "",
-        actionDesc: s.actionDesc ?? "",
-        cameraDesc: s.cameraDesc ?? "",
-        envChangeDesc: s.envChangeDesc ?? "",
-        motionSpeedDesc: s.motionSpeedDesc ?? "",
-        negativeMotionPrompt: s.negativeMotionPrompt ?? "",
-        duration: [4, 5, 8].includes(s.duration) ? s.duration : 5,
-        useDualFrame: s.useDualFrame ?? false,
-      }));
-
-      // Fallback for empty prompts
-      for (const shot of shots) {
-        if (!shot.visualPrompt.trim() && shot.scriptText.trim()) {
-          shot.visualPrompt = `Cinematic shot: ${shot.scriptText.trim()}, professional lighting, high quality, detailed composition, photorealistic, 8k`;
-        }
-        if (!shot.motionPrompt.trim() && shot.scriptText.trim()) {
-          shot.motionPrompt = `Slow cinematic camera movement, gentle ambient motion, subtle environmental changes, natural physics`;
-        }
-      }
-
-      const hasEmpty = shots.some((s) => !s.visualPrompt.trim() || !s.motionPrompt.trim());
-      if (hasEmpty && attempt < MAX_SCRIPT_RETRIES) {
-        lastError = new Error(getTranslation("error.shotMissingPromptRetry"));
-        continue;
-      }
-
-      // Merge extracted characters with existing ones
-      // New characters from AI get prefixed IDs to avoid collision with existing ones
-      const extractedCharacters: RawCharacter[] = Array.isArray(parsed.characters)
-        ? parsed.characters.map((c) => ({
-            name: c.name ?? "",
-            description: c.description ?? "",
-            details: c.details,
-            appearancePrompt: c.appearancePrompt ?? "",
-          }))
-        : [];
-
-      // 产品主体提取（与角色同构，供步骤 2 生成产品参考图）
-      const extractedProducts: RawProduct[] = Array.isArray(parsed.products)
-        ? parsed.products.map((c) => ({
-            name: c.name ?? "",
-            description: c.description ?? "",
-            details: c.details,
-            appearancePrompt: c.appearancePrompt ?? "",
-          }))
-        : [];
-
-      // 道具提取（供步骤 2 生成道具参考图）
-      const extractedProps: RawProp[] = Array.isArray(parsed.props)
-        ? parsed.props.map((c) => ({
-            name: c.name ?? "",
-            description: c.description ?? "",
-            details: c.details,
-            appearancePrompt: c.appearancePrompt ?? "",
-          }))
-        : [];
-
-      // 场景提取（供步骤 2 生成场景参考图）
-      const extractedScenes: RawScene[] = Array.isArray(parsed.scenes)
-        ? parsed.scenes.map((c) => ({
-            name: c.name ?? "",
-            description: c.description ?? "",
-            details: c.details,
-            appearancePrompt: c.appearancePrompt ?? "",
-          }))
-        : [];
-
-      // 风格提取（仅中文描述；英文 stylePrompt 运行期懒派生）
-      const extractedStyles: RawStyle[] = Array.isArray(parsed.styles)
-        ? parsed.styles
-            .slice(0, 1) // 最多 1 个整体风格
-            .map((s) => ({
-              name: s.name ?? "",
-              description: s.description ?? "",
-            }))
-        : [];
-
-      // Update activeCharacterIds in shots to reference existing characters by name match
-      // (AI may generate new IDs that don't match existing store IDs)
-      const existingCharacters = (opts.assets ?? []).filter((a) => a.type === "character");
-      if (existingCharacters.length > 0) {
-        const nameToId = new Map(
-          existingCharacters.map((c) => [c.name.toLowerCase(), c.id]),
-        );
-        for (const shot of shots) {
-          shot.activeCharacterIds = shot.activeCharacterIds.map((refId) => {
-            // If this ID matches an existing character, keep it
-            if (existingCharacters.some((c) => c.id === refId)) return refId;
-            // Otherwise try to match by name (the AI may have used name as ID)
-            return nameToId.get(refId.toLowerCase()) ?? refId;
-          });
-          // 对白同样按名字匹配回填；匹配不到的置 null（归为旁白），避免残留无效角色 ID
-          for (const line of shot.dialogues ?? []) {
-            if (line.characterId && !existingCharacters.some((c) => c.id === line.characterId)) {
-              line.characterId = nameToId.get(line.characterId.toLowerCase()) ?? null;
-            }
-          }
-        }
-      }
-
-      return {
-        shots,
-        characters: extractedCharacters,
-        products: extractedProducts,
-        props: extractedProps,
-        scenes: extractedScenes,
-        styles: extractedStyles,
-      };
+      return shot;
     } catch (parseErr) {
-      lastError = new Error(
-        `JSON 解析失败（第 ${attempt + 1} 次尝试）：${parseErr instanceof Error ? parseErr.message : String(parseErr)}。提取内容：${jsonStr.slice(0, 200)}`,
-      );
+      lastError = parseErr instanceof Error ? parseErr : new Error(String(parseErr));
       if (attempt < MAX_SCRIPT_RETRIES) continue;
       throw lastError;
     }
   }
-
-  throw lastError ?? new Error("Script generation failed after retries.");
+  throw lastError ?? new Error("Shot generation failed after retries.");
 }
 
 /* ── 轻量资产提取（步骤 1 使用，不生成分镜，节省 token） ──────────────────── */
@@ -635,8 +623,16 @@ export async function extractVisualDirectionFromIdea(
   return direction;
 }
 
-export async function extractAssetsFromIdea(
+export type ExtractableAssetType = "character" | "scene" | "product" | "prop" | "style";
+
+/**
+ * 分类型资产提取（2026-09-15 重构）：每次只请求一类资产，编排层并行发多个
+ * 请求并逐类写回 —— 单请求输出变小（不再贴超时线），且资产卡片可逐类蹦出。
+ * 复用同一 extractAssets 规格，类型过滤通过 user 指令约束。
+ */
+export async function extractAssetsByType(
   opts: GenerateScriptOptions,
+  type: ExtractableAssetType,
   visualDirection?: RawStyle,
 ): Promise<{ characters: RawCharacter[]; products: RawProduct[]; props: RawProp[]; scenes: RawScene[]; styles: RawStyle[] }> {
   const systemPrompt = buildTaskSystemPrompt(
@@ -657,6 +653,7 @@ export async function extractAssetsFromIdea(
     baseUrl: opts.baseUrl,
     context: [
       "Task: extract typed assets (characters, products, props, scenes, style) with structured details and English appearance prompts, as strict JSON.",
+      `This call extracts ONLY: ${type}`,
       `Language: ${opts.language}`,
       `Aspect ratio: ${opts.aspectRatio}`,
       `Existing assets: ${opts.assets?.length ?? 0}`,
@@ -674,6 +671,7 @@ export async function extractAssetsFromIdea(
             ? `Confirmed visual direction:\n${JSON.stringify(visualDirection)}`
             : "",
           "Design assets according to the confirmed visual direction. Asset appearance prompts describe the subject only; do not redefine the global art style.",
+          `THIS CALL EXTRACTS ONLY "${type}": the "${type}s" array carries the assets for this call, and every other array MUST be an empty array.`,
         ].filter(Boolean).join("\n\n"),
       },
     ],
@@ -689,7 +687,7 @@ export async function extractAssetsFromIdea(
   if (import.meta.env.DEV) {
     void import("@/lib/devDump").then((m) =>
       m.dumpExtractLog({
-        idea: opts.prompt.slice(0, 400),
+        idea: `${type}: ${opts.prompt.slice(0, 380)}`,
         raw: content,
         usage: {
           promptTokens: result.usage?.promptTokens,
@@ -759,11 +757,23 @@ export async function extractAssetsFromIdea(
         })
       : [];
 
-  return {
-    characters: map(parsed.characters, (item) => item.details),
-    products: map(parsed.products, (item) => item.details),
-    props: map(parsed.props, (item) => item.details),
-    scenes: map(parsed.scenes, (item) => item.details),
-    styles: mapStyles(parsed.styles),
+  // 类型过滤兜底：即使模型越界输出了其他类数组，也只保留本次请求的目标类
+  const filtered = {
+    characters: type === "character" ? map(parsed.characters, (item) => item.details) : [],
+    products: type === "product" ? map(parsed.products, (item) => item.details) : [],
+    props: type === "prop" ? map(parsed.props, (item) => item.details) : [],
+    scenes: type === "scene" ? map(parsed.scenes, (item) => item.details) : [],
+    styles: type === "style" ? mapStyles(parsed.styles) : [],
   };
+  const targetMap: Record<ExtractableAssetType, unknown[]> = {
+    character: filtered.characters,
+    scene: filtered.scenes,
+    product: filtered.products,
+    prop: filtered.props,
+    style: filtered.styles,
+  };
+  if (targetMap[type].length === 0) {
+    throw new Error(getTranslation("error.assetsParseFailed"));
+  }
+  return filtered;
 }

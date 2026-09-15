@@ -51,17 +51,20 @@ describe("BUILTIN_RULES 默认渲染回归锁", () => {
     }
   });
 
-  it("storyboard 渲染含 JSON 模板与规则/安全 header", () => {
-    const zh = buildSystemPrompt("storyboard", "zh", BUILTIN_RULES);
+  it("storyboardOutline 渲染含 shots 模板；storyboardShot 渲染含规则/安全 header", () => {
+    const outline = buildSystemPrompt("storyboardOutline", "zh", BUILTIN_RULES);
+    expect(outline).toContain('"shots"');
+    expect(outline).toContain("{{assets}}");
+
+    const zh = buildSystemPrompt("storyboardShot", "zh", BUILTIN_RULES);
     expect(zh).toContain("重要规则：");
     expect(zh).toContain("⚠️ 内容安全要求：");
-    expect(zh).toContain('"shots"');
-    expect(zh).toContain('"appearancePrompt"');
+    expect(zh).toContain("scriptText");
 
-    const en = buildSystemPrompt("storyboard", "en", BUILTIN_RULES);
+    const en = buildSystemPrompt("storyboardShot", "en", BUILTIN_RULES);
     expect(en).toContain("Important rules:");
     expect(en).toContain("Content safety:");
-    expect(en).toContain('"shots"');
+    expect(en).toContain("scriptText");
   });
 
   it("关键内置条目 id 齐全（architect 清单回归锁）", () => {
@@ -111,18 +114,18 @@ describe("BUILTIN_RULES 默认渲染回归锁", () => {
 /* ── SKELETONS ────────────────────────────────────────────────────────────── */
 
 describe("SKELETONS", () => {
-  it("zh/en 骨架均含 JSON 格式段（extractAssets / storyboard）", () => {
-    for (const task of ["extractAssets", "storyboard"] as const) {
-      expect(SKELETONS[task].zh).toContain('"characters"');
-      expect(SKELETONS[task].en).toContain('"characters"');
-      expect(SKELETONS[task].zh).toContain("{{assets}}");
-      expect(SKELETONS[task].en).toContain("{{assets}}");
-    }
+  it("zh/en 骨架均含 JSON 格式段（extractAssets / storyboardOutline）", () => {
+    expect(SKELETONS.extractAssets.zh).toContain('"characters"');
+    expect(SKELETONS.extractAssets.en).toContain('"characters"');
+    expect(SKELETONS.storyboardOutline.zh).toContain('"shots"');
+    expect(SKELETONS.storyboardOutline.en).toContain('"shots"');
+    expect(SKELETONS.extractAssets.zh).toContain("{{assets}}");
+    expect(SKELETONS.storyboardOutline.en).toContain("{{assets}}");
   });
 
   it("storyboard zh/en 骨架含三个 section 占位块", () => {
     for (const lang of ["zh", "en"] as const) {
-      const s = SKELETONS.storyboard[lang];
+      const s = SKELETONS.storyboardShot[lang];
       expect(s).toContain("{{#rules}}");
       expect(s).toContain("{{#examples}}");
       expect(s).toContain("{{#safety}}");
@@ -137,7 +140,7 @@ describe("mergeRules", () => {
     const stored: PromptRule[] = [
       makeRule({
         id: "storyboard.shot-count",
-        task: "storyboard",
+        task: "storyboardShot",
         section: "rules",
         content: { zh: "- 总镜头数改为 6 个", en: "- exactly 6 shots" },
         enabled: false,
@@ -157,7 +160,7 @@ describe("mergeRules", () => {
 
   it("仅存在于 stored 的自定义条目追加在 builtin 之后", () => {
     const stored: PromptRule[] = [
-      makeRule({ id: "custom.my-rule", task: "storyboard", section: "examples" }),
+      makeRule({ id: "custom.my-rule", task: "storyboardShot", section: "examples" }),
     ];
     const merged = mergeRules(BUILTIN_RULES, stored);
     expect(merged.length).toBe(BUILTIN_RULES.length + 1);
@@ -180,19 +183,19 @@ describe("buildSystemPrompt", () => {
     const disabled: PromptRule[] = BUILTIN_RULES.map((r) =>
       r.id === "storyboard.duration" ? { ...r, enabled: false } : r,
     );
-    const rendered = buildSystemPrompt("storyboard", "zh", disabled);
+    const rendered = buildSystemPrompt("storyboardShot", "zh", disabled);
     expect(rendered).not.toContain("每镜头 duration 为 4、5 或 8 秒");
     // 其他条目仍在
-    expect(rendered).toContain("总镜头数 4-8 个");
+    expect(rendered).toContain("必须用英文");
   });
 
   it("渲染顺序：rules → examples → safety", () => {
     const rules: PromptRule[] = [
-      makeRule({ id: "c1", task: "storyboard", section: "safety", content: { zh: "SAFETY_ITEM", en: "SAFETY_ITEM" } }),
-      makeRule({ id: "c2", task: "storyboard", section: "examples", content: { zh: "EXAMPLE_ITEM", en: "EXAMPLE_ITEM" } }),
-      makeRule({ id: "c3", task: "storyboard", section: "rules", content: { zh: "RULES_ITEM", en: "RULES_ITEM" } }),
+      makeRule({ id: "c1", task: "storyboardShot", section: "safety", content: { zh: "SAFETY_ITEM", en: "SAFETY_ITEM" } }),
+      makeRule({ id: "c2", task: "storyboardShot", section: "examples", content: { zh: "EXAMPLE_ITEM", en: "EXAMPLE_ITEM" } }),
+      makeRule({ id: "c3", task: "storyboardShot", section: "rules", content: { zh: "RULES_ITEM", en: "RULES_ITEM" } }),
     ];
-    const rendered = buildSystemPrompt("storyboard", "zh", rules);
+    const rendered = buildSystemPrompt("storyboardShot", "zh", rules);
     const iRules = rendered.indexOf("RULES_ITEM");
     const iExamples = rendered.indexOf("EXAMPLE_ITEM");
     const iSafety = rendered.indexOf("SAFETY_ITEM");
@@ -203,14 +206,14 @@ describe("buildSystemPrompt", () => {
 
   it("空 section 连同 header 整块移除（不残留悬空标题）", () => {
     // 只保留 rules 与 safety，examples 全空 → 「参考示例：」 header 不残留
-    const rendered = buildSystemPrompt("storyboard", "zh", BUILTIN_RULES);
+    const rendered = buildSystemPrompt("storyboardShot", "zh", BUILTIN_RULES);
     expect(rendered).not.toContain("参考示例：");
-    const en = buildSystemPrompt("storyboard", "en", BUILTIN_RULES);
+    const en = buildSystemPrompt("storyboardShot", "en", BUILTIN_RULES);
     expect(en).not.toContain("Examples:");
   });
 
   it("条目不串任务：polish 条目不会出现在 storyboard 渲染中", () => {
-    const rendered = buildSystemPrompt("storyboard", "zh", BUILTIN_RULES);
+    const rendered = buildSystemPrompt("storyboardShot", "zh", BUILTIN_RULES);
     expect(rendered).not.toContain("视频文案优化专家");
   });
 });
