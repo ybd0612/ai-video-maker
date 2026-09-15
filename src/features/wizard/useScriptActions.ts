@@ -88,7 +88,17 @@ export function useScriptActions(
       if (!ok) return false;
     }
 
-    useProjectStore.getState().setProjectStatusById(targetProjectId, "scripting");
+    // 发起即清空旧 auto 资产与其派生（仅保留手动添加的）：
+    // 并行模式下视觉方向先完成就会切到步骤 2，不清空的话页面会显示上一次的
+    // 旧资产卡片，被误当成新结果。提取失败时旧资产不恢复，重试即可。
+    useProjectStore.getState().updateProjectById(targetProjectId, (p) => ({
+      ...p,
+      assets: p.assets.filter((a) => a.source === "manual"),
+      styleReferenceUrl: undefined,
+      styleReferenceError: undefined,
+      assetsReviewed: false,
+      status: "scripting",
+    }));
 
     const trace = beginTrace("logmsg.trace.extractFromIdea", { projectId: targetProjectId });
 
