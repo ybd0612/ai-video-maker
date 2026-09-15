@@ -40,11 +40,16 @@ interface SettingsState {
   autoRegeneratePortrait: boolean;
   autoRegenerateAssetImages: boolean;
   /**
-   * 运行日志与链路追踪开关（默认开启）。
+   * 运行日志采集开关（默认开启）。
    * 日志仅存内存环形缓冲（最多 1000 条），不上报网络；旧存储缺该字段时
    * 由 persist 浅合并回退到默认值 true，无需迁移。
+   * 采集恒开的好处：打开日志面板时，刚刚失败的那次调用已经在里面。
    */
   loggingEnabled: boolean;
+  /** 是否在主界面底部展示日志面板（DevTools 风格，默认关闭） */
+  showLogPanel: boolean;
+  /** 日志面板高度（px，可拖拽调整并持久化） */
+  logPanelHeight: number;
 
   setTheme: (theme: Theme) => void;
   setLanguage: (lang: Language) => void;
@@ -55,6 +60,8 @@ interface SettingsState {
   setAutoRegeneratePortrait: (value: boolean) => void;
   setAutoRegenerateAssetImages: (value: boolean) => void;
   setLoggingEnabled: (value: boolean) => void;
+  setShowLogPanel: (value: boolean) => void;
+  setLogPanelHeight: (value: number) => void;
 }
 
 /**
@@ -110,6 +117,8 @@ export const useSettingsStore = create<SettingsState>()(
       autoRegeneratePortrait: true,
       autoRegenerateAssetImages: true,
       loggingEnabled: true,
+      showLogPanel: false,
+      logPanelHeight: 260,
 
       setTheme: (theme) => set({ theme }),
       setLanguage: (language) => set({ language }),
@@ -120,6 +129,8 @@ export const useSettingsStore = create<SettingsState>()(
       setAutoRegeneratePortrait: (autoRegeneratePortrait) => set({ autoRegeneratePortrait }),
       setAutoRegenerateAssetImages: (autoRegenerateAssetImages) => set({ autoRegenerateAssetImages }),
       setLoggingEnabled: (loggingEnabled) => set({ loggingEnabled }),
+      setShowLogPanel: (showLogPanel) => set({ showLogPanel }),
+      setLogPanelHeight: (logPanelHeight) => set({ logPanelHeight }),
     }),
     {
       name: "wxhb-settings",

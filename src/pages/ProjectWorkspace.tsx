@@ -14,8 +14,9 @@ import { ProjectSidebar } from "@/features/projects/ProjectSidebar";
 import {
   Settings, Trash2,
   FolderOpen, Layers,
-  Moon, Sun,
+  Moon, Sun, TerminalSquare,
 } from "lucide-react";
+import { LogConsoleDock } from "@/components/LogConsoleDock";
 import { ApiKeyBanner } from "@/components/ApiKeyBanner";
 import { confirmDialog } from "@/components/ui/ConfirmDialog";
 import { CreationWizard } from "@/features/wizard/CreationWizard";
@@ -31,6 +32,8 @@ export function ProjectWorkspace() {
   const openSettings = useSettingsStore((s) => s.setSettingsDialogOpen);
   const theme = useSettingsStore((s) => s.theme);
   const setTheme = useSettingsStore((s) => s.setTheme);
+  const showLogPanel = useSettingsStore((s) => s.showLogPanel);
+  const setShowLogPanel = useSettingsStore((s) => s.setShowLogPanel);
   const { rerollImage, rerollVideo } = useWizardActions();
 
   const [selectedShotId, setSelectedShotId] = useState<string | null>(null);
@@ -82,6 +85,17 @@ export function ProjectWorkspace() {
         </div>
 
         <div className="flex items-center gap-2">
+          {/* Log panel toggle（DevTools 式底部停靠面板） */}
+          <button
+            onClick={() => setShowLogPanel(!showLogPanel)}
+            className={`rounded-md p-1.5 hover:bg-raised ${
+              showLogPanel ? "text-accent" : "text-ink-4 hover:text-ink-2"
+            }`}
+            title={showLogPanel ? t("log.hidePanel") : t("log.showPanel")}
+          >
+            <TerminalSquare size={14} />
+          </button>
+
           {/* Theme toggle: light / dark */}
           <button
             onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
@@ -172,6 +186,9 @@ export function ProjectWorkspace() {
           </aside>
         )}
       </div>
+
+      {/* Bottom dock: 运行日志（DevTools 风格，可拖拽高度） */}
+      {showLogPanel && <LogConsoleDock />}
     </div>
   );
 }

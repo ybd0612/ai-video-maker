@@ -76,7 +76,6 @@ const zh = {
   // Prompt rules settings (T05)
   "settings.tabGeneral": "基础",
   "settings.tabRules": "提示词规则",
-  "settings.tabLogs": "日志",
   "settings.rules.hint": "这些规则会拼入对应环节的 AI 提示词（资产提取 / 分镜 / 角色外貌 / 风格派生 / 润色）。改动立即生效，可随时恢复默认。",
   "settings.rules.enabled": "启用",
   "settings.rules.restoreItem": "恢复默认",
@@ -635,7 +634,7 @@ const zh = {
 
   // 运行日志与链路追踪（设置 → 日志）
   "log.title": "运行日志",
-  "log.hint": "记录每次模型调用的参数、结果与耗时，用于排查问题。日志只存在内存里（最多 1000 条），刷新页面即清空。",
+  "log.hint": "记录每次模型调用的参数、结果与耗时，用于排查问题。开启后日志面板停靠在主界面底部，可拖拽调整高度；日志只存在内存里（最多 1000 条），刷新页面即清空。",
   "log.enable": "启用日志与链路追踪",
   "log.filterLevel": "级别",
   "log.filterScope": "来源",
@@ -661,6 +660,13 @@ const zh = {
   "log.scope.image": "图片",
   "log.scope.video": "视频",
   "log.scope.app": "应用",
+  "log.dragHint": "拖拽调整高度",
+  "log.close": "关闭日志面板",
+  "log.expandAll": "展开全部",
+  "log.collapseAll": "收起全部",
+  "log.showPanel": "显示日志面板",
+  "log.hidePanel": "隐藏日志面板",
+  "log.record": "记录运行日志（内存最多 1000 条）",
 
 } as const;
 
@@ -733,7 +739,6 @@ const en = {
   // Prompt rules settings (T05)
   "settings.tabGeneral": "General",
   "settings.tabRules": "Prompt Rules",
-  "settings.tabLogs": "Logs",
   "settings.rules.hint": "These rules are composed into the AI prompts of each stage (asset extraction / storyboard / character appearance / style derivation / polish). Changes take effect immediately and can be reset anytime.",
   "settings.rules.enabled": "Enabled",
   "settings.rules.restoreItem": "Reset",
@@ -1295,7 +1300,7 @@ const en = {
 
   // Runtime log & tracing (Settings → Logs)
   "log.title": "Runtime log",
-  "log.hint": "Records the parameters, results and duration of every model call for troubleshooting. Logs live in memory only (max 1000 entries) and reset on page reload.",
+  "log.hint": "Records the parameters, results and duration of every model call for troubleshooting. When enabled, the log panel docks at the bottom of the main view and can be resized by dragging. Logs live in memory only (max 1000 entries) and reset on page reload.",
   "log.enable": "Enable logging and tracing",
   "log.filterLevel": "Level",
   "log.filterScope": "Scope",
@@ -1321,6 +1326,13 @@ const en = {
   "log.scope.image": "Image",
   "log.scope.video": "Video",
   "log.scope.app": "App",
+  "log.dragHint": "Drag to resize",
+  "log.close": "Close log panel",
+  "log.expandAll": "Expand all",
+  "log.collapseAll": "Collapse all",
+  "log.showPanel": "Show log panel",
+  "log.hidePanel": "Hide log panel",
+  "log.record": "Record runtime log (max 1000 entries in memory)",
 
 } as const;
 

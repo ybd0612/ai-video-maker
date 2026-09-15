@@ -2,7 +2,6 @@ import { useState, useEffect, useRef } from "react";
 import { X, Eye, EyeOff, CheckCircle2, Loader2, AlertTriangle, Plus, Trash2, RotateCcw, Download, Upload } from "lucide-react";
 import { useSettingsStore } from "@/stores/settingsStore";
 import { motion, AnimatePresence } from "framer-motion";
-import { LogViewerPanel } from "@/components/LogViewerPanel";
 import { resolveBaseUrl } from '@/lib/resolveBaseUrl';
 import { useT } from '@/i18n';
 import type { Language } from '@/stores/settingsStore';
@@ -333,12 +332,16 @@ export function SettingsDialog() {
   const open = useSettingsStore((s) => s.settingsDialogOpen);
   const language = useSettingsStore((s) => s.language);
   const setLanguage = useSettingsStore((s) => s.setLanguage);
+  const loggingEnabled = useSettingsStore((s) => s.loggingEnabled);
+  const setLoggingEnabled = useSettingsStore((s) => s.setLoggingEnabled);
+  const showLogPanel = useSettingsStore((s) => s.showLogPanel);
+  const setShowLogPanel = useSettingsStore((s) => s.setShowLogPanel);
   const t = useT();
   const setOpen = useSettingsStore((s) => s.setSettingsDialogOpen);
   const providerConfig = useSettingsStore((s) => s.providerConfig);
   const setProviderConfig = useSettingsStore((s) => s.setProviderConfig);
 
-  const [tab, setTab] = useState<"general" | "rules" | "logs">("general");
+  const [tab, setTab] = useState<"general" | "rules">("general");
   const [apiKey, setApiKey] = useState("");
   const [baseUrl, setBaseUrl] = useState("https://api.agnes-ai.cn/v1");
   const [plan, setPlan] = useState<PlanId>("default");
@@ -458,8 +461,7 @@ export function SettingsDialog() {
                 {([
                   ["general", t("settings.tabGeneral") as string],
                   ["rules", t("settings.tabRules") as string],
-                  ["logs", t("settings.tabLogs") as string],
-                ] as Array<["general" | "rules" | "logs", string]>).map(([id, label]) => (
+                ] as Array<["general" | "rules", string]>).map(([id, label]) => (
                   <button
                     key={id}
                     type="button"
@@ -591,6 +593,32 @@ export function SettingsDialog() {
                     ))}
                   </div>
                 </div>
+                {/* 运行日志：面板显示开关 + 采集开关 */}
+                <div className="rounded-lg border border-line/50 bg-raised/40 p-3">
+                  <label className="mb-1 block text-[0.6875rem] font-medium text-ink-3">
+                    {t("log.title")}
+                  </label>
+                  <label className="flex select-none items-center gap-2 py-1 text-xs text-ink-2">
+                    <input
+                      type="checkbox"
+                      checked={showLogPanel}
+                      onChange={(e) => setShowLogPanel(e.target.checked)}
+                      className="h-3.5 w-3.5 accent-accent"
+                    />
+                    {t("log.showPanel")}
+                  </label>
+                  <label className="flex select-none items-center gap-2 py-1 text-xs text-ink-2">
+                    <input
+                      type="checkbox"
+                      checked={loggingEnabled}
+                      onChange={(e) => setLoggingEnabled(e.target.checked)}
+                      className="h-3.5 w-3.5 accent-accent"
+                    />
+                    {t("log.record")}
+                  </label>
+                  <p className="mt-1 text-[0.625rem] leading-relaxed text-ink-5">{t("log.hint")}</p>
+                </div>
+
                 <p className="text-[0.625rem] text-ink-5">
 {t("settings.storageNote")}
                 </p>
@@ -605,10 +633,8 @@ export function SettingsDialog() {
                   <span className="ml-auto text-[0.625rem] text-ink-4">{t("settings.github.desc")}</span>
                 </a>
               </div>
-              ) : tab === "rules" ? (
-                <PromptRulesSettings t={t} language={language} showToast={showToast} />
               ) : (
-                <LogViewerPanel />
+                <PromptRulesSettings t={t} language={language} showToast={showToast} />
               )}
             </motion.div>
           </motion.div>
