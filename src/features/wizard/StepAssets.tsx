@@ -247,7 +247,7 @@ export function StepAssets() {
   }
 
   return (
-    <div className="mx-auto flex max-w-2xl flex-col gap-6 py-8">
+    <div className="mx-auto flex w-full max-w-4xl flex-col gap-6 px-4 py-8">
       {/* Title */}
       <div className="text-center">
         <h2 className="text-lg font-bold text-ink">
@@ -336,7 +336,7 @@ export function StepAssets() {
         </div>
 
         {characters.length > 0 ? (
-          <div className="flex flex-col gap-2">
+          <div className="grid gap-3 md:grid-cols-2">
             {characters.map((char) => (
               <div
                 key={char.id}
@@ -350,9 +350,9 @@ export function StepAssets() {
                   }
                 }}
                 title={t("characters.edit")}
-                className="group flex cursor-pointer items-start gap-3 rounded-xl border border-line bg-raised/50 p-3 transition hover:border-line-strong focus:border-success focus:outline-none"
+                className="group relative flex cursor-pointer flex-col overflow-hidden rounded-xl border border-line bg-raised/50 transition hover:border-line-strong focus:border-success focus:outline-none"
               >
-                <div className="flex h-16 w-24 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-line bg-app">
+                <div className="relative flex aspect-video w-full shrink-0 items-center justify-center overflow-hidden border-b border-line bg-app">
                   {(char.imageUrl || char.avatarUrl) ? (
                     <Lightbox src={char.imageUrl || char.avatarUrl} alt={char.name}>
                       <img
@@ -367,7 +367,7 @@ export function StepAssets() {
                     </div>
                   )}
                 </div>
-                <div className="min-w-0 flex-1">
+                <div className="min-w-0 flex-1 p-3">
                   <p className="text-sm font-medium text-ink">{char.name}</p>
                   <p className="mt-0.5 text-xs text-ink-4 line-clamp-2">
                     {(char.description || char.appearancePrompt || "—").split("\n")[0]}
@@ -378,7 +378,7 @@ export function StepAssets() {
                     </p>
                   )}
                 </div>
-                <div className="flex shrink-0 gap-1 opacity-0 transition group-hover:opacity-100">
+                <div className="absolute right-2 top-2 flex shrink-0 gap-1 opacity-0 transition group-hover:opacity-100">
                   <button
                     onClick={(e) => {
                       // 阻止冒泡，避免点删除时同时触发卡片的「进入编辑」
@@ -433,17 +433,18 @@ export function StepAssets() {
           )}
         </div>
 
-        {sceneReferences.map((scene) => (
+        <div className="grid gap-3 md:grid-cols-2">
+          {sceneReferences.map((scene) => (
           <div
             key={scene.id}
             role="button"
             tabIndex={0}
             onClick={() => setEditingAsset(scene)}
             onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setEditingAsset(scene); } }}
-            className="group flex cursor-pointer items-start gap-3 rounded-xl border border-line bg-raised/50 p-3 transition hover:border-line-strong focus:border-accent focus:outline-none"
+            className="group relative flex cursor-pointer flex-col overflow-hidden rounded-xl border border-line bg-raised/50 transition hover:border-line-strong focus:border-accent focus:outline-none"
           >
             {/* Scene image preview（点击放大查看） */}
-            <div className="flex h-16 w-24 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-line bg-app" onClick={(e) => e.stopPropagation()}>
+            <div className="relative flex aspect-video w-full shrink-0 items-center justify-center overflow-hidden border-b border-line bg-app" onClick={(e) => e.stopPropagation()}>
               {scene.imageUrl ? (
                 <Lightbox src={scene.imageUrl} alt={scene.name}>
                   <img
@@ -459,14 +460,14 @@ export function StepAssets() {
               )}
             </div>
 
-            <div className="min-w-0 flex-1">
+            <div className="min-w-0 flex-1 p-3">
               <p className="text-sm font-medium text-ink">{scene.name || "未命名场景"}</p>
               <p className="mt-0.5 line-clamp-2 text-xs text-ink-4">{(scene.description || scene.prompt || "—").split("\n")[0]}</p>
               {scene.error && <p className="mt-0.5 truncate text-[0.625rem] text-danger" title={scene.error}>生成失败：{scene.error}</p>}
             </div>
 
             {/* Actions */}
-            <div className="flex shrink-0 flex-col gap-1 opacity-0 transition group-hover:opacity-100" onClick={(e) => e.stopPropagation()}>
+            <div className="absolute right-2 top-2 flex shrink-0 flex-col gap-1 opacity-0 transition group-hover:opacity-100" onClick={(e) => e.stopPropagation()}>
               <button
                 onClick={() => void handleDeleteAsset(scene)}
                 className="rounded p-1.5 text-ink-4 hover:bg-danger-deep hover:text-danger"
@@ -476,7 +477,8 @@ export function StepAssets() {
               </button>
             </div>
           </div>
-        ))}
+          ))}
+        </div>
 
         <button
           onClick={handleAddScene}
@@ -510,17 +512,18 @@ export function StepAssets() {
           )}
         </div>
 
-        {products.map((product) => (
+        <div className="grid gap-3 md:grid-cols-2">
+          {products.map((product) => (
           <div
             key={product.id}
             role="button"
             tabIndex={0}
             onClick={() => setEditingAsset(product)}
             onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setEditingAsset(product); } }}
-            className="group flex cursor-pointer items-start gap-3 rounded-xl border border-line bg-raised/50 p-3 transition hover:border-line-strong focus:border-accent focus:outline-none"
+            className="group relative flex cursor-pointer flex-col overflow-hidden rounded-xl border border-line bg-raised/50 transition hover:border-line-strong focus:border-accent focus:outline-none"
           >
             {/* Product image preview（点击放大查看） */}
-            <div className="flex h-16 w-24 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-line bg-app" onClick={(e) => e.stopPropagation()}>
+            <div className="relative flex aspect-video w-full shrink-0 items-center justify-center overflow-hidden border-b border-line bg-app" onClick={(e) => e.stopPropagation()}>
               {product.imageUrl ? (
                 <Lightbox src={product.imageUrl} alt={product.name}>
                   <img
@@ -536,14 +539,14 @@ export function StepAssets() {
               )}
             </div>
 
-            <div className="min-w-0 flex-1">
+            <div className="min-w-0 flex-1 p-3">
               <p className="text-sm font-medium text-ink">{product.name || "未命名主体"}</p>
               <p className="mt-0.5 line-clamp-2 text-xs text-ink-4">{(product.description || product.prompt || "—").split("\n")[0]}</p>
               {product.error && <p className="mt-0.5 truncate text-[0.625rem] text-danger" title={product.error}>生成失败：{product.error}</p>}
             </div>
 
             {/* Actions */}
-            <div className="flex shrink-0 flex-col gap-1 opacity-0 transition group-hover:opacity-100" onClick={(e) => e.stopPropagation()}>
+            <div className="absolute right-2 top-2 flex shrink-0 flex-col gap-1 opacity-0 transition group-hover:opacity-100" onClick={(e) => e.stopPropagation()}>
               <button
                 onClick={() => void handleDeleteAsset(product)}
                 className="rounded p-1.5 text-ink-4 hover:bg-danger-deep hover:text-danger"
@@ -553,7 +556,8 @@ export function StepAssets() {
               </button>
             </div>
           </div>
-        ))}
+          ))}
+        </div>
 
         <button
           onClick={handleAddProduct}
@@ -587,16 +591,17 @@ export function StepAssets() {
           )}
         </div>
 
-        {props.map((prop) => (
+        <div className="grid gap-3 md:grid-cols-2">
+          {props.map((prop) => (
           <div
             key={prop.id}
             role="button"
             tabIndex={0}
             onClick={() => setEditingAsset(prop)}
             onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setEditingAsset(prop); } }}
-            className="group flex cursor-pointer items-start gap-3 rounded-xl border border-line bg-raised/50 p-3 transition hover:border-line-strong focus:border-accent focus:outline-none"
+            className="group relative flex cursor-pointer flex-col overflow-hidden rounded-xl border border-line bg-raised/50 transition hover:border-line-strong focus:border-accent focus:outline-none"
           >
-            <div className="flex h-16 w-24 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-line bg-app" onClick={(e) => e.stopPropagation()}>
+            <div className="relative flex aspect-video w-full shrink-0 items-center justify-center overflow-hidden border-b border-line bg-app" onClick={(e) => e.stopPropagation()}>
               {prop.imageUrl ? (
                 <Lightbox src={prop.imageUrl} alt={prop.name}>
                   <img src={prop.imageUrl} alt={prop.name} className="h-full w-full object-contain" />
@@ -607,12 +612,12 @@ export function StepAssets() {
                 </div>
               )}
             </div>
-            <div className="min-w-0 flex-1">
+            <div className="min-w-0 flex-1 p-3">
               <p className="text-sm font-medium text-ink">{prop.name || "未命名道具"}</p>
               <p className="mt-0.5 line-clamp-2 text-xs text-ink-4">{(prop.description || prop.prompt || "—").split("\n")[0]}</p>
               {prop.error && <p className="mt-0.5 truncate text-[0.625rem] text-danger" title={prop.error}>生成失败：{prop.error}</p>}
             </div>
-            <div className="flex shrink-0 flex-col gap-1 opacity-0 transition group-hover:opacity-100" onClick={(e) => e.stopPropagation()}>
+            <div className="absolute right-2 top-2 flex shrink-0 flex-col gap-1 opacity-0 transition group-hover:opacity-100" onClick={(e) => e.stopPropagation()}>
               <button
                 onClick={() => void handleDeleteAsset(prop)}
                 className="rounded p-1.5 text-ink-4 hover:bg-danger-deep hover:text-danger"
@@ -622,7 +627,8 @@ export function StepAssets() {
               </button>
             </div>
           </div>
-        ))}
+          ))}
+        </div>
 
         <button
           onClick={handleAddProp}
