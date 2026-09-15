@@ -90,7 +90,7 @@ export function useScriptActions(
 
     useProjectStore.getState().setProjectStatusById(targetProjectId, "scripting");
 
-    const trace = beginTrace("从想法提取视觉方向与资产", { projectId: targetProjectId });
+    const trace = beginTrace("logmsg.trace.extractFromIdea", { projectId: targetProjectId });
 
     try {
       const visualDirectionResult = await refineWithAudit<RawVisualDirection>({

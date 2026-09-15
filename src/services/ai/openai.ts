@@ -10,6 +10,17 @@ import { fetchWithRetry } from "@/lib/fetchWithRetry";
 import { rateLimiter, imageSizeToTier } from "@/services/rateLimit";
 import { generateVideo as rawGenerateVideo } from "@/services/videoService";
 import { getTranslation } from "@/i18n";
+
+/**
+ * 图片提示词被内容安全过滤。
+ * 用独立类型（而非匹配错误文案）向上层传递，避免文案本地化后判断失效。
+ */
+class ImageSafetyFilterError extends Error {
+  constructor() {
+    super(getTranslation("error.imageSafetyFiltered"));
+    this.name = "ImageSafetyFilterError";
+  }
+}
 import { startSpan } from "@/lib/logger";
 import type {
   AIService,
@@ -74,7 +85,9 @@ export class OpenAIService implements AIService {
 
     if (!resp.ok) {
       const body = await resp.text().catch(() => "");
-      throw new Error(`Chat API error ${resp.status}: ${body}`);
+      throw new Error(
+        getTranslation("error.chatApiError", { status: resp.status, detail: body }),
+      );
     }
 
     const contentType = resp.headers.get("content-type") ?? "";
@@ -110,7 +123,7 @@ export class OpenAIService implements AIService {
       }
       throw new Error(
         getTranslation("error.chatEmptyContent", {
-          finishReason: finishReason || "未知",
+          finishReason: finishReason || getTranslation("common.unknown"),
         }),
       );
     }
@@ -190,25 +203,25 @@ export class OpenAIService implements AIService {
       try {
         const errJson = JSON.parse(text);
         if (errJson.error?.code === "content_policy_violation") {
-          throw new Error(
-            "图片提示词触发了内容安全过滤，请修改提示词后重试（避免涉及未成年人、暴力等敏感内容）。",
-          );
+          throw new ImageSafetyFilterError();
         }
       } catch (parseErr) {
-        if (
-          parseErr instanceof Error &&
-          parseErr.message.includes("内容安全过滤")
-        )
-          throw parseErr;
+        // 用错误类型判断，不依赖本地化后的文案
+        if (parseErr instanceof ImageSafetyFilterError) throw parseErr;
       }
-      throw new Error(`Image API error ${resp.status}: ${text}`);
+      throw new Error(
+        getTranslation("error.imageApiError", { status: resp.status, detail: text }),
+      );
     }
 
     const contentType = resp.headers.get("content-type") ?? "";
     if (!contentType.includes("application/json")) {
       const text = await resp.text().catch(() => "");
       throw new Error(
-        `Image API 返回了非 JSON 响应 (Content-Type: ${contentType})。请检查 Base URL 是否正确。响应前 200 字符：${text.slice(0, 200)}`,
+        getTranslation("error.imageApiNonJson", {
+          contentType,
+          body: text.slice(0, 200),
+        }),
       );
     }
 
@@ -222,7 +235,7 @@ export class OpenAIService implements AIService {
       imageUrl = "https://" + imageUrl;
     }
     if (!imageUrl) {
-      throw new Error("Image API returned no URL.");
+      throw new Error(getTranslation("error.imageApiNoUrl"));
     }
 
     span.end({ imageUrl });

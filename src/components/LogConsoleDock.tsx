@@ -24,6 +24,7 @@ import {
   clearLog,
   exportLog,
   getLogSnapshot,
+  renderLogMessage,
   subscribeLog,
   type LogEntry,
   type LogLevel,
@@ -153,8 +154,23 @@ export function LogConsoleDock() {
     });
   };
 
+  /** 词典缺失时回退到原始值，避免界面上出现 "log.scope.xxx" 这种裸 key */
+  const labelOr = useCallback(
+    (key: string, fallback: string) => {
+      const label = t(key as TranslationKey);
+      return label === key ? fallback : label;
+    },
+    [t],
+  );
+
+  /** 日志消息按当前语言渲染（logmsg.* key → 译文，其余原样） */
+  const localizeMessage = useCallback(
+    (message: string) => renderLogMessage(message, (key) => t(key as TranslationKey)),
+    [t],
+  );
+
   const handleExport = () => {
-    const blob = new Blob([exportLog()], { type: "application/json" });
+    const blob = new Blob([exportLog(localizeMessage)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
@@ -165,7 +181,7 @@ export function LogConsoleDock() {
 
   const handleCopy = async () => {
     try {
-      await navigator.clipboard.writeText(exportLog());
+      await navigator.clipboard.writeText(exportLog(localizeMessage));
       setCopied(true);
       window.setTimeout(() => setCopied(false), 2000);
     } catch {
@@ -313,12 +329,14 @@ export function LogConsoleDock() {
                     {hasData ? (isOpen ? <ChevronDown size={10} /> : <ChevronRight size={10} />) : null}
                   </span>
                   <span className="shrink-0 text-ink-5">{timeLabel(entry.ts)}</span>
-                  <span className={`w-9 shrink-0 rounded border px-1 text-center text-[0.5625rem] uppercase ${LEVEL_BADGE[entry.level]}`}>
-                    {entry.level}
+                  <span className={`w-11 shrink-0 rounded border px-1 text-center text-[0.5625rem] ${LEVEL_BADGE[entry.level]}`}>
+                    {labelOr(`log.level.${entry.level}`, entry.level)}
                   </span>
-                  <span className="w-10 shrink-0 text-ink-4">{entry.scope}</span>
+                  <span className="w-10 shrink-0 text-ink-4">
+                    {labelOr(`log.scope.${entry.scope}`, entry.scope)}
+                  </span>
                   <span className={`min-w-0 flex-1 whitespace-pre-wrap break-all ${LEVEL_TEXT[entry.level]}`}>
-                    {entry.message}
+                    {localizeMessage(entry.message)}
                   </span>
                   {typeof entry.durationMs === "number" && (
                     <span className="shrink-0 text-ink-5">{entry.durationMs}ms</span>

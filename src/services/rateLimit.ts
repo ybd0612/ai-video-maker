@@ -12,6 +12,7 @@
 // 设计取舍：以「实际 RPM」作安全上限；用量在 acquire 时即记账（保守，与服务器计数一致）。
 // ────────────────────────────────────────────────────────────────────────────
 
+import { getTranslation } from "@/i18n";
 import { useSettingsStore } from "@/stores/settingsStore";
 import {
   WINDOW,
@@ -82,7 +83,7 @@ export interface AcquireOptions {
 function sleep(ms: number, signal?: AbortSignal): Promise<void> {
   return new Promise<void>((resolve, reject) => {
     if (signal?.aborted) {
-      reject(new RateLimitError({ reason: "aborted", kind: "text", message: "请求已取消。" }));
+      reject(new RateLimitError({ reason: "aborted", kind: "text", message: getTranslation("error.requestCancelled") }));
       return;
     }
     const id = setTimeout(() => {
@@ -91,7 +92,7 @@ function sleep(ms: number, signal?: AbortSignal): Promise<void> {
     }, ms);
     const onAbort = () => {
       clearTimeout(id);
-      reject(new RateLimitError({ reason: "aborted", kind: "text", message: "请求已取消。" }));
+      reject(new RateLimitError({ reason: "aborted", kind: "text", message: getTranslation("error.requestCancelled") }));
     };
     signal?.addEventListener("abort", onAbort);
   });

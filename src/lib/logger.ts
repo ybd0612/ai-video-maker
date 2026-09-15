@@ -76,9 +76,41 @@ export function clearLog(): void {
 }
 
 /** 导出为可下载的 JSON（用于问题反馈） */
-export function exportLog(): string {
+/**
+ * 日志消息的 i18n key 前缀（约定）。
+ * message 以该前缀开头时视为词典 key，在**渲染 / 导出 / 落盘**时按当前语言翻译；
+ * 其余 message（HTTP 端点名等技术标识）原样输出。
+ * 如此 logger 仍与 i18n 解耦（只认前缀），而界面与 runtime.log 都保持可读。
+ */
+export const LOG_MESSAGE_PREFIX = "logmsg.";
+
+/** 该 message 是否为待翻译的日志消息 key */
+export function isLogMessageKey(message: string): boolean {
+  return message.startsWith(LOG_MESSAGE_PREFIX);
+}
+
+/** 渲染日志消息：key 走翻译函数，非 key 原样返回 */
+export function renderLogMessage(
+  message: string,
+  translate: (key: string) => string,
+): string {
+  return isLogMessageKey(message) ? translate(message) : message;
+}
+
+/**
+ * 导出日志 JSON。传入 translate 时把 logmsg.* 消息翻译成当前语言，
+ * 便于人工阅读与直接交给 AI 分析。
+ */
+export function exportLog(translate?: (message: string) => string): string {
+  const entries = translate
+    ? buffer.map((entry) =>
+        isLogMessageKey(entry.message)
+          ? { ...entry, message: translate(entry.message) }
+          : entry,
+      )
+    : buffer;
   return JSON.stringify(
-    { exportedAt: new Date().toISOString(), entries: buffer },
+    { exportedAt: new Date().toISOString(), entries },
     null,
     2,
   );

@@ -16,6 +16,7 @@
 // ────────────────────────────────────────────────────────────────────────────
 
 import { startSpan } from "@/lib/logger";
+import { getTranslation } from "@/i18n";
 import { MODELS } from "@/lib/models";
 import { fetchWithRetry } from "@/lib/fetchWithRetry";
 import { clampNumber } from "@/lib/validation";
@@ -164,7 +165,8 @@ export async function generateVideo(
   let videoId: string | undefined;
 
   {
-    if (signal?.aborted) throw new Error("视频生成已取消。");
+    if (signal?.aborted)
+      throw new Error(getTranslation("error.videoGenerationCancelled"));
 
     const createStartedAt = Date.now();
 
@@ -215,7 +217,7 @@ export async function generateVideo(
   }
 
   if (!videoId) {
-    throw new Error("视频创建失败：无法获取 video_id");
+    throw new Error(getTranslation("error.videoCreateNoVideoId"));
   }
 
   // ── Poll for result ────────────────────────────────────────────────────
@@ -232,10 +234,10 @@ export async function generateVideo(
   let notExistCount = 0;
 
   while (Date.now() < deadline) {
-    if (signal?.aborted) throw new Error("视频轮询已取消。");
+    if (signal?.aborted) throw new Error(getTranslation("error.videoPollCancelled"));
 
     await new Promise<void>((r) => setTimeout(r, VIDEO_POLL_INTERVAL_MS));
-    if (signal?.aborted) throw new Error("视频轮询已取消。");
+    if (signal?.aborted) throw new Error(getTranslation("error.videoPollCancelled"));
 
     const pollResp = await fetchWithRetry(pollUrl, {
       headers: { Authorization: `Bearer ${opts.apiKey}` },
@@ -301,7 +303,7 @@ export async function generateVideo(
           false,
         );
       }
-      startSpan("video", "视频生成完成", { videoId }).end({
+      startSpan("video", "logmsg.videoCompleted", { videoId }).end({
         videoUrl,
         coverImageUrl,
         seconds: duration,
@@ -317,12 +319,21 @@ export async function generateVideo(
         : pollJson.error
           ? JSON.stringify(pollJson.error)
           : "unknown error";
-      startSpan("video", "视频生成失败", { videoId }).fail(new Error(errDetail));
-      throw new VideoTaskCreatedError(`视频生成失败: ${errDetail}`, videoId, false);
+      startSpan("video", "logmsg.videoFailed", { videoId }).fail(new Error(errDetail));
+      throw new VideoTaskCreatedError(
+        getTranslation("error.videoGenerationFailed", { reason: errDetail }),
+        videoId,
+        false,
+      );
     }
   }
 
-  if (!videoUrl) throw new VideoTaskCreatedError("视频生成超时，任务可能仍在服务器运行。", videoId, true);
+  if (!videoUrl)
+    throw new VideoTaskCreatedError(
+      getTranslation("error.videoGenerationTimedOut"),
+      videoId,
+      true,
+    );
 
   if (!videoUrl.startsWith("http://") && !videoUrl.startsWith("https://")) {
     videoUrl = "https://" + videoUrl;

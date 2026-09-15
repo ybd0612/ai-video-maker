@@ -326,7 +326,7 @@ export function StepAssets() {
       <section className="flex flex-col gap-3">
         <div className="flex items-center justify-between">
           <h3 className="text-sm font-semibold text-ink-2">
-            {t("characters.title" as any) || "角色"} ({characters.length})
+            {t("characters.title")} ({characters.length})
           </h3>
         </div>
 
@@ -369,7 +369,7 @@ export function StepAssets() {
                   </p>
                   {char.error && (
                     <p className="mt-0.5 truncate text-[0.625rem] text-danger" title={char.error}>
-                      生成失败：{char.error}
+                      {t("assetEditor.generateFailedWith", { message: char.error })}
                     </p>
                   )}
                 </div>
@@ -448,7 +448,7 @@ export function StepAssets() {
             <div className="min-w-0 flex-1 py-1 pr-1">
               <p className="text-sm font-medium text-ink">{scene.name || t("assetEditor.unnamedScene")}</p>
               <p className="mt-0.5 line-clamp-2 text-xs text-ink-4">{(scene.description || scene.prompt || "—").split("\n")[0]}</p>
-              {scene.error && <p className="mt-0.5 truncate text-[0.625rem] text-danger" title={scene.error}>{t("assetEditor.generateFailed")}: {scene.error}</p>}
+              {scene.error && <p className="mt-0.5 truncate text-[0.625rem] text-danger" title={scene.error}>{t("assetEditor.generateFailedWith", { message: scene.error })}</p>}
             </div>
 
             {/* Actions */}
@@ -517,7 +517,7 @@ export function StepAssets() {
             <div className="min-w-0 flex-1 py-1 pr-1">
               <p className="text-sm font-medium text-ink">{product.name || t("assetEditor.unnamedProduct")}</p>
               <p className="mt-0.5 line-clamp-2 text-xs text-ink-4">{(product.description || product.prompt || "—").split("\n")[0]}</p>
-              {product.error && <p className="mt-0.5 truncate text-[0.625rem] text-danger" title={product.error}>{t("assetEditor.generateFailed")}: {product.error}</p>}
+              {product.error && <p className="mt-0.5 truncate text-[0.625rem] text-danger" title={product.error}>{t("assetEditor.generateFailedWith", { message: product.error })}</p>}
             </div>
 
             {/* Actions */}
@@ -580,7 +580,7 @@ export function StepAssets() {
             <div className="min-w-0 flex-1 py-1 pr-1">
               <p className="text-sm font-medium text-ink">{prop.name || t("assetEditor.unnamedProp")}</p>
               <p className="mt-0.5 line-clamp-2 text-xs text-ink-4">{(prop.description || prop.prompt || "—").split("\n")[0]}</p>
-              {prop.error && <p className="mt-0.5 truncate text-[0.625rem] text-danger" title={prop.error}>{t("assetEditor.generateFailed")}: {prop.error}</p>}
+              {prop.error && <p className="mt-0.5 truncate text-[0.625rem] text-danger" title={prop.error}>{t("assetEditor.generateFailedWith", { message: prop.error })}</p>}
             </div>
             <div className="absolute right-2 top-2 flex shrink-0 flex-col gap-1 opacity-0 transition group-hover:opacity-100" onClick={(e) => e.stopPropagation()}>
               <button

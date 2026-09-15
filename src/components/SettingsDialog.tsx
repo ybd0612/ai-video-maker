@@ -29,20 +29,24 @@ function PlanLimitSummary({
     <div className="mt-2 space-y-1 rounded-lg border border-line/60 bg-raised/40 px-3 py-2 text-[0.625rem] leading-relaxed text-ink-3">
       <p>{t("settings.planHint")}</p>
       <p>
-        <span className="text-ink-4">{t("settings.planRpm")}：</span>{" "}
-        文本 {plan.rpm.text} · 图片(1K) {plan.rpm.image["1K"]} · 视频 {plan.rpm.video}
+        <span className="text-ink-4">{t("settings.planRpm")}</span>{" "}
+        {t("settings.planRpmValue", {
+          text: plan.rpm.text,
+          tier: "1K",
+          image: plan.rpm.image["1K"],
+          video: plan.rpm.video,
+        })}
       </p>
       <p>
-        <span className="text-ink-4">{t("settings.planQuota")}：</span>{" "}
-        {hasQuota ? (
-          <>
-            文本 每5h {q.textPer5h?.toLocaleString()} / 每周 {q.textPerWeek?.toLocaleString()}；
-            图片 每日 {q.imagePerDay?.toLocaleString()} 张；
-            视频 每日 {q.videoSecondsPerDay?.toLocaleString()} 秒
-          </>
-        ) : (
-          t("settings.planNone")
-        )}
+        <span className="text-ink-4">{t("settings.planQuota")}</span>{" "}
+        {hasQuota
+          ? t("settings.planQuotaValue", {
+              text5h: (q.textPer5h ?? 0).toLocaleString(),
+              textWeek: (q.textPerWeek ?? 0).toLocaleString(),
+              imageDay: (q.imagePerDay ?? 0).toLocaleString(),
+              videoDay: (q.videoSecondsPerDay ?? 0).toLocaleString(),
+            })
+          : t("settings.planNone")}
       </p>
     </div>
   );
@@ -588,6 +592,7 @@ export function SettingsDialog() {
                             : "border-line bg-raised text-ink-3 hover:border-line-strong hover:text-ink"
                         }`}
                       >
+                        {/* 语言名用各自语言自称（中文 / English），不随界面语言变化，属国际惯例 */}
                         {lng === "zh" ? "中文" : "English"}
                       </button>
                     ))}

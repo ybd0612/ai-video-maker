@@ -3,6 +3,8 @@
 // Unified fetch wrapper with timeout, retry, and exponential backoff.
 // ────────────────────────────────────────────────────────────────────────────
 
+import { getTranslation } from "@/i18n";
+
 const DEFAULT_MAX_RETRIES = 3;
 const DEFAULT_TIMEOUT_MS = 60_000; // 60s per attempt
 const DEFAULT_BASE_DELAY_MS = 2_000; // 2s base delay
@@ -106,7 +108,7 @@ export async function fetchWithRetry(
     // If external signal is already aborted, throw immediately
     if (externalSignal?.aborted) {
       clearTimeout(timeoutId);
-      throw new Error("请求已取消。");
+      throw new Error(getTranslation("error.requestCancelled"));
     }
 
     // Forward external abort to internal controller

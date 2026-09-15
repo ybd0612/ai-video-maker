@@ -11,6 +11,7 @@ import {
   getActiveRules,
 } from "@/lib/promptRules";
 import { extractJsonFromResponse, parseJsonFromResponse } from "@/lib/jsonResponse";
+import { getTranslation } from "@/i18n";
 import { resolveGenerationParams } from "@/lib/generationParams";
 import type { AuditOutcome } from "@/lib/refineContent";
 
@@ -274,10 +275,10 @@ export async function generateScript(
       // Unified chatCompletion already validates non-empty content. Keep
       // diagnostics focused on malformed JSON and preserve retry behavior.
       const detail = content.trim().length === 0
-        ? "模型返回了空内容，可能触发了内容安全过滤或模型拒绝"
-        : `模型返回的内容不是有效 JSON。响应内容：${content.slice(0, 200)}`;
+        ? getTranslation("error.scriptEmptyContent")
+        : getTranslation("error.scriptNotJson", { body: content.slice(0, 200) });
       lastError = new Error(
-        `无法从模型响应中提取 JSON（第 ${attempt + 1} 次尝试）。${detail}`,
+        `${getTranslation("error.scriptJsonExtractFailed", { attempt: attempt + 1 })} ${detail}`,
       );
       if (attempt < MAX_SCRIPT_RETRIES) continue;
       throw lastError;
@@ -293,7 +294,7 @@ export async function generateScript(
         styles?: RawStyle[];
       }>(content);
       if (!parsed || !Array.isArray(parsed.shots) || parsed.shots.length === 0) {
-        throw new Error("Model returned empty or invalid shots array.");
+        throw new Error(getTranslation("error.shotsInvalid"));
       }
 
       const shots = parsed.shots.map((s) => ({
@@ -337,7 +338,7 @@ export async function generateScript(
 
       const hasEmpty = shots.some((s) => !s.visualPrompt.trim() || !s.motionPrompt.trim());
       if (hasEmpty && attempt < MAX_SCRIPT_RETRIES) {
-        lastError = new Error("部分分镜缺少提示词，自动重试...");
+        lastError = new Error(getTranslation("error.shotMissingPromptRetry"));
         continue;
       }
 
@@ -628,7 +629,8 @@ export async function extractVisualDirectionFromIdea(
     enableThinking: params.enableThinking,
   });
   const direction = parseVisualDirection(result.content);
-  if (!direction) throw new Error("无法解析模型返回的视觉方向 JSON，请重试。");
+  if (!direction)
+    throw new Error(getTranslation("error.visualDirectionParseFailed"));
   return direction;
 }
 
@@ -706,7 +708,9 @@ export async function extractAssetsFromIdea(
   if (!parsed) {
     const jsonStr = extractJsonFromResponse(content);
     throw new Error(
-      `无法解析模型返回的资产 JSON，请重试。${jsonStr ? `响应片段：${jsonStr.slice(0, 200)}` : ""}`,
+      jsonStr
+        ? `${getTranslation("error.assetsParseFailed")} ${getTranslation("error.scriptNotJson", { body: jsonStr.slice(0, 200) })}`
+        : getTranslation("error.assetsParseFailed"),
     );
   }
 

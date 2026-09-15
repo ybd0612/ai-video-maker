@@ -11,7 +11,9 @@ import {
   createTrace,
   exportLog,
   getLogSnapshot,
+  isLogMessageKey,
   logger,
+  renderLogMessage,
   startSpan,
   subscribeLog,
   withTrace,
@@ -172,5 +174,35 @@ describe("beginTrace 手动开合", () => {
     const entries = getLogSnapshot().filter((e) => e.message.startsWith("X ·"));
     expect(entries).toHaveLength(1);
     expect(entries[0].level).toBe("error");
+  });
+});
+
+describe("日志消息本地化（logmsg.* 约定）", () => {
+  it("isLogMessageKey 只认 logmsg. 前缀", () => {
+    expect(isLogMessageKey("logmsg.sessionStart")).toBe(true);
+    expect(isLogMessageKey("POST /chat/completions")).toBe(false);
+    expect(isLogMessageKey("开始执行")).toBe(false);
+  });
+
+  it("renderLogMessage 翻译 key，非 key 原样返回", () => {
+    const translate = (key: string) => `T(${key})`;
+    expect(renderLogMessage("logmsg.videoCompleted", translate)).toBe("T(logmsg.videoCompleted)");
+    expect(renderLogMessage("POST /videos", translate)).toBe("POST /videos");
+  });
+
+  it("exportLog 不传翻译函数时保留原始 key", () => {
+    logger.info("app", "logmsg.sessionStart");
+    const parsed = JSON.parse(exportLog()) as { entries: Array<{ message: string }> };
+    expect(parsed.entries[0].message).toBe("logmsg.sessionStart");
+  });
+
+  it("exportLog 传翻译函数时把 logmsg.* 译成当前语言，技术标识保持不变", () => {
+    logger.info("app", "logmsg.sessionStart");
+    logger.info("llm", "POST /chat/completions");
+    const parsed = JSON.parse(
+      exportLog((message) => (message === "logmsg.sessionStart" ? "页面会话开始" : message)),
+    ) as { entries: Array<{ message: string }> };
+    expect(parsed.entries[0].message).toBe("页面会话开始");
+    expect(parsed.entries[1].message).toBe("POST /chat/completions");
   });
 });

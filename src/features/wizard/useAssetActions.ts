@@ -183,7 +183,7 @@ export function useAssetActions(): AssetActions {
     if (getStyleReferenceUrl(project) && !force) return;
     if (hasActiveTask(activeAssetTasks, pid)) return;
 
-    const trace = beginTrace("生成视觉方向图", { projectId: pid, force });
+    const trace = beginTrace("logmsg.trace.generateStyleReference", { projectId: pid, force });
 
     const controller = new AbortController();
     activeAssetTasks.set(pid, controller);
@@ -303,7 +303,7 @@ export function useAssetActions(): AssetActions {
 
     if (hasActiveTask(activeAssetTasks, targetProjectId)) return;
 
-    const trace = beginTrace("生成资产图", { projectId: targetProjectId, options: { ...opts } });
+    const trace = beginTrace("logmsg.trace.generateAssetImages", { projectId: targetProjectId, options: { ...opts } });
 
     const generatePortraits = opts?.generatePortraits !== false;
     const generateScenes = opts?.generateScenes !== false;

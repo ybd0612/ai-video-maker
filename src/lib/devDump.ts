@@ -14,7 +14,14 @@
 import { useProjectStore } from "@/stores/projectStore";
 import { useSettingsStore } from "@/stores/settingsStore";
 import { sanitizeForDump } from "@/lib/dumpSanitize";
-import { getLogSnapshot, logger, subscribeLog, type LogEntry } from "@/lib/logger";
+import {
+  getLogSnapshot,
+  isLogMessageKey,
+  logger,
+  subscribeLog,
+  type LogEntry,
+} from "@/lib/logger";
+import { getTranslation, type TranslationKey } from "@/i18n";
 
 const DUMP_ENDPOINT = "/__debug/dump";
 const LOG_ENDPOINT = "/__debug/log";
@@ -92,7 +99,7 @@ export async function dumpExtractLog(payload: {
   usage?: { promptTokens?: number; completionTokens?: number };
 }): Promise<void> {
   // 统一进日志流：面板可见 + 落进 runtime.log（与 extract-logs/ 文件同步取证）
-  logger.warn("llm", "资产提取原始响应留痕（JSON 解析异常取证）", {
+  logger.warn("llm", "logmsg.extractRawResponse", {
     ideaChars: payload.idea.length,
     raw: payload.raw,
     ...payload.usage,
@@ -131,11 +138,17 @@ export function setupLogDump(): void {
     if (pending.length === 0) return;
     const batch = pending;
     pending = [];
+    // 落盘前把 logmsg.* 消息翻译为当前语言，runtime.log 直接可读
+    const localized = batch.map((entry) =>
+      isLogMessageKey(entry.message)
+        ? { ...entry, message: getTranslation(entry.message as TranslationKey) }
+        : entry,
+    );
     try {
       await fetch(LOG_ENDPOINT, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ session: LOG_SESSION, entries: batch }),
+        body: JSON.stringify({ session: LOG_SESSION, entries: localized }),
       });
     } catch (err) {
       console.debug("[devDump] log flush failed:", err);
@@ -151,5 +164,5 @@ export function setupLogDump(): void {
     if (timer === undefined) timer = setTimeout(() => void flush(), LOG_FLUSH_MS);
   });
 
-  logger.info("app", "页面会话开始", { sessionId: LOG_SESSION });
+  logger.info("app", "logmsg.sessionStart", { sessionId: LOG_SESSION });
 }

@@ -5,6 +5,7 @@
 
 import { FFmpeg } from "@ffmpeg/ffmpeg";
 import { toBlobURL } from "@ffmpeg/util";
+import { getTranslation } from "@/i18n";
 
 let ffmpegInstance: FFmpeg | null = null;
 
@@ -64,7 +65,9 @@ async function getFFmpeg(): Promise<FFmpeg> {
     }
   }
 
-  throw loadError instanceof Error ? loadError : new Error("FFmpeg 核心加载失败。");
+  throw loadError instanceof Error
+    ? loadError
+    : new Error(getTranslation("error.ffmpegLoadFailed"));
 }
 
 export interface RenderOptions {
@@ -180,7 +183,8 @@ async function runConcat(
  */
 export async function concatenateVideos(opts: RenderOptions): Promise<string> {
   const { videoUrls, onProgress, signal } = opts;
-  if (videoUrls.length === 0) throw new Error("没有可拼接的视频。");
+  if (videoUrls.length === 0)
+    throw new Error(getTranslation("error.noVideoToConcat"));
 
   // 单镜头项目同样包一层 Blob URL：直接返回远程 URL 时，跨域下载的
   // a.download 文件名不生效（可能打开新页面而非下载），且 revokeObjectURL 无意义。
@@ -210,7 +214,7 @@ export async function concatenateVideos(opts: RenderOptions): Promise<string> {
   try {
     // Download all videos into FFmpeg virtual filesystem
     for (let i = 0; i < videoUrls.length; i++) {
-      if (signal?.aborted) throw new Error("拼接已取消。");
+      if (signal?.aborted) throw new Error(getTranslation("error.concatCancelled"));
       const originalUrl = videoUrls[i];
       const proxyUrl = toProxyUrl(originalUrl);
       const data = await fetchVideoBytes(proxyUrl, originalUrl, signal);
