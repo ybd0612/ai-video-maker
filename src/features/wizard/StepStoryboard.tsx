@@ -4,7 +4,7 @@
 // Uses asset context (characters + scene references) for consistency.
 // ────────────────────────────────────────────────────────────────────────────
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useProjectStore, selectActiveProject, type Asset } from "@/stores/projectStore";
 import { useT, type TranslationKey } from "@/i18n";
 import { ShotCard } from "./ShotCard";
@@ -81,6 +81,39 @@ export function StepStoryboard() {
       useDualFrame: false,
     });
   };
+
+  // 自动生成分镜：挂载 / 镜头数变化时触发一次（与 StepImages 自动生成同模式）。
+  // 触发条件收紧为「没有任何镜头携带内容」（shots 为空，或只有手动添加的空壳镜头）：
+  // - 空壳无内容可丢，不弹覆盖确认，直接生成；
+  // - 已有真实分镜内容时绝不自动覆盖（重新生成走顶部按钮 + 确认弹窗）。
+  // 依赖只放 [shots.length]（铁律：自动触发 effect 禁止依赖生成状态位，防重入误杀）；
+  // autoStoryboardRef 挡 StrictMode 双挂载 / 状态位变化引起的重复调用。
+  const autoStoryboardRef = useRef(false);
+  const ideaPromptTrimmed = ideaPrompt.trim();
+  useEffect(() => {
+    if (autoStoryboardRef.current) return;
+    if (!ideaPromptTrimmed || !project) return;
+    const hasContent = shots.some((s) => s.scriptText.trim() || s.visualPrompt.trim());
+    if (hasContent) return;
+    autoStoryboardRef.current = true;
+    void (async () => {
+      setIsGenerating(true);
+      setError(null);
+      try {
+        await generateStoryboard(ideaPromptTrimmed);
+        // auto 模式：分镜生成成功后自动推进到图片步骤（与手动生成行为一致）
+        const latest = useProjectStore.getState().projects.find((p) => p.id === project.id);
+        if (latest?.automationMode === "auto") {
+          setWizardStep(4);
+        }
+      } catch (err) {
+        setError(err instanceof Error ? err.message : String(err));
+      } finally {
+        setIsGenerating(false);
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [shots.length, ideaPromptTrimmed]);
 
   // Show generate prompt when no shots exist
   if (shots.length === 0) {
