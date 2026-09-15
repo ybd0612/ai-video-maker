@@ -270,6 +270,12 @@ export function LogConsoleDock() {
         {copied && <span className="text-[0.625rem] text-success">{t("log.copied")}</span>}
       </div>
 
+      {import.meta.env.DEV && (
+        <p className="border-b border-line-soft bg-raised/40 px-2 py-0.5 text-[0.625rem] text-ink-5">
+          {t("log.localHint")}
+        </p>
+      )}
+
       {traceFilter && (
         <div className="flex items-center gap-2 border-b border-line-soft bg-accent-deep/20 px-2 py-0.5 text-[0.625rem] text-accent">
           <span className="truncate">

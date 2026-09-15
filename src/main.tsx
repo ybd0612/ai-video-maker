@@ -3,7 +3,7 @@ import { createRoot } from "react-dom/client";
 import "@/styles/globals.css";
 import App from "./App";
 import { useProjectStore } from "@/stores/projectStore";
-import { setupDevDump } from "@/lib/devDump";
+import { setupDevDump, setupLogDump } from "@/lib/devDump";
 
 // Expose store for debugging / browser automation
 (window as unknown as Record<string, unknown>).__projectStore = useProjectStore;
@@ -12,6 +12,7 @@ import { setupDevDump } from "@/lib/devDump";
 // (via the debugDumpPlugin Vite middleware) for local debugging.
 if (import.meta.env.DEV) {
   setupDevDump();
+  setupLogDump();
 }
 
 createRoot(document.getElementById("root")!).render(

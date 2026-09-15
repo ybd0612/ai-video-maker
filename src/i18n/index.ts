@@ -667,6 +667,7 @@ const zh = {
   "log.showPanel": "显示日志面板",
   "log.hidePanel": "隐藏日志面板",
   "log.record": "记录运行日志（内存最多 1000 条）",
+  "log.localHint": "开发模式：日志同时以 NDJSON 追加写入 debug-dump/runtime.log（可直接交给 AI 分析）",
 
 } as const;
 
@@ -1333,6 +1334,7 @@ const en = {
   "log.showPanel": "Show log panel",
   "log.hidePanel": "Hide log panel",
   "log.record": "Record runtime log (max 1000 entries in memory)",
+  "log.localHint": "Dev mode: entries are also appended as NDJSON to debug-dump/runtime.log (ready for AI analysis)",
 
 } as const;
 

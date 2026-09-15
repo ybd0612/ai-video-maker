@@ -6,13 +6,20 @@
 // Flow: store change → debounce → sanitize → POST /__debug/dump
 // The Vite plugin (vite-plugins/debugDumpPlugin.ts, apply:"serve") writes the
 // payload to debug-dump/state.json. Production builds never register this.
+//
+// 同时提供运行日志落盘：logger 的新增条目经 250ms 合并后 POST /__debug/log，
+// 由插件以 NDJSON 追加写入 debug-dump/runtime.log（生成环境不可用，改用面板导出）。
 // ────────────────────────────────────────────────────────────────────────────
 
 import { useProjectStore } from "@/stores/projectStore";
 import { useSettingsStore } from "@/stores/settingsStore";
 import { sanitizeForDump } from "@/lib/dumpSanitize";
+import { getLogSnapshot, logger, subscribeLog, type LogEntry } from "@/lib/logger";
 
 const DUMP_ENDPOINT = "/__debug/dump";
+const LOG_ENDPOINT = "/__debug/log";
+/** 日志落盘合批窗口：既能近实时看到卡住的调用，又避免每条一次请求 */
+const LOG_FLUSH_MS = 250;
 const DEBOUNCE_MS = 800;
 /** Matches the limit enforced by the Vite plugin. */
 const MAX_PAYLOAD_BYTES = 20 * 1024 * 1024;
@@ -84,6 +91,12 @@ export async function dumpExtractLog(payload: {
   /** 模型返回的 token 用量（观察 max_tokens 边界用） */
   usage?: { promptTokens?: number; completionTokens?: number };
 }): Promise<void> {
+  // 统一进日志流：面板可见 + 落进 runtime.log（与 extract-logs/ 文件同步取证）
+  logger.warn("llm", "资产提取原始响应留痕（JSON 解析异常取证）", {
+    ideaChars: payload.idea.length,
+    raw: payload.raw,
+    ...payload.usage,
+  });
   if (!import.meta.env.DEV) return;
   try {
     await fetch("/__debug/extract-log", {
@@ -94,4 +107,49 @@ export async function dumpExtractLog(payload: {
   } catch (err) {
     console.debug("[devDump] extract log failed:", err);
   }
+}
+
+/* ── 运行日志落盘（DEV） ─────────────────────────────────────────────────── */
+
+/** 本次页面会话标识：写入每行日志，便于在 runtime.log 中区分刷新边界 */
+const LOG_SESSION = Math.random().toString(36).slice(2, 10);
+
+/**
+ * DEV-ONLY: 把 logger 的新增条目增量写入 debug-dump/runtime.log（NDJSON）。
+ * best-effort：失败仅 console.debug，绝不影响主流程；生成构建不注册。
+ * 生成环境要看日志请用日志面板的「导出 JSON」。
+ */
+export function setupLogDump(): void {
+  if (!import.meta.env.DEV) return;
+
+  let lastId = 0;
+  let pending: LogEntry[] = [];
+  let timer: ReturnType<typeof setTimeout> | undefined;
+
+  const flush = async (): Promise<void> => {
+    timer = undefined;
+    if (pending.length === 0) return;
+    const batch = pending;
+    pending = [];
+    try {
+      await fetch(LOG_ENDPOINT, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ session: LOG_SESSION, entries: batch }),
+      });
+    } catch (err) {
+      console.debug("[devDump] log flush failed:", err);
+    }
+  };
+
+  subscribeLog(() => {
+    const all = getLogSnapshot();
+    const fresh = all.filter((entry) => entry.id > lastId);
+    if (fresh.length === 0) return;
+    lastId = fresh[fresh.length - 1].id;
+    pending.push(...fresh);
+    if (timer === undefined) timer = setTimeout(() => void flush(), LOG_FLUSH_MS);
+  });
+
+  logger.info("app", "页面会话开始", { sessionId: LOG_SESSION });
 }
