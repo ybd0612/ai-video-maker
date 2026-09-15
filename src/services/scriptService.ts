@@ -10,6 +10,7 @@ import {
   buildSystemPrompt as buildTaskSystemPrompt,
   getActiveRules,
 } from "@/lib/promptRules";
+import { extractJsonFromResponse, parseJsonFromResponse } from "@/lib/jsonResponse";
 
 interface GenerateScriptOptions {
   apiKey: string;
@@ -106,33 +107,6 @@ export interface GenerateScriptResult {
  * 二次翻译在 JSON 解析失败时用 "Camera slowly pans, gentle movement" 等兜底文案
  * 覆盖完整提示词，导致视频请求体 prompt 内容缺失（实测问题）。
  */
-
-/**
- * Extract JSON object from a model response that may contain markdown fences,
- * preamble text, or trailing commentary.
- */
-function extractJsonFromResponse(content: string): string | null {
-  const fenced = content.match(/```(?:json)?\s*\n?([\s\S]*?)```/);
-  if (fenced) {
-    const inner = fenced[1].trim();
-    if (inner.startsWith("{")) return inner;
-  }
-
-  const start = content.indexOf("{");
-  if (start === -1) return null;
-
-  let depth = 0;
-  for (let i = start; i < content.length; i++) {
-    if (content[i] === "{") depth++;
-    if (content[i] === "}") depth--;
-    if (depth === 0) {
-      return content.slice(start, i + 1);
-    }
-  }
-
-  const fallback = content.match(/\{[\s\S]*\}/);
-  return fallback ? fallback[0] : null;
-}
 
 const MAX_SCRIPT_RETRIES = 2;
 
@@ -288,15 +262,15 @@ export async function generateScript(
     }
 
     try {
-      const parsed = JSON.parse(jsonStr) as {
+      const parsed = parseJsonFromResponse<{
         shots: RawShot[];
         characters?: RawCharacter[];
         products?: RawProduct[];
         props?: RawProp[];
         scenes?: RawScene[];
         styles?: RawStyle[];
-      };
-      if (!Array.isArray(parsed.shots) || parsed.shots.length === 0) {
+      }>(content);
+      if (!parsed || !Array.isArray(parsed.shots) || parsed.shots.length === 0) {
         throw new Error("Model returned empty or invalid shots array.");
       }
 
@@ -487,9 +461,8 @@ export async function extractVisualDirectionFromIdea(
     temperature: 0.3,
     enableThinking: false,
   });
-  const jsonStr = extractJsonFromResponse(result.content);
-  if (!jsonStr) throw new Error("无法从模型响应中提取视觉方向 JSON。");
-  const parsed = JSON.parse(jsonStr) as Partial<RawStyle>;
+  const parsed = parseJsonFromResponse<Partial<RawStyle>>(result.content);
+  if (!parsed) throw new Error("无法解析模型返回的视觉方向 JSON，请重试。");
   return {
     name: parsed.name ?? "",
     description: parsed.description ?? parsed.name ?? "",
@@ -554,18 +527,19 @@ export async function extractAssetsFromIdea(
     );
   }
 
-  const jsonStr = extractJsonFromResponse(content);
-  if (!jsonStr) {
-    throw new Error("无法从模型响应中提取资产 JSON。");
-  }
-
-  const parsed = JSON.parse(jsonStr) as {
+  const parsed = parseJsonFromResponse<{
     characters?: RawCharacter[];
     products?: RawProduct[];
     props?: RawProp[];
     scenes?: RawScene[];
     styles?: RawStyle[];
-  };
+  }>(content);
+  if (!parsed) {
+    const jsonStr = extractJsonFromResponse(content);
+    throw new Error(
+      `无法解析模型返回的资产 JSON，请重试。${jsonStr ? `响应片段：${jsonStr.slice(0, 200)}` : ""}`,
+    );
+  }
 
   const map = <T extends RawCharacter | RawProduct | RawProp | RawScene, D>(
     arr: T[] | undefined,
