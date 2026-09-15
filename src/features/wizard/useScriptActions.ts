@@ -257,11 +257,6 @@ export function useScriptActions(
       }
 
       useProjectStore.getState().setProjectStatusById(targetProjectId, "idle");
-      useProjectStore.getState().addHistory(
-        "script_generated",
-        { key: "history.scriptGenerated", params: { count: shots.length } },
-        targetProjectId,
-      );
     } catch (err) {
       useProjectStore.getState().updateProjectById(targetProjectId, (p) => ({
         ...p,
@@ -336,11 +331,6 @@ export function useScriptActions(
         restoreProjectStatusIfReady(
           targetProjectId,
           (p) => p.shots.every((s) => s.status !== "failed"),
-        );
-        useProjectStore.getState().addHistory(
-          "shot_regenerated",
-          { key: "history.shotRerolled", params: { index: shot.index + 1 } },
-          targetProjectId,
         );
       }
     } catch (err) {

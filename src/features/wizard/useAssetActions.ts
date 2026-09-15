@@ -274,7 +274,6 @@ export function useAssetActions(): AssetActions {
         styleReferenceUrl: url,
         styleReferenceError: undefined,
       }));
-      useProjectStore.getState().addHistory("style_generated", { key: "history.styleGenerated" }, pid);
     } catch (err) {
       useProjectStore.getState().updateProjectById(pid, (currentProject) => ({
         ...currentProject,

@@ -268,6 +268,30 @@ describe("migratePersistedState：v13 → v14（视觉方向与风格资产结�
   });
 });
 
+describe("migratePersistedState：v14 → v15（停用操作历史）", () => {
+  it("删除持久化的 history 数组，其余状态原样保留", () => {
+    const state = {
+      version: 14,
+      projects: [{ id: "p1", title: "t", assets: [] }],
+      history: [
+        { id: "hist_1", projectId: "p1", action: "project_created", description: "x", timestamp: 1 },
+      ],
+    };
+
+    const migrated = migratePersistedState(state, 14) as Record<string, unknown>;
+    expect("history" in migrated).toBe(false);
+    expect((migrated.projects as Array<Record<string, unknown>>)[0].title).toBe("t");
+  });
+
+  it("无 history 字段时不抛错，结果幂等", () => {
+    const state = { version: 14, projects: [{ id: "p1", assets: [] }] };
+    expect(() => migratePersistedState(state, 14)).not.toThrow();
+    const first = migratePersistedState(JSON.parse(JSON.stringify(state)), 14);
+    const second = migratePersistedState(JSON.parse(JSON.stringify(first)), 14);
+    expect(second).toEqual(first);
+  });
+});
+
 describe("migratePersistedState：v1 全链路迁移不回归", () => {
   it("v1 单项目 → v9 多项目结构，链路完整跑通", () => {
     const state = {

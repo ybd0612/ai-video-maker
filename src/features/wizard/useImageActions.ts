@@ -210,11 +210,6 @@ export function useImageActions(): ImageActions {
       restoreProjectStatusIfReady(targetProjectId, (currentProject) =>
         currentProject.shots.every((item) => !!item.imageUrl),
       );
-      useProjectStore.getState().addHistory(
-        "shot_regenerated",
-        { key: "history.shotImageRerolled", params: { index: shot.index + 1 } },
-        targetProjectId,
-      );
     } catch (err) {
       store.setShotStatusByProjectIdIfRevision(
         targetProjectId,

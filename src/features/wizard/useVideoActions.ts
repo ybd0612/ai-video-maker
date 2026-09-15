@@ -222,11 +222,6 @@ export function useVideoActions(): VideoActions {
       restoreProjectStatusIfReady(targetProjectId, (currentProject) =>
         currentProject.shots.every((item) => !!item.videoUrl),
       );
-      useProjectStore.getState().addHistory(
-        "shot_regenerated",
-        { key: "history.shotVideoRerolled", params: { index: shot.index + 1 } },
-        targetProjectId,
-      );
     } catch (err) {
       if (err instanceof VideoTaskCreatedError) {
         if (!err.stillRunning) {

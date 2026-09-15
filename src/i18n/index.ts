@@ -556,18 +556,6 @@ const zh = {
   "wizard.taskRunningSwitchTitle": "任务仍在后台运行",
   "wizard.taskRunningSwitchConfirm": "项目「{title}」仍有任务在后台运行，切换后任务将继续完成并写回该项目。确定切换？",
 
-  // History descriptions（L10nText：持久化 key+params，渲染时经 translateL10n 按当前语言翻译）
-  "history.projectCreated": "创建项目「{title}」",
-  "history.projectSwitched": "切换到项目「{title}」",
-  "history.projectDeleted": "删除项目「{title}」",
-  "history.projectDuplicated": "复制项目「{title}」",
-  "history.projectCleared": "清空当前项目",
-  "history.settingsChanged": "更新设置（API Key / 套餐）",
-  "history.styleGenerated": "生成风格参考图",
-  "history.scriptGenerated": "生成分镜（{count} 个镜头）",
-  "history.shotRerolled": "重新生成镜头 {index}",
-  "history.shotImageRerolled": "重新生成镜头图片 {index}",
-  "history.shotVideoRerolled": "重新生成镜头视频 {index}",
 
   // Service-layer error messages（非 React 上下文瞬时错误，经 getTranslation 定格当前语言）
   "error.chatNonJson": "Chat API 返回了非 JSON 响应 (Content-Type: {contentType})。响应前 200 字符：{body}",
@@ -1228,18 +1216,6 @@ const en = {
   "wizard.taskRunningSwitchTitle": "Task still running",
   "wizard.taskRunningSwitchConfirm": "Project \"{title}\" still has tasks running in the background. They will continue and write back to that project. Switch anyway?",
 
-  // History descriptions (L10nText: persisted as key+params, rendered via translateL10n)
-  "history.projectCreated": "Created project \"{title}\"",
-  "history.projectSwitched": "Switched to project \"{title}\"",
-  "history.projectDeleted": "Deleted project \"{title}\"",
-  "history.projectDuplicated": "Duplicated project \"{title}\"",
-  "history.projectCleared": "Cleared current project",
-  "history.settingsChanged": "Updated settings (API Key / plan)",
-  "history.styleGenerated": "Generated style reference image",
-  "history.scriptGenerated": "Generated storyboard ({count} shots)",
-  "history.shotRerolled": "Re-rolled shot {index}",
-  "history.shotImageRerolled": "Re-rolled shot image {index}",
-  "history.shotVideoRerolled": "Re-rolled shot video {index}",
 
   // Service-layer error messages (instant errors outside React context, frozen via getTranslation)
   "error.chatNonJson": "Chat API returned a non-JSON response (Content-Type: {contentType}). First 200 chars: {body}",
@@ -1351,35 +1327,6 @@ const en = {
 export type TranslationKey = keyof typeof zh;
 
 const dictionaries: Record<string, Record<TranslationKey, string>> = { zh, en };
-
-/* ── Persistable localized text（历史记录等需要持久化后跨语言渲染的场景） ── */
-
-/**
- * 可持久化的本地化文本。
- * 旧持久化数据中的描述为纯字符串（天然兼容，渲染时原样返回）；
- * 新数据写为 { key, params }，渲染时按当前语言翻译。
- */
-export type L10nText = {
-  key: TranslationKey;
-  params?: Record<string, string | number>;
-};
-
-/** 翻译函数最小接口（useT / getTranslation 的返回函数均满足） */
-export type TranslateFn = (
-  key: TranslationKey,
-  params?: Record<string, string | number>,
-) => string;
-
-/**
- * 渲染「纯字符串 | L10nText」union 的持久化描述：
- * - 纯字符串（旧数据兜底）原样返回；
- * - L10nText 走 t(key, params) 按当前语言插值翻译；
- * - 未知 key（持久化数据中出现已被移除的 key）由 t 的 dict[key] ?? key 兜底原样返回。
- */
-export function translateL10n(desc: string | L10nText, t: TranslateFn): string {
-  if (typeof desc === "string") return desc;
-  return t(desc.key, desc.params);
-}
 
 /* ── Translation hook ───────────────────────────────────────────────────── */
 

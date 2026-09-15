@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { X, Eye, EyeOff, CheckCircle2, Loader2, AlertTriangle, Plus, Trash2, RotateCcw, Download, Upload } from "lucide-react";
 import { useSettingsStore } from "@/stores/settingsStore";
-import { useProjectStore } from "@/stores/projectStore";
 import { motion, AnimatePresence } from "framer-motion";
 import { LogViewerPanel } from "@/components/LogViewerPanel";
 import { resolveBaseUrl } from '@/lib/resolveBaseUrl';
@@ -378,7 +377,6 @@ export function SettingsDialog() {
       return;
     }
     setProviderConfig({ apiKey, baseUrl, plan });
-    useProjectStore.getState().addHistory("settings_changed", { key: "history.settingsChanged" });
     showToast("success", t("settings.saved"));
     setOpen(false);
   };

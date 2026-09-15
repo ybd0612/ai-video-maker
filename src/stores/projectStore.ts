@@ -7,7 +7,6 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 // 仅类型导入（verbatimModuleSyntax 下运行时零依赖，无循环加载风险）
-import type { L10nText } from "@/i18n";
 import { normalizeCharacterDescription } from "@/lib/promptComposer";
 import { normalizeAssetDetails } from "@/lib/assetDetails";
 
@@ -269,31 +268,6 @@ export interface Project {
   videoGenerationStarted?: boolean;
 }
 
-export type HistoryAction =
-  | "project_created"
-  | "project_deleted"
-  | "project_switched"
-  | "script_generated"
-  | "style_generated"
-  | "pipeline_started"
-  | "pipeline_completed"
-  | "pipeline_failed"
-  | "shot_regenerated"
-  | "settings_changed";
-
-export interface HistoryEntry {
-  id: string;
-  projectId: string;
-  action: HistoryAction;
-  /**
-   * 描述文案：旧持久化数据为纯字符串（渲染时原样返回）；
-   * 新数据为 L10nText（key+params），渲染时经 translateL10n 按当前语言翻译。
-   * 不做 persist 迁移，纯字符串天然兼容 union。
-   */
-  description: string | L10nText;
-  timestamp: number;
-}
-
 /* ── ID generator ───────────────────────────────────────────────────────── */
 
 let counter = 0;
@@ -311,7 +285,6 @@ interface ProjectState {
   /* Multi-project state */
   projects: Project[];
   activeProjectId: string | null;
-  history: HistoryEntry[];
 
   /* Project actions */
   createProject: (title: string) => Project;
@@ -390,8 +363,6 @@ interface ProjectState {
   setVideoGenerationStartedByProjectId: (projectId: string, v: boolean) => void;
 
   /* History actions */
-  addHistory: (action: HistoryAction, description: string | L10nText, projectId?: string) => void;
-  clearHistory: () => void;
 }
 
 /* ── Helpers ────────────────────────────────────────────────────────────── */
@@ -615,7 +586,6 @@ export function migratePersistedState(
     if (project) {
       state.projects = [project];
       state.activeProjectId = project.id;
-      state.history = [];
     }
   }
 
@@ -935,6 +905,13 @@ export function migratePersistedState(
     }
   }
 
+  // Migrate from v14 to v15: 停用操作历史（左侧「历史」入口已移除）。
+  // 删除持久化的 history 数组，避免脏数据长期驻留 localStorage。幂等。
+  if (version < 15) {
+    const withHistory = state as Record<string, unknown>;
+    if ("history" in withHistory) delete withHistory.history;
+  }
+
   return state;
 }
 
@@ -945,7 +922,6 @@ export const useProjectStore = create<ProjectState>()(
     (set, get) => ({
       projects: [],
       activeProjectId: null,
-      history: [],
 
       /* ── Project actions ────────────────────────────────────────────── */
 
@@ -975,7 +951,6 @@ export const useProjectStore = create<ProjectState>()(
           projects: [...s.projects, project],
           activeProjectId: project.id,
         }));
-        get().addHistory("project_created", { key: "history.projectCreated", params: { title } });
         return project;
       },
 
@@ -983,7 +958,6 @@ export const useProjectStore = create<ProjectState>()(
         const project = get().projects.find((p) => p.id === id);
         if (!project) return;
         set({ activeProjectId: id });
-        get().addHistory("project_switched", { key: "history.projectSwitched", params: { title: project.title } });
       },
 
       updateProject: (updates) =>
@@ -1041,7 +1015,6 @@ export const useProjectStore = create<ProjectState>()(
               : s.activeProjectId;
           return { projects: remaining, activeProjectId: newActiveId };
         });
-        get().addHistory("project_deleted", { key: "history.projectDeleted", params: { title: project.title } });
       },
 
       duplicateProject: (id) => {
@@ -1075,7 +1048,6 @@ export const useProjectStore = create<ProjectState>()(
           projects: [...s.projects, dup],
           activeProjectId: dup.id,
         }));
-        get().addHistory("project_created", { key: "history.projectDuplicated", params: { title: source.title } });
         return dup;
       },
 
@@ -1106,7 +1078,6 @@ export const useProjectStore = create<ProjectState>()(
               ? s.projects.find((p) => p.id !== activeProjectId)?.id ?? null
               : null,
         }));
-        get().addHistory("project_deleted", { key: "history.projectCleared" });
       },
 
       /* ── Shot actions ───────────────────────────────────────────────── */
@@ -1554,29 +1525,10 @@ export const useProjectStore = create<ProjectState>()(
 
       setVideoGenerationStartedByProjectId: (projectId, v) =>
         set((s) => ({ projects: s.projects.map((p) => p.id === projectId ? { ...p, videoGenerationStarted: v, updatedAt: Date.now() } : p) })),
-
-      /* ── History actions ────────────────────────────────────────────── */
-
-      addHistory: (action, description, projectId) => {
-        const { activeProjectId } = get();
-        // 异步任务完成后写历史时显式传入发起项目 ID，避免记录到已切换的活动项目
-        const entry: HistoryEntry = {
-          id: newId("hist"),
-          projectId: projectId ?? activeProjectId ?? "",
-          action,
-          description,
-          timestamp: Date.now(),
-        };
-        set((s) => ({
-          history: [...s.history.slice(-199), entry], // keep last 200
-        }));
-      },
-
-      clearHistory: () => set({ history: [] }),
     }),
     {
       name: "wxhb-project",
-      version: 14,
+      version: 15,
       // 迁移主体提取为导出纯函数 migratePersistedState（见文件上方），便于单测
       migrate: (persisted: unknown, version: number) =>
         migratePersistedState(persisted, version),
