@@ -14,6 +14,8 @@ import {
   getStyleReferenceUrl,
   composeImageToImagePrompt,
   composePortraitPrompt,
+  assetImageBoundary,
+  composeStyleReferencePrompt,
 } from "@/lib/promptComposer";
 import { buildSystemPrompt as buildRulesSystemPrompt, getActiveRules } from "@/lib/promptRules";
 
@@ -171,9 +173,7 @@ export function useAssetActions(): AssetActions {
       }
 
       const stylePrompt = styleAsset.prompt.trim() || fallbackStylePrompt(latest.style.trim());
-      const imagePrompt =
-        `${stylePrompt}. Visual style reference / mood board, cohesive composition, ` +
-        `no text, no watermark, no character in focus.`;
+      const imagePrompt = composeStyleReferencePrompt(stylePrompt);
       const { size, ratio } = aspectRatioToImageParams(latest.aspectRatio);
 
       const url = await generateImage({
@@ -296,9 +296,7 @@ export function useAssetActions(): AssetActions {
                   apiKey: providerConfig.apiKey,
                   baseUrl: providerConfig.baseUrl,
                   prompt: composeImageToImagePrompt({
-                    change: styleInstruction
-                      ? `${styleInstruction.trim()} Render the scene below as a clean environment reference image`
-                      : "Render the scene below as a clean environment reference image",
+                    change: `${assetImageBoundary("scene")} ${styleInstruction.trim()}`,
                     newStyle: stylePrompt,
                     keep: scene.prompt,
                   }),
@@ -336,9 +334,7 @@ export function useAssetActions(): AssetActions {
                   apiKey: providerConfig.apiKey,
                   baseUrl: providerConfig.baseUrl,
                   prompt: composeImageToImagePrompt({
-                    change: styleInstruction
-                      ? `${styleInstruction.trim()} Render the product below as a clean product reference image`
-                      : "Render the product below as a clean product reference image",
+                    change: `${assetImageBoundary("product")} ${styleInstruction.trim()}`,
                     newStyle: stylePrompt,
                     keep: product.prompt,
                   }),
@@ -376,9 +372,7 @@ export function useAssetActions(): AssetActions {
                   apiKey: providerConfig.apiKey,
                   baseUrl: providerConfig.baseUrl,
                   prompt: composeImageToImagePrompt({
-                    change: styleInstruction
-                      ? `${styleInstruction.trim()} Render the prop below as a clean key-object reference image`
-                      : "Render the prop below as a clean key-object reference image",
+                    change: `${assetImageBoundary("prop")} ${styleInstruction.trim()}`,
                     newStyle: stylePrompt,
                     keep: prop.prompt,
                   }),

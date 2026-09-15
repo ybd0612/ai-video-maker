@@ -13,6 +13,8 @@ import {
   pickShotReferences,
   getStyleReferenceUrl,
   getStylePrompt,
+  assetImageBoundary,
+  composeStyleReferencePrompt,
   normalizeCharacterDescription,
   parseCharacterDescription,
 } from "@/lib/promptComposer";
@@ -95,6 +97,22 @@ describe("composeImageToImagePrompt", () => {
 });
 
 /* ── composeMultiReferencePrompt ──────────────────────────────────────────── */
+
+describe("资产主体边界与视觉方向", () => {
+  it("按资产类型生成最小主体边界，同时保留让模型生成具体提示词的空间", () => {
+    expect(assetImageBoundary("scene")).toContain("Environment-only");
+    expect(assetImageBoundary("product")).toContain("Product-only");
+    expect(assetImageBoundary("prop")).toContain("Prop-only");
+    expect(assetImageBoundary("scene")).not.toContain("rabbit");
+  });
+
+  it("视觉方向参考图只强调可复用视觉语言", () => {
+    const prompt = composeStyleReferencePrompt("soft 3D cartoon rendering");
+    expect(prompt).toContain("soft 3D cartoon rendering");
+    expect(prompt).toContain("Pure visual style board");
+    expect(prompt).toContain("no recognizable subject");
+  });
+});
 
 describe("composeMultiReferencePrompt", () => {
   it("参考图说明在前（按 index），目标场景在后，尾部固定图像关系指令", () => {

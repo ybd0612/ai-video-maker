@@ -87,6 +87,21 @@ export function composeImageToImagePrompt(i: {
   return parts.join(", ");
 }
 
+/**
+ * 资产生图的最小主体边界：保持共享风格参考图，同时要求模型只呈现当前资产。
+ * 具体外观提示词仍由资产提取/编辑模型生成，避免在代码中重写资产内容。
+ */
+export function assetImageBoundary(type: "scene" | "product" | "prop"): string {
+  if (type === "scene") return "Environment-only reference image; show the environment itself, not a story scene or characters.";
+  if (type === "product") return "Product-only reference image; show only the product itself, not people or a usage scene.";
+  return "Prop-only reference image; show only the named object itself, not characters or story action.";
+}
+
+/** 视觉方向图只呈现风格语言，不让故事主体进入共享风格参考图。 */
+export function composeStyleReferencePrompt(stylePrompt: string): string {
+  return `${stylePrompt.trim()}. Pure visual style board showing only medium, material, color, lighting and texture; no recognizable subject, character, creature, product or narrative content.`;
+}
+
 /* ── 多图合成（分镜图） ──────────────────────────────────────────────────── */
 
 /**

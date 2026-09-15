@@ -63,7 +63,8 @@ export const SKELETONS: Record<PromptTask, { zh: string; en: string }> = {
   "cameraTexture": "镜头质感",
   "composition": "构图倾向",
   "emotion": "整体情绪"
-}`,
+}
+只提取可复用的视觉语言：媒介、材质、色彩、光影、镜头质感、构图规律与氛围。不要写具体人物、动物、角色、产品、道具、故事动作或角色关系。`,
     en: `You are a visual director. Extract a project-level visual direction from the user's video idea. Return JSON only:
 {
   "name": "Visual direction name",
@@ -73,7 +74,8 @@ export const SKELETONS: Record<PromptTask, { zh: string; en: string }> = {
   "cameraTexture": "Camera texture",
   "composition": "Composition tendency",
   "emotion": "Overall emotion"
-}`,
+}
+Extract only reusable visual language: medium, material, color, lighting, camera texture, composition patterns and atmosphere. Do not write specific people, animals, characters, products, props, story actions or character relationships.`,
   },
   /* ── 步骤 1 轻量资产提取（scriptService.extractAssetsFromIdea） ── */
   extractAssets: {
@@ -116,6 +118,8 @@ export const SKELETONS: Record<PromptTask, { zh: string; en: string }> = {
 {{#safety}}
 {{safety}}
 {{/safety}}
+- appearancePrompt 必须只描述对应资产本身的可视化外观，不写故事动作、角色关系或其他资产；视觉方向只提供画风参考，不把故事主体写入视觉方向描述
+- 场景 appearancePrompt 只描述环境、空间、时间、天气、光线、材质与氛围；产品和道具 appearancePrompt 只描述物件本体
 - 不要生成分镜，只返回上述 JSON`,
     en: `You are a professional video asset extraction assistant. The user will give you a video topic or idea. Extract asset info and return strictly in this JSON format, no other text:
 {
@@ -156,6 +160,8 @@ Examples:
 {{#safety}}
 {{safety}}
 {{/safety}}
+- appearancePrompt must describe only the visual appearance of its own asset, not story action, character relationships or other assets; the visual direction must contain style language, not story subjects
+- Scene appearancePrompt describes only environment, space, time, weather, lighting, material and atmosphere; product and prop appearancePrompt describe only the object itself
 - Do NOT generate storyboard shots; return only the JSON above`,
   },
 
