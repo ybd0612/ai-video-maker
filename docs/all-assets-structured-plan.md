@@ -2,7 +2,6 @@
 
 > 状态：**已实施**（2026-09-15）
 > 背景：资产生图多轮修补中积累的代码特化逻辑（动画专用风格板模板、全局关键词清洗）跨风格会误伤；且风格资产提取后 6 个结构化字段在部分链路被丢弃。
-
 ## 1. 用户确立的原则（不可违背）
 
 1. **代码只做两件事：结构化数据模型 + 流程控制**（幂等、并发、版本、参考图策略、写回）。
@@ -98,3 +97,94 @@ AssetDetails（全资产类型化）
 - 不做"参考图影响强度"参数（当前 API 无此参数）。
 - 不做图像生成后的视觉内容质检（下一期再评估，需图像理解模型）。
 - 不改 `composePortraitPrompt` 的物种锁定（数据驱动关键词，属一致性保护，非效果判断）。
+
+---
+
+# 第二阶段：参数决策 + 多轮精修（2026-09-15 追加）
+
+> 用户追加原则：**所有影响效果的参数（temperature / top_p / Thinking）也由模型判断**；允许慢、允许多次调用大模型完善内容；框架只搭结构，模型升级即效果提升。
+
+## 9. 参数决策层
+
+### 9.1 设计
+
+```
+用途 + 运行上下文
+  → [LLM·task=generationParams] 决定 temperature / topP / enableThinking
+  → [代码] 区间校验（越界一律拒绝，不夹取不猜测）
+  → [代码] 按 用途+缓存键 缓存，同用途复用
+  → 下发到实际生成调用
+```
+
+新增 `src/lib/generationParams.ts`：
+
+| 导出 | 职责 |
+|---|---|
+| `GenerationPurpose` | 用途枚举（visualDirection / visualDirectionAudit / assetExtraction / storyboard / shotReroll / styleRef / stylePromptAudit / characterAppearance / fieldAssist） |
+| `clampGenerationParams` | 纯函数结构校验：temperature ∈ [0,2]、topP ∈ [0.01,1]、enableThinking 为布尔；越界/类型错/缺失 → 退回 fallback |
+| `resolveGenerationParams` | 调用 `generationParams` 任务规格拿参数；按 `purpose:cacheKey` 缓存；失败退化 `NEUTRAL_GENERATION_PARAMS`（不抛错、不写缓存，下次重试） |
+| `clearGenerationParamCache` | 清缓存（测试/切项目用） |
+
+要点：
+
+- **代码不预设"某用途该用多少温度"**，只做范围校验与缓存——效果判断仍归模型。
+- 参数决策本身是元调用，只能用中性参数（`NEUTRAL_GENERATION_PARAMS`），否则自举递归。
+- 决策失败不阻塞生成链路（文本免费但网络会失败）；下一次调用会重试。
+
+### 9.2 刻意不交给模型的参数（属结构问题，非效果问题）
+
+| 参数 | 原因 |
+|---|---|
+| `max_tokens` | 固定模型上限（65536），防长 JSON 被 `finish_reason=length` 截断 |
+| 图像 `size` / `ratio` | 画幅由项目设置决定 |
+| 视频 `size` / `seconds` / `mode` | 接口约束（Flash 固定 720P）与画幅 |
+| 连通性探测的 `temperature`/`max_tokens` | 协议自检，不是内容生成 |
+
+### 9.3 调用点改造
+
+`ai/index.ts` 新增 `topP`，`openai.ts` 仅在给出时下发 `top_p`；`chatService.ChatOptions` 新增 `purpose` / `paramContext` / `paramCacheKey`（显式 `temperature` 仍保留给结构性场景）。
+
+| 调用点 | purpose |
+|---|---|
+| `scriptService.generateScript` | storyboard |
+| `scriptService.extractVisualDirectionFromIdea` | visualDirection |
+| `scriptService.auditVisualDirection` | visualDirectionAudit |
+| `scriptService.extractAssetsFromIdea` | assetExtraction |
+| `useAssetActions.deriveStylePrompt` | styleRef |
+| `useAssetActions.auditStylePrompt` | stylePromptAudit |
+| `CharacterEditor.deriveAppearance` | characterAppearance |
+| `AssetEditor.applyInstruction` | fieldAssist |
+| `VisualDirectionEditor.applyInstruction` | visualDirection |
+| `chatService.polishText` | fieldAssist |
+
+## 10. 多轮精修循环
+
+新增 `src/lib/refineContent.ts`：
+
+```
+产出 → 审计(clean?) → 越界则采用重写 → 复审计 …… 最多 maxRounds 轮
+```
+
+- 代码只控制轮数与失败兜底；是否越界、如何重写全部由模型判断。
+- 审计抛错 → 保留当前内容并结束（不阻塞主链路）；轮数耗尽仍不 clean → 返回最后一版重写结果。
+
+已接入：
+
+| 链路 | 结构 | 轮数 |
+|---|---|---|
+| 视觉方向 | `extractVisualDirectionFromIdea` → `auditVisualDirection`（新增任务 `visualDirectionAudit`） | 2 |
+| 风格提示词 | `deriveStylePrompt` → `auditStylePrompt` | 2 |
+
+新增 `promptRules` 任务规格：`generationParams`、`visualDirectionAudit`（均为可被用户维护的版本化配置）。
+
+顺带修复：`parseVisualDirection` 现在显式补齐内部判别字段 `kind: "style"`。模型不会返回 `kind`，此前会让 `normalizeAssetDetails` 判定 kind 不匹配而丢弃模型给的 details，退回从描述正则解析（信息损失）。该缺陷由新增单测发现。
+
+## 11. 第二阶段验证
+
+- 新增单测：`tests/lib/refineContent.test.ts`（6 项）、`tests/lib/generationParams.test.ts`（11 项）、`tests/services/scriptService.test.ts`（6 项）。
+- 结果：`npm run test` **304 项通过（25 个文件）**；`npx tsc --noEmit`、`git diff --check`、`npm run build` 全部通过。
+
+## 12. 第二阶段已知取舍
+
+- 每个用途首次调用会多一次参数决策请求（之后走缓存）；文本模型当前免费，成本可接受，换来的是温度/采样随用途与模型升级自动调整。
+- 视觉方向自检在**首次提取**时清单为空（资产尚未提取），此时由模型按"是否描述了具体主体/叙事"自行判断，非清单驱动。

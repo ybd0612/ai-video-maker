@@ -51,12 +51,14 @@ export class OpenAIService implements AIService {
         model: MODELS.text,
         messages: params.messages,
         temperature: params.temperature ?? 0.7,
+        // top_p 仅在参数决策层给出时下发（不给就让服务端用自己的默认值）
+        ...(typeof params.topP === "number" ? { top_p: params.topP } : {}),
         // ⚠️ 必须显式传最大输出：实测不传时服务端缺省 max_tokens=4096，
         // 长内容（分镜/9 行角色描述）会被 finish_reason=length 截断。
         // 统一给到模型最大值（效果优先，不做 token 精打细算），参数不外暴露。
         max_tokens: MAX_OUTPUT_TOKENS,
-        // 默认关闭 Thinking 模式：聊天/脚本生成等任务无需深度推理，
-        // 关闭后所有 token 预算用于实际输出，从根本上避免思考耗尽导致 content 为空，且响应更快。
+        // Thinking 由参数决策层按用途决定（缺省关闭）：关闭后所有 token 预算
+        // 用于实际输出，从根本上避免思考耗尽导致 content 为空。
         chat_template_kwargs: { enable_thinking: params.enableThinking ?? false },
       }),
     });

@@ -5,8 +5,13 @@
 
 export interface ChatParams {
   messages: Array<{ role: "system" | "user" | "assistant"; content: string }>;
-  /** 控制文本派生结果的随机性；角色外貌派生使用低温度保持稳定。 */
+  /**
+   * 采样参数：由 lib/generationParams.ts 的模型决策层给出
+   * （代码不预设"某用途该用多少温度"）。缺省时服务端默认 0.7。
+   */
   temperature?: number;
+  /** 核采样阈值（OpenAI 兼容 top_p），由模型决策层给出 */
+  topP?: number;
   /**
    * 输出预算不可调：统一 MAX_OUTPUT_TOKENS（65536，见 lib/models.ts）。
    * 实测服务端缺省 max_tokens=4096（finish_reason=length 截断），

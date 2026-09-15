@@ -5,6 +5,7 @@
 // ────────────────────────────────────────────────────────────────────────────
 
 import { createAIService } from "@/services/ai/factory";
+import { resolveGenerationParams, type GenerationPurpose } from "@/lib/generationParams";
 import { getTranslation } from "@/i18n";
 
 /* ── Types ──────────────────────────────────────────────────────────────── */
@@ -18,7 +19,17 @@ export interface ChatOptions {
   apiKey: string;
   baseUrl: string;
   messages: ChatMessage[];
+  /**
+   * 采样参数覆盖：仅在"效果参数必须固定"的结构性场景使用（如连通性探测）。
+   * 内容生成一律声明 `purpose`，由参数决策层让模型决定温度/采样/Thinking。
+   */
   temperature?: number;
+  /** 生成用途：声明后由 lib/generationParams.ts 决策本次调用的采样参数 */
+  purpose?: GenerationPurpose;
+  /** 参数决策上下文（运行环境、字段类型等），交给模型判断用 */
+  paramContext?: string;
+  /** 参数决策缓存键（通常为项目 id） */
+  paramCacheKey?: string;
 }
 
 export interface ChatResult {
@@ -64,7 +75,24 @@ export async function chatCompletion(opts: ChatOptions): Promise<ChatResult> {
     apiKey: opts.apiKey,
     baseUrl: opts.baseUrl,
   });
-  return service.chatCompletion({ messages: trimmed, temperature: opts.temperature });
+
+  // 采样参数：显式 temperature 优先（结构性场景），否则由模型按用途决策。
+  const decided = opts.purpose
+    ? await resolveGenerationParams({
+        purpose: opts.purpose,
+        apiKey: opts.apiKey,
+        baseUrl: opts.baseUrl,
+        context: opts.paramContext,
+        cacheKey: opts.paramCacheKey,
+      })
+    : undefined;
+
+  return service.chatCompletion({
+    messages: trimmed,
+    temperature: opts.temperature ?? decided?.temperature,
+    ...(decided?.topP === undefined ? {} : { topP: decided.topP }),
+    ...(decided === undefined ? {} : { enableThinking: decided.enableThinking }),
+  });
 }
 
 /* ── One-click polish ───────────────────────────────────────────────────── */
@@ -100,6 +128,11 @@ export async function polishText(opts: PolishOptions): Promise<string> {
   const result = await chatCompletion({
     apiKey: opts.apiKey,
     baseUrl: opts.baseUrl,
+    purpose: "fieldAssist",
+    paramContext: [
+      "Task: polish and improve a single form field's text, preserving its intent, language and scope.",
+      opts.language === "en" ? "Output language: English" : "Output language: Chinese",
+    ].join("\n"),
     messages: [
       { role: "system", content: opts.systemPrompt },
       { role: "user", content: `${instruction}${content}` },

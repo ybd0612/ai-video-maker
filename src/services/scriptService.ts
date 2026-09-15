@@ -11,6 +11,8 @@ import {
   getActiveRules,
 } from "@/lib/promptRules";
 import { extractJsonFromResponse, parseJsonFromResponse } from "@/lib/jsonResponse";
+import { resolveGenerationParams } from "@/lib/generationParams";
+import type { AuditOutcome } from "@/lib/refineContent";
 
 interface GenerateScriptOptions {
   apiKey: string;
@@ -240,6 +242,19 @@ export async function generateScript(
     baseUrl: opts.baseUrl,
   });
 
+  // 采样参数由模型按用途决定（代码不预设温度）
+  const params = await resolveGenerationParams({
+    purpose: "storyboard",
+    apiKey: opts.apiKey,
+    baseUrl: opts.baseUrl,
+    context: [
+      `Task: generate a complete storyboard (shots + assets) as strict JSON.`,
+      `Language: ${opts.language}`,
+      `Aspect ratio: ${opts.aspectRatio}`,
+      `Known assets: ${opts.assets?.length ?? 0}`,
+    ].join("\n"),
+  });
+
   let lastError: Error | null = null;
 
   for (let attempt = 0; attempt <= MAX_SCRIPT_RETRIES; attempt++) {
@@ -248,9 +263,9 @@ export async function generateScript(
         { role: "system", content: systemPrompt },
         { role: "user", content: opts.prompt },
       ],
-      temperature: 0.7,
-      // 输出预算走 MAX_OUTPUT_TOKENS（65536，效果优先不做 token 精打细算）
-      enableThinking: false,
+      temperature: params.temperature,
+      ...(params.topP === undefined ? {} : { topP: params.topP }),
+      enableThinking: params.enableThinking,
     });
     const content = result.content;
 
@@ -452,32 +467,25 @@ function buildExtractAssetsContext(language: "zh" | "en", assets?: Asset[]): str
 }
 
 /**
- * 轻量资产提取：只返回 characters/products/scenes，不生成分镜。
- * 供步骤 1「AI 提取角色/产品并继续」使用，避免完整分镜生成（8192 tokens）的浪费。
+ * 把模型返回的视觉方向 JSON 规范化为 RawVisualDirection：
+ * details 恒存在（缺字段以空串补齐），旧平铺 6 字段写法同时兼容。
  */
-export async function extractVisualDirectionFromIdea(
-  opts: GenerateScriptOptions,
-): Promise<RawVisualDirection> {
-  const systemPrompt = buildTaskSystemPrompt("visualDirection", opts.language, getActiveRules());
-  const service = createAIService({ provider: "openai", apiKey: opts.apiKey, baseUrl: opts.baseUrl });
-  const result = await service.chatCompletion({
-    messages: [
-      { role: "system", content: systemPrompt },
-      { role: "user", content: opts.prompt },
-    ],
-    temperature: 0.3,
-    enableThinking: false,
-  });
-  const parsed = parseJsonFromResponse<Partial<RawStyle>>(result.content);
-  if (!parsed) throw new Error("无法解析模型返回的视觉方向 JSON，请重试。");
-  const details: Extract<AssetDetails, { kind: "style" }> = parsed.details ?? {
+export function parseVisualDirection(content: string): RawVisualDirection | null {
+  const parsed = parseJsonFromResponse<Partial<RawStyle>>(content);
+  if (!parsed) return null;
+  // 模型不会返回内部判别字段 kind，这里统一补齐；
+  // 同时兼容它把六个维度写在 details 或平铺在顶层两种写法。
+  const raw = parsed.details;
+  const pick = (key: keyof Omit<Extract<AssetDetails, { kind: "style" }>, "kind">): string =>
+    (raw?.[key] ?? parsed[key] ?? "").trim();
+  const details: Extract<AssetDetails, { kind: "style" }> = {
     kind: "style",
-    mediumMaterial: parsed.mediumMaterial ?? "",
-    colorPalette: parsed.colorPalette ?? "",
-    lightingMood: parsed.lightingMood ?? "",
-    cameraTexture: parsed.cameraTexture ?? "",
-    composition: parsed.composition ?? "",
-    emotion: parsed.emotion ?? "",
+    mediumMaterial: pick("mediumMaterial"),
+    colorPalette: pick("colorPalette"),
+    lightingMood: pick("lightingMood"),
+    cameraTexture: pick("cameraTexture"),
+    composition: pick("composition"),
+    emotion: pick("emotion"),
   };
   return {
     name: parsed.name ?? "",
@@ -490,6 +498,138 @@ export async function extractVisualDirectionFromIdea(
     composition: details.composition,
     emotion: details.emotion,
   };
+}
+
+/**
+ * 用模型给出的重写结果替换原视觉方向：逐字段采用非空重写值，其余保持原值。
+ * 空重写字段不覆盖原值（避免模型只改一处时把其他维度抹空）。
+ */
+export function applyVisualDirectionRewrite(
+  base: RawVisualDirection,
+  rewritten: Partial<RawStyle>,
+): RawVisualDirection {
+  const pick = (next: unknown, fallback: string): string =>
+    typeof next === "string" && next.trim() ? next.trim() : fallback;
+
+  const incoming = rewritten.details;
+  const details: Extract<AssetDetails, { kind: "style" }> = {
+    kind: "style",
+    mediumMaterial: pick(incoming?.mediumMaterial ?? rewritten.mediumMaterial, base.details.mediumMaterial),
+    colorPalette: pick(incoming?.colorPalette ?? rewritten.colorPalette, base.details.colorPalette),
+    lightingMood: pick(incoming?.lightingMood ?? rewritten.lightingMood, base.details.lightingMood),
+    cameraTexture: pick(incoming?.cameraTexture ?? rewritten.cameraTexture, base.details.cameraTexture),
+    composition: pick(incoming?.composition ?? rewritten.composition, base.details.composition),
+    emotion: pick(incoming?.emotion ?? rewritten.emotion, base.details.emotion),
+  };
+
+  return {
+    name: pick(rewritten.name, base.name),
+    description: pick(rewritten.description, base.description),
+    details,
+    mediumMaterial: details.mediumMaterial,
+    colorPalette: details.colorPalette,
+    lightingMood: details.lightingMood,
+    cameraTexture: details.cameraTexture,
+    composition: details.composition,
+    emotion: details.emotion,
+  };
+}
+
+/** 视觉方向自检：把方向与项目自身主体清单交给模型，判断是否越界并重写。 */
+export async function auditVisualDirection(opts: {
+  apiKey: string;
+  baseUrl: string;
+  language: "zh" | "en";
+  direction: RawVisualDirection;
+  /** 项目自身非风格资产名（数据驱动，代码不硬编码任何主体词） */
+  forbiddenSubjects: string[];
+}): Promise<AuditOutcome<RawVisualDirection>> {
+  const keep = { clean: true as const, value: opts.direction };
+  try {
+    const params = await resolveGenerationParams({
+      purpose: "visualDirectionAudit",
+      apiKey: opts.apiKey,
+      baseUrl: opts.baseUrl,
+      context: [
+        "Task: audit a project-level visual direction and rewrite it when it overreaches into concrete subjects or narrative.",
+        `Language: ${opts.language}`,
+      ].join("\n"),
+    });
+    const service = createAIService({
+      provider: "openai",
+      apiKey: opts.apiKey,
+      baseUrl: opts.baseUrl,
+    });
+    const result = await service.chatCompletion({
+      messages: [
+        {
+          role: "system",
+          content: buildTaskSystemPrompt("visualDirectionAudit", opts.language, getActiveRules()),
+        },
+        {
+          role: "user",
+          content: [
+            `Visual direction:\n${JSON.stringify({
+              name: opts.direction.name,
+              description: opts.direction.description,
+              details: opts.direction.details,
+            })}`,
+            opts.forbiddenSubjects.length > 0
+              ? `Forbidden subject list: ${opts.forbiddenSubjects.join(", ")}`
+              : "Forbidden subject list: (none provided)",
+          ].join("\n"),
+        },
+      ],
+      temperature: params.temperature,
+      ...(params.topP === undefined ? {} : { topP: params.topP }),
+      enableThinking: params.enableThinking,
+    });
+
+    const parsed = parseJsonFromResponse<{ clean?: boolean; rewritten?: Partial<RawStyle> }>(
+      result.content,
+    );
+    if (!parsed || parsed.clean !== false) return keep;
+
+    const rewritten = parsed.rewritten;
+    if (!rewritten || typeof rewritten !== "object" || Array.isArray(rewritten)) return keep;
+    return { clean: false, value: applyVisualDirectionRewrite(opts.direction, rewritten) };
+  } catch (err) {
+    console.warn("Visual direction audit failed, keeping extracted direction:", err);
+    return keep;
+  }
+}
+
+/**
+ * 轻量资产提取：只返回 characters/products/scenes，不生成分镜。
+ * 供步骤 1「AI 提取角色/产品并继续」使用，避免完整分镜生成（8192 tokens）的浪费。
+ */
+export async function extractVisualDirectionFromIdea(
+  opts: GenerateScriptOptions,
+): Promise<RawVisualDirection> {
+  const systemPrompt = buildTaskSystemPrompt("visualDirection", opts.language, getActiveRules());
+  const service = createAIService({ provider: "openai", apiKey: opts.apiKey, baseUrl: opts.baseUrl });
+  const params = await resolveGenerationParams({
+    purpose: "visualDirection",
+    apiKey: opts.apiKey,
+    baseUrl: opts.baseUrl,
+    context: [
+      "Task: extract a reusable, subject-free visual direction (medium, color, lighting, camera texture, composition, atmosphere) from a story idea.",
+      `Language: ${opts.language}`,
+      `Aspect ratio: ${opts.aspectRatio}`,
+    ].join("\n"),
+  });
+  const result = await service.chatCompletion({
+    messages: [
+      { role: "system", content: systemPrompt },
+      { role: "user", content: opts.prompt },
+    ],
+    temperature: params.temperature,
+    ...(params.topP === undefined ? {} : { topP: params.topP }),
+    enableThinking: params.enableThinking,
+  });
+  const direction = parseVisualDirection(result.content);
+  if (!direction) throw new Error("无法解析模型返回的视觉方向 JSON，请重试。");
+  return direction;
 }
 
 export async function extractAssetsFromIdea(
@@ -508,6 +648,18 @@ export async function extractAssetsFromIdea(
     baseUrl: opts.baseUrl,
   });
 
+  const params = await resolveGenerationParams({
+    purpose: "assetExtraction",
+    apiKey: opts.apiKey,
+    baseUrl: opts.baseUrl,
+    context: [
+      "Task: extract typed assets (characters, products, props, scenes, style) with structured details and English appearance prompts, as strict JSON.",
+      `Language: ${opts.language}`,
+      `Aspect ratio: ${opts.aspectRatio}`,
+      `Existing assets: ${opts.assets?.length ?? 0}`,
+    ].join("\n"),
+  });
+
   const result = await service.chatCompletion({
     messages: [
       { role: "system", content: systemPrompt },
@@ -522,9 +674,9 @@ export async function extractAssetsFromIdea(
         ].filter(Boolean).join("\n\n"),
       },
     ],
-    temperature: 0.3,
-    // 输出预算走 MAX_OUTPUT_TOKENS（65536），9 行角色描述 + 多资产不再有触顶风险
-    enableThinking: false,
+    temperature: params.temperature,
+    ...(params.topP === undefined ? {} : { topP: params.topP }),
+    enableThinking: params.enableThinking,
   });
 
   const content = result.content;

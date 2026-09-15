@@ -10,10 +10,15 @@ import {
 } from "@/stores/projectStore";
 import { useSettingsStore } from "@/stores/settingsStore";
 import { useT } from "@/i18n";
-import { extractAssetsFromIdea, extractVisualDirectionFromIdea, generateScript } from "@/services/scriptService";
+import { extractAssetsFromIdea, extractVisualDirectionFromIdea, generateScript, auditVisualDirection, type RawVisualDirection } from "@/services/scriptService";
 import { extractNewAssets } from "@/lib/extractAssets";
+import { collectSubjectVocabulary } from "@/lib/promptComposer";
+import { refineWithAudit } from "@/lib/refineContent";
 import { pickShotFields } from "@/lib/shotFields";
 import { restoreProjectStatusIfReady } from "./wizardActionUtils";
+
+/** 视觉方向自检轮数上限（效果优先，允许重复调用大模型收敛）。 */
+const VISUAL_DIRECTION_MAX_ROUNDS = 2;
 
 export interface ScriptActions {
   extractCharactersFromIdea: (prompt: string) => Promise<boolean>;
@@ -85,13 +90,26 @@ export function useScriptActions(
     useProjectStore.getState().setProjectStatusById(targetProjectId, "scripting");
 
     try {
-      const visualDirectionResult = await extractVisualDirectionFromIdea({
-        apiKey: providerConfig.apiKey,
-        baseUrl: providerConfig.baseUrl,
-        prompt,
-        language: project.language,
-        aspectRatio: project.aspectRatio,
-        assets: project.assets,
+      const visualDirectionResult = await refineWithAudit<RawVisualDirection>({
+        produce: () =>
+          extractVisualDirectionFromIdea({
+            apiKey: providerConfig.apiKey,
+            baseUrl: providerConfig.baseUrl,
+            prompt,
+            language: project.language,
+            aspectRatio: project.aspectRatio,
+            assets: project.assets,
+          }),
+        // 自检：禁止清单来自项目自身非风格资产名（数据驱动），是否越界与如何重写由模型判断。
+        audit: (current) =>
+          auditVisualDirection({
+            apiKey: providerConfig.apiKey,
+            baseUrl: providerConfig.baseUrl,
+            language: project.language,
+            direction: current,
+            forbiddenSubjects: collectSubjectVocabulary(project),
+          }),
+        maxRounds: VISUAL_DIRECTION_MAX_ROUNDS,
       });
       const visualDirection: VisualDirection = {
         name: visualDirectionResult.name,

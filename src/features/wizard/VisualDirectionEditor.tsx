@@ -99,7 +99,12 @@ export function VisualDirectionEditor({ onClose, onGenerate, generating = false 
       const result = await chatCompletion({
         apiKey: providerConfig.apiKey,
         baseUrl: providerConfig.baseUrl,
-        temperature: 0.2,
+        // 采样参数由模型按用途决定
+        purpose: "visualDirection",
+        paramContext: [
+          "Task: apply a user instruction to a project-level visual direction and return the complete updated JSON (name + one-sentence description + six visual dimensions).",
+          "The result becomes the shared style master for all assets, so it must stay pure visual language.",
+        ].join("\n"),
         messages: [
           { role: "system", content: SYSTEM_PROMPT_VISUAL_DIRECTION_EDIT_ZH },
           {

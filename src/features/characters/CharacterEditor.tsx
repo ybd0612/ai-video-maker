@@ -91,8 +91,12 @@ export function CharacterEditor({ character, onClose }: CharacterEditorProps) {
         const result = await chatCompletion({
           apiKey: providerConfig.apiKey,
           baseUrl: providerConfig.baseUrl,
-          // 外貌提示词是角色一致性锚点：降低随机性，避免同一描述每次派生出不同英文。
-          temperature: 0.2,
+          // 采样参数由模型按用途决定（外貌提示词是角色一致性锚点，不再是代码硬编码温度）
+          purpose: "characterAppearance",
+          paramContext: [
+            "Task: derive an English appearance prompt for a character, used as the identity anchor across all shots.",
+            "Consistency across repeated derivations matters.",
+          ].join("\n"),
           messages: [
             { role: "system", content: buildCharacterAppearancePrompt() },
             {

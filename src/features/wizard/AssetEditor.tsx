@@ -80,7 +80,12 @@ export function AssetEditor({ asset, onClose, onGenerate, generating }: AssetEdi
       const result = await chatCompletion({
         apiKey: providerConfig.apiKey,
         baseUrl: providerConfig.baseUrl,
-        temperature: 0.2,
+        // 采样参数由模型按用途决定
+        purpose: "fieldAssist",
+        paramContext: [
+          "Task: apply a user instruction to a single asset and return the complete updated asset JSON (description + structured details + English image prompt).",
+          `Asset type: ${asset.type}`,
+        ].join("\n"),
         messages: [
           { role: "system", content: SYSTEM_PROMPT_ASSET_EDIT_ZH },
           {

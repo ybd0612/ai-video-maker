@@ -21,10 +21,12 @@ import { useSettingsStore } from "@/stores/settingsStore";
 export type PromptTask =
   | "extractAssets"
   | "visualDirection"
+  | "visualDirectionAudit"
   | "storyboard"
   | "characterAppearance"
   | "styleRef"
   | "stylePromptAudit"
+  | "generationParams"
   | "composeShot"
   | "negativeStrategy"
   | "polish";
@@ -116,6 +118,73 @@ Return JSON only:
 }
 The rewritten prompt must keep the original overall style tone and only remove the overreaching subject/narrative content; it must not introduce new subjects or plot.`,
   },
+
+  /* ── 视觉方向自检（校验/重写视觉方向，判断权归模型） ── */
+  visualDirectionAudit: {
+    zh: `你是一位视觉指导。给定一个项目级视觉方向（六个视觉维度 + 一句话简介）与一份"禁止出现的主体清单"（可能为空），判断这些内容是否越界：
+- 是否出现了清单中的具体主体（角色/场景/产品/道具名）
+- 是否描述了故事动作、叙事场景、角色关系或具体物件
+- 是否把主体材质（如毛发、皮肤）当作整体画风来描述
+
+合格标准：只描述可复用的视觉语言——媒介与渲染方式、色彩关系、光影、镜头质感、构图规律、情绪氛围。
+
+只返回 JSON：
+{
+  "clean": true 或 false,
+  "reason": "越界原因（clean 为 true 时为空字符串）",
+  "rewritten": "若 clean 为 false，返回重写后的视觉方向，结构与输入一致：{ name, description, details: { mediumMaterial, colorPalette, lightingMood, cameraTexture, composition, emotion } }；clean 为 true 时为空对象 {}"
+}
+重写必须保持原方向的整体风格基调，只移除越界的主体/叙事内容，不得引入新的主体、剧情或具体物件。`,
+    en: `You are a visual director. Given a project-level visual direction (six visual dimensions plus a one-sentence summary) and a "forbidden subject list" (may be empty), decide whether the content overreaches:
+- Does it mention a specific subject from the list (character / scene / product / prop name)?
+- Does it describe story actions, narrative scenes, character relationships or concrete objects?
+- Does it treat subject-bound material (fur, skin) as the overall art style?
+
+Valid output describes only reusable visual language: medium and rendering, color relationships, lighting, camera texture, composition patterns and atmosphere.
+
+Return JSON only:
+{
+  "clean": true or false,
+  "reason": "why it overreaches (empty string when clean is true)",
+  "rewritten": "if clean is false, return the rewritten visual direction with the same shape as the input: { name, description, details: { mediumMaterial, colorPalette, lightingMood, cameraTexture, composition, emotion } }; empty object {} when clean is true"
+}
+The rewrite must keep the original overall style tone and only remove the overreaching subject/narrative content; it must not introduce new subjects, plot or concrete objects.`,
+  },
+
+  /* ── 生成参数决策（温度/采样/Thinking 由模型按用途决定） ── */
+  generationParams: {
+    zh: `你是模型调用参数规划器。给定一个生成用途与它的上下文，决定这次调用最合适的文本模型采样参数，目标是让该用途的输出质量最高。
+
+可选参数与合法范围：
+- temperature：0 ~ 2。需要稳定、可复现、结构化输出时取低值；需要创意、多样性时取高值。
+- topP：0.01 ~ 1。核采样阈值，通常 0.8 ~ 1。
+- enableThinking：true 或 false。需要多步推理、复杂约束权衡、长任务规划时开启；纯格式化/改写/翻译类任务关闭更稳。
+
+只返回 JSON：
+{
+  "temperature": 0.7,
+  "topP": 1,
+  "enableThinking": false,
+  "reason": "一句话说明为什么这样取值"
+}
+不要返回其他字段，不要解释范围之外的参数。`,
+    en: `You are a model-call parameter planner. Given a generation purpose and its context, decide the best text-model sampling parameters for that purpose, aiming for the highest output quality.
+
+Available parameters and legal ranges:
+- temperature: 0 to 2. Use low values for stable, reproducible, structured output; higher values for creativity and variety.
+- topP: 0.01 to 1. Nucleus sampling threshold, typically 0.8 to 1.
+- enableThinking: true or false. Enable for multi-step reasoning, trade-offs among complex constraints and long-task planning; disable for pure formatting/rewriting/translation tasks.
+
+Return JSON only:
+{
+  "temperature": 0.7,
+  "topP": 1,
+  "enableThinking": false,
+  "reason": "one sentence explaining the choice"
+}
+Return no other fields and no parameters outside the legal range.`,
+  },
+
   /* ── 步骤 1 轻量资产提取（scriptService.extractAssetsFromIdea） ── */
   extractAssets: {
     zh: `你是一位专业的视频资产提取助手。用户会给你一个视频主题或想法，请提取其中的资产信息，严格按以下 JSON 格式返回，不要包含任何其他文字：

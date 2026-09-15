@@ -20,6 +20,8 @@ import {
   collectSubjectVocabulary,
 } from "@/lib/promptComposer";
 import { parseJsonFromResponse } from "@/lib/jsonResponse";
+import { resolveGenerationParams } from "@/lib/generationParams";
+import { refineWithAudit, type AuditOutcome } from "@/lib/refineContent";
 import { buildSystemPrompt as buildRulesSystemPrompt, getActiveRules } from "@/lib/promptRules";
 
 const activeAssetTasks = new Map<string, AbortController>();
@@ -83,13 +85,23 @@ async function deriveStylePrompt(
       ]
         .filter(Boolean)
         .join("\n");
+      const params = await resolveGenerationParams({
+        purpose: "styleRef",
+        apiKey,
+        baseUrl,
+        context: [
+          "Task: derive ONE English image-style prompt (pure visual language) from a structured visual direction; the result becomes the shared style reference for all assets.",
+          `Desired style given by user: ${zhStyle || "(none)"}`,
+        ].join("\n"),
+      });
       const result = await service.chatCompletion({
         messages: [
           { role: "system", content: buildRulesSystemPrompt("styleRef", "en", getActiveRules()) },
           { role: "user", content: userContent },
         ],
-        temperature: 0.4,
-        enableThinking: false,
+        temperature: params.temperature,
+        ...(params.topP === undefined ? {} : { topP: params.topP }),
+        enableThinking: params.enableThinking,
       });
       const text = result.content.trim();
       if (text) return text;
@@ -104,17 +116,25 @@ async function deriveStylePrompt(
  * LLM 审计：风格提示词是否混入项目自身主体（角色/场景/产品/道具名）。
  * 禁止清单来自项目数据（collectSubjectVocabulary），代码不硬编码任何风格/物种关键词；
  * 是否越界与如何重写都由模型判断（task=stylePromptAudit）。
- * 无清单、审计失败或解析失败时保留原提示词，不阻塞生成。
+ * 返回 clean=true 时表示无需改动；审计失败时同样返回 clean=true（保留原文，不阻塞生成）。
  */
 async function auditStylePrompt(i: {
   stylePrompt: string;
   subjects: string[];
   apiKey: string;
   baseUrl: string;
-}): Promise<string> {
-  if (i.subjects.length === 0) return i.stylePrompt;
+}): Promise<AuditOutcome<string>> {
+  const keep = { clean: true as const, value: i.stylePrompt };
+  if (i.subjects.length === 0) return keep;
   try {
     const service = createAIService({ provider: "openai", apiKey: i.apiKey, baseUrl: i.baseUrl });
+    const params = await resolveGenerationParams({
+      purpose: "stylePromptAudit",
+      apiKey: i.apiKey,
+      baseUrl: i.baseUrl,
+      context:
+        "Task: audit an English style prompt against the project's own subject list and rewrite it when it overreaches; the result is shown to the image model as a pure style master.",
+    });
     const result = await service.chatCompletion({
       messages: [
         { role: "system", content: buildRulesSystemPrompt("stylePromptAudit", "en", getActiveRules()) },
@@ -126,22 +146,22 @@ async function auditStylePrompt(i: {
           ].join("\n"),
         },
       ],
-      temperature: 0,
-      enableThinking: false,
+      temperature: params.temperature,
+      ...(params.topP === undefined ? {} : { topP: params.topP }),
+      enableThinking: params.enableThinking,
     });
     const parsed = parseJsonFromResponse<{ clean?: boolean; rewritten?: string }>(result.content);
-    if (!parsed || parsed.clean !== false) return i.stylePrompt;
+    if (!parsed || parsed.clean !== false) return keep;
     const rewritten = parsed.rewritten?.trim();
-    if (rewritten) {
-      console.info("Style prompt audited as off-boundary, using rewritten version.");
-      return rewritten;
-    }
-    return i.stylePrompt;
+    return rewritten ? { clean: false, value: rewritten } : keep;
   } catch (err) {
     console.warn("Style prompt audit failed, keeping derived prompt:", err);
-    return i.stylePrompt;
+    return keep;
   }
 }
+
+/** 风格提示词精修轮数上限（效果优先，允许多轮；每轮仅一次文本调用） */
+const STYLE_PROMPT_MAX_ROUNDS = 2;
 
 export function useAssetActions(): AssetActions {
   /**
@@ -187,18 +207,30 @@ export function useAssetActions(): AssetActions {
       const styleAssetId = styleAsset.id;
       let styleRevision = styleAsset.renderRevision ?? 0;
       if ((force || !styleAsset.prompt.trim()) && (!styleAsset.derivation?.locked || force)) {
-        const derived = await deriveStylePrompt(
-          latest.style.trim(),
-          providerConfig.apiKey,
-          providerConfig.baseUrl,
-          latest.visualDirection,
-        );
-        // 审计：把项目自身主体名单交给模型判断是否越界并重写（代码不做关键词清洗）。
-        const audited = await auditStylePrompt({
-          stylePrompt: derived,
-          subjects: collectSubjectVocabulary(latest),
-          apiKey: providerConfig.apiKey,
-          baseUrl: providerConfig.baseUrl,
+        const subjects = collectSubjectVocabulary(latest);
+        // 派生 → 自检 → 越界则由模型重写，最多 STYLE_PROMPT_MAX_ROUNDS 轮。
+        // 代码只控制轮数与失败兜底，是否越界与如何重写全部由模型判断。
+        const audited = await refineWithAudit<string>({
+          produce: () =>
+            deriveStylePrompt(
+              latest.style.trim(),
+              providerConfig.apiKey,
+              providerConfig.baseUrl,
+              latest.visualDirection,
+            ),
+          audit: (current, round) =>
+            auditStylePrompt({
+              stylePrompt: current,
+              subjects,
+              apiKey: providerConfig.apiKey,
+              baseUrl: providerConfig.baseUrl,
+            }).then((outcome) => {
+              if (!outcome.clean) {
+                console.info(`Style prompt audited as off-boundary (round ${round}), using rewrite.`);
+              }
+              return outcome;
+            }),
+          maxRounds: STYLE_PROMPT_MAX_ROUNDS,
         });
         const applied = useProjectStore.getState().updateAssetByProjectIdIfRevision(
           pid,
