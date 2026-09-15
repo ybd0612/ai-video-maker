@@ -297,21 +297,7 @@ export function StepAssets() {
             <div className="min-w-0 flex-1">
               <p className="text-sm font-medium text-ink">{project?.visualDirection?.name || styleAsset?.name || project?.style || t("wizard.visualDirectionUnset" as any)}</p>
               <p className="mt-1 text-xs text-ink-3">{styleAsset?.description || t("wizard.visualDirectionDescription" as any)}</p>
-              {project?.visualDirection && (
-                <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-[0.6875rem] text-ink-4">
-                  <span>画风与材质：{project.visualDirection.mediumMaterial || "—"}</span>
-                  <span>主色调：{project.visualDirection.colorPalette || "—"}</span>
-                  <span>光影氛围：{project.visualDirection.lightingMood || "—"}</span>
-                  <span>镜头质感：{project.visualDirection.cameraTexture || "—"}</span>
-                  <span>构图倾向：{project.visualDirection.composition || "—"}</span>
-                  <span>整体情绪：{project.visualDirection.emotion || "—"}</span>
-                </div>
-              )}
               {project?.styleReferenceError && <p className="mt-1 truncate text-[0.625rem] text-danger" title={project?.styleReferenceError}>{project?.styleReferenceError}</p>}
-              <button onClick={(e) => { e.stopPropagation(); void handleGenerateStyle(); }} disabled={anyGenerating} className="mt-2 flex items-center gap-1.5 rounded px-3 py-1.5 text-[0.6875rem] text-accent hover:bg-accent-deep/30 transition disabled:opacity-50">
-                {generatingStyle ? <Loader2 size={11} className="animate-spin" /> : <Wand2 size={11} />}
-                {styleReferenceUrl ? t("wizard.regenerateVisualDirection" as any) : t("wizard.generateVisualDirection" as any)}
-              </button>
             </div>
           </div>
         </div>
