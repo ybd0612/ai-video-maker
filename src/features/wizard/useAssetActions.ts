@@ -161,8 +161,8 @@ async function auditStylePrompt(i: {
   }
 }
 
-/** 风格提示词精修轮数上限（效果优先，允许多轮；每轮仅一次文本调用） */
-const STYLE_PROMPT_MAX_ROUNDS = 2;
+/** 风格提示词精修轮数上限（2026-09-15 由 2 → 1：审计+重写已合一，第 2 轮边际收益低于耗时）。 */
+const STYLE_PROMPT_MAX_ROUNDS = 1;
 
 export function useAssetActions(): AssetActions {
   /**

@@ -168,7 +168,7 @@ The rewrite must keep the original overall style tone and only remove the overre
 可选参数与合法范围：
 - temperature：0 ~ 2。需要稳定、可复现、结构化输出时取低值；需要创意、多样性时取高值。
 - topP：0.01 ~ 1。核采样阈值，通常 0.8 ~ 1。
-- enableThinking：true 或 false。需要多步推理、复杂约束权衡、长任务规划时开启；纯格式化/改写/翻译类任务关闭更稳。
+- enableThinking：true 或 false。需要多步推理、复杂约束权衡、长任务规划时开启；纯格式化/改写/翻译类任务关闭更稳。审计/校验/重写类用途（purpose 含 audit）必须 false —— 深度推理会让同一次调用耗时翻倍。
 
 只返回 JSON：
 {
@@ -183,7 +183,7 @@ The rewrite must keep the original overall style tone and only remove the overre
 Available parameters and legal ranges:
 - temperature: 0 to 2. Use low values for stable, reproducible, structured output; higher values for creativity and variety.
 - topP: 0.01 to 1. Nucleus sampling threshold, typically 0.8 to 1.
-- enableThinking: true or false. Enable for multi-step reasoning, trade-offs among complex constraints and long-task planning; disable for pure formatting/rewriting/translation tasks.
+- enableThinking: true or false. Enable for multi-step reasoning, trade-offs among complex constraints and long-task planning; disable for pure formatting/rewriting/translation tasks. Audit/rewrite purposes (purpose containing "audit") must be false — deep reasoning doubles the latency of the same call.
 
 Return JSON only:
 {

@@ -91,6 +91,26 @@ describe("resolveGenerationParams", () => {
     expect(chatMock).toHaveBeenCalledTimes(1);
   });
 
+  it("审计/重写类用途 Thinking 恒关（结构约束，不交模型决策）", async () => {
+    // 2026-09-15 实测：自检重写被决策开 Thinking 后 63.6s → 117.6s（900+ token 为推理）
+    chatMock.mockResolvedValue({
+      content: JSON.stringify({ temperature: 0.2, enableThinking: true }),
+    });
+
+    for (const purpose of ["visualDirectionAudit", "stylePromptAudit"] as const) {
+      const params = await resolveGenerationParams({ purpose, apiKey: "k", baseUrl: "b" });
+      expect(params.enableThinking).toBe(false);
+    }
+
+    // 非 audit 用途不受影响
+    const keep = await resolveGenerationParams({
+      purpose: "visualDirection",
+      apiKey: "k",
+      baseUrl: "b",
+    });
+    expect(keep.enableThinking).toBe(true);
+  });
+
   it("同用途同缓存键复用决策（只问一次模型）", async () => {
     chatMock.mockResolvedValue({ content: JSON.stringify({ temperature: 0.9 }) });
 

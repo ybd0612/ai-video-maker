@@ -53,6 +53,17 @@ export const NEUTRAL_GENERATION_PARAMS: GenerationParams = {
 export const TEMPERATURE_RANGE = [0, 2] as const;
 export const TOP_P_RANGE = [0.01, 1] as const;
 
+/**
+ * 结构性禁用 Thinking 的用途（不交模型决策，与 max_tokens 同类的结构问题）：
+ * 审计/重写是"格式化改写"任务，深度推理收益低但耗时翻倍 ——
+ * 2026-09-15 实测同一视觉方向重写调用 63.6s → 117.6s
+ * （completionTokens 1608 中 900+ 为 thinking，正文仅 661 chars）。
+ */
+const THINKING_FIXED_FALSE_PURPOSES: ReadonlySet<GenerationPurpose> = new Set([
+  "visualDirectionAudit",
+  "stylePromptAudit",
+]);
+
 function inRange(
   value: unknown,
   range: readonly [number, number],
@@ -153,8 +164,12 @@ export async function resolveGenerationParams(
 
     const parsed = parseJsonFromResponse<Record<string, unknown>>(result.content);
     const resolved = clampGenerationParams(parsed, NEUTRAL_GENERATION_PARAMS);
-    paramCache.set(key, resolved);
-    return resolved;
+    // 结构约束：审计/重写类用途 Thinking 恒关（见 THINKING_FIXED_FALSE_PURPOSES 注释）
+    const final = THINKING_FIXED_FALSE_PURPOSES.has(opts.purpose)
+      ? { ...resolved, enableThinking: false }
+      : resolved;
+    paramCache.set(key, final);
+    return final;
   } catch (err) {
     console.warn(
       `Generation param decision failed for ${opts.purpose}, using neutral params:`,

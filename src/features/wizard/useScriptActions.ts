@@ -18,8 +18,8 @@ import { beginTrace } from "@/lib/logger";
 import { pickShotFields } from "@/lib/shotFields";
 import { restoreProjectStatusIfReady } from "./wizardActionUtils";
 
-/** 视觉方向自检轮数上限（效果优先，允许重复调用大模型收敛）。 */
-const VISUAL_DIRECTION_MAX_ROUNDS = 2;
+/** 视觉方向自检轮数上限（2026-09-15 由 2 → 1：审计+重写已合一，第 2 轮边际收益低于 ~40s 耗时）。 */
+const VISUAL_DIRECTION_MAX_ROUNDS = 1;
 
 export interface ScriptActions {
   extractCharactersFromIdea: (prompt: string) => Promise<boolean>;
