@@ -16,6 +16,7 @@ import {
   composePortraitPrompt,
   assetImageBoundary,
   composeStyleReferencePrompt,
+  sanitizeVisualDirectionField,
 } from "@/lib/promptComposer";
 import { buildSystemPrompt as buildRulesSystemPrompt, getActiveRules } from "@/lib/promptRules";
 
@@ -74,12 +75,12 @@ async function deriveStylePrompt(
         zhStyle ? `Desired style (Chinese): ${zhStyle}` : "",
         visualDirection
           ? [
-              `Medium and material: ${visualDirection.mediumMaterial}`,
-              `Color palette: ${visualDirection.colorPalette}`,
-              `Lighting and mood: ${visualDirection.lightingMood}`,
-              `Camera texture: ${visualDirection.cameraTexture}`,
-              `Composition: ${visualDirection.composition}`,
-              `Emotion: ${visualDirection.emotion}`,
+              `Medium and material: ${sanitizeVisualDirectionField(visualDirection.mediumMaterial, "material")}`,
+              `Color palette: ${sanitizeVisualDirectionField(visualDirection.colorPalette)}`,
+              `Lighting and mood: ${sanitizeVisualDirectionField(visualDirection.lightingMood)}`,
+              `Camera texture: ${sanitizeVisualDirectionField(visualDirection.cameraTexture)}`,
+              `Composition: ${sanitizeVisualDirectionField(visualDirection.composition, "composition")}`,
+              `Emotion: ${sanitizeVisualDirectionField(visualDirection.emotion)}`,
             ].filter((value) => !value.endsWith(": ")).join("\n")
           : "",
       ]
@@ -168,7 +169,7 @@ export function useAssetActions(): AssetActions {
         styleRevision = refreshedStyleAsset.renderRevision ?? 0;
       }
 
-      const stylePrompt = styleAsset.prompt.trim() || fallbackStylePrompt(latest.style.trim());
+      const stylePrompt = sanitizeVisualDirectionField(styleAsset.prompt.trim() || fallbackStylePrompt(latest.style.trim()));
       const imagePrompt = composeStyleReferencePrompt(stylePrompt);
       const { size, ratio } = aspectRatioToImageParams(latest.aspectRatio);
 

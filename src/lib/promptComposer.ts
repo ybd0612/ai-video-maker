@@ -43,7 +43,7 @@ export function getStylePrompt(
 ): string | undefined {
   const styleAsset = project.assets.find((a) => a.type === "style");
   const prompt = styleAsset?.prompt?.trim();
-  return prompt || undefined;
+  return prompt ? sanitizeVisualDirectionField(prompt) : undefined;
 }
 
 /* ── 文生图：六段式 ──────────────────────────────────────────────────────── */
@@ -95,6 +95,25 @@ export function assetImageBoundary(type: "scene" | "product" | "prop"): string {
   if (type === "scene") return "Environment-only reference image; show the environment itself, not a story scene or characters.";
   if (type === "product") return "Product-only reference image; show only the product itself, not people or a usage scene.";
   return "Prop-only reference image; show only the named object itself, not characters or story action.";
+}
+
+/**
+ * 清理视觉方向中的主体语义，避免“毛发/双主体/角色构图”等词污染纯风格板。
+ * 只处理明显的主体泄漏；正常的画风、色彩和光影描述保持不变。
+ */
+export function sanitizeVisualDirectionField(field: string, kind: "material" | "composition" | "generic" = "generic"): string {
+  const value = field.trim();
+  if (!value) return "";
+  if (kind === "composition" && /主体|角色|人物|动物|双主|呼应|character|subject|figure|animal|story/i.test(value)) {
+    return "Abstract balanced arrangement with layered color fields, soft depth and generous negative space";
+  }
+  return value
+    .replace(/高毛绒质感|毛茸茸质感|毛绒质感|毛发质感|毛发|绒毛|皮肤次表面散射|皮肤/gi, "细腻哑光表面质感")
+    .replace(/fur texture|fluffy fur|fur|skin subsurface scattering/gi, "matte surface texture")
+    .replace(/小猪|小狗|兔子|角色|人物|动物|主角|配角|双主体|character|animal|creature|piglet|puppy|rabbit/gi, "")
+    .replace(/\s{2,}/g, " ")
+    .replace(/[，,、]\s*([，,、])/g, "$1")
+    .trim();
 }
 
 /** 视觉方向图只呈现风格语言，不让故事主体进入共享风格参考图。 */

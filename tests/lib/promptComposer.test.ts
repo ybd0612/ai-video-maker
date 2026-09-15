@@ -15,6 +15,7 @@ import {
   getStylePrompt,
   assetImageBoundary,
   composeStyleReferencePrompt,
+  sanitizeVisualDirectionField,
   normalizeCharacterDescription,
   parseCharacterDescription,
 } from "@/lib/promptComposer";
@@ -99,6 +100,11 @@ describe("composeImageToImagePrompt", () => {
 /* ── composeMultiReferencePrompt ──────────────────────────────────────────── */
 
 describe("资产主体边界与视觉方向", () => {
+  it("清理视觉方向中的主体材质和主体构图语义", () => {
+    expect(sanitizeVisualDirectionField("高毛绒质感与皮肤次表面散射", "material")).toContain("细腻哑光表面质感");
+    expect(sanitizeVisualDirectionField("双主体对称构图，角色居中", "composition")).toContain("Abstract balanced arrangement");
+    expect(sanitizeVisualDirectionField("小猪与小狗的温馨陪伴")).not.toContain("小猪");
+  });
   it("按资产类型生成最小主体边界，同时保留让模型生成具体提示词的空间", () => {
     expect(assetImageBoundary("scene")).toContain("Environment-only");
     expect(assetImageBoundary("product")).toContain("Product-only");
