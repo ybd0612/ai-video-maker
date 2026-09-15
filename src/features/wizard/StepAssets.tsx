@@ -250,8 +250,8 @@ export function StepAssets() {
       {/* Title */}
       <div>
         <p className="text-[0.6875rem] font-medium uppercase tracking-[0.14em] text-accent">{t("wizard.stepAssets")}</p>
-        <h2 className="mt-1 text-xl font-bold text-ink">{t("wizard.assetWorkbenchTitle" as any)}</h2>
-        <p className="mt-1 max-w-2xl text-xs text-ink-4">{t("wizard.assetWorkbenchHint" as any)}</p>
+        <h2 className="mt-1 text-xl font-bold text-ink">{t("wizard.assetWorkbenchTitle")}</h2>
+        <p className="mt-1 max-w-2xl text-xs text-ink-4">{t("wizard.assetWorkbenchHint")}</p>
       </div>
 
       {/* 无资产提示：可直接下一步（等价跳过），但说明一致性影响 */}
@@ -298,28 +298,28 @@ export function StepAssets() {
       <section className="rounded-xl border border-line bg-raised/30 p-4">
         <div className="flex items-center justify-between gap-3">
           <div>
-            <h3 className="text-sm font-semibold text-ink">{t("wizard.assetReadinessTitle" as any)}</h3>
-            <p className="mt-0.5 text-[0.6875rem] text-ink-5">{t("wizard.assetReadinessHint" as any)}</p>
+            <h3 className="text-sm font-semibold text-ink">{t("wizard.assetReadinessTitle")}</h3>
+            <p className="mt-0.5 text-[0.6875rem] text-ink-5">{t("wizard.assetReadinessHint")}</p>
           </div>
           <button onClick={() => void handleFillMissing()} disabled={anyGenerating || !hasMissingAssets} className="flex shrink-0 items-center gap-1.5 rounded-lg bg-accent-solid px-3 py-2 text-[0.6875rem] font-medium text-white transition hover:bg-accent-solid disabled:cursor-not-allowed disabled:opacity-50">
             {anyGenerating ? <Loader2 size={12} className="animate-spin" /> : <Wand2 size={12} />}
-            {t("wizard.fillMissingAssets" as any)}
+            {t("wizard.fillMissingAssets")}
           </button>
         </div>
         <div className="mt-3 grid grid-cols-2 gap-2 md:grid-cols-4">
           {[
-            [t("characters.title" as any), characters.length, characters.filter((char) => Boolean(char.imageUrl || char.avatarUrl)).length],
-            [t("wizard.worldScenes" as any), sceneReferences.length, sceneReferences.filter((scene) => Boolean(scene.imageUrl)).length],
-            [t("wizard.coreSubject" as any), products.length, products.filter((product) => Boolean(product.imageUrl)).length],
-            [t("wizard.keyObjects" as any), props.length, props.filter((prop) => Boolean(prop.imageUrl)).length],
+            [t("characters.title"), characters.length, characters.filter((char) => Boolean(char.imageUrl || char.avatarUrl)).length],
+            [t("wizard.worldScenes"), sceneReferences.length, sceneReferences.filter((scene) => Boolean(scene.imageUrl)).length],
+            [t("wizard.coreSubject"), products.length, products.filter((product) => Boolean(product.imageUrl)).length],
+            [t("wizard.keyObjects"), props.length, props.filter((prop) => Boolean(prop.imageUrl)).length],
           ].map(([label, count, ready]) => (
             <div key={String(label)} className="rounded-lg border border-line-soft bg-app/60 px-3 py-2">
               <p className="text-xs font-medium text-ink-2">{label}</p>
-              <p className="mt-1 text-[0.6875rem] text-ink-5">{ready} / {count} {t("wizard.readyCount" as any)}</p>
+              <p className="mt-1 text-[0.6875rem] text-ink-5">{ready} / {count} {t("wizard.readyCount")}</p>
             </div>
           ))}
         </div>
-        <p className="mt-3 text-[0.6875rem] text-ink-4">{t("wizard.readinessSummary" as any, { ready: readyAssetCount, total: totalAssetCount })}</p>
+        <p className="mt-3 text-[0.6875rem] text-ink-4">{t("wizard.readinessSummary", { ready: readyAssetCount, total: totalAssetCount })}</p>
       </section>
 
       {/* ── Characters section ────────────────────────────────────────── */}

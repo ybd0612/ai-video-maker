@@ -130,7 +130,7 @@ export function VisualDirectionEditor({ onClose, onGenerate, generating = false 
         ],
       });
       const next = parseVisualDirection(result.content, draft);
-      if (!next) throw new Error(t("wizard.visualDirectionInvalidResponse" as any));
+      if (!next) throw new Error(t("wizard.visualDirectionInvalidResponse"));
       setHistory((items) => [...items, draft]);
       setDraft(next);
       setInstruction("");
@@ -143,7 +143,7 @@ export function VisualDirectionEditor({ onClose, onGenerate, generating = false 
   }, [autoRegenerateAssetImages, busy, draft, instruction, onGenerate, providerConfig, t]);
 
   if (!project || !draft) {
-    return <div className="p-3 text-xs text-ink-4">{t("wizard.visualDirectionUnset" as any)}</div>;
+    return <div className="p-3 text-xs text-ink-4">{t("wizard.visualDirectionUnset")}</div>;
   }
 
   const referenceUrl = getStyleReferenceUrl(project);

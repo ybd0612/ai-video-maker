@@ -1,4 +1,3 @@
-
 import { useSettingsStore } from "@/stores/settingsStore";
 
 /* ── Translation dictionaries ───────────────────────────────────────────── */
@@ -8,27 +7,10 @@ const zh = {
   "sidebar.settings": "设置",
   "sidebar.theme": "切换黑白主题",
 
-
-  // Task
-  "task.title": "任务",
-  "task.new": "新建",
-  "task.newPlaceholder": "给画布起个名字...",
-  "task.saveTo": "保存到",
-  "task.noTasks": "暂无保存的任务，输入名称点击新建。",
-  "task.recovered": "已恢复的任务",
-  "task.folder": "文件夹",
-  "task.rename": "重命名",
-  "task.moveTo": "移动到",
-  "task.moveToRoot": "移到根目录",
-  "task.open": "打开",
-  "task.deleteFolderConfirm": "删除文件夹「{name}」？其中的工作流将移至根目录。",
-  "task.historyEntries": "个历史版本",
-  "task.restoreVersion": "恢复此版本",
-  "task.deleteConfirm": "删除「{name}」？",
+  // Dialog
   "dialog.confirm": "确认",
   "dialog.cancel": "取消",
   "dialog.delete": "删除",
-
 
   // Settings
   "settings.title": "设置",
@@ -84,10 +66,6 @@ const zh = {
   "settings.planRpmValue": "文本 {text} · 图片({tier}) {image} · 视频 {video}",
   "settings.planQuotaValue": "文本 每 5 小时 {text5h} / 每周 {textWeek}；图片 每日 {imageDay} 张；视频 每日 {videoDay} 秒",
 
-
-
-
-
   // Workflow — errors & log messages
   "error.videoCreateNoVideoId": "视频 API 未返回 video_id。",
   "error.videoPollCancelled": "视频轮询已取消。",
@@ -140,7 +118,7 @@ const zh = {
   "pipeline.sortNewest": "最新优先",
   "pipeline.sortOldest": "最早优先",
 
-  // AI Assist
+  // Polish（输入框内嵌的 AI 润色按钮）
   "polish.action": "润色",
   "polish.undo": "撤销",
   "polish.running": "润色中",
@@ -181,7 +159,6 @@ const zh = {
   "dialogue.narrator": "旁白",
   "dialogue.deliveryPlaceholder": "如：温柔地、愤怒地...",
   "dialogue.textPlaceholder": "输入台词...",
-
 
   // Shot extras
   "shot.characters": "出场角色",
@@ -309,7 +286,6 @@ const zh = {
   "wizard.cancelRender": "取消拼接",
   "wizard.taskRunningSwitchTitle": "任务仍在后台运行",
   "wizard.taskRunningSwitchConfirm": "项目「{title}」仍有任务在后台运行，切换后任务将继续完成并写回该项目。确定切换？",
-
 
   // Service-layer error messages（非 React 上下文瞬时错误，经 getTranslation 定格当前语言）
   "error.chatNonJson": "Chat API 返回了非 JSON 响应 (Content-Type: {contentType})。响应前 200 字符：{body}",
@@ -453,27 +429,10 @@ const en = {
   "sidebar.settings": "Settings",
   "sidebar.theme": "Toggle light/dark theme",
 
-
-  // Task
-  "task.title": "Tasks",
-  "task.new": "New",
-  "task.newPlaceholder": "Name your canvas...",
-  "task.saveTo": "Save to",
-  "task.noTasks": "No saved tasks. Type a name and click New.",
-  "task.recovered": "Recovered Task",
-  "task.folder": "Folder",
-  "task.rename": "Rename",
-  "task.moveTo": "Move to",
-  "task.moveToRoot": "Move to root",
-  "task.open": "Open",
-  "task.deleteFolderConfirm": "Delete folder \u201c{name}\u201d? Workflows inside will be moved to root.",
-  "task.historyEntries": "history entries",
-  "task.restoreVersion": "Restore this version",
-  "task.deleteConfirm": "Delete \"{name}\"?",
+  // Dialog
   "dialog.confirm": "Confirm",
   "dialog.cancel": "Cancel",
   "dialog.delete": "Delete",
-
 
   // Settings
   "settings.title": "Settings",
@@ -529,19 +488,13 @@ const en = {
   "settings.planRpmValue": "Text {text} · Image ({tier}) {image} · Video {video}",
   "settings.planQuotaValue": "Text {text5h} / 5h · {textWeek} / week; Image {imageDay} / day; Video {videoDay} s / day",
 
-
-
-
-
   // Workflow — errors & log messages
   "error.videoCreateNoVideoId": "Video API did not return a video_id.",
   "error.videoPollCancelled": "Video polling cancelled.",
   "error.videoGenerationFailed": "Video generation failed: {reason}",
   "error.videoGenerationTimedOut": "Video generation timed out.",
 
-
   // Pipeline
-
 
   "pipeline.title": "AI Video Creator",
   "pipeline.apiKeyRequired": "API Key not configured. Please set your key to use AI features.",
@@ -588,7 +541,7 @@ const en = {
   "pipeline.sortNewest": "Newest first",
   "pipeline.sortOldest": "Oldest first",
 
-  // AI Assist
+  // Polish（input-embedded AI polish button）
   "polish.action": "Polish",
   "polish.undo": "Undo",
   "polish.running": "Polishing",
@@ -629,7 +582,6 @@ const en = {
   "dialogue.narrator": "Narrator",
   "dialogue.deliveryPlaceholder": "e.g. gently, angrily...",
   "dialogue.textPlaceholder": "Enter dialogue...",
-
 
   // Shot extras
   "shot.characters": "Characters",
@@ -757,7 +709,6 @@ const en = {
   "wizard.cancelRender": "Cancel",
   "wizard.taskRunningSwitchTitle": "Task still running",
   "wizard.taskRunningSwitchConfirm": "Project \"{title}\" still has tasks running in the background. They will continue and write back to that project. Switch anyway?",
-
 
   // Service-layer error messages (instant errors outside React context, frozen via getTranslation)
   "error.chatNonJson": "Chat API returned a non-JSON response (Content-Type: {contentType}). First 200 chars: {body}",
