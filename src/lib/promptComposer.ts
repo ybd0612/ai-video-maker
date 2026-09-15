@@ -117,9 +117,40 @@ export function assetImageBoundary(type: "scene" | "product" | "prop"): string {
  * 风格参考图提示词：在模型生成的 stylePrompt 上声明这张图的角色（纯风格母版）。
  * 具体风格语言（媒介、色彩、光影、材质、镜头、构图）由模型决定（task=styleRef），
  * 代码不写死任何风格特化词汇，跨动画/写实/水彩/产品摄影等风格通用。
+ *
+ * ⚠️ 2026-09-15 事故修复：原实现只给否定约束（"no central subject / no recognizable entity"）。
+ * 文生图模型无法渲染"空画面"，必然按语境自造主体填空 —— "fine fur textures + tenderness"
+ * 被填成一只毛茸茸的猫；该猫随后经图生图扩散，让全部资产图都变成猫。
+ * 现改为**正向载体**：明确要求画面是抽象样张（材质/色卡/光影/笔触样张），
+ * 模型有明确可画之物就不会再造主体。载体描述对所有风格通用，不属风格特化。
  */
 export function composeStyleReferencePrompt(stylePrompt: string): string {
-  return `${stylePrompt.trim()}. A pure style reference board showing only reusable visual language: no central subject, no recognizable entity, no narrative content.`;
+  // 去掉模型偶发给出的句末句号，避免拼接出 "emotion.. Render ..." 双句号
+  const base = stylePrompt.trim().replace(/[\s.]+$/, "");
+  return (
+    `${base}. Render this as an abstract style sample sheet: material and texture swatches, ` +
+    "colour palette chips, lighting and gradient studies, brush and rendering samples. " +
+    "Abstract visual language only — no character, no animal, no creature, no person, " +
+    "no face, no product, no scenery, no narrative scene."
+  );
+}
+
+/**
+ * 图生图时的风格锚点声明：参考图（风格母版）只提供画风/色彩/光照，**不提供主体**。
+ * 角色定妆照、场景/产品/道具资产图共用同一句，避免多处各写一份导致语义漂移。
+ *
+ * ⚠️ 2026-09-15 事故修复：原实现是一句否定（"do not copy its content or composition"）。
+ * 图生图模型对参考图内容的复制强度远高于文本否定，母版里只要出现主体就会被整体复制
+ * （母版的猫 → 小猪、场景、道具全变猫）。现改为**正向主体归属**：显式声明本图主体
+ * 只有下述描述的主体，参考图中出现的任何主体一律丢弃。
+ */
+export function composeStyleAnchorInstruction(): string {
+  return (
+    "Use the reference image as a style and palette sample only: take its rendering style, " +
+    "colour palette, lighting and material treatment. The subject of this image is exactly " +
+    "the one described below and nothing else — discard any subject, character, animal or " +
+    "scene visible in the reference image."
+  );
 }
 
 /* ── 多图合成（分镜图） ──────────────────────────────────────────────────── */
@@ -154,9 +185,12 @@ export function composeMultiReferencePrompt(i: {
   const composition = i.composition?.trim();
   if (composition) parts.push(`Composition: ${composition}`);
 
-  // 图像关系：参考图只作锚点，勿复制内容/构图
+  // 图像关系：参考图只作锚点，勿复制内容/构图。
+  // ⚠️ 2026-09-15：原为纯否定（"do not copy their content or composition"），
+  // 图生图模型对参考图内容的复制强于文本否定，母版里的主体会扩散到分镜图。
+  // 现改为**正向主体归属**：本图主体/场景即上文所描述者，参考图中未被描述的主体一律丢弃。
   parts.push(
-    "The reference images only anchor art style, color palette and character identity; do not copy their content or composition.",
+    "The reference images are style, palette and identity anchors only: the subject and scene of this image are exactly those described above and nothing else — discard any subject visible in the references that is not described above.",
     "Scene, product and prop references anchor only the named asset identity and appearance; do not copy their layout.",
   );
 

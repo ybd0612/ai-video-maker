@@ -24,6 +24,7 @@ import { Lightbox } from "@/components/ui/Lightbox";
 import { confirmDialog } from "@/components/ui/ConfirmDialog";
 import {
   composeImageToImagePrompt,
+  composeStyleAnchorInstruction,
   assetImageBoundary,
   getStylePrompt,
   getStyleReferenceUrl,
@@ -167,7 +168,7 @@ export function StepAssets() {
       const styleRef = project ? getStyleReferenceUrl(project) : undefined;
       const stylePrompt = project ? getStylePrompt(project) : undefined;
       const styleInstruction = styleRef
-        ? "Match the art style, color palette and lighting mood of the reference image; do not copy its content or composition."
+        ? composeStyleAnchorInstruction()
         : "Render this asset as a clean consistency reference image";
       const url = await generateImage({
         apiKey: providerConfig.apiKey,

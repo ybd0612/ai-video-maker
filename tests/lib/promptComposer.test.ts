@@ -15,6 +15,7 @@ import {
   getStylePrompt,
   assetImageBoundary,
   composeStyleReferencePrompt,
+  composeStyleAnchorInstruction,
   collectSubjectVocabulary,
   normalizeCharacterDescription,
   parseCharacterDescription,
@@ -107,17 +108,34 @@ describe("资产主体边界与视觉方向", () => {
     expect(assetImageBoundary("scene")).not.toContain("rabbit");
   });
 
-  it("视觉方向参考图只声明风格母版角色，不改写模型给出的风格语言", () => {
+  it("视觉方向参考图声明为抽象样张载体（正向约束），不改写模型给出的风格语言", () => {
     const stylePrompt = "soft 3D cartoon rendering, fuzzy plush surface, warm golden palette";
     const prompt = composeStyleReferencePrompt(stylePrompt);
     // 模型给的风格语言原样保留：材质词是否合法属效果判断，由 LLM 审计裁定，
     // 代码不做关键词清洗（避免误伤写实/水彩/毛绒产品等合法风格）。
     expect(prompt).toContain("fuzzy plush surface");
-    expect(prompt).toContain("pure style reference board");
-    expect(prompt).toContain("no central subject");
-    expect(prompt).toContain("no narrative content");
+    // 2026-09-15 事故：只给否定约束时文生图模型会自造主体填空
+    // （"fine fur textures" + 治愈情绪 → 一只毛茸茸的猫），该主体再经图生图
+    // 扩散到全部资产图。故必须给出正向、可画的抽象载体。
+    expect(prompt).toContain("abstract style sample sheet");
+    expect(prompt).toContain("material and texture swatches");
+    expect(prompt).toContain("no animal");
     // 不再写死任何风格特化词汇
     expect(prompt).not.toContain("cartoon rendering style study");
+  });
+
+  it("风格提示词自带句末句号时不拼出双句号（旧日志出现 \"emotion.. Render\"）", () => {
+    const prompt = composeStyleReferencePrompt("warm tones and soft light.");
+    expect(prompt).toContain("soft light. Render this as");
+    expect(prompt).not.toContain("..");
+  });
+
+  it("图生图风格锚点声明正向主体归属，不再只靠否定句", () => {
+    const out = composeStyleAnchorInstruction();
+    expect(out).toContain("style and palette sample only");
+    expect(out).toContain(
+      "discard any subject, character, animal or scene visible in the reference image",
+    );
   });
 
   it("审计禁止清单只来自项目自身非风格资产名，去重且不硬编码关键词", () => {
@@ -157,12 +175,12 @@ describe("composeMultiReferencePrompt", () => {
     expect(out).toContain("Image 3 is the style reference: 整体风格: anime");
     expect(out).toContain("Target scene / subject: the fox walks in the forest");
     expect(out).toContain(
-      "The reference images only anchor art style, color palette and character identity; do not copy their content or composition.",
+      "The reference images are style, palette and identity anchors only: the subject and scene of this image are exactly those described above and nothing else — discard any subject visible in the references that is not described above.",
     );
     // 顺序：参考图说明 → 目标场景 → 图像关系（末尾）
     const idx1 = out.indexOf("Image 1");
     const idxScene = out.indexOf("Target scene");
-    const idxAnchor = out.indexOf("The reference images only anchor");
+    const idxAnchor = out.indexOf("The reference images are style, palette and identity anchors");
     expect(idx1).toBeLessThan(idxScene);
     expect(idxScene).toBeLessThan(idxAnchor);
   });

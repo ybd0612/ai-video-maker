@@ -17,6 +17,7 @@ import {
   composePortraitPrompt,
   assetImageBoundary,
   composeStyleReferencePrompt,
+  composeStyleAnchorInstruction,
   collectSubjectVocabulary,
 } from "@/lib/promptComposer";
 import { parseJsonFromResponse } from "@/lib/jsonResponse";
@@ -323,7 +324,7 @@ export function useAssetActions(): AssetActions {
         const styleReferenceUrl = latestProject ? getStyleReferenceUrl(latestProject) : undefined;
         const stylePrompt = latestProject ? getStylePrompt(latestProject) : undefined;
         const styleInstruction = styleReferenceUrl
-          ? "Match the art style, color palette and lighting mood of the reference image; do not copy its content or composition. "
+          ? `${composeStyleAnchorInstruction()} `
           : "";
         const { size: imageSize, ratio: imageRatio } = aspectRatioToImageParams(project.aspectRatio);
         const tasks: Array<() => Promise<void>> = [];

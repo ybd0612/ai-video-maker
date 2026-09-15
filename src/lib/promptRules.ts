@@ -89,34 +89,44 @@ Extract only reusable visual language: medium, material, color, lighting, camera
 
   /* ── 风格提示词审计（校验/重写 stylePrompt，数据驱动，判断权归模型） ── */
   stylePromptAudit: {
-    zh: `你是一位图像提示词审计员。给定一段英文风格提示词（stylePrompt）与一份"禁止出现的主体清单"（来自项目自身的角色名、资产名与剧情关键词），判断这段提示词是否越界：
-- 是否出现了清单中的具体主体（角色/产品/道具/场景名）
-- 是否描述了故事动作、叙事场景或具体物件
-- 是否暗示了可识别的主体轮廓
+    zh: `You are an image prompt auditor. Given an English style prompt (stylePrompt) and a "forbidden subject list" (derived from the project's own character names, asset names and story keywords), decide whether the prompt overreaches.
 
-只使用纯视觉语言（媒介、色彩、光影、材质、镜头质感、构图规律、氛围）。
+A style prompt is valid ONLY when it describes reusable visual language carried by an abstract sample sheet. It overreaches if ANY of these is true:
+1. It mentions a specific subject from the list (character / product / prop / scene name).
+2. It describes story actions, narrative scenes or concrete objects.
+3. It implies a recognizable subject silhouette.
+4. It would make the image model render a concrete entity as the frame's subject — an animal, creature, character, person, face, product, vehicle, readable landscape or room — EVEN IF that entity is not on the list. Judge by what the language forces the model to draw, not only by named entities: "fine fur textures" together with "extreme tenderness and pure healing emotion" reads as a fluffy animal even though no animal is named, and a soft diffuse-material passage with no renderable content makes the model invent a subject. Missing entity names do not make a prompt clean.
+5. It uses a subject-bound material word (fur, hair, feather, plush, skin, scale) as bare overall style language instead of as an abstract material sample attached to a carrier.
+6. It names no abstract carrier for the visual language (material / texture swatch, colour palette chips, lighting or gradient study, brush or rendering sample).
 
-只返回 JSON：
-{
-  "clean": true 或 false,
-  "reason": "越界原因（clean 为 true 时为空字符串）",
-  "rewritten": "若 clean 为 false，返回重写后的纯风格提示词（一句话到两句，英文，不含主体）；clean 为 true 时为空字符串"
-}
-rewritten 必须保留原提示词的整体风格基调，只移除越界的主体/叙事内容，不得引入新的主体或剧情。`,
-    en: `You are an image prompt auditor. Given an English style prompt (stylePrompt) and a "forbidden subject list" (derived from the project's own character names, asset names and story keywords), decide whether the prompt overreaches:
-- Does it mention any specific subject from the list (character / product / prop / scene name)?
-- Does it describe story actions, narrative scenes or concrete objects?
-- Does it imply a recognizable subject silhouette?
-
-Use only pure visual language (medium, color, lighting, material, camera texture, composition patterns, atmosphere).
+Valid output describes only reusable visual language on an explicit abstract carrier.
 
 Return JSON only:
 {
   "clean": true or false,
   "reason": "why it overreaches (empty string when clean is true)",
-  "rewritten": "if clean is false, return the rewritten pure-style prompt (one to two sentences, English, no subjects); empty string when clean is true"
+  "rewritten": "if clean is false, return the rewritten pure-style prompt (one to three sentences, English); empty string when clean is true"
 }
-The rewritten prompt must keep the original overall style tone and only remove the overreaching subject/narrative content; it must not introduce new subjects or plot.`,
+rewritten 必须保留原提示词的整体风格基调，把视觉语言承载到抽象样张上（材质/肌理样张、色卡、光影研究、笔触样张），并把主体绑定材质词改写为挂在载体上的抽象材质样本（如 "fur-like fibre texture swatch"）；不得引入新的主体或剧情。`,
+    en: `You are an image prompt auditor. Given an English style prompt (stylePrompt) and a "forbidden subject list" (derived from the project's own character names, asset names and story keywords), decide whether the prompt overreaches.
+
+A style prompt is valid ONLY when it describes reusable visual language carried by an abstract sample sheet. It overreaches if ANY of these is true:
+1. It mentions a specific subject from the list (character / product / prop / scene name).
+2. It describes story actions, narrative scenes or concrete objects.
+3. It implies a recognizable subject silhouette.
+4. It would make the image model render a concrete entity as the frame's subject — an animal, creature, character, person, face, product, vehicle, readable landscape or room — EVEN IF that entity is not on the list. Judge by what the language forces the model to draw, not only by named entities: "fine fur textures" together with "extreme tenderness and pure healing emotion" reads as a fluffy animal even though no animal is named, and a soft diffuse-material passage with no renderable content makes the model invent a subject. Missing entity names do not make a prompt clean.
+5. It uses a subject-bound material word (fur, hair, feather, plush, skin, scale) as bare overall style language instead of as an abstract material sample attached to a carrier.
+6. It names no abstract carrier for the visual language (material / texture swatch, colour palette chips, lighting or gradient study, brush or rendering sample).
+
+Valid output describes only reusable visual language on an explicit abstract carrier.
+
+Return JSON only:
+{
+  "clean": true or false,
+  "reason": "why it overreaches (empty string when clean is true)",
+  "rewritten": "if clean is false, return the rewritten pure-style prompt (one to three sentences, English); empty string when clean is true"
+}
+The rewritten prompt must keep the original overall style tone, carry the visual language on an abstract sample sheet (material / texture swatch, colour chips, lighting study, brush sample), and convert subject-bound material words into abstract material samples attached to a carrier (e.g. "fur-like fibre texture swatch"); it must not introduce new subjects or plot.`,
   },
 
   /* ── 视觉方向自检（校验/重写视觉方向，判断权归模型） ── */
@@ -124,9 +134,9 @@ The rewritten prompt must keep the original overall style tone and only remove t
     zh: `你是一位视觉指导。给定一个项目级视觉方向（六个视觉维度 + 一句话简介）与一份"禁止出现的主体清单"（可能为空），判断这些内容是否越界：
 - 是否出现了清单中的具体主体（角色/场景/产品/道具名）
 - 是否描述了故事动作、叙事场景、角色关系或具体物件
-- 是否把主体材质（如毛发、皮肤）当作整体画风来描述
+- 是否把主体绑定材质词（毛发、皮肤、羽毛、绒毛、鳞片）当作具体主体或整体画风来描述，而不是作为抽象载体上的材质样本（如"毛绒肌理样张"）
 
-合格标准：只描述可复用的视觉语言——媒介与渲染方式、色彩关系、光影、镜头质感、构图规律、情绪氛围。
+合格标准：只描述可复用的视觉语言——媒介与渲染方式、色彩关系、光影、镜头质感、构图规律、情绪氛围。主体绑定材质若要保留，须表述为抽象材质样本（毛绒/皮革/织物肌理等），不得指向任何生物或物件。
 
 只返回 JSON：
 {
@@ -138,9 +148,9 @@ The rewritten prompt must keep the original overall style tone and only remove t
     en: `You are a visual director. Given a project-level visual direction (six visual dimensions plus a one-sentence summary) and a "forbidden subject list" (may be empty), decide whether the content overreaches:
 - Does it mention a specific subject from the list (character / scene / product / prop name)?
 - Does it describe story actions, narrative scenes, character relationships or concrete objects?
-- Does it treat subject-bound material (fur, skin) as the overall art style?
+- Does it treat a subject-bound material word (fur, hair, feather, plush, skin, scale) as a concrete subject or as the overall art style, instead of as an abstract material sample on a carrier?
 
-Valid output describes only reusable visual language: medium and rendering, color relationships, lighting, camera texture, composition patterns and atmosphere.
+Valid output describes only reusable visual language: medium and rendering, color relationships, lighting, camera texture, composition patterns and atmosphere. When a subject-bound material must be kept, it has to be worded as an abstract material sample (plush / leather / fabric grain sample) and must not point at any living being or object.
 
 Return JSON only:
 {
@@ -488,7 +498,7 @@ Return ONLY the appearance description, with no explanations and no bullet point
 
   /* ── 风格提示词派生（useWizardActions.deriveStylePrompt） ── */
   styleRef: {
-    zh: `You are a visual style director. Based only on the desired visual direction fields, produce ONE English image-style prompt that will be used to generate a style reference / mood board image.
+    zh: `You are a visual style director. Based only on the desired visual direction fields, produce ONE English image-style prompt that will be used to generate a STYLE SAMPLE SHEET (a style master board), not an illustration.
 
 The prompt MUST describe ONLY reusable visual language:
 - medium / art form
@@ -497,7 +507,11 @@ The prompt MUST describe ONLY reusable visual language:
 - atmosphere / material / texture
 - composition and camera treatment
 
-The output is a style-only board, not a scene or poster. It must have no core subject and must not imply any recognizable entity.
+CARRIER RULE (critical): a text-to-image model cannot render an empty frame. A style-only prompt with no renderable content gets silently filled with an invented subject drawn from its own priors. So the prompt MUST name an explicit abstract carrier that the model can render: material and texture swatches, colour palette chips, lighting and gradient studies, brushwork or rendering samples. Describe that carrier — never a scene, poster or illustration.
+
+SUBJECT-BOUND MATERIAL RULE: words that normally belong to a living subject (fur, hair, feather, plush, skin, scale, fin) may be used ONLY as an abstract material sample attached to a carrier — e.g. "fur-like fibre texture swatch" or "plush-surface material sample". Never leave them bare as overall style language ("fine fur textures"), because a bare material word plus a soft/healing mood reads to the image model as an animal.
+
+NEVER let any concrete entity become the frame's subject: no animal, no creature, no character, no person, no face, no product, no vehicle, no readable landscape or room, no narrative action, no text, no watermark.
 
 {{#rules}}
 {{rules}}
@@ -507,8 +521,8 @@ Examples:
 {{examples}}
 {{/examples}}
 
-Output ONLY the prompt text itself, one or two sentences, no quotes, no explanation.`,
-    en: `You are a visual style director. Based only on the desired visual direction fields, produce ONE English image-style prompt that will be used to generate a style reference / mood board image.
+Output ONLY the prompt text itself, one to three sentences, no quotes, no explanation.`,
+    en: `You are a visual style director. Based only on the desired visual direction fields, produce ONE English image-style prompt that will be used to generate a STYLE SAMPLE SHEET (a style master board), not an illustration.
 
 The prompt MUST describe ONLY reusable visual language:
 - medium / art form
@@ -517,7 +531,11 @@ The prompt MUST describe ONLY reusable visual language:
 - atmosphere / material / texture
 - composition and camera treatment
 
-The output is a style-only board, not a scene or poster. It must have no core subject and must not imply any recognizable entity.
+CARRIER RULE (critical): a text-to-image model cannot render an empty frame. A style-only prompt with no renderable content gets silently filled with an invented subject drawn from its own priors. So the prompt MUST name an explicit abstract carrier that the model can render: material and texture swatches, colour palette chips, lighting and gradient studies, brushwork or rendering samples. Describe that carrier — never a scene, poster or illustration.
+
+SUBJECT-BOUND MATERIAL RULE: words that normally belong to a living subject (fur, hair, feather, plush, skin, scale, fin) may be used ONLY as an abstract material sample attached to a carrier — e.g. "fur-like fibre texture swatch" or "plush-surface material sample". Never leave them bare as overall style language ("fine fur textures"), because a bare material word plus a soft/healing mood reads to the image model as an animal.
+
+NEVER let any concrete entity become the frame's subject: no animal, no creature, no character, no person, no face, no product, no vehicle, no readable landscape or room, no narrative action, no text, no watermark.
 
 {{#rules}}
 {{rules}}
@@ -527,7 +545,7 @@ Examples:
 {{examples}}
 {{/examples}}
 
-Output ONLY the prompt text itself, one or two sentences, no quotes, no explanation.`,
+Output ONLY the prompt text itself, one to three sentences, no quotes, no explanation.`,
   },
 
   /* ── 分镜画面提示词拼装规范（composeShot 纯函数拼装的约束文档条目） ── */
@@ -997,8 +1015,8 @@ export const BUILTIN_RULES: PromptRule[] = [
     task: "styleRef",
     section: "rules",
     content: {
-      zh: "- 只使用纯视觉语言：媒介、色彩、光影、材质、镜头质感、构图规律与氛围\n- 风格图是纯风格母版：不出现核心主体、不暗示任何可识别实体、不叙述故事或借用故事主体/场景/构图\n- 画面中不要出现文字与水印",
-      en: "- Use only pure visual language: medium, color, lighting, material, camera texture, composition patterns and atmosphere\n- The style board is a pure style master: no core subject, no recognizable entity, no story or borrowed subjects/setting/composition\n- No text or watermark in the image",
+      zh: "- 只使用纯视觉语言：媒介、色彩、光影、材质、镜头质感、构图规律与氛围\n- 风格图是纯风格母版，必须落在**抽象样张载体**上（材质/肌理样张、色卡、光影研究、笔触或渲染样张），而不是场景、海报或插画\n- 不出现核心主体、不暗示任何可识别实体、不叙述故事或借用故事主体/场景/构图\n- 主体绑定材质词（毛发、皮肤、羽毛、绒毛、鳞片）只能挂在抽象载体的材质样本上（如 \"fur-like fibre texture swatch\"），不得裸写为整体画风，否则会被图像模型理解成一只动物\n- 画面中不要出现文字与水印",
+      en: "- Use only pure visual language: medium, color, lighting, material, camera texture, composition patterns and atmosphere\n- The style sheet is a pure style master and must sit on an ABSTRACT CARRIER (material / texture swatches, colour chips, lighting studies, brush or rendering samples) — never a scene, poster or illustration\n- No core subject, no recognizable entity, no story or borrowed subjects/setting/composition\n- Subject-bound material words (fur, hair, feather, plush, skin, scale) may only be attached to an abstract material sample (e.g. \"fur-like fibre texture swatch\"); never leave them bare as overall style language, or the image model reads them as an animal\n- No text or watermark in the image",
     },
     enabled: true,
     source: "builtin",

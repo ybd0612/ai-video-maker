@@ -24,6 +24,7 @@ import { generateImage, aspectRatioToImageParams } from "@/services/imageService
 import { generateAssetNamespace, generateFullPrompt } from "@/lib/assetNamespace";
 import {
   composePortraitPrompt,
+  composeStyleAnchorInstruction,
   getStylePrompt,
   getStyleReferenceUrl,
   normalizeCharacterDescription,
@@ -154,7 +155,7 @@ export function CharacterEditor({ character, onClose }: CharacterEditorProps) {
           apiKey: providerConfig.apiKey,
           baseUrl: providerConfig.baseUrl,
           prompt: styleReferenceUrl
-            ? `Match the art style, color palette and lighting mood of the reference image; do not copy its content or composition. ${prompt}`
+            ? `${composeStyleAnchorInstruction()} ${prompt}`
             : prompt,
           size,
           ratio,
