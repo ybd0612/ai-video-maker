@@ -52,6 +52,19 @@ export function StepAssembly() {
     };
   }, []);
 
+  // auto 模式：镜头视频齐全时自动拼接成片（一条龙收尾）。
+  // 仅在本次观察期间「从未就绪到就绪」触发一次；已有成片 / 拼接失败后
+  // 不自动重试（失败走手动按钮）。autoRenderRef 挡 StrictMode 双挂载重复调用。
+  const autoRenderRef = useRef(false);
+  useEffect(() => {
+    if (autoRenderRef.current) return;
+    if (project?.automationMode !== "auto") return;
+    if (!canRender || isRendering || renderedUrl) return;
+    autoRenderRef.current = true;
+    void handleRender();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [project?.automationMode, canRender, isRendering, renderedUrl]);
+
   const handleRender = useCallback(async () => {
     if (!canRender || !project) return;
     const targetProjectId = project.id;

@@ -4,7 +4,7 @@
 // Generates reference images used as img2img anchors for storyboard consistency.
 // ────────────────────────────────────────────────────────────────────────────
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import type { Dispatch, SetStateAction } from "react";
 import {
   useProjectStore, selectActiveProject,
@@ -79,6 +79,22 @@ export function StepAssets() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [project?.id]);
+
+  // auto 模式：全部资产有图后自动推进到 Step 3（分镜页挂载后会自动生成分镜）。
+  // 仅在本次观察期间「从缺到齐」（false→true）时推进：挂载时已全部就绪
+  // （如从后续步骤返回）不推进，避免用户无法返回上一步修改。
+  // 失败/手动资产无图会卡住推进 —— 与 StepImages 的 allImaged 语义一致，用户手动处理。
+  const prevAllImagedByProjectRef = useRef<Record<string, boolean>>({});
+  const allAssetsImaged = assets.length > 0 && assets.every((a) => !!a.imageUrl);
+  useEffect(() => {
+    const pid = project?.id;
+    if (!pid) return;
+    const prev = prevAllImagedByProjectRef.current[pid] ?? allAssetsImaged;
+    prevAllImagedByProjectRef.current[pid] = allAssetsImaged;
+    if (allAssetsImaged && !prev && project?.automationMode === "auto") {
+      setWizardStep(3);
+    }
+  }, [allAssetsImaged, project?.id, project?.automationMode, setWizardStep]);
 
   // ── Character handlers ────────────────────────────────────────────────
 
