@@ -1,13 +1,20 @@
 import { useCallback, useEffect, useState } from "react";
-import { Loader2, Sparkles, Undo2 } from "lucide-react";
-import { AssetDetailLayout, AssetPreviewFrame } from "./AssetDetailLayout";
 import { useProjectStore, selectActiveProject, type StyleDetails, type VisualDirection } from "@/stores/projectStore";
 import { useSettingsStore } from "@/stores/settingsStore";
-import { useT } from "@/i18n";
+import { useT, type TranslationKey } from "@/i18n";
 import { chatCompletion } from "@/services/chatService";
 import { SYSTEM_PROMPT_VISUAL_DIRECTION_EDIT_ZH } from "@/lib/promptRules";
 import { Lightbox } from "@/components/ui/Lightbox";
 import { getStyleReferenceUrl } from "@/lib/promptComposer";
+import {
+  AssetDetailShell,
+  AssetDetailsBlock,
+  AssetEditorFooter,
+  AssetEditorMessages,
+  AssetInstructionRow,
+  AssetNameField,
+  AssetPreviewColumn,
+} from "./AssetEditorTemplate";
 
 interface VisualDirectionEditorProps {
   onClose: () => void;
@@ -17,13 +24,14 @@ interface VisualDirectionEditorProps {
 
 type DetailField = keyof Omit<StyleDetails, "kind">;
 
-const FIELD_LABELS: Array<{ key: DetailField; label: string }> = [
-  { key: "mediumMaterial", label: "画风与材质" },
-  { key: "colorPalette", label: "主色调" },
-  { key: "lightingMood", label: "光影氛围" },
-  { key: "cameraTexture", label: "镜头质感" },
-  { key: "composition", label: "构图倾向" },
-  { key: "emotion", label: "整体情绪" },
+/** 六个视觉维度（展示名走 i18n：assetField.*，与资产设定字段共用同一套标签） */
+const DETAIL_FIELDS: DetailField[] = [
+  "mediumMaterial",
+  "colorPalette",
+  "lightingMood",
+  "cameraTexture",
+  "composition",
+  "emotion",
 ];
 
 /** 逐字段取字符串：details 缺失时回落旧平铺字段（兼容旧模型输出）。 */
@@ -139,89 +147,78 @@ export function VisualDirectionEditor({ onClose, onGenerate, generating = false 
   }
 
   const referenceUrl = getStyleReferenceUrl(project);
-
   return (
-    <AssetDetailLayout
-      title={t("wizard.editVisualDirection" as any)}
+    <AssetDetailShell
+      title={t("wizard.editVisualDirection")}
+      backLabel={t("assetEditor.back")}
       onBack={onClose}
       backDisabled={busy || generating}
       preview={(
-        <>
-          <label className="text-[0.6875rem] font-medium text-ink-4">{t("wizard.visualDirectionReference" as any)}</label>
-          {referenceUrl ? (
-            <Lightbox src={referenceUrl} alt={t("wizard.visualDirectionReference" as any)}>
-              <AssetPreviewFrame><img src={referenceUrl} alt={t("wizard.visualDirectionReference" as any)} className="h-full w-full object-contain" /></AssetPreviewFrame>
+        <AssetPreviewColumn
+          label={t("wizard.visualDirectionReference")}
+          imageUrl={referenceUrl}
+          alt={draft.name || t("wizard.visualDirectionUnset")}
+          generating={generating}
+          onGenerate={() => void onGenerate?.()}
+          generateLabel={t("wizard.regenerateVisualDirection")}
+          generateDisabled={busy || generating || !onGenerate}
+          autoRegenerate={onGenerate ? {
+            checked: autoRegenerateAssetImages,
+            onChange: (checked) => useSettingsStore.getState().setAutoRegenerateAssetImages(checked),
+            label: t("assetEditor.autoRegenerate"),
+            disabled: busy || generating,
+          } : undefined}
+          onOpenLightbox={(src, alt) => (
+            <Lightbox src={src} alt={alt}>
+              <img src={src} alt={alt} className="aspect-video w-full rounded-lg border border-line object-contain" />
             </Lightbox>
-          ) : <AssetPreviewFrame><span className="text-ink-5">—</span></AssetPreviewFrame>}
-          {onGenerate && <>
-            <button onClick={() => void onGenerate()} disabled={busy || generating} className="flex w-full items-center justify-center gap-1 rounded border border-line px-1.5 py-1 text-[0.625rem] text-accent hover:bg-accent-deep/30 disabled:opacity-50">
-              {generating ? <Loader2 size={10} className="animate-spin" /> : <Sparkles size={10} />}
-              重新生成视觉方向图
-            </button>
-            <label className="flex select-none items-center gap-1.5 text-[0.625rem] text-ink-3">
-              <input type="checkbox" checked={autoRegenerateAssetImages} onChange={(event) => useSettingsStore.getState().setAutoRegenerateAssetImages(event.target.checked)} disabled={busy || generating} className="h-3 w-3 accent-accent" />
-              编辑后自动生成图片
-            </label>
-          </>}
-        </>
+          )}
+        />
       )}
       footer={(
-        <div className="flex justify-end gap-2 border-t border-line-soft pt-3">
-          <button onClick={onClose} disabled={busy} className="rounded-md border border-line px-3 py-1.5 text-xs text-ink-3 hover:bg-raised disabled:opacity-50">{t("dialog.cancel")}</button>
-          <button onClick={() => { updateVisualDirection({ name: draft.name, description: draft.description, details: draft.details }); onClose(); }} disabled={busy || !draft.name.trim()} className="rounded-md bg-success px-3 py-1.5 text-xs font-medium text-white hover:opacity-90 disabled:opacity-50">{t("wizard.saveVisualDirection" as any)}</button>
-        </div>
+        <AssetEditorFooter
+          cancelLabel={t("dialog.cancel")}
+          onCancel={onClose}
+          cancelDisabled={busy}
+          saveLabel={t("wizard.saveVisualDirection")}
+          onSave={() => {
+            updateVisualDirection({ name: draft.name, description: draft.description, details: draft.details });
+            onClose();
+          }}
+          saveDisabled={busy || !draft.name.trim()}
+        />
       )}
     >
-        <div className="space-y-3">
-          <div className="space-y-1">
-            <label className="text-[0.6875rem] font-medium text-ink-4">{t("wizard.visualDirectionName" as any)}</label>
-            <input
-              value={draft.name}
-              onChange={(e) => setDraft({ ...draft, name: e.target.value })}
-              className="w-full rounded-md border border-line bg-raised px-2 py-1.5 text-xs text-ink focus:border-accent focus:outline-none"
-            />
-          </div>
-
-          <div className="space-y-1">
-            <label className="text-[0.6875rem] font-medium text-ink-4">{t("wizard.visualDirectionContent" as any)}</label>
-            <div className="space-y-1.5 rounded-md border border-line bg-raised p-2">
-              {FIELD_LABELS.map(({ key, label }) => (
-                <div key={key} className="flex gap-2 text-xs leading-relaxed">
-                  <span className="w-16 shrink-0 font-medium text-ink-3">{label}</span>
-                  <span className="min-w-0 flex-1 text-ink">{draft.details[key] || "—"}</span>
-                </div>
-              ))}
-            </div>
-            <p className="text-[0.625rem] text-ink-5">{t("wizard.visualDirectionReadonlyHint" as any)}</p>
-          </div>
-
-          <div className="flex items-center gap-1.5">
-            <input
-              value={instruction}
-              onChange={(e) => setInstruction(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && !e.nativeEvent.isComposing) {
-                  e.preventDefault();
-                  void applyInstruction();
-                }
-              }}
-              placeholder={t("wizard.visualDirectionInstructionPlaceholder" as any)}
-              disabled={busy}
-              className="min-w-0 flex-1 rounded-md border border-line bg-raised px-2 py-1.5 text-xs text-ink placeholder:text-ink-5 focus:border-accent focus:outline-none disabled:opacity-50"
-            />
-            <button onClick={() => void applyInstruction()} disabled={busy || !providerConfig.apiKey || !providerConfig.baseUrl} className="flex shrink-0 items-center gap-1 rounded-md bg-accent px-2 py-1.5 text-[0.6875rem] font-medium text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50" title={t("wizard.visualDirectionApply" as any)}>
-              {busy ? <Loader2 size={10} className="animate-spin" /> : <Sparkles size={10} />}
-              {busy ? t("characters.applying") : t("wizard.visualDirectionApply" as any)}
-            </button>
-            {history.length > 0 && (
-              <button onClick={() => { setDraft(history[history.length - 1]); setHistory((items) => items.slice(0, -1)); }} disabled={busy} className="shrink-0 rounded-md border border-line px-2 py-1.5 text-[0.6875rem] text-ink-3 hover:bg-raised disabled:opacity-50" title={t("characters.undoDescription") as any}>
-                <Undo2 size={11} />
-              </button>
-            )}
-          </div>
-          {error && <p className="text-[0.625rem] text-danger">{error}</p>}
-        </div>
-
-    </AssetDetailLayout>
+      <AssetNameField
+        label={t("wizard.visualDirectionName")}
+        value={draft.name}
+        onChange={(name) => setDraft({ ...draft, name })}
+        disabled={busy}
+      />
+      <AssetDetailsBlock
+        label={t("wizard.visualDirectionContent")}
+        fields={DETAIL_FIELDS.map((key) => ({
+          label: t(("assetField." + key) as TranslationKey),
+          value: draft.details[key],
+        }))}
+        emptyHint={t("assetEditor.detailsEmpty")}
+        labelWidth="w-16"
+      />
+      <AssetInstructionRow
+        instruction={instruction}
+        onInstructionChange={setInstruction}
+        onApply={() => void applyInstruction()}
+        applying={busy}
+        canApply={Boolean(providerConfig.apiKey && providerConfig.baseUrl)}
+        applyLabel={t("wizard.visualDirectionApply")}
+        applyingLabel={t("characters.applying")}
+        placeholder={t("wizard.visualDirectionInstructionPlaceholder")}
+        disabled={busy}
+        onUndo={history.length > 0 ? () => { setDraft(history[history.length - 1]); setHistory((items) => items.slice(0, -1)); } : undefined}
+        undoLabel={t("characters.undoDescription")}
+      />
+      <AssetEditorMessages error={error} />
+      <p className="text-[0.625rem] text-ink-5">{t("wizard.visualDirectionReadonlyHint")}</p>
+    </AssetDetailShell>
   );
 }

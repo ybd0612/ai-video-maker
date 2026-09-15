@@ -204,7 +204,7 @@ export function StepAssembly() {
       {/* 拼接失败原因（含 FFmpeg 日志尾部，便于反馈定位） */}
       {renderError && (
         <div className="mx-auto w-full max-w-md rounded-lg border border-danger bg-danger-deep/30 p-3 text-left text-xs text-danger">
-          <div className="font-semibold text-danger">拼接失败：</div>
+          <div className="font-semibold text-danger">{t("assembly.failedPrefix")}：</div>
           <pre className="mt-1 max-h-40 overflow-auto whitespace-pre-wrap break-all">{renderError}</pre>
         </div>
       )}

@@ -91,10 +91,10 @@ export function DualFrameToggle({ shot }: DualFrameToggleProps) {
           {/* 尾帧预览（点击放大查看） */}
           {shot.lastFrameUrl && (
             <div className="mt-1 overflow-hidden rounded border border-line w-20 h-14">
-              <Lightbox src={shot.lastFrameUrl} alt="Last frame preview">
+              <Lightbox src={shot.lastFrameUrl} alt={t("wizard.lastFrameUrl")}>
                 <img
                   src={shot.lastFrameUrl}
-                  alt="Last frame preview"
+                  alt={t("wizard.lastFrameUrl")}
                   className="h-full w-full object-cover"
                 />
               </Lightbox>

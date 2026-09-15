@@ -262,37 +262,33 @@ export function StepAssets() {
       )}
 
       {/* ── Visual direction section: upstream of all assets ───────────── */}
-      <section className="rounded-2xl border border-accent/40 bg-accent-deep/10 p-4">
+      <section
+        role="button"
+        tabIndex={0}
+        aria-disabled={!project?.visualDirection}
+        onClick={() => project?.visualDirection && setShowVisualDirectionEditor(true)}
+        onKeyDown={(e) => {
+          if ((e.key === "Enter" || e.key === " ") && project?.visualDirection) {
+            e.preventDefault();
+            setShowVisualDirectionEditor(true);
+          }
+        }}
+        title={project?.visualDirection ? (t("wizard.editVisualDirection" as never) as string) : undefined}
+        className="cursor-pointer rounded-2xl border border-accent/40 bg-accent-deep/10 p-4 transition hover:border-accent focus:border-accent focus:outline-none"
+      >
         <div className="flex items-start gap-4">
-          <div
-            role="button"
-            tabIndex={0}
-            onClick={() => project?.visualDirection && setShowVisualDirectionEditor(true)}
-            onKeyDown={(e) => {
-              if ((e.key === "Enter" || e.key === " ") && project?.visualDirection) {
-                e.preventDefault();
-                setShowVisualDirectionEditor(true);
-              }
-            }}
-            className="flex h-24 w-36 shrink-0 cursor-pointer items-center justify-center overflow-hidden rounded-xl border border-accent/30 bg-app focus:border-accent focus:outline-none"
-            title={project?.visualDirection ? (t("wizard.editVisualDirection" as any) as string) : undefined}
-          >
+          <div className="flex h-24 w-36 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-accent/30 bg-app">
             {styleReferenceUrl ? (
-              <Lightbox src={styleReferenceUrl} alt="Visual direction reference">
-                <img src={styleReferenceUrl} alt="Visual direction reference" className="h-full w-full object-cover" />
+              <Lightbox src={styleReferenceUrl} alt={t("wizard.visualDirectionReference" as never) as string}>
+                <img src={styleReferenceUrl} alt={t("wizard.visualDirectionReference" as never) as string} className="h-full w-full object-cover" />
               </Lightbox>
             ) : <ImageIcon size={20} className="text-ink-5" />}
           </div>
           <div className="min-w-0 flex-1">
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <p className="text-[0.6875rem] font-medium uppercase tracking-[0.12em] text-accent">{t("wizard.visualDirectionTitle" as any)}</p>
-                <p className="mt-1 text-base font-semibold text-ink">{project?.visualDirection?.name || styleAsset?.name || project?.style || t("wizard.visualDirectionUnset" as any)}</p>
-              </div>
-              <button onClick={() => setShowVisualDirectionEditor(true)} className="shrink-0 rounded-lg border border-accent/40 px-2.5 py-1.5 text-[0.6875rem] text-accent transition hover:bg-accent-deep/30">{t("wizard.editVisualDirection" as any)}</button>
-            </div>
-            <p className="mt-1 text-xs text-ink-3">{styleAsset?.description || t("wizard.visualDirectionDescription" as any)}</p>
-            <p className="mt-2 text-[0.6875rem] text-ink-5">{t("wizard.visualDirectionHint" as any)}</p>
+            <p className="text-[0.6875rem] font-medium uppercase tracking-[0.12em] text-accent">{t("wizard.visualDirectionTitle" as never) as string}</p>
+            <p className="mt-1 text-base font-semibold text-ink">{project?.visualDirection?.name || styleAsset?.name || project?.style || t("wizard.visualDirectionUnset" as never) as string}</p>
+            <p className="mt-1 text-xs text-ink-3">{styleAsset?.description || t("wizard.visualDirectionDescription" as never) as string}</p>
+            <p className="mt-2 text-[0.6875rem] text-ink-5">{t("wizard.visualDirectionHint" as never) as string}</p>
             {project?.styleReferenceError && <p className="mt-1 truncate text-[0.625rem] text-danger" title={project.styleReferenceError}>{project.styleReferenceError}</p>}
           </div>
         </div>
@@ -450,9 +446,9 @@ export function StepAssets() {
             </div>
 
             <div className="min-w-0 flex-1 py-1 pr-1">
-              <p className="text-sm font-medium text-ink">{scene.name || "未命名场景"}</p>
+              <p className="text-sm font-medium text-ink">{scene.name || t("assetEditor.unnamedScene")}</p>
               <p className="mt-0.5 line-clamp-2 text-xs text-ink-4">{(scene.description || scene.prompt || "—").split("\n")[0]}</p>
-              {scene.error && <p className="mt-0.5 truncate text-[0.625rem] text-danger" title={scene.error}>生成失败：{scene.error}</p>}
+              {scene.error && <p className="mt-0.5 truncate text-[0.625rem] text-danger" title={scene.error}>{t("assetEditor.generateFailed")}: {scene.error}</p>}
             </div>
 
             {/* Actions */}
@@ -460,7 +456,7 @@ export function StepAssets() {
               <button
                 onClick={() => void handleDeleteAsset(scene)}
                 className="rounded p-1.5 text-ink-4 hover:bg-danger-deep hover:text-danger"
-                title="删除"
+                title={t("assetEditor.delete")}
               >
                 <Trash2 size={12} />
               </button>
@@ -519,9 +515,9 @@ export function StepAssets() {
             </div>
 
             <div className="min-w-0 flex-1 py-1 pr-1">
-              <p className="text-sm font-medium text-ink">{product.name || "未命名主体"}</p>
+              <p className="text-sm font-medium text-ink">{product.name || t("assetEditor.unnamedProduct")}</p>
               <p className="mt-0.5 line-clamp-2 text-xs text-ink-4">{(product.description || product.prompt || "—").split("\n")[0]}</p>
-              {product.error && <p className="mt-0.5 truncate text-[0.625rem] text-danger" title={product.error}>生成失败：{product.error}</p>}
+              {product.error && <p className="mt-0.5 truncate text-[0.625rem] text-danger" title={product.error}>{t("assetEditor.generateFailed")}: {product.error}</p>}
             </div>
 
             {/* Actions */}
@@ -529,7 +525,7 @@ export function StepAssets() {
               <button
                 onClick={() => void handleDeleteAsset(product)}
                 className="rounded p-1.5 text-ink-4 hover:bg-danger-deep hover:text-danger"
-                title="删除"
+                title={t("assetEditor.delete")}
               >
                 <Trash2 size={12} />
               </button>
@@ -582,15 +578,15 @@ export function StepAssets() {
               )}
             </div>
             <div className="min-w-0 flex-1 py-1 pr-1">
-              <p className="text-sm font-medium text-ink">{prop.name || "未命名道具"}</p>
+              <p className="text-sm font-medium text-ink">{prop.name || t("assetEditor.unnamedProp")}</p>
               <p className="mt-0.5 line-clamp-2 text-xs text-ink-4">{(prop.description || prop.prompt || "—").split("\n")[0]}</p>
-              {prop.error && <p className="mt-0.5 truncate text-[0.625rem] text-danger" title={prop.error}>生成失败：{prop.error}</p>}
+              {prop.error && <p className="mt-0.5 truncate text-[0.625rem] text-danger" title={prop.error}>{t("assetEditor.generateFailed")}: {prop.error}</p>}
             </div>
             <div className="absolute right-2 top-2 flex shrink-0 flex-col gap-1 opacity-0 transition group-hover:opacity-100" onClick={(e) => e.stopPropagation()}>
               <button
                 onClick={() => void handleDeleteAsset(prop)}
                 className="rounded p-1.5 text-ink-4 hover:bg-danger-deep hover:text-danger"
-                title="删除"
+                title={t("assetEditor.delete")}
               >
                 <Trash2 size={12} />
               </button>

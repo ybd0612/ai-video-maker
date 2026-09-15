@@ -14,7 +14,6 @@ import {
 } from "@/stores/projectStore";
 import { useSettingsStore } from "@/stores/settingsStore";
 import { useT } from "@/i18n";
-import { ArrowLeft, Sparkles, Loader2, RefreshCw, ImageIcon } from "lucide-react";
 import { chatCompletion } from "@/services/chatService";
 import {
   SYSTEM_PROMPT_CHARACTER_DESCRIPTION_ZH,
@@ -31,6 +30,17 @@ import {
   parseCharacterDescription,
 } from "@/lib/promptComposer";
 import { normalizeAssetDetails } from "@/lib/assetDetails";
+import {
+  AssetDetailShell,
+  AssetDetailsBlock,
+  AssetEditorFooter,
+  AssetEditorMessages,
+  AssetInstructionRow,
+  AssetNameField,
+  AssetPreviewColumn,
+  AssetPromptBlock,
+  AssetSummaryBlock,
+} from "@/features/wizard/AssetEditorTemplate";
 
 interface CharacterEditorProps {
   character: Asset | null; // null = creating new
@@ -349,230 +359,97 @@ export function CharacterEditor({ character, onClose }: CharacterEditorProps) {
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [busy, onClose]);
+  // 描述结构化解析：首行总述 → 一句话简介；8 要素 → 完整设定（无法解析时整段兜底）
+  const parsedDescription = parseCharacterDescription(description);
+  const summary = parsedDescription.summary ?? "";
+  const detailFields = parsedDescription.fields;
+  const promptHint = isDerivingAppearance
+    ? t("characters.deriving")
+    : appearanceStale
+      ? t("characters.deriveRetryOnSave")
+      : t("characters.appearanceReadonly");
 
   return (
-    <div className="@container flex flex-col gap-3 p-3">
-      {/* Header */}
-      <button
-        type="button"
-        onClick={onClose}
-        disabled={busy}
-        className="flex w-fit items-center gap-2 rounded p-1 text-xs font-medium text-ink-2 transition hover:bg-raised hover:text-ink-2 disabled:opacity-50"
-        title={t("dialog.cancel")}
-      >
-        <ArrowLeft size={14} />
-        <span>{character ? t("characters.edit") : t("characters.add")}</span>
-      </button>
-
-      {/* 主体：左列文字(3) / 右列定妆照(2) ≈ 6:4，右列高度 stretch 撑满与左列齐平（容器宽 <32rem 时回退上下布局，适配窄侧边栏） */}
-      <div className="flex flex-col gap-3 @md:flex-row @md:items-stretch">
-        {/* 左：名称 / 描述 / 外观提示词 */}
-        <div className="min-w-0 flex-1 space-y-3 @md:flex-[3_1_0%]">
-
-      {/* Name（可编辑） */}
-      <div className="space-y-1">
-        <label className="text-[0.6875rem] font-medium text-ink-4">
-          {t("characters.name")}
-        </label>
-        <input
-          type="text"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          placeholder={t("characters.namePlaceholder")}
-          className="w-full rounded-md border border-line bg-raised px-2 py-1.5 text-xs text-ink placeholder:text-ink-5 focus:border-success focus:outline-none"
+    <AssetDetailShell
+      title={character ? t("assetEditor.editCharacter") : t("assetEditor.addCharacter")}
+      backLabel={t("assetEditor.back")}
+      onBack={onClose}
+      backDisabled={busy}
+      preview={(
+        <AssetPreviewColumn
+          label={t("characters.portrait")}
+          imageUrl={portraitUrl || undefined}
+          alt={name.trim() || t("assetEditor.unnamedCharacter")}
+          generating={isGeneratingPortrait}
+          onGenerate={() => void handleGeneratePortrait()}
+          generateLabel={portraitUrl ? t("characters.regeneratePortrait") : t("characters.generatePortrait")}
+          generateDisabled={busy || (!appearancePrompt.trim() && !description.trim()) || !providerConfig.apiKey}
+          generateTitle={t("characters.generatePortrait")}
+          generatingHint={t("wizard.generating")}
+          autoRegenerate={{
+            checked: autoRegeneratePortrait,
+            onChange: setAutoRegeneratePortrait,
+            label: t("characters.autoRegeneratePortrait"),
+            disabled: busy,
+          }}
+          onOpenLightbox={(src, alt) => (
+            <Lightbox src={src} alt={alt}>
+              <img src={src} alt={alt} className="aspect-video w-full rounded-lg border border-line object-contain" />
+            </Lightbox>
+          )}
         />
-      </div>
-
-      {/* Description（只读：由 AI 维护；用户经指令输入框让 AI 修改） */}
-      <div className="space-y-1">
-        <label className="text-[0.6875rem] font-medium text-ink-4">
-          {t("characters.description")}
-        </label>
-        {/* 完整中文角色描述（唯一事实源，只读展示；一行总述 + 8 要素分行，旧格式整段兜底） */}
-        {(() => {
-          const parsed = parseCharacterDescription(description);
-          if (description.trim() === "") {
-            return (
-              <div className="w-full rounded-md border border-line bg-raised px-2 py-1.5 text-xs text-ink-5">
-                {t("characters.descriptionEmpty")}
-              </div>
-            );
-          }
-          if (parsed && parsed.fields.length > 0) {
-            return (
-              <div className="w-full space-y-0.5 rounded-md border border-line bg-raised px-2 py-1.5 text-xs select-text">
-                {parsed.summary && (
-                  <p className="pb-1 leading-relaxed text-ink">{parsed.summary}</p>
-                )}
-                {parsed.fields.map(({ label, value }) => (
-                  <div key={label} className="flex gap-1.5 leading-relaxed">
-                    <span className="w-12 shrink-0 font-medium text-ink-3">{label}</span>
-                    <span className="min-w-0 flex-1 text-ink">{value}</span>
-                  </div>
-                ))}
-              </div>
-            );
-          }
-          return (
-            <div className="w-full whitespace-pre-wrap rounded-md border border-line bg-raised px-2 py-1.5 text-xs leading-relaxed text-ink select-text">
-              {description}
-            </div>
-          );
-        })()}
-        <p className="text-[0.625rem] text-ink-5">{t("characters.descriptionReadonlyHint")}</p>
-
-        {/* 指令输入框 + 修改描述（AI 融合要求） + 撤销 */}
-        <div className="flex items-center gap-1.5">
-          <input
-            type="text"
-            value={instruction}
-            onChange={(e) => setInstruction(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.nativeEvent.isComposing) {
-                e.preventDefault();
-                void handleApplyInstruction();
-              }
-            }}
-            placeholder={t("characters.instructionPlaceholder")}
-            className="min-w-0 flex-1 rounded-md border border-line bg-raised px-2 py-1.5 text-xs text-ink placeholder:text-ink-5 focus:border-success focus:outline-none"
-          />
-          <button
-            onClick={handleApplyInstruction}
-            disabled={
-              busy || !providerConfig.apiKey || !providerConfig.baseUrl
-            }
-            className="flex shrink-0 items-center gap-1 rounded-md bg-success px-2 py-1.5 text-[0.6875rem] font-medium text-white transition hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
-            title={t("characters.applyInstruction")}
-          >
-            {isApplyingInstruction ? (
-              <Loader2 size={10} className="animate-spin" />
-            ) : (
-              <Sparkles size={10} />
-            )}
-            {isApplyingInstruction ? t("characters.applying") : t("characters.applyInstruction")}
-          </button>
-          {descHistory.length > 0 && (
-            <button
-              onClick={handleUndoDescription}
-              disabled={busy}
-              className="shrink-0 rounded-md border border-line px-2 py-1.5 text-[0.6875rem] text-ink-3 transition hover:bg-raised disabled:opacity-50 disabled:cursor-not-allowed"
-              title={t("characters.undoDescription")}
-            >
-              {t("characters.undoDescription")}
-            </button>
-          )}
-        </div>
-      </div>
-
-      {/* Appearance prompt（只读展示：由角色描述自动派生） */}
-      <div className="space-y-1">
-        <label className="text-[0.6875rem] font-medium text-ink-4">
-          {t("characters.appearance")}
-        </label>
-        <div
-          className="w-full rounded-md border border-line/60 bg-raised/50 px-2 py-1.5 text-xs text-ink-3 select-text"
-          title={t("characters.appearanceReadonly")}
-        >
-          {appearancePrompt.trim() || t("characters.appearanceEmpty")}
-        </div>
-        <p className="text-[0.625rem] text-ink-5">
-          {isDerivingAppearance
-            ? t("characters.deriving")
-            : appearanceStale
-              ? t("characters.deriveRetryOnSave")
-              : t("characters.appearanceReadonly")}
-        </p>
-      </div>
-
-        </div>
-
-        {/* 右：定妆照（与左列等高的弹性列，宽度占比 2/5；生成按钮移至照片下方） */}
-        <div className="flex flex-col gap-1 @md:flex-[2_1_0%]">
-          <label className="shrink-0 text-[0.6875rem] font-medium text-ink-4">
-            {t("characters.portrait")}
-          </label>
-          {portraitUrl ? (
-            <div className="flex aspect-video w-full items-center justify-center overflow-hidden rounded-lg border border-line bg-surface">
-              <Lightbox src={portraitUrl} alt={t("characters.portrait")}>
-                <div className="relative h-full w-full">
-                  <img
-                    src={portraitUrl}
-                    alt={t("characters.portrait")}
-                    className="h-full w-full object-contain"
-                  />
-                </div>
-              </Lightbox>
-            </div>
-          ) : (
-            <div className="flex aspect-video w-full items-center justify-center rounded-lg border border-dashed border-line text-ink-5">
-              <ImageIcon size={24} />
-            </div>
-          )}
-          <button
-            onClick={handleGeneratePortrait}
-            disabled={
-              busy ||
-              (!appearancePrompt.trim() && !description.trim()) ||
-              !providerConfig.apiKey
-            }
-            className="flex w-full shrink-0 items-center justify-center gap-1 rounded border border-line px-1.5 py-1 text-[0.625rem] text-accent transition hover:bg-accent-deep/30 disabled:opacity-50 disabled:cursor-not-allowed"
-            title={t("characters.generatePortrait")}
-          >
-            {isGeneratingPortrait ? (
-              <Loader2 size={10} className="animate-spin" />
-            ) : portraitUrl ? (
-              <RefreshCw size={10} />
-            ) : (
-              <ImageIcon size={10} />
-            )}
-            {portraitUrl ? t("characters.regeneratePortrait") : t("characters.generatePortrait")}
-          </button>
-          {isGeneratingPortrait && (
-            <p className="shrink-0 text-[0.625rem] text-success animate-pulse">
-              {t("wizard.generating") || "生成中..."}
-            </p>
-          )}
-          {/* 自动重生成开关：勾选后 AI 修改描述成功即自动重生成定妆照（默认勾选，持久化到设置） */}
-          <label
-            className={`flex shrink-0 select-none items-center gap-1.5 text-[0.625rem] text-ink-3 ${
-              busy ? "cursor-not-allowed opacity-60" : "cursor-pointer"
-            }`}
-            title={t("characters.autoRegenerateHint")}
-          >
-            <input
-              type="checkbox"
-              checked={autoRegeneratePortrait}
-              disabled={busy}
-              onChange={(e) => setAutoRegeneratePortrait(e.target.checked)}
-              className="h-3 w-3 accent-success"
-            />
-            {t("characters.autoRegeneratePortrait")}
-          </label>
-        </div>
-      </div>
-
-      {/* Save button（AI/生成请求期间一并禁用：描述未定稿、定妆照与 imageUrl 存在竞态） */}
-      <button
-        onClick={handleSave}
-        disabled={!name.trim() || busy}
-        className="mt-2 rounded-md bg-success-solid px-4 py-2 text-xs font-medium text-white transition hover:bg-success-solid disabled:opacity-50 disabled:cursor-not-allowed"
-      >
-        {isSaving ? t("characters.saving") : character ? t("characters.edit") : t("characters.add")}
-      </button>
-
-      {/* Notice（非阻断提示，如派生失败保留原值） */}
-      {notice && (
-        <div className="rounded-md border border-warn bg-warn-deep/30 p-2 text-[0.6875rem] text-warn">
-          {notice}
-        </div>
       )}
-
-      {/* Error */}
-      {error && (
-        <div className="rounded-md border border-danger bg-danger-deep/30 p-2 text-[0.6875rem] text-danger">
-          {error}
-        </div>
+      footer={(
+        <AssetEditorFooter
+          cancelLabel={t("dialog.cancel")}
+          onCancel={onClose}
+          cancelDisabled={busy}
+          saveLabel={t("assetEditor.saveCharacter")}
+          onSave={() => void handleSave()}
+          saveDisabled={!name.trim() || busy}
+          saving={isSaving}
+        />
       )}
-    </div>
+    >
+      <AssetNameField
+        label={t("assetEditor.name")}
+        value={name}
+        placeholder={t("characters.namePlaceholder")}
+        onChange={setName}
+        disabled={busy}
+      />
+      <AssetSummaryBlock
+        label={t("assetEditor.summary")}
+        summary={summary}
+        emptyHint={t("assetEditor.summaryEmpty")}
+      />
+      <AssetDetailsBlock
+        label={t("characters.description")}
+        fields={detailFields}
+        rawText={description}
+        emptyHint={t("characters.descriptionEmpty")}
+        labelWidth="w-14"
+      />
+      <AssetPromptBlock
+        label={t("assetEditor.prompt")}
+        prompt={appearancePrompt}
+        emptyHint={t("characters.appearanceEmpty")}
+        hint={promptHint}
+      />
+      <AssetInstructionRow
+        instruction={instruction}
+        onInstructionChange={setInstruction}
+        onApply={() => void handleApplyInstruction()}
+        applying={isApplyingInstruction}
+        canApply={Boolean(providerConfig.apiKey && providerConfig.baseUrl)}
+        applyLabel={t("characters.applyInstruction")}
+        applyingLabel={t("characters.applying")}
+        placeholder={t("characters.instructionPlaceholder")}
+        disabled={busy}
+        onUndo={descHistory.length > 0 ? handleUndoDescription : undefined}
+        undoLabel={t("characters.undoDescription")}
+      />
+      <AssetEditorMessages notice={notice} error={error} />
+    </AssetDetailShell>
   );
 }

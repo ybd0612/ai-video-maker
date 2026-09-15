@@ -52,7 +52,7 @@ export function PromptSubFields({
             onChange={(v) => handleChange("subjectDesc", v)}
             systemPrompt={SYSTEM_PROMPT_VISUAL_PROMPT}
             resetKey={shotId}
-            placeholder="一位长发黑色长发的年轻女性"
+            placeholder={t("promptPh.subject")}
             color="violet"
           />
           <PromptField
@@ -61,7 +61,7 @@ export function PromptSubFields({
             onChange={(v) => handleChange("sceneDesc", v)}
             systemPrompt={SYSTEM_PROMPT_VISUAL_PROMPT}
             resetKey={shotId}
-            placeholder="坐在阳光充足的咖啡馆窗边"
+            placeholder={t("promptPh.scene")}
             color="violet"
           />
           <PromptField
@@ -70,7 +70,7 @@ export function PromptSubFields({
             onChange={(v) => handleChange("detailDesc", v)}
             systemPrompt={SYSTEM_PROMPT_VISUAL_PROMPT}
             resetKey={shotId}
-            placeholder="穿着白色衬衫，精致首饰"
+            placeholder={t("promptPh.style")}
             color="violet"
           />
           <PromptField
@@ -79,7 +79,7 @@ export function PromptSubFields({
             onChange={(v) => handleChange("lightingDesc", v)}
             systemPrompt={SYSTEM_PROMPT_VISUAL_PROMPT}
             resetKey={shotId}
-            placeholder="温暖的金色夕阳光，电影感轮廓光"
+            placeholder={t("promptPh.lighting")}
             color="violet"
           />
           <PromptField
@@ -88,7 +88,7 @@ export function PromptSubFields({
             onChange={(v) => handleChange("styleDesc", v)}
             systemPrompt={SYSTEM_PROMPT_VISUAL_PROMPT}
             resetKey={shotId}
-            placeholder="写实风格，8K，超精细"
+            placeholder={t("promptPh.quality")}
             color="violet"
           />
         </div>
@@ -107,7 +107,7 @@ export function PromptSubFields({
             onChange={(v) => handleChange("actionDesc", v)}
             systemPrompt={SYSTEM_PROMPT_MOTION_PROMPT}
             resetKey={shotId}
-            placeholder="缓缓转头，温柔微笑"
+            placeholder={t("promptPh.motion")}
             color="amber"
           />
           <PromptField
@@ -116,7 +116,7 @@ export function PromptSubFields({
             onChange={(v) => handleChange("cameraDesc", v)}
             systemPrompt={SYSTEM_PROMPT_MOTION_PROMPT}
             resetKey={shotId}
-            placeholder="镜头缓缓推进，特写跟踪镜头"
+            placeholder={t("promptPh.camera")}
             color="amber"
           />
           <PromptField
@@ -125,7 +125,7 @@ export function PromptSubFields({
             onChange={(v) => handleChange("envChangeDesc", v)}
             systemPrompt={SYSTEM_PROMPT_MOTION_PROMPT}
             resetKey={shotId}
-            placeholder="咖啡杯蒸汽上升，窗外树叶摇曳"
+            placeholder={t("promptPh.environment")}
             color="amber"
           />
           <PromptField
@@ -134,7 +134,7 @@ export function PromptSubFields({
             onChange={(v) => handleChange("motionSpeedDesc", v)}
             systemPrompt={SYSTEM_PROMPT_MOTION_PROMPT}
             resetKey={shotId}
-            placeholder="电影感慢动作，24fps"
+            placeholder={t("promptPh.motionQuality")}
             color="amber"
           />
         </div>
@@ -149,7 +149,7 @@ export function PromptSubFields({
             onChange={(v) => handleChange("negativePrompt", v)}
             systemPrompt={SYSTEM_PROMPT_NEGATIVE_PROMPT}
             resetKey={shotId}
-            placeholder="解剖异常，多余肢体，模糊，变形"
+            placeholder={t("promptPh.negativeImage")}
             color="red"
             rows={1}
           />
@@ -159,7 +159,7 @@ export function PromptSubFields({
             onChange={(v) => handleChange("negativeMotionPrompt", v)}
             systemPrompt={SYSTEM_PROMPT_NEGATIVE_PROMPT}
             resetKey={shotId}
-            placeholder="变形，闪烁，突兀剪辑，镜头抖动"
+            placeholder={t("promptPh.negativeMotion")}
             color="red"
             rows={1}
           />

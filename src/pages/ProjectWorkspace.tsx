@@ -10,12 +10,10 @@ import { useSettingsStore } from "@/stores/settingsStore";
 import { useT } from "@/i18n";
 import { ShotList } from "@/features/shots/ShotList";
 import { ShotEditor } from "@/features/shots/ShotEditor";
-import { CharacterPanel } from "@/features/characters/CharacterPanel";
 import { ProjectSidebar } from "@/features/projects/ProjectSidebar";
-import { HistoryPanel } from "@/features/history/HistoryPanel";
 import {
   Settings, Trash2,
-  FolderOpen, Clock, Layers,
+  FolderOpen, Layers,
   Moon, Sun,
 } from "lucide-react";
 import { ApiKeyBanner } from "@/components/ApiKeyBanner";
@@ -23,7 +21,7 @@ import { confirmDialog } from "@/components/ui/ConfirmDialog";
 import { CreationWizard } from "@/features/wizard/CreationWizard";
 import { useWizardActions } from "@/features/wizard/useWizardActions";
 
-type LeftTab = "projects" | "shots" | "characters" | "history";
+type LeftTab = "projects" | "shots";
 
 export function ProjectWorkspace() {
   const t = useT();
@@ -145,28 +143,6 @@ export function ProjectWorkspace() {
               <Layers size={10} />
               {t("pipeline.shots")} ({shots.length})
             </button>
-            <button
-              onClick={() => setLeftTab("characters")}
-              className={`flex flex-1 items-center justify-center gap-1 py-2 text-[0.625rem] font-medium transition ${
-                leftTab === "characters"
-                  ? "border-b-2 border-success text-success"
-                  : "text-ink-5 hover:text-ink-3"
-              }`}
-            >
-              🎭
-              {t("characters.title")}
-            </button>
-            <button
-              onClick={() => setLeftTab("history")}
-              className={`flex flex-1 items-center justify-center gap-1 py-2 text-[0.625rem] font-medium transition ${
-                leftTab === "history"
-                  ? "border-b-2 border-success text-success"
-                  : "text-ink-5 hover:text-ink-3"
-              }`}
-            >
-              <Clock size={10} />
-              {t("pipeline.tabHistory")}
-            </button>
           </div>
 
           {/* Tab content */}
@@ -177,8 +153,6 @@ export function ProjectWorkspace() {
               onSelect={setSelectedShotId}
             />
           )}
-          {leftTab === "history" && <HistoryPanel />}
-          {leftTab === "characters" && <CharacterPanel />}
         </aside>
 
         {/* Center: always show wizard */}
