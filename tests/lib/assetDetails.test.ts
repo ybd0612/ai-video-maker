@@ -24,4 +24,40 @@ describe("asset details", () => {
     expect(details?.kind).toBe("product");
     expect(details?.category).toBe("台灯");
   });
+
+  it("materializes style details from a labeled visual-direction description", () => {
+    const description = "温暖治愈 3D 动画风\n画风：柔和 3D 动画渲染\n主色调：金黄与暖橙\n光影：柔和夕阳光\n镜头：浅景深\n构图：平视留白\n情绪：温暖治愈";
+    const expected = {
+      kind: "style",
+      mediumMaterial: "柔和 3D 动画渲染",
+      colorPalette: "金黄与暖橙",
+      lightingMood: "柔和夕阳光",
+      cameraTexture: "浅景深",
+      composition: "平视留白",
+      emotion: "温暖治愈",
+    };
+    expect(createDefaultAssetDetails({ type: "style", description })).toEqual(expected);
+    // style 资产物化路径：无 incoming 时与描述派生结果一致
+    expect(normalizeAssetDetails({ type: "style", description }, undefined)).toEqual(expected);
+  });
+
+  it("style 描述不含标签时六个维度为空串，kind 仍为 style", () => {
+    expect(createDefaultAssetDetails({ type: "style", description: "温暖治愈动画风" })).toEqual({
+      kind: "style",
+      mediumMaterial: "",
+      colorPalette: "",
+      lightingMood: "",
+      cameraTexture: "",
+      composition: "",
+      emotion: "",
+    });
+  });
+
+  it("style 归一化在新旧 kind 不匹配时回落到描述派生的默认值", () => {
+    const details = normalizeAssetDetails(
+      { type: "style", description: "画风：水彩插画" },
+      { kind: "scene", settingType: "", environment: "", time: "", weather: "", elements: "", spatialLayers: "", lighting: "", paletteMood: "", storyUse: "" },
+    );
+    expect(details).toMatchObject({ kind: "style", mediumMaterial: "水彩插画" });
+  });
 });

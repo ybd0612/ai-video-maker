@@ -1,4 +1,4 @@
-import type { Asset, AssetDetails, CharacterDetails, ProductDetails, PropDetails, SceneDetails } from "@/stores/projectStore";
+import type { Asset, AssetDetails, CharacterDetails, ProductDetails, PropDetails, SceneDetails, StyleDetails } from "@/stores/projectStore";
 
 const value = (text: string, label: string): string => {
   const match = text.match(new RegExp(`(?:^|\\n)${label}：?\\s*(.+)`, "i"));
@@ -25,6 +25,18 @@ export function createDefaultAssetDetails(asset: Pick<Asset, "type" | "descripti
   }
   if (asset.type === "prop") {
     const details: PropDetails = { kind: "prop", purpose: value(text, "用途"), storyRole: value(text, "故事作用"), objectType: value(text, "物件类型"), shape: value(text, "整体形状"), dimensions: value(text, "尺寸与比例"), material: value(text, "材质"), color: value(text, "颜色"), structure: value(text, "结构细节"), wear: value(text, "磨损与使用痕迹"), signature: value(text, "特殊标记") || value(text, "识别特征"), usage: value(text, "使用方式") };
+    return details;
+  }
+  if (asset.type === "style") {
+    const details: StyleDetails = {
+      kind: "style",
+      mediumMaterial: value(text, "画风") || value(text, "媒介") || value(text, "材质"),
+      colorPalette: value(text, "主色调") || value(text, "色彩"),
+      lightingMood: value(text, "光影"),
+      cameraTexture: value(text, "镜头"),
+      composition: value(text, "构图"),
+      emotion: value(text, "情绪") || value(text, "氛围"),
+    };
     return details;
   }
   return undefined;

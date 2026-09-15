@@ -6,12 +6,12 @@ import {
   type Asset,
   type AssetType,
   type Shot,
+  type VisualDirection,
 } from "@/stores/projectStore";
 import { useSettingsStore } from "@/stores/settingsStore";
 import { useT } from "@/i18n";
 import { extractAssetsFromIdea, extractVisualDirectionFromIdea, generateScript } from "@/services/scriptService";
 import { extractNewAssets } from "@/lib/extractAssets";
-import { sanitizeVisualDirectionField } from "@/lib/promptComposer";
 import { pickShotFields } from "@/lib/shotFields";
 import { restoreProjectStatusIfReady } from "./wizardActionUtils";
 
@@ -93,14 +93,10 @@ export function useScriptActions(
         aspectRatio: project.aspectRatio,
         assets: project.assets,
       });
-      const visualDirection = {
+      const visualDirection: VisualDirection = {
         name: visualDirectionResult.name,
-        mediumMaterial: sanitizeVisualDirectionField(visualDirectionResult.mediumMaterial ?? "", "material"),
-        colorPalette: sanitizeVisualDirectionField(visualDirectionResult.colorPalette ?? ""),
-        lightingMood: sanitizeVisualDirectionField(visualDirectionResult.lightingMood ?? ""),
-        cameraTexture: sanitizeVisualDirectionField(visualDirectionResult.cameraTexture ?? ""),
-        composition: sanitizeVisualDirectionField(visualDirectionResult.composition ?? "", "composition"),
-        emotion: sanitizeVisualDirectionField(visualDirectionResult.emotion ?? ""),
+        description: visualDirectionResult.description,
+        details: visualDirectionResult.details,
         revision: (project.visualDirection?.revision ?? 0) + 1,
         status: "draft" as const,
       };

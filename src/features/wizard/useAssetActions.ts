@@ -4,6 +4,7 @@ import {
   selectActiveProject,
   newId,
   type Asset,
+  type StyleDetails,
 } from "@/stores/projectStore";
 import { useSettingsStore } from "@/stores/settingsStore";
 import { generateImage, aspectRatioToImageParams } from "@/services/imageService";
@@ -16,8 +17,9 @@ import {
   composePortraitPrompt,
   assetImageBoundary,
   composeStyleReferencePrompt,
-  sanitizeVisualDirectionField,
+  collectSubjectVocabulary,
 } from "@/lib/promptComposer";
+import { parseJsonFromResponse } from "@/lib/jsonResponse";
 import { buildSystemPrompt as buildRulesSystemPrompt, getActiveRules } from "@/lib/promptRules";
 
 const activeAssetTasks = new Map<string, AbortController>();
@@ -51,36 +53,31 @@ function fallbackStylePrompt(style: string): string {
 }
 
 /**
- * L2 派生：从想法文本 + 中文风格描述派生英文 stylePrompt。
+ * L2 派生：从中文风格描述 + 视觉方向结构化字段派生英文 stylePrompt。
+ * 输入刻意不含故事主体（故事上下文会把角色/剧情带进风格母版）。
  * 派生失败（网络/内容过滤/空输出）走兜底链，不阻塞风格图生成。
  */
 async function deriveStylePrompt(
   styleDescription: string,
   apiKey: string,
   baseUrl: string,
-  visualDirection?: {
-    mediumMaterial: string;
-    colorPalette: string;
-    lightingMood: string;
-    cameraTexture: string;
-    composition: string;
-    emotion: string;
-  },
+  visualDirection?: { name?: string; details?: StyleDetails },
 ): Promise<string> {
   const zhStyle = styleDescription.trim();
-  if (zhStyle || visualDirection) {
+  const details = visualDirection?.details;
+  if (zhStyle || details) {
     try {
       const service = createAIService({ provider: "openai", apiKey, baseUrl });
       const userContent = [
         zhStyle ? `Desired style (Chinese): ${zhStyle}` : "",
-        visualDirection
+        details
           ? [
-              `Medium and material: ${sanitizeVisualDirectionField(visualDirection.mediumMaterial, "material")}`,
-              `Color palette: ${sanitizeVisualDirectionField(visualDirection.colorPalette)}`,
-              `Lighting and mood: ${sanitizeVisualDirectionField(visualDirection.lightingMood)}`,
-              `Camera texture: ${sanitizeVisualDirectionField(visualDirection.cameraTexture)}`,
-              `Composition: ${sanitizeVisualDirectionField(visualDirection.composition, "composition")}`,
-              `Emotion: ${sanitizeVisualDirectionField(visualDirection.emotion)}`,
+              `Medium and material: ${details.mediumMaterial}`,
+              `Color palette: ${details.colorPalette}`,
+              `Lighting and mood: ${details.lightingMood}`,
+              `Camera texture: ${details.cameraTexture}`,
+              `Composition: ${details.composition}`,
+              `Emotion: ${details.emotion}`,
             ].filter((value) => !value.endsWith(": ")).join("\n")
           : "",
       ]
@@ -94,13 +91,56 @@ async function deriveStylePrompt(
         temperature: 0.4,
         enableThinking: false,
       });
-      const text = sanitizeVisualDirectionField(result.content.trim());
+      const text = result.content.trim();
       if (text) return text;
     } catch (err) {
       console.warn("Style prompt derivation failed, using fallback:", err);
     }
   }
   return fallbackStylePrompt(zhStyle);
+}
+
+/**
+ * LLM 审计：风格提示词是否混入项目自身主体（角色/场景/产品/道具名）。
+ * 禁止清单来自项目数据（collectSubjectVocabulary），代码不硬编码任何风格/物种关键词；
+ * 是否越界与如何重写都由模型判断（task=stylePromptAudit）。
+ * 无清单、审计失败或解析失败时保留原提示词，不阻塞生成。
+ */
+async function auditStylePrompt(i: {
+  stylePrompt: string;
+  subjects: string[];
+  apiKey: string;
+  baseUrl: string;
+}): Promise<string> {
+  if (i.subjects.length === 0) return i.stylePrompt;
+  try {
+    const service = createAIService({ provider: "openai", apiKey: i.apiKey, baseUrl: i.baseUrl });
+    const result = await service.chatCompletion({
+      messages: [
+        { role: "system", content: buildRulesSystemPrompt("stylePromptAudit", "en", getActiveRules()) },
+        {
+          role: "user",
+          content: [
+            `Style prompt: ${i.stylePrompt}`,
+            `Forbidden subject list: ${i.subjects.join(", ")}`,
+          ].join("\n"),
+        },
+      ],
+      temperature: 0,
+      enableThinking: false,
+    });
+    const parsed = parseJsonFromResponse<{ clean?: boolean; rewritten?: string }>(result.content);
+    if (!parsed || parsed.clean !== false) return i.stylePrompt;
+    const rewritten = parsed.rewritten?.trim();
+    if (rewritten) {
+      console.info("Style prompt audited as off-boundary, using rewritten version.");
+      return rewritten;
+    }
+    return i.stylePrompt;
+  } catch (err) {
+    console.warn("Style prompt audit failed, keeping derived prompt:", err);
+    return i.stylePrompt;
+  }
 }
 
 export function useAssetActions(): AssetActions {
@@ -153,11 +193,18 @@ export function useAssetActions(): AssetActions {
           providerConfig.baseUrl,
           latest.visualDirection,
         );
+        // 审计：把项目自身主体名单交给模型判断是否越界并重写（代码不做关键词清洗）。
+        const audited = await auditStylePrompt({
+          stylePrompt: derived,
+          subjects: collectSubjectVocabulary(latest),
+          apiKey: providerConfig.apiKey,
+          baseUrl: providerConfig.baseUrl,
+        });
         const applied = useProjectStore.getState().updateAssetByProjectIdIfRevision(
           pid,
           styleAssetId,
           styleRevision,
-          { prompt: derived },
+          { prompt: audited },
         );
         if (!applied) return;
         const refreshedStyleAsset = useProjectStore
@@ -169,7 +216,7 @@ export function useAssetActions(): AssetActions {
         styleRevision = refreshedStyleAsset.renderRevision ?? 0;
       }
 
-      const stylePrompt = sanitizeVisualDirectionField(styleAsset.prompt.trim() || fallbackStylePrompt(latest.style.trim()));
+      const stylePrompt = styleAsset.prompt.trim() || fallbackStylePrompt(latest.style.trim());
       const imagePrompt = composeStyleReferencePrompt(stylePrompt);
       const { size, ratio } = aspectRatioToImageParams(latest.aspectRatio);
 

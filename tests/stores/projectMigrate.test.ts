@@ -160,6 +160,114 @@ describe("migratePersistedState：v9 → v10（角色描述格式恢复）", () 
   });
 });
 
+describe("migratePersistedState：v13 → v14（视觉方向与风格资产结构化）", () => {
+  it("视觉方向平铺 6 字段平移进 details，并移除平铺字段", () => {
+    const state = makeState(13, {
+      id: "p1",
+      visualDirection: {
+        name: "温暖治愈 3D 动画风",
+        mediumMaterial: "柔和 3D 动画",
+        colorPalette: "金黄暖橙",
+        lightingMood: "柔和夕阳光",
+        cameraTexture: "浅景深",
+        composition: "平视留白",
+        emotion: "温暖治愈",
+        revision: 2,
+        status: "confirmed",
+      },
+      assets: [],
+    });
+
+    const migrated = migratePersistedState(state, 13);
+    const project = (migrated.projects as Array<Record<string, unknown>>)[0];
+    const direction = project.visualDirection as Record<string, unknown>;
+
+    expect(direction.details).toEqual({
+      kind: "style",
+      mediumMaterial: "柔和 3D 动画",
+      colorPalette: "金黄暖橙",
+      lightingMood: "柔和夕阳光",
+      cameraTexture: "浅景深",
+      composition: "平视留白",
+      emotion: "温暖治愈",
+    });
+    expect(direction.name).toBe("温暖治愈 3D 动画风");
+    expect(direction.revision).toBe(2);
+    expect(direction.status).toBe("confirmed");
+    for (const flat of ["mediumMaterial", "colorPalette", "lightingMood", "cameraTexture", "composition", "emotion"]) {
+      expect(direction).not.toHaveProperty(flat);
+    }
+  });
+
+  it("缺字段的视觉方向以空串补齐；已有 details 的不重复处理", () => {
+    const missing = makeState(13, {
+      id: "p1",
+      visualDirection: { name: "n", revision: 1, status: "draft" },
+      assets: [],
+    });
+    const missingDirection = (migratePersistedState(missing, 13).projects as Array<Record<string, unknown>>)[0]
+      .visualDirection as Record<string, unknown>;
+    expect(missingDirection.details).toEqual({
+      kind: "style",
+      mediumMaterial: "",
+      colorPalette: "",
+      lightingMood: "",
+      cameraTexture: "",
+      composition: "",
+      emotion: "",
+    });
+
+    const details = { kind: "style", mediumMaterial: "keep", colorPalette: "", lightingMood: "", cameraTexture: "", composition: "", emotion: "" };
+    const existing = makeState(13, {
+      id: "p1",
+      visualDirection: { name: "n", details, revision: 1, status: "draft" },
+      assets: [],
+    });
+    const existingDirection = (migratePersistedState(existing, 13).projects as Array<Record<string, unknown>>)[0]
+      .visualDirection as Record<string, unknown>;
+    expect(existingDirection.details).toEqual(details);
+  });
+
+  it("style 资产物化 details；非 style 资产或已有 details 的资产保持原样", () => {
+    const state = makeState(13, {
+      id: "p1",
+      assets: [
+        { id: "st1", type: "style", name: "风格", description: "画风：水彩插画", prompt: "" },
+        { id: "sc1", type: "scene", name: "麦田", description: "场景", prompt: "wheat field" },
+        { id: "st2", type: "style", name: "风格2", description: "d", details: { kind: "style", mediumMaterial: "keep" } },
+      ],
+    });
+
+    const migrated = migratePersistedState(state, 13);
+    const assets = (migrated.projects as Array<Record<string, unknown>>)[0].assets as Array<Record<string, unknown>>;
+
+    expect(assets[0].details).toMatchObject({ kind: "style", mediumMaterial: "水彩插画" });
+    expect(assets[1].details).toBeUndefined();
+    expect(assets[2].details).toEqual({ kind: "style", mediumMaterial: "keep" });
+  });
+
+  it("视觉方向为坏结构时原样保留且不抛错", () => {
+    for (const bad of [null, "bad", 42, []]) {
+      const state = makeState(13, { id: "p1", visualDirection: bad, assets: [] });
+      expect(() => migratePersistedState(state, 13)).not.toThrow();
+      const project = (migratePersistedState(state, 13).projects as Array<Record<string, unknown>>)[0];
+      expect(project.visualDirection).toEqual(bad);
+    }
+  });
+
+  it("对已迁移数据重复执行 v14 分支结果幂等", () => {
+    const state = makeState(13, {
+      id: "p1",
+      visualDirection: { name: "n", mediumMaterial: "m", colorPalette: "", lightingMood: "", cameraTexture: "", composition: "", emotion: "", revision: 1, status: "draft" },
+      assets: [{ id: "st1", type: "style", name: "s", description: "画风：水彩", prompt: "" }],
+    });
+
+    const first = migratePersistedState(JSON.parse(JSON.stringify(state)), 13);
+    const second = migratePersistedState(JSON.parse(JSON.stringify(first)), 13);
+    expect(second).toEqual(first);
+  });
+});
+
 describe("migratePersistedState：v1 全链路迁移不回归", () => {
   it("v1 单项目 → v9 多项目结构，链路完整跑通", () => {
     const state = {

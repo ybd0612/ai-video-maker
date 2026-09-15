@@ -16,12 +16,13 @@ import { generateAssetNamespace, generateFullPrompt } from "@/lib/assetNamespace
 import { normalizeCharacterDescription } from "@/lib/promptComposer";
 import { normalizeAssetDetails } from "@/lib/assetDetails";
 
-/** 模型输出的资产条目（提取/分镜共用的原始形态；style 仅 name+description） */
+/** 模型输出的资产条目（提取/分镜共用的原始形态；style 提供 details 或平铺 6 字段） */
 export interface RawAsset {
   name: string;
   description: string;
   appearancePrompt?: string;
   details?: AssetDetails;
+  /** 平铺 6 字段（兼容旧模型输出）：未提供 details 时用于物化 style details */
   mediumMaterial?: string;
   colorPalette?: string;
   lightingMood?: string;
@@ -67,9 +68,22 @@ export function extractNewAssets(
         ? normalizeCharacterDescription(description)
         : description,
       prompt: type === "style" ? "" : appearancePrompt,
-      ...(type !== "style"
-        ? { details: normalizeAssetDetails({ type, description }, item.details) }
-        : {}),
+      ...(type === "style"
+        ? {
+            details: normalizeAssetDetails(
+              { type, description },
+              item.details ?? {
+                kind: "style",
+                mediumMaterial: item.mediumMaterial ?? "",
+                colorPalette: item.colorPalette ?? "",
+                lightingMood: item.lightingMood ?? "",
+                cameraTexture: item.cameraTexture ?? "",
+                composition: item.composition ?? "",
+                emotion: item.emotion ?? "",
+              },
+            ),
+          }
+        : { details: normalizeAssetDetails({ type, description }, item.details) }),
       ...(type === "character"
         ? {
             appearancePrompt,

@@ -82,12 +82,19 @@ interface RawScene {
 export interface RawStyle {
   name: string;
   description: string;
+  /** 六个结构化视觉维度（v14 起为结构化事实源） */
+  details?: Extract<AssetDetails, { kind: "style" }>;
   mediumMaterial?: string;
   colorPalette?: string;
   lightingMood?: string;
   cameraTexture?: string;
   composition?: string;
   emotion?: string;
+}
+
+/** 视觉方向提取结果：details 恒存在（模型缺字段时以空串补齐），可直接写回项目。 */
+export interface RawVisualDirection extends RawStyle {
+  details: Extract<AssetDetails, { kind: "style" }>;
 }
 
 export interface GenerateScriptResult {
@@ -450,7 +457,7 @@ function buildExtractAssetsContext(language: "zh" | "en", assets?: Asset[]): str
  */
 export async function extractVisualDirectionFromIdea(
   opts: GenerateScriptOptions,
-): Promise<RawStyle> {
+): Promise<RawVisualDirection> {
   const systemPrompt = buildTaskSystemPrompt("visualDirection", opts.language, getActiveRules());
   const service = createAIService({ provider: "openai", apiKey: opts.apiKey, baseUrl: opts.baseUrl });
   const result = await service.chatCompletion({
@@ -463,15 +470,25 @@ export async function extractVisualDirectionFromIdea(
   });
   const parsed = parseJsonFromResponse<Partial<RawStyle>>(result.content);
   if (!parsed) throw new Error("无法解析模型返回的视觉方向 JSON，请重试。");
-  return {
-    name: parsed.name ?? "",
-    description: parsed.description ?? parsed.name ?? "",
+  const details: Extract<AssetDetails, { kind: "style" }> = parsed.details ?? {
+    kind: "style",
     mediumMaterial: parsed.mediumMaterial ?? "",
     colorPalette: parsed.colorPalette ?? "",
     lightingMood: parsed.lightingMood ?? "",
     cameraTexture: parsed.cameraTexture ?? "",
     composition: parsed.composition ?? "",
     emotion: parsed.emotion ?? "",
+  };
+  return {
+    name: parsed.name ?? "",
+    description: parsed.description ?? parsed.name ?? "",
+    details,
+    mediumMaterial: details.mediumMaterial,
+    colorPalette: details.colorPalette,
+    lightingMood: details.lightingMood,
+    cameraTexture: details.cameraTexture,
+    composition: details.composition,
+    emotion: details.emotion,
   };
 }
 
@@ -559,18 +576,30 @@ export async function extractAssetsFromIdea(
         }))
       : [];
 
-  const mapStyles = (arr: RawStyle[] | undefined) =>
+  const mapStyles = (arr: RawStyle[] | undefined): RawStyle[] =>
     Array.isArray(arr)
-      ? arr.slice(0, 1).map((s) => ({
-          name: s.name ?? "",
-          description: s.description ?? "",
-          mediumMaterial: s.mediumMaterial ?? "",
-          colorPalette: s.colorPalette ?? "",
-          lightingMood: s.lightingMood ?? "",
-          cameraTexture: s.cameraTexture ?? "",
-          composition: s.composition ?? "",
-          emotion: s.emotion ?? "",
-        }))
+      ? arr.slice(0, 1).map((s) => {
+          const details = s.details ?? {
+            kind: "style" as const,
+            mediumMaterial: s.mediumMaterial ?? "",
+            colorPalette: s.colorPalette ?? "",
+            lightingMood: s.lightingMood ?? "",
+            cameraTexture: s.cameraTexture ?? "",
+            composition: s.composition ?? "",
+            emotion: s.emotion ?? "",
+          };
+          return {
+            name: s.name ?? "",
+            description: s.description ?? "",
+            details,
+            mediumMaterial: details.mediumMaterial,
+            colorPalette: details.colorPalette,
+            lightingMood: details.lightingMood,
+            cameraTexture: details.cameraTexture,
+            composition: details.composition,
+            emotion: details.emotion,
+          };
+        })
       : [];
 
   return {

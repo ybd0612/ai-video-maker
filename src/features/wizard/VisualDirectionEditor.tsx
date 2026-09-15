@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Loader2, Sparkles, Undo2 } from "lucide-react";
 import { AssetDetailLayout, AssetPreviewFrame } from "./AssetDetailLayout";
-import { useProjectStore, selectActiveProject, type VisualDirection } from "@/stores/projectStore";
+import { useProjectStore, selectActiveProject, type StyleDetails, type VisualDirection } from "@/stores/projectStore";
 import { useSettingsStore } from "@/stores/settingsStore";
 import { useT } from "@/i18n";
 import { chatCompletion } from "@/services/chatService";
@@ -15,12 +15,9 @@ interface VisualDirectionEditorProps {
   generating?: boolean;
 }
 
-type EditableField = keyof Pick<
-  VisualDirection,
-  "name" | "mediumMaterial" | "colorPalette" | "lightingMood" | "cameraTexture" | "composition" | "emotion"
->;
+type DetailField = keyof Omit<StyleDetails, "kind">;
 
-const FIELD_LABELS: Array<{ key: EditableField; label: string }> = [
+const FIELD_LABELS: Array<{ key: DetailField; label: string }> = [
   { key: "mediumMaterial", label: "画风与材质" },
   { key: "colorPalette", label: "主色调" },
   { key: "lightingMood", label: "光影氛围" },
@@ -29,20 +26,44 @@ const FIELD_LABELS: Array<{ key: EditableField; label: string }> = [
   { key: "emotion", label: "整体情绪" },
 ];
 
+/** 逐字段取字符串：details 缺失时回落旧平铺字段（兼容旧模型输出）。 */
+function readDetailField(
+  raw: Record<string, unknown>,
+  flat: Record<string, unknown>,
+  key: DetailField,
+  fallback: string,
+): string {
+  for (const source of [raw, flat]) {
+    const value = source[key];
+    if (typeof value === "string" && value.trim()) return value.trim();
+  }
+  return fallback;
+}
+
 function parseVisualDirection(content: string, fallback: VisualDirection): VisualDirection | null {
   const match = content.match(/\{[\s\S]*\}/);
   if (!match) return null;
   try {
-    const parsed = JSON.parse(match[0]) as Partial<VisualDirection>;
+    const parsed = JSON.parse(match[0]) as Record<string, unknown>;
+    const rawDetails = (
+      parsed.details && typeof parsed.details === "object" && !Array.isArray(parsed.details)
+        ? parsed.details
+        : {}
+    ) as Record<string, unknown>;
+    const details: StyleDetails = {
+      kind: "style",
+      mediumMaterial: readDetailField(rawDetails, parsed, "mediumMaterial", fallback.details.mediumMaterial),
+      colorPalette: readDetailField(rawDetails, parsed, "colorPalette", fallback.details.colorPalette),
+      lightingMood: readDetailField(rawDetails, parsed, "lightingMood", fallback.details.lightingMood),
+      cameraTexture: readDetailField(rawDetails, parsed, "cameraTexture", fallback.details.cameraTexture),
+      composition: readDetailField(rawDetails, parsed, "composition", fallback.details.composition),
+      emotion: readDetailField(rawDetails, parsed, "emotion", fallback.details.emotion),
+    };
     return {
       ...fallback,
-      name: typeof parsed.name === "string" ? parsed.name.trim() : fallback.name,
-      mediumMaterial: typeof parsed.mediumMaterial === "string" ? parsed.mediumMaterial.trim() : fallback.mediumMaterial,
-      colorPalette: typeof parsed.colorPalette === "string" ? parsed.colorPalette.trim() : fallback.colorPalette,
-      lightingMood: typeof parsed.lightingMood === "string" ? parsed.lightingMood.trim() : fallback.lightingMood,
-      cameraTexture: typeof parsed.cameraTexture === "string" ? parsed.cameraTexture.trim() : fallback.cameraTexture,
-      composition: typeof parsed.composition === "string" ? parsed.composition.trim() : fallback.composition,
-      emotion: typeof parsed.emotion === "string" ? parsed.emotion.trim() : fallback.emotion,
+      name: typeof parsed.name === "string" && parsed.name.trim() ? parsed.name.trim() : fallback.name,
+      description: typeof parsed.description === "string" ? parsed.description.trim() : fallback.description,
+      details,
     };
   } catch {
     return null;
@@ -86,12 +107,8 @@ export function VisualDirectionEditor({ onClose, onGenerate, generating = false 
             content: [
               `当前视觉方向：${JSON.stringify({
                 name: draft.name,
-                mediumMaterial: draft.mediumMaterial,
-                colorPalette: draft.colorPalette,
-                lightingMood: draft.lightingMood,
-                cameraTexture: draft.cameraTexture,
-                composition: draft.composition,
-                emotion: draft.emotion,
+                description: draft.description ?? "",
+                details: draft.details,
               })}`,
               `修改要求：${instruction.trim() || "请补全并优化当前视觉方向，使六个维度更加具体、协调。"}`,
               "只返回修改后的完整 JSON。",
@@ -146,7 +163,7 @@ export function VisualDirectionEditor({ onClose, onGenerate, generating = false 
       footer={(
         <div className="flex justify-end gap-2 border-t border-line-soft pt-3">
           <button onClick={onClose} disabled={busy} className="rounded-md border border-line px-3 py-1.5 text-xs text-ink-3 hover:bg-raised disabled:opacity-50">{t("dialog.cancel")}</button>
-          <button onClick={() => { updateVisualDirection({ name: draft.name, mediumMaterial: draft.mediumMaterial, colorPalette: draft.colorPalette, lightingMood: draft.lightingMood, cameraTexture: draft.cameraTexture, composition: draft.composition, emotion: draft.emotion }); onClose(); }} disabled={busy || !draft.name.trim()} className="rounded-md bg-success px-3 py-1.5 text-xs font-medium text-white hover:opacity-90 disabled:opacity-50">{t("wizard.saveVisualDirection" as any)}</button>
+          <button onClick={() => { updateVisualDirection({ name: draft.name, description: draft.description, details: draft.details }); onClose(); }} disabled={busy || !draft.name.trim()} className="rounded-md bg-success px-3 py-1.5 text-xs font-medium text-white hover:opacity-90 disabled:opacity-50">{t("wizard.saveVisualDirection" as any)}</button>
         </div>
       )}
     >
@@ -166,7 +183,7 @@ export function VisualDirectionEditor({ onClose, onGenerate, generating = false 
               {FIELD_LABELS.map(({ key, label }) => (
                 <div key={key} className="flex gap-2 text-xs leading-relaxed">
                   <span className="w-16 shrink-0 font-medium text-ink-3">{label}</span>
-                  <span className="min-w-0 flex-1 text-ink">{draft[key] || "—"}</span>
+                  <span className="min-w-0 flex-1 text-ink">{draft.details[key] || "—"}</span>
                 </div>
               ))}
             </div>

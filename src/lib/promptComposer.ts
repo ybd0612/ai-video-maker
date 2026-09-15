@@ -43,7 +43,22 @@ export function getStylePrompt(
 ): string | undefined {
   const styleAsset = project.assets.find((a) => a.type === "style");
   const prompt = styleAsset?.prompt?.trim();
-  return prompt ? sanitizeVisualDirectionField(prompt) : undefined;
+  return prompt || undefined;
+}
+
+/**
+ * 风格提示词审计的禁止主体清单（数据驱动）。
+ * 只取项目自身的非风格资产名（角色/场景/产品/道具），
+ * 代码不硬编码任何风格或物种关键词——是否越界由 LLM 判断（task=stylePromptAudit）。
+ */
+export function collectSubjectVocabulary(
+  project: Pick<Project, "assets">,
+): string[] {
+  const names = project.assets
+    .filter((asset) => asset.type !== "style")
+    .map((asset) => asset.name.trim())
+    .filter(Boolean);
+  return [...new Set(names)];
 }
 
 /* ── 文生图：六段式 ──────────────────────────────────────────────────────── */
@@ -98,28 +113,12 @@ export function assetImageBoundary(type: "scene" | "product" | "prop"): string {
 }
 
 /**
- * 清理视觉方向中的主体语义，避免“毛发/双主体/角色构图”等词污染纯风格板。
- * 只处理明显的主体泄漏；正常的画风、色彩和光影描述保持不变。
+ * 风格参考图提示词：在模型生成的 stylePrompt 上声明这张图的角色（纯风格母版）。
+ * 具体风格语言（媒介、色彩、光影、材质、镜头、构图）由模型决定（task=styleRef），
+ * 代码不写死任何风格特化词汇，跨动画/写实/水彩/产品摄影等风格通用。
  */
-export function sanitizeVisualDirectionField(field: string, kind: "material" | "composition" | "generic" = "generic"): string {
-  const value = field.trim();
-  if (!value) return "";
-  if (kind === "composition" && /主体|角色|人物|动物|双主|呼应|character|subject|figure|animal|story/i.test(value)) {
-    return "Abstract balanced arrangement with layered color fields, soft depth and generous negative space";
-  }
-  return value
-    .replace(/高毛绒质感|毛茸茸质感|毛绒质感|毛发质感|毛发|绒毛|皮肤次表面散射|皮肤/gi, "圆润的卡通表面表现")
-    .replace(/fuzzy plush material textures|fuzzy plush textures|plush material textures|fluffy fur|fur texture|fuzzy|plush|fur|skin subsurface scattering/gi, "rounded illustrated surface treatment")
-    .replace(/小猪|小狗|兔子|角色|人物|动物|主角|配角|双主体|character|animal|creature|piglet|puppy|rabbit/gi, "")
-    .replace(/\s{2,}/g, " ")
-    .replace(/[，,、]\s*([，,、])/g, "$1")
-    .trim();
-}
-
-/** 视觉方向图只呈现抽象卡通渲染语言，不让材质样本被模型实体化为毛绒主体。 */
 export function composeStyleReferencePrompt(stylePrompt: string): string {
-  const cleanStyle = sanitizeVisualDirectionField(stylePrompt);
-  return `${cleanStyle}. Generate an abstract cartoon rendering style study using clean rounded geometric forms, simplified non-representational shapes, soft gradients, gentle illustration brushwork, color relationships and lighting transitions. Show only abstract visual language; do not depict fur, hair, fabric, plush objects, animals, characters, products, props, scenery or narrative action.`;
+  return `${stylePrompt.trim()}. A pure style reference board showing only reusable visual language: no central subject, no recognizable entity, no narrative content.`;
 }
 
 /* ── 多图合成（分镜图） ──────────────────────────────────────────────────── */

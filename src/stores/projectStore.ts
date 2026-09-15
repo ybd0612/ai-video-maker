@@ -38,15 +38,24 @@ export type WizardStep = 1 | 2 | 3 | 4 | 5 | 6;
 
 export type AutomationMode = 'auto' | 'semi-auto';
 
-/** 项目级视觉方向：资产与分镜共享的视觉母版。旧项目通过 style 字段兼容。 */
-export interface VisualDirection {
-  name: string;
+/** 风格（视觉方向）六个结构化维度；视觉方向与 style 资产共用同一组字段。 */
+export interface StyleDetails {
+  kind: "style";
   mediumMaterial: string;
   colorPalette: string;
   lightingMood: string;
   cameraTexture: string;
   composition: string;
   emotion: string;
+}
+
+/** 项目级视觉方向：资产与分镜共享的视觉母版。旧项目通过 style 字段兼容。 */
+export interface VisualDirection {
+  name: string;
+  /** 一句话简介（外层卡片展示用） */
+  description?: string;
+  /** 六个结构化视觉维度（v14 起收敛为 details，旧平铺字段由迁移平移） */
+  details: StyleDetails;
   revision: number;
   status: "draft" | "confirmed" | "stale";
 }
@@ -123,7 +132,7 @@ export interface PropDetails {
   usage: string;
 }
 
-export type AssetDetails = CharacterDetails | SceneDetails | ProductDetails | PropDetails;
+export type AssetDetails = CharacterDetails | SceneDetails | ProductDetails | PropDetails | StyleDetails;
 
 /** 分镜派生锁定（画面/动态提示词各自独立） */
 export interface ShotDerivation {
@@ -866,6 +875,66 @@ export function migratePersistedState(
     }
   }
 
+  // Migrate from v13 to v14: consolidate visualDirection's six flat fields into
+  // a structured `details` object, and materialize style-asset details (same as
+  // v13 for non-style assets). Idempotent — projects already on the new shape
+  // are returned unchanged.
+  if (version < 14) {
+    const projects = state.projects;
+    if (Array.isArray(projects)) {
+      state.projects = (projects as unknown[]).map((p) => {
+        if (!p || typeof p !== "object") return p;
+        const project = p as Record<string, unknown>;
+
+        // 视觉方向：平铺 6 字段平移进 details（已有 details 则跳过）。
+        const direction = project.visualDirection;
+        let migratedDirection = direction;
+        if (direction && typeof direction === "object" && !Array.isArray(direction)) {
+          const dir = direction as Record<string, unknown>;
+          const existingDetails = dir.details;
+          if (!existingDetails || typeof existingDetails !== "object" || Array.isArray(existingDetails)) {
+            const next = { ...dir };
+            next.details = {
+              kind: "style" as const,
+              mediumMaterial: typeof dir.mediumMaterial === "string" ? dir.mediumMaterial : "",
+              colorPalette: typeof dir.colorPalette === "string" ? dir.colorPalette : "",
+              lightingMood: typeof dir.lightingMood === "string" ? dir.lightingMood : "",
+              cameraTexture: typeof dir.cameraTexture === "string" ? dir.cameraTexture : "",
+              composition: typeof dir.composition === "string" ? dir.composition : "",
+              emotion: typeof dir.emotion === "string" ? dir.emotion : "",
+            };
+            delete next.mediumMaterial;
+            delete next.colorPalette;
+            delete next.lightingMood;
+            delete next.cameraTexture;
+            delete next.composition;
+            delete next.emotion;
+            migratedDirection = next;
+          }
+        }
+
+        // 资产：为 style 资产物化 details（与 v13 非 style 逻辑一致，幂等）。
+        let migratedAssets = project.assets;
+        if (Array.isArray(project.assets)) {
+          migratedAssets = (project.assets as unknown[]).map((raw) => {
+            if (!raw || typeof raw !== "object") return raw;
+            const asset = raw as Record<string, unknown>;
+            if (asset.type !== "style") return raw;
+            const existing = asset.details;
+            if (existing && typeof existing === "object" && !Array.isArray(existing)) return raw;
+            const details = normalizeAssetDetails(
+              { type: "style", description: typeof asset.description === "string" ? asset.description : "" },
+              undefined,
+            );
+            return details ? { ...asset, details } : raw;
+          });
+        }
+
+        return { ...project, visualDirection: migratedDirection, assets: migratedAssets };
+      });
+    }
+  }
+
   return state;
 }
 
@@ -1507,7 +1576,7 @@ export const useProjectStore = create<ProjectState>()(
     }),
     {
       name: "wxhb-project",
-      version: 13,
+      version: 14,
       // 迁移主体提取为导出纯函数 migratePersistedState（见文件上方），便于单测
       migrate: (persisted: unknown, version: number) =>
         migratePersistedState(persisted, version),

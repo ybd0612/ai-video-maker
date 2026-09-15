@@ -15,7 +15,7 @@ import {
   getStylePrompt,
   assetImageBoundary,
   composeStyleReferencePrompt,
-  sanitizeVisualDirectionField,
+  collectSubjectVocabulary,
   normalizeCharacterDescription,
   parseCharacterDescription,
 } from "@/lib/promptComposer";
@@ -100,11 +100,6 @@ describe("composeImageToImagePrompt", () => {
 /* ── composeMultiReferencePrompt ──────────────────────────────────────────── */
 
 describe("资产主体边界与视觉方向", () => {
-  it("清理视觉方向中的主体材质和主体构图语义", () => {
-    expect(sanitizeVisualDirectionField("高毛绒质感与皮肤次表面散射", "material")).toContain("圆润的卡通表面表现");
-    expect(sanitizeVisualDirectionField("双主体对称构图，角色居中", "composition")).toContain("Abstract balanced arrangement");
-    expect(sanitizeVisualDirectionField("小猪与小狗的温馨陪伴")).not.toContain("小猪");
-  });
   it("按资产类型生成最小主体边界，同时保留让模型生成具体提示词的空间", () => {
     expect(assetImageBoundary("scene")).toContain("Environment-only");
     expect(assetImageBoundary("product")).toContain("Product-only");
@@ -112,12 +107,38 @@ describe("资产主体边界与视觉方向", () => {
     expect(assetImageBoundary("scene")).not.toContain("rabbit");
   });
 
-  it("视觉方向参考图只强调可复用视觉语言", () => {
-    const prompt = composeStyleReferencePrompt("soft 3D cartoon rendering");
-    expect(prompt).toContain("soft 3D cartoon rendering");
-    expect(prompt).toContain("abstract cartoon rendering style study");
-    expect(prompt).toContain("do not depict fur");
-    expect(prompt).not.toContain("fuzzy");
+  it("视觉方向参考图只声明风格母版角色，不改写模型给出的风格语言", () => {
+    const stylePrompt = "soft 3D cartoon rendering, fuzzy plush surface, warm golden palette";
+    const prompt = composeStyleReferencePrompt(stylePrompt);
+    // 模型给的风格语言原样保留：材质词是否合法属效果判断，由 LLM 审计裁定，
+    // 代码不做关键词清洗（避免误伤写实/水彩/毛绒产品等合法风格）。
+    expect(prompt).toContain("fuzzy plush surface");
+    expect(prompt).toContain("pure style reference board");
+    expect(prompt).toContain("no central subject");
+    expect(prompt).toContain("no narrative content");
+    // 不再写死任何风格特化词汇
+    expect(prompt).not.toContain("cartoon rendering style study");
+  });
+
+  it("审计禁止清单只来自项目自身非风格资产名，去重且不硬编码关键词", () => {
+    const project = {
+      assets: [
+        makeAsset({ id: "c1", type: "character", name: " 小兔子 " }),
+        makeAsset({ id: "sc1", type: "scene", name: "麦田" }),
+        makeAsset({ id: "c2", type: "character", name: "小兔子" }),
+        makeAsset({ id: "st1", type: "style", name: "温暖治愈 3D 动画风" }),
+        makeAsset({ id: "c3", type: "character", name: "   " }),
+      ],
+    };
+    expect(collectSubjectVocabulary(project)).toEqual(["小兔子", "麦田"]);
+    expect(collectSubjectVocabulary({ assets: [] })).toEqual([]);
+  });
+
+  it("getStylePrompt 原样返回派生物，不做二次清洗", () => {
+    const project = {
+      assets: [makeAsset({ id: "s1", type: "style", name: "style", prompt: "  fuzzy plush texture, warm tones  " })],
+    };
+    expect(getStylePrompt(project)).toBe("fuzzy plush texture, warm tones");
   });
 });
 

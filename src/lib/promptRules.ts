@@ -24,6 +24,7 @@ export type PromptTask =
   | "storyboard"
   | "characterAppearance"
   | "styleRef"
+  | "stylePromptAudit"
   | "composeShot"
   | "negativeStrategy"
   | "polish";
@@ -57,25 +58,63 @@ export const SKELETONS: Record<PromptTask, { zh: string; en: string }> = {
     zh: `你是一位视觉指导。请从用户的视频想法中提炼项目级视觉方向，只返回 JSON：
 {
   "name": "视觉方向名称",
-  "mediumMaterial": "画风与材质",
-  "colorPalette": "主色调与明暗关系",
-  "lightingMood": "光影氛围",
-  "cameraTexture": "镜头质感",
-  "composition": "构图倾向",
-  "emotion": "整体情绪"
+  "description": "一句话视觉方向简介",
+  "details": {
+    "mediumMaterial": "媒介与材质（画风/渲染方式，如 2D 动画、水彩、写实摄影、3D 渲染）",
+    "colorPalette": "主色调与明暗关系",
+    "lightingMood": "光影氛围",
+    "cameraTexture": "镜头质感与景深",
+    "composition": "构图规律与留白",
+    "emotion": "整体情绪氛围"
+  }
 }
-只提取可复用的视觉语言：媒介、材质、色彩、光影、镜头质感、构图规律与氛围。不要写具体人物、动物、角色、产品、道具、故事动作或角色关系。`,
+只提取可复用的视觉语言：媒介、材质、色彩、光影、镜头质感、构图规律与氛围。不要写具体人物、动物、角色、产品、道具、故事动作或角色关系。details 各字段都只描述视觉语言本身，不承载故事主体。`,
     en: `You are a visual director. Extract a project-level visual direction from the user's video idea. Return JSON only:
 {
   "name": "Visual direction name",
-  "mediumMaterial": "Medium and material",
-  "colorPalette": "Color palette and contrast",
-  "lightingMood": "Lighting and mood",
-  "cameraTexture": "Camera texture",
-  "composition": "Composition tendency",
-  "emotion": "Overall emotion"
+  "description": "One-sentence visual direction summary",
+  "details": {
+    "mediumMaterial": "Medium and material (art form / rendering, e.g. 2D animation, watercolor, photographic, 3D render)",
+    "colorPalette": "Color palette and contrast",
+    "lightingMood": "Lighting and mood",
+    "cameraTexture": "Camera texture and depth of field",
+    "composition": "Composition patterns and negative space",
+    "emotion": "Overall atmosphere"
+  }
 }
-Extract only reusable visual language: medium, material, color, lighting, camera texture, composition patterns and atmosphere. Do not write specific people, animals, characters, products, props, story actions or character relationships.`,
+Extract only reusable visual language: medium, material, color, lighting, camera texture, composition patterns and atmosphere. Do not write specific people, animals, characters, products, props, story actions or character relationships. Every details field describes only the visual language itself, never story subjects.`,
+  },
+
+  /* ── 风格提示词审计（校验/重写 stylePrompt，数据驱动，判断权归模型） ── */
+  stylePromptAudit: {
+    zh: `你是一位图像提示词审计员。给定一段英文风格提示词（stylePrompt）与一份"禁止出现的主体清单"（来自项目自身的角色名、资产名与剧情关键词），判断这段提示词是否越界：
+- 是否出现了清单中的具体主体（角色/产品/道具/场景名）
+- 是否描述了故事动作、叙事场景或具体物件
+- 是否暗示了可识别的主体轮廓
+
+只使用纯视觉语言（媒介、色彩、光影、材质、镜头质感、构图规律、氛围）。
+
+只返回 JSON：
+{
+  "clean": true 或 false,
+  "reason": "越界原因（clean 为 true 时为空字符串）",
+  "rewritten": "若 clean 为 false，返回重写后的纯风格提示词（一句话到两句，英文，不含主体）；clean 为 true 时为空字符串"
+}
+rewritten 必须保留原提示词的整体风格基调，只移除越界的主体/叙事内容，不得引入新的主体或剧情。`,
+    en: `You are an image prompt auditor. Given an English style prompt (stylePrompt) and a "forbidden subject list" (derived from the project's own character names, asset names and story keywords), decide whether the prompt overreaches:
+- Does it mention any specific subject from the list (character / product / prop / scene name)?
+- Does it describe story actions, narrative scenes or concrete objects?
+- Does it imply a recognizable subject silhouette?
+
+Use only pure visual language (medium, color, lighting, material, camera texture, composition patterns, atmosphere).
+
+Return JSON only:
+{
+  "clean": true or false,
+  "reason": "why it overreaches (empty string when clean is true)",
+  "rewritten": "if clean is false, return the rewritten pure-style prompt (one to two sentences, English, no subjects); empty string when clean is true"
+}
+The rewritten prompt must keep the original overall style tone and only remove the overreaching subject/narrative content; it must not introduce new subjects or plot.`,
   },
   /* ── 步骤 1 轻量资产提取（scriptService.extractAssetsFromIdea） ── */
   extractAssets: {
@@ -96,13 +135,8 @@ Extract only reusable visual language: medium, material, color, lighting, camera
   "styles": [
     {
       "name": "风格名",
-      "description": "视觉方向摘要（中文）",
-      "mediumMaterial": "画风与材质",
-      "colorPalette": "主色调与明暗关系",
-      "lightingMood": "光影氛围",
-      "cameraTexture": "镜头质感",
-      "composition": "构图倾向",
-      "emotion": "整体情绪"
+      "description": "一句话视觉方向简介（中文）",
+      "details": { "mediumMaterial": "媒介与材质", "colorPalette": "主色调与明暗关系", "lightingMood": "光影氛围", "cameraTexture": "镜头质感与景深", "composition": "构图规律与留白", "emotion": "整体情绪氛围" }
     }
   ]
 }
@@ -138,13 +172,8 @@ Extract only reusable visual language: medium, material, color, lighting, camera
   "styles": [
     {
       "name": "Style name",
-      "description": "Visual direction summary",
-      "mediumMaterial": "Medium and material",
-      "colorPalette": "Color palette and contrast",
-      "lightingMood": "Lighting and mood",
-      "cameraTexture": "Camera texture",
-      "composition": "Composition tendency",
-      "emotion": "Overall emotion"
+      "description": "One-sentence visual direction summary",
+      "details": { "mediumMaterial": "Medium and material", "colorPalette": "Color palette and contrast", "lightingMood": "Lighting and mood", "cameraTexture": "Camera texture and depth", "composition": "Composition patterns and negative space", "emotion": "Overall atmosphere" }
     }
   ]
 }
@@ -208,7 +237,7 @@ Examples:
     }
   ],
   "styles": [
-    { "name": "风格名", "description": "整体画面风格描述（中文：画种/媒介、色调、光照氛围，贴合故事本身）" }
+    { "name": "风格名", "description": "一句话视觉方向简介", "details": { "mediumMaterial": "媒介与材质", "colorPalette": "主色调与明暗关系", "lightingMood": "光影氛围", "cameraTexture": "镜头质感与景深", "composition": "构图规律与留白", "emotion": "整体情绪氛围" } }
   ],
   "shots": [
     {
@@ -392,12 +421,12 @@ Return ONLY the appearance description, with no explanations and no bullet point
   styleRef: {
     zh: `You are a visual style director. Based only on the desired visual direction fields, produce ONE English image-style prompt that will be used to generate a style reference / mood board image.
 
-The prompt MUST describe ONLY:
-- medium / art form (e.g. 2D animation, watercolor illustration, cinematic photography, 3D render)
+The prompt MUST describe ONLY reusable visual language:
+- medium / art form
 - color palette
 - lighting mood
-- atmosphere / texture
-- abstract material, color and lighting studies
+- atmosphere / material / texture
+- composition and camera treatment
 
 The output is a style-only board, not a scene or poster. It must have no core subject and must not imply any recognizable entity.
 
@@ -412,12 +441,12 @@ Examples:
 Output ONLY the prompt text itself, one or two sentences, no quotes, no explanation.`,
     en: `You are a visual style director. Based only on the desired visual direction fields, produce ONE English image-style prompt that will be used to generate a style reference / mood board image.
 
-The prompt MUST describe ONLY:
-- medium / art form (e.g. 2D animation, watercolor illustration, cinematic photography, 3D render)
+The prompt MUST describe ONLY reusable visual language:
+- medium / art form
 - color palette
 - lighting mood
-- atmosphere / texture
-- abstract material, color and lighting studies
+- atmosphere / material / texture
+- composition and camera treatment
 
 The output is a style-only board, not a scene or poster. It must have no core subject and must not imply any recognizable entity.
 
@@ -547,11 +576,11 @@ JSON 必须严格包含 name、description、details、prompt 四个字段。des
 `;
 
 export const SYSTEM_PROMPT_VISUAL_DIRECTION_EDIT_ZH = `你是一位短视频项目的视觉指导。用户会给你一个项目级视觉方向和修改要求，请只返回修改后的完整 JSON，不要解释、不要 Markdown 代码块。
-JSON 必须严格包含以下字段：name、mediumMaterial、colorPalette、lightingMood、cameraTexture、composition、emotion。
-只修改用户明确要求的内容，其他字段保持原意；保证六个视觉维度具体、互相协调，并且服务于同一个项目。
+JSON 必须严格包含以下字段：name、description（一句话简介）、details（含 mediumMaterial、colorPalette、lightingMood、cameraTexture、composition、emotion 六个视觉维度）。
+只修改用户明确要求的内容，其他字段保持原意；缺失细节要根据当前故事和视觉方向合理补全。六个维度只描述可复用的视觉语言，不得写具体人物、动物、角色、产品、道具或故事动作。
 
 示例格式：
-{"name":"温暖治愈 3D 动画风","mediumMaterial":"柔和 3D 动画、毛绒与软陶质感","colorPalette":"金黄、暖橙、淡紫，低对比度","lightingMood":"柔和夕阳光，温暖、低对比度","cameraTexture":"轻电影感、浅景深、细腻柔和","composition":"平视与低机位，主体明确，保留环境留白","emotion":"温暖、治愈、具有陪伴感"}`;
+{"name":"温暖治愈 3D 动画风","description":"柔和 3D 动画风格的暖色治愈视觉","details":{"mediumMaterial":"柔和 3D 动画渲染","colorPalette":"金黄、暖橙、淡紫，低对比度","lightingMood":"柔和夕阳光，温暖、低对比度","cameraTexture":"轻电影感、浅景深、细腻柔和","composition":"平视与低机位，保留环境留白","emotion":"温暖、治愈、具有陪伴感"}}`;
 
 export const SYSTEM_PROMPT_CHARACTER_DESCRIPTION_ZH = `你是一位 AI 角色设定专家，服务于短视频、短剧、长视频等各类视频创作。用户会给你一个角色名和现有描述（可能不完整），请输出这个角色的**完整角色描述**，作为该角色的唯一事实源（后续英文绘图提示词与分镜创作都将由它派生）。
 
@@ -899,8 +928,8 @@ export const BUILTIN_RULES: PromptRule[] = [
     task: "styleRef",
     section: "rules",
     content: {
-      zh: "- 绝不提及任何角色、人物、人类、动物、生物、面孔、身体、产品或具体物件——只使用纯风格词汇\n- 风格图必须是抽象材质、色块、光影和纹理研究，不得有核心主体，不得暗示任何可识别实体\n- 不要叙述故事；只描述视觉语言，不要从故事中借用主体、场景或构图\n- 画面中不要出现文字与水印",
-      en: "- NEVER mention any character, person, human, animal, creature, face, body, product or specific object — pure style vocabulary only\n- The style board must be abstract material, color, lighting and texture studies with no central subject and no recognizable entity\n- Do not narrate the story or borrow its subjects, setting or composition; describe only reusable visual language\n- No text, no watermark in the image",
+      zh: "- 只使用纯视觉语言：媒介、色彩、光影、材质、镜头质感、构图规律与氛围\n- 风格图是纯风格母版：不出现核心主体、不暗示任何可识别实体、不叙述故事或借用故事主体/场景/构图\n- 画面中不要出现文字与水印",
+      en: "- Use only pure visual language: medium, color, lighting, material, camera texture, composition patterns and atmosphere\n- The style board is a pure style master: no core subject, no recognizable entity, no story or borrowed subjects/setting/composition\n- No text or watermark in the image",
     },
     enabled: true,
     source: "builtin",
