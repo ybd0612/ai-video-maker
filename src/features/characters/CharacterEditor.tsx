@@ -453,7 +453,6 @@ export function CharacterEditor({ character, onClose }: CharacterEditorProps) {
         fields={detailFields}
         rawText={description}
         emptyHint={t("characters.descriptionEmpty")}
-        labelWidth="w-14"
       />
       <AssetPromptBlock
         label={t("assetEditor.prompt")}

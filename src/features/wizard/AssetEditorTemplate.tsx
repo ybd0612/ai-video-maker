@@ -127,7 +127,9 @@ export function AssetDetailsBlock({
   fields,
   rawText,
   emptyHint,
-  labelWidth = "w-20",
+  // 中文标签最长 8 字（"镜头中的使用方式"）：w-28 在 112.5% 整体缩放下约 126px，8 字不换行；
+  // 各编辑器统一走默认宽度，禁止再各自传窄值（此前 w-14/w-16 导致 7 字标签换行）
+  labelWidth = "w-28",
 }: {
   label: string;
   fields: Array<{ label: string; value: string }>;

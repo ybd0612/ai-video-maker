@@ -212,7 +212,6 @@ export function VisualDirectionEditor({ onClose, onGenerate, generating = false 
           value: draft.details[key],
         }))}
         emptyHint={t("assetEditor.detailsEmpty")}
-        labelWidth="w-16"
       />
       {/* 英文风格提示词：由 AI 派生并用于生成风格参考图，只读展示 */}
       <AssetPromptBlock
