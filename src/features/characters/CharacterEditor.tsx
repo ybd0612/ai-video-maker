@@ -153,8 +153,9 @@ export function CharacterEditor({ character, onClose }: CharacterEditorProps) {
           appearancePrompt: effectiveAppearance,
           stylePrompt,
         });
-        // 统一档位串参数（1K 档 + 1:1 画幅）；随机 seed 保证每次重新生成效果不同
-        const { size, ratio } = aspectRatioToImageParams("1:1");
+        // 画幅与批量链路一致（项目画幅），避免手动重生成把定妆照规格改掉；
+        // 随机 seed 保证每次重新生成效果不同
+        const { size, ratio } = aspectRatioToImageParams(project?.aspectRatio ?? "1:1");
         const url = await generateImage({
           apiKey: providerConfig.apiKey,
           baseUrl: providerConfig.baseUrl,

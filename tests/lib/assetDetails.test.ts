@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  composeAssetDescription,
   composeDetailsText,
   createDefaultAssetDetails,
   detailEntries,
@@ -27,6 +28,21 @@ describe("detailEntries / composeDetailsText", () => {
     const partial = { kind: "character" as const, species: "兔", role: "", age: "" };
     expect(composeDetailsText(partial)).toBe("species: 兔");
     expect(composeDetailsText(undefined)).toBe("");
+  });
+
+  it("composeAssetDescription 单行拼 summary + 结构化字段；无 details 回落原始 description", () => {
+    const asset = {
+      description: "一只贪玩好奇的粉色小猪。",
+      details: character,
+    };
+    const line = composeAssetDescription(asset);
+    expect(line).toContain("一只贪玩好奇的粉色小猪。");
+    expect(line).toContain("species: 猪");
+    expect(line).not.toContain("\n");
+
+    expect(composeAssetDescription({ description: "旧数据一句话", details: undefined })).toBe(
+      "旧数据一句话",
+    );
   });
 });
 

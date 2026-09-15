@@ -13,6 +13,7 @@ import {
 import { extractJsonFromResponse, parseJsonFromResponse } from "@/lib/jsonResponse";
 import { getTranslation } from "@/i18n";
 import { resolveGenerationParams } from "@/lib/generationParams";
+import { composeAssetDescription } from "@/lib/assetDetails";
 import type { AuditOutcome } from "@/lib/refineContent";
 
 interface GenerateScriptOptions {
@@ -145,7 +146,7 @@ function buildAssetsContext(language: "zh" | "en", assets?: Asset[]): string {
       charSection =
         "\nExisting characters (use corresponding IDs if content involves them):\n" +
         characters
-          .map((c) => `- ${c.name} (ID: ${c.id}): ${c.description || "No description"}`)
+          .map((c) => `- ${c.name} (ID: ${c.id}): ${composeAssetDescription(c) || "No description"}`)
           .join("\n") +
         "\n";
     }
@@ -155,7 +156,7 @@ function buildAssetsContext(language: "zh" | "en", assets?: Asset[]): string {
       sceneSection =
         "\nAvailable scene references (use these scenes, keep sceneDesc consistent with scene names):\n" +
         scenes
-          .map((s) => `- ${s.name}: ${s.description}`)
+          .map((s) => `- ${s.name}: ${composeAssetDescription(s)}`)
           .join("\n") +
         "\n";
     }
@@ -165,7 +166,7 @@ function buildAssetsContext(language: "zh" | "en", assets?: Asset[]): string {
       productSection =
         "\nExisting product subjects (if content involves these products, keep the subject consistent across shots):\n" +
         products
-          .map((p) => `- ${p.name}: ${p.description}`)
+          .map((p) => `- ${p.name}: ${composeAssetDescription(p)}`)
           .join("\n") +
         "\n";
     }
@@ -175,7 +176,7 @@ function buildAssetsContext(language: "zh" | "en", assets?: Asset[]): string {
       propSection =
         "\nExisting props / key objects (use IDs when they appear in a shot):\n" +
         props
-          .map((p) => `- ${p.name} (ID: ${p.id}): ${p.description}`)
+          .map((p) => `- ${p.name} (ID: ${p.id}): ${composeAssetDescription(p)}`)
           .join("\n") +
         "\n";
     }
@@ -188,7 +189,7 @@ function buildAssetsContext(language: "zh" | "en", assets?: Asset[]): string {
     charSection =
       "\n已有角色（如内容涉及这些角色，请使用对应 ID）：\n" +
       characters
-        .map((c) => `- ${c.name}（ID: ${c.id}）：${c.description || "无描述"}`)
+        .map((c) => `- ${c.name}（ID: ${c.id}）：${composeAssetDescription(c) || "无描述"}`)
         .join("\n") +
       "\n";
   }
@@ -198,7 +199,7 @@ function buildAssetsContext(language: "zh" | "en", assets?: Asset[]): string {
     sceneSection =
       "\n已有场景参考（请在分镜中使用这些场景，保持 sceneDesc 与场景名称一致）：\n" +
       scenes
-        .map((s) => `- ${s.name}：${s.description}`)
+        .map((s) => `- ${s.name}：${composeAssetDescription(s)}`)
         .join("\n") +
       "\n";
   }
@@ -208,7 +209,7 @@ function buildAssetsContext(language: "zh" | "en", assets?: Asset[]): string {
     productSection =
       "\n已有产品主体（如内容涉及这些产品，请确保镜头主体保持一致）：\n" +
       products
-        .map((p) => `- ${p.name}：${p.description}`)
+        .map((p) => `- ${p.name}：${composeAssetDescription(p)}`)
         .join("\n") +
       "\n";
   }
@@ -218,7 +219,7 @@ function buildAssetsContext(language: "zh" | "en", assets?: Asset[]): string {
     propSection =
       "\n已有道具 / 关键物件（出现在镜头中时请使用对应 ID）：\n" +
       props
-        .map((p) => `- ${p.name}（ID: ${p.id}）：${p.description}`)
+        .map((p) => `- ${p.name}（ID: ${p.id}）：${composeAssetDescription(p)}`)
         .join("\n") +
       "\n";
   }

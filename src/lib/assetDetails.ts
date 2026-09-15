@@ -306,6 +306,23 @@ export function composeDetailsText(details: AssetDetails | undefined): string {
 }
 
 /**
+ * 资产完整描述单行文本（一句话简介 + 「字段名: 值」），供模型上下文的
+ * 资产清单条目使用（分镜脚本的角色/场景清单等）。
+ * description 只存一句话简介，直接拼清单会丢失全部结构化信息；
+ * 无 details（旧数据）时回落原始 description。
+ */
+export function composeAssetDescription(
+  asset: Pick<Asset, "description" | "details">,
+): string {
+  const summary = (asset.description ?? "").trim();
+  const parts = detailEntries(asset.details)
+    .filter(([, value]) => value.trim() !== "")
+    .map(([key, value]) => `${key}: ${value.trim()}`);
+  if (parts.length === 0) return summary;
+  return [summary, ...parts].join("；");
+}
+
+/**
  * 修复历史数据的 details 缺陷（幂等、保守，只动"明显坏了"的字段）：
  *   ① 污染值：值形如「与行为倾向：贪玩…」「或识别特征：…」——旧正则按短标签
  *      前缀截取时把标签残片留在了值里 → 用描述的重新派生值替换；

@@ -42,7 +42,9 @@ function describeReferenceNote(
 ): string {
   const asset = project.assets.find((a) => a.imageUrl === url || a.avatarUrl === url);
   if (!asset) return "overall art style / mood reference";
-  return `${asset.name}: ${(asset.description || asset.prompt).trim()}`;
+  // note 拼进英文图像 prompt：英文 prompt（appearancePrompt/场景描述）优先，
+  // description（一句话中文简介）只作兜底 —— 中文长句混在英文指令里遵循差
+  return `${asset.name}: ${(asset.prompt || asset.description).trim()}`;
 }
 
 /**
