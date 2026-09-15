@@ -108,17 +108,18 @@ export function sanitizeVisualDirectionField(field: string, kind: "material" | "
     return "Abstract balanced arrangement with layered color fields, soft depth and generous negative space";
   }
   return value
-    .replace(/高毛绒质感|毛茸茸质感|毛绒质感|毛发质感|毛发|绒毛|皮肤次表面散射|皮肤/gi, "细腻哑光表面质感")
-    .replace(/fur texture|fluffy fur|fur|skin subsurface scattering/gi, "matte surface texture")
+    .replace(/高毛绒质感|毛茸茸质感|毛绒质感|毛发质感|毛发|绒毛|皮肤次表面散射|皮肤/gi, "圆润的卡通表面表现")
+    .replace(/fuzzy plush material textures|fuzzy plush textures|plush material textures|fluffy fur|fur texture|fuzzy|plush|fur|skin subsurface scattering/gi, "rounded illustrated surface treatment")
     .replace(/小猪|小狗|兔子|角色|人物|动物|主角|配角|双主体|character|animal|creature|piglet|puppy|rabbit/gi, "")
     .replace(/\s{2,}/g, " ")
     .replace(/[，,、]\s*([，,、])/g, "$1")
     .trim();
 }
 
-/** 视觉方向图只呈现风格语言，不让故事主体进入共享风格参考图。 */
+/** 视觉方向图只呈现抽象卡通渲染语言，不让材质样本被模型实体化为毛绒主体。 */
 export function composeStyleReferencePrompt(stylePrompt: string): string {
-  return `${stylePrompt.trim()}. Generate an abstract visual style board with material swatches, color fields, lighting studies and texture samples only; no central subject, recognizable entity, character, creature, product, prop or narrative scene.`;
+  const cleanStyle = sanitizeVisualDirectionField(stylePrompt);
+  return `${cleanStyle}. Generate an abstract cartoon rendering style study using clean rounded geometric forms, simplified non-representational shapes, soft gradients, gentle illustration brushwork, color relationships and lighting transitions. Show only abstract visual language; do not depict fur, hair, fabric, plush objects, animals, characters, products, props, scenery or narrative action.`;
 }
 
 /* ── 多图合成（分镜图） ──────────────────────────────────────────────────── */

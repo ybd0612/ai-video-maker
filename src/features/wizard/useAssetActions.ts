@@ -94,7 +94,7 @@ async function deriveStylePrompt(
         temperature: 0.4,
         enableThinking: false,
       });
-      const text = result.content.trim();
+      const text = sanitizeVisualDirectionField(result.content.trim());
       if (text) return text;
     } catch (err) {
       console.warn("Style prompt derivation failed, using fallback:", err);

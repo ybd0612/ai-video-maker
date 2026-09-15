@@ -101,7 +101,7 @@ describe("composeImageToImagePrompt", () => {
 
 describe("资产主体边界与视觉方向", () => {
   it("清理视觉方向中的主体材质和主体构图语义", () => {
-    expect(sanitizeVisualDirectionField("高毛绒质感与皮肤次表面散射", "material")).toContain("细腻哑光表面质感");
+    expect(sanitizeVisualDirectionField("高毛绒质感与皮肤次表面散射", "material")).toContain("圆润的卡通表面表现");
     expect(sanitizeVisualDirectionField("双主体对称构图，角色居中", "composition")).toContain("Abstract balanced arrangement");
     expect(sanitizeVisualDirectionField("小猪与小狗的温馨陪伴")).not.toContain("小猪");
   });
@@ -115,9 +115,9 @@ describe("资产主体边界与视觉方向", () => {
   it("视觉方向参考图只强调可复用视觉语言", () => {
     const prompt = composeStyleReferencePrompt("soft 3D cartoon rendering");
     expect(prompt).toContain("soft 3D cartoon rendering");
-    expect(prompt).toContain("abstract visual style board");
-    expect(prompt).toContain("no central subject");
-    expect(prompt).toContain("recognizable entity");
+    expect(prompt).toContain("abstract cartoon rendering style study");
+    expect(prompt).toContain("do not depict fur");
+    expect(prompt).not.toContain("fuzzy");
   });
 });
 
