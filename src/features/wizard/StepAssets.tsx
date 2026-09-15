@@ -23,8 +23,7 @@ import { generateImage, aspectRatioToImageParams } from "@/services/imageService
 import { Lightbox } from "@/components/ui/Lightbox";
 import { confirmDialog } from "@/components/ui/ConfirmDialog";
 import {
-  composeImageToImagePrompt,
-  composeStyleAnchorInstruction,
+  composeTextToImagePrompt,
   assetImageBoundary,
   getStylePrompt,
   getStyleReferenceUrl,
@@ -165,22 +164,18 @@ export function StepAssets() {
     setGenerating((prev) => new Set(prev).add(asset.id));
     try {
       const { size, ratio } = aspectRatioToImageParams(project?.aspectRatio ?? "16:9");
-      const styleRef = project ? getStyleReferenceUrl(project) : undefined;
+      // ⚠️ 2026-09-15 事故决策：风格母版不再作为 i2i 参考图（内容会被整体复制），
+      // 风格一致性由 stylePrompt 文本承载；主体边界句防止模型画入角色/剧情。
       const stylePrompt = project ? getStylePrompt(project) : undefined;
-      const styleInstruction = styleRef
-        ? composeStyleAnchorInstruction()
-        : "Render this asset as a clean consistency reference image";
       const url = await generateImage({
         apiKey: providerConfig.apiKey,
         baseUrl: providerConfig.baseUrl,
-        prompt: composeImageToImagePrompt({
-          change: `${assetImageBoundary(kind)} ${styleInstruction}`,
-          newStyle: stylePrompt,
-          keep: asset.prompt,
+        prompt: composeTextToImagePrompt({
+          subject: `${assetImageBoundary(kind)} ${asset.prompt}`.trim(),
+          style: stylePrompt,
         }),
         size,
         ratio,
-        ...(styleRef ? { referenceImageUrls: [styleRef] } : {}),
       });
       updateAssetByProjectIdIfRevision(targetProjectId, asset.id, expectedRevision, {
         imageUrl: url,

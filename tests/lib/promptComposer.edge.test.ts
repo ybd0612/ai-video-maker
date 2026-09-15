@@ -97,9 +97,9 @@ describe("pickShotReferences 边界", () => {
     };
     const shot = makeShot({ sceneDesc: "walking in the Forest" });
 
+    // 2026-09-15 决策：风格图退出参考图，回退结果只含资产形象图
     expect(pickShotReferences(shot, project)).toEqual([
       "http://img/beach.png",
-      STYLE_URL,
     ]);
   });
 
@@ -110,7 +110,7 @@ describe("pickShotReferences 边界", () => {
     expect(pickShotReferences(makeShot(), { assets: [], styleReferenceUrl: undefined })).toEqual([]);
   });
 
-  it("四类非风格来源齐全：只取前两优先级（场景+角色），产品被舍弃，风格图末位补齐至 3", () => {
+  it("四类来源齐全：风格图退出后取前三个（场景+两角色），产品被舍弃", () => {
     const scene = makeAsset({ id: "s", type: "scene", name: "Forest", imageUrl: "http://img/scene.png" });
     const char1 = makeAsset({ id: "c1", type: "character", name: "A", imageUrl: "http://img/c1.png" });
     const char2 = makeAsset({ id: "c2", type: "character", name: "B", imageUrl: "http://img/c2.png" });
@@ -125,14 +125,15 @@ describe("pickShotReferences 边界", () => {
     });
 
     const refs = pickShotReferences(shot, project);
-    expect(refs).toEqual(["http://img/scene.png", "http://img/c1.png", STYLE_URL]);
+    expect(refs).toEqual(["http://img/scene.png", "http://img/c1.png", "http://img/c2.png"]);
     expect(refs).toHaveLength(3);
+    expect(refs).not.toContain(STYLE_URL);
   });
 
   it("activeCharacterIds 引用不存在的角色 ID：静默跳过，不抛错", () => {
     const project = { assets: [styleAsset(STYLE_URL)], styleReferenceUrl: undefined };
     const shot = makeShot({ activeCharacterIds: ["ghost_id"] });
-    expect(pickShotReferences(shot, project)).toEqual([STYLE_URL]);
+    expect(pickShotReferences(shot, project)).toEqual([]);
   });
 });
 

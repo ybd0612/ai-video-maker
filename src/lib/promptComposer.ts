@@ -82,35 +82,16 @@ export function composeTextToImagePrompt(i: {
     .join(", ");
 }
 
-/* ── 图生图（定妆照/资产图） ─────────────────────────────────────────────── */
+/* ── 资产图（角色/场景/产品/道具） ─────────────────────────────────────── */
 
 /**
- * 图生图提示词：[改变要求]+[新风格/场景]+[保留]。
- * keep 为需原样保留的主体描述，显式以 "Keep unchanged:" 标注，
- * 降低图生图模型把参考图内容复制进结果的概率。
- */
-export function composeImageToImagePrompt(i: {
-  change: string;
-  newStyle?: string;
-  keep: string;
-}): string {
-  const keep = i.keep.trim();
-  const parts = [
-    i.change.trim(),
-    i.newStyle?.trim(),
-    keep ? `Keep unchanged: ${keep}` : "",
-  ].filter((s): s is string => !!s && s.length > 0);
-  return parts.join(", ");
-}
-
-/**
- * 资产生图的最小主体边界：保持共享风格参考图，同时要求模型只呈现当前资产。
+ * 资产生图的最小主体边界：要求模型只呈现当前资产。
  * 具体外观提示词仍由资产提取/编辑模型生成，避免在代码中重写资产内容。
  */
 export function assetImageBoundary(type: "scene" | "product" | "prop"): string {
-  if (type === "scene") return "Environment-only reference image; show the environment itself, not a story scene or characters.";
-  if (type === "product") return "Product-only reference image; show only the product itself, not people or a usage scene.";
-  return "Prop-only reference image; show only the named object itself, not characters or story action.";
+  if (type === "scene") return "Environment-only image; show the environment itself, not a story scene or characters.";
+  if (type === "product") return "Product-only image; show only the product itself, not people or a usage scene.";
+  return "Prop-only image; show only the named object itself, not characters or story action.";
 }
 
 /**
@@ -120,8 +101,7 @@ export function assetImageBoundary(type: "scene" | "product" | "prop"): string {
  *
  * ⚠️ 2026-09-15 事故修复：原实现只给否定约束（"no central subject / no recognizable entity"）。
  * 文生图模型无法渲染"空画面"，必然按语境自造主体填空 —— "fine fur textures + tenderness"
- * 被填成一只毛茸茸的猫；该猫随后经图生图扩散，让全部资产图都变成猫。
- * 现改为**正向载体**：明确要求画面是抽象样张（材质/色卡/光影/笔触样张），
+ * 被填成一只毛茸茸的猫。现改为**正向载体**：明确要求画面是抽象样张（材质/色卡/光影/笔触样张），
  * 模型有明确可画之物就不会再造主体。载体描述对所有风格通用，不属风格特化。
  */
 export function composeStyleReferencePrompt(stylePrompt: string): string {
@@ -132,24 +112,6 @@ export function composeStyleReferencePrompt(stylePrompt: string): string {
     "colour palette chips, lighting and gradient studies, brush and rendering samples. " +
     "Abstract visual language only — no character, no animal, no creature, no person, " +
     "no face, no product, no scenery, no narrative scene."
-  );
-}
-
-/**
- * 图生图时的风格锚点声明：参考图（风格母版）只提供画风/色彩/光照，**不提供主体**。
- * 角色定妆照、场景/产品/道具资产图共用同一句，避免多处各写一份导致语义漂移。
- *
- * ⚠️ 2026-09-15 事故修复：原实现是一句否定（"do not copy its content or composition"）。
- * 图生图模型对参考图内容的复制强度远高于文本否定，母版里只要出现主体就会被整体复制
- * （母版的猫 → 小猪、场景、道具全变猫）。现改为**正向主体归属**：显式声明本图主体
- * 只有下述描述的主体，参考图中出现的任何主体一律丢弃。
- */
-export function composeStyleAnchorInstruction(): string {
-  return (
-    "Use the reference image as a style and palette sample only: take its rendering style, " +
-    "colour palette, lighting and material treatment. The subject of this image is exactly " +
-    "the one described below and nothing else — discard any subject, character, animal or " +
-    "scene visible in the reference image."
   );
 }
 
@@ -185,13 +147,10 @@ export function composeMultiReferencePrompt(i: {
   const composition = i.composition?.trim();
   if (composition) parts.push(`Composition: ${composition}`);
 
-  // 图像关系：参考图只作锚点，勿复制内容/构图。
-  // ⚠️ 2026-09-15：原为纯否定（"do not copy their content or composition"），
-  // 图生图模型对参考图内容的复制强于文本否定，母版里的主体会扩散到分镜图。
-  // 现改为**正向主体归属**：本图主体/场景即上文所描述者，参考图中未被描述的主体一律丢弃。
+  // 图像关系：参考图都是「我方资产形象」（场景/角色/产品/道具），锚定主体身份与画风；
+  // 画面构图由文本决定，勿照抄参考图排版。（风格母版已退出参考图，见 pickShotReferences）
   parts.push(
-    "The reference images are style, palette and identity anchors only: the subject and scene of this image are exactly those described above and nothing else — discard any subject visible in the references that is not described above.",
-    "Scene, product and prop references anchor only the named asset identity and appearance; do not copy their layout.",
+    "The reference images anchor the identity, appearance and art style of the subjects described above; keep those subjects consistent with their references, but compose the picture from the text description — do not copy the references' layout or background.",
   );
 
   return parts.join(", ");
@@ -276,12 +235,13 @@ export function composePortraitPrompt(i: {
 
 /**
  * 分镜图参考图选取（有序去重，总上限 3 张）。
- * 槽位规则（主理人裁决：风格图必须恒保留）：
- * - 场景参考 + 角色定妆照 + 产品图 + 道具图 合计最多取 2 张（按优先级顺序）；
- * - 风格图（getStyleReferenceUrl 结果）恒占末位预留槽：只要有就必保留，
- *   即使非风格参考已满 2 张也会挤掉最后一个非风格项（即非风格项最多 2 张）。
+ * ⚠️ 2026-09-15 事故决策（主理人裁决）：**风格母版不再进入参考图**。
+ * 实测 i2i 模型对参考图内容的复制强度远高于文本否定 —— 母版里不管是猫还是
+ * 抽象样张方块，都会被整体复制进资产图/分镜图（两轮事故同一根因）。
+ * 风格一致性改由 stylePrompt 文本承载；参考图只保留"有主体归属"的资产形象：
+ * - 场景图 + 角色定妆照 + 产品图 + 道具图 合计最多 3 张；
  * 优先级：显式场景 → 文本匹配场景 → 角色定妆照
- * （activeCharacterIds 命中）→ 显式产品 → 显式道具 → 风格图。
+ * （activeCharacterIds 命中）→ 显式产品 → 显式道具。
  */
 export function pickShotReferences(
   shot: Shot,
@@ -289,43 +249,40 @@ export function pickShotReferences(
 ): string[] {
   const out: string[] = [];
 
-  /** 非风格参考：合计最多 2 张（给风格图预留末位槽） */
-  const pushNonStyle = (url: string | undefined | null): void => {
-    if (url && !out.includes(url) && out.length < 2) out.push(url);
+  const push = (url: string | undefined | null): void => {
+    if (url && !out.includes(url) && out.length < 3) out.push(url);
   };
 
   // 1. 场景参考：优先使用镜头显式场景，其次才用旧数据的文本匹配/首个场景兜底。
   const scenes = project.assets.filter((a) => a.type === "scene");
   const explicitScene = scenes.find((scene) => scene.id === shot.activeSceneId);
-  if (explicitScene?.imageUrl) pushNonStyle(explicitScene.imageUrl);
+  if (explicitScene?.imageUrl) push(explicitScene.imageUrl);
   if (!explicitScene && shot.sceneDesc?.trim() && scenes.length > 0) {
     const shotScene = shot.sceneDesc.toLowerCase();
     const matched = scenes.find(
       (s) => s.imageUrl && shotScene.includes(s.name.toLowerCase()),
     );
-    if (matched?.imageUrl) pushNonStyle(matched.imageUrl);
+    if (matched?.imageUrl) push(matched.imageUrl);
   }
-  if (out.length === 0) pushNonStyle(scenes.find((s) => !!s.imageUrl)?.imageUrl);
+  if (out.length === 0) push(scenes.find((s) => !!s.imageUrl)?.imageUrl);
 
   // 2. 角色定妆照（activeCharacterIds 命中；imageUrl 优先，avatarUrl 兜底）
   for (const id of shot.activeCharacterIds ?? []) {
     const c = project.assets.find((a) => a.id === id && a.type === "character");
-    pushNonStyle(c?.imageUrl ?? c?.avatarUrl);
+    push(c?.imageUrl ?? c?.avatarUrl);
   }
 
   // 3. 产品图：只使用镜头显式引用，避免把全局产品污染到无关镜头。
   for (const id of shot.activeProductIds ?? []) {
-    pushNonStyle(project.assets.find((a) => a.id === id && a.type === "product")?.imageUrl);
+    push(project.assets.find((a) => a.id === id && a.type === "product")?.imageUrl);
   }
 
   // 4. 道具图：只使用镜头显式引用。
   for (const id of shot.activePropIds ?? []) {
-    pushNonStyle(project.assets.find((a) => a.id === id && a.type === "prop")?.imageUrl);
+    push(project.assets.find((a) => a.id === id && a.type === "prop")?.imageUrl);
   }
 
-  // 5. 风格图：恒占末位预留槽（有则必保留，总上限 3 由非风格 cap=2 保证）
-  const styleUrl = getStyleReferenceUrl(project);
-  if (styleUrl && !out.includes(styleUrl)) out.push(styleUrl);
+  // 风格母版不进入参考图（见函数头注释）；风格由 stylePrompt 文本承载。
 
   return out;
 }

@@ -13,11 +13,10 @@ import { createBatchRunner, hasActiveTask } from "@/lib/batchRunner";
 import {
   getStylePrompt,
   getStyleReferenceUrl,
-  composeImageToImagePrompt,
+  composeTextToImagePrompt,
   composePortraitPrompt,
   assetImageBoundary,
   composeStyleReferencePrompt,
-  composeStyleAnchorInstruction,
   collectSubjectVocabulary,
 } from "@/lib/promptComposer";
 import { parseJsonFromResponse } from "@/lib/jsonResponse";
@@ -321,11 +320,10 @@ export function useAssetActions(): AssetActions {
       registry: activeAssetTasks,
       buildTasks: (_pid, signal) => {
         const latestProject = useProjectStore.getState().projects.find((item) => item.id === targetProjectId);
-        const styleReferenceUrl = latestProject ? getStyleReferenceUrl(latestProject) : undefined;
+        // ⚠️ 2026-09-15 事故决策：资产图不再把风格母版作为 i2i 参考图 ——
+        // 实测参考图内容（猫/抽象样张方块）会被整体复制进结果，文本否定压不住。
+        // 风格一致性由 stylePrompt 文本承载；参考图机制只保留给分镜图的形象锚点。
         const stylePrompt = latestProject ? getStylePrompt(latestProject) : undefined;
-        const styleInstruction = styleReferenceUrl
-          ? `${composeStyleAnchorInstruction()} `
-          : "";
         const { size: imageSize, ratio: imageRatio } = aspectRatioToImageParams(project.aspectRatio);
         const tasks: Array<() => Promise<void>> = [];
 
@@ -343,10 +341,9 @@ export function useAssetActions(): AssetActions {
                 const url = await generateImage({
                   apiKey: providerConfig.apiKey,
                   baseUrl: providerConfig.baseUrl,
-                  prompt: `${styleInstruction}${portraitPrompt}`,
+                  prompt: portraitPrompt,
                   size: imageSize,
                   ratio: imageRatio,
-                  ...(styleReferenceUrl ? { referenceImageUrls: [styleReferenceUrl] } : {}),
                 });
                 useProjectStore.getState().updateAssetByProjectIdIfRevision(
                   targetProjectId,
@@ -377,14 +374,12 @@ export function useAssetActions(): AssetActions {
                 const url = await generateImage({
                   apiKey: providerConfig.apiKey,
                   baseUrl: providerConfig.baseUrl,
-                  prompt: composeImageToImagePrompt({
-                    change: `${assetImageBoundary("scene")} ${styleInstruction.trim()}`,
-                    newStyle: stylePrompt,
-                    keep: scene.prompt,
+                  prompt: composeTextToImagePrompt({
+                    subject: `${assetImageBoundary("scene")} ${scene.prompt}`.trim(),
+                    style: stylePrompt,
                   }),
                   size: imageSize,
                   ratio: imageRatio,
-                  ...(styleReferenceUrl ? { referenceImageUrls: [styleReferenceUrl] } : {}),
                 });
                 useProjectStore.getState().updateAssetByProjectIdIfRevision(
                   targetProjectId,
@@ -415,14 +410,12 @@ export function useAssetActions(): AssetActions {
                 const url = await generateImage({
                   apiKey: providerConfig.apiKey,
                   baseUrl: providerConfig.baseUrl,
-                  prompt: composeImageToImagePrompt({
-                    change: `${assetImageBoundary("product")} ${styleInstruction.trim()}`,
-                    newStyle: stylePrompt,
-                    keep: product.prompt,
+                  prompt: composeTextToImagePrompt({
+                    subject: `${assetImageBoundary("product")} ${product.prompt}`.trim(),
+                    style: stylePrompt,
                   }),
                   size: imageSize,
                   ratio: imageRatio,
-                  ...(styleReferenceUrl ? { referenceImageUrls: [styleReferenceUrl] } : {}),
                 });
                 useProjectStore.getState().updateAssetByProjectIdIfRevision(
                   targetProjectId,
@@ -453,14 +446,12 @@ export function useAssetActions(): AssetActions {
                 const url = await generateImage({
                   apiKey: providerConfig.apiKey,
                   baseUrl: providerConfig.baseUrl,
-                  prompt: composeImageToImagePrompt({
-                    change: `${assetImageBoundary("prop")} ${styleInstruction.trim()}`,
-                    newStyle: stylePrompt,
-                    keep: prop.prompt,
+                  prompt: composeTextToImagePrompt({
+                    subject: `${assetImageBoundary("prop")} ${prop.prompt}`.trim(),
+                    style: stylePrompt,
                   }),
                   size: imageSize,
                   ratio: imageRatio,
-                  ...(styleReferenceUrl ? { referenceImageUrls: [styleReferenceUrl] } : {}),
                 });
                 useProjectStore.getState().updateAssetByProjectIdIfRevision(
                   targetProjectId,

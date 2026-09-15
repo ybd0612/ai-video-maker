@@ -237,9 +237,72 @@ export function normalizeAssetDetails(
   return { ...merged, kind: defaults.kind } as AssetDetails;
 }
 
+/**
+ * 以**描述派生值优先**、既有 details 补空的合并（与 normalizeAssetDetails 方向相反）。
+ * 使用场景：AI 指令改写了完整描述后保存 —— 描述是刚刚确认的最新意图，
+ * 从它解析出的字段值必须胜过旧 details；旧 details 只负责补上描述里没写的字段。
+ * 无 description 派生能力（类型不支持）时原样返回 undefined。
+ */
+export function mergeDetailsPreferDerived(
+  asset: Pick<Asset, "type" | "description">,
+  current?: AssetDetails,
+): AssetDetails | undefined {
+  const derived = createDefaultAssetDetails(asset);
+  if (!derived) return undefined;
+
+  const currentKind = (current as { kind?: string } | undefined)?.kind;
+  const usableCurrent =
+    current && (!currentKind || currentKind === derived.kind)
+      ? (current as unknown as Record<string, unknown>)
+      : undefined;
+
+  const merged: Record<string, unknown> = { ...derived };
+  if (usableCurrent) {
+    for (const [key, value] of Object.entries(merged)) {
+      if (key === "kind") continue;
+      const existing = usableCurrent[key];
+      if (
+        typeof value === "string" &&
+        value.trim() === "" &&
+        typeof existing === "string" &&
+        existing.trim() !== ""
+      ) {
+        merged[key] = existing;
+      }
+    }
+  }
+  return { ...merged, kind: derived.kind } as AssetDetails;
+}
+
 export function ensureAssetDetails(asset: Asset): Asset {
   const details = normalizeAssetDetails(asset, asset.details);
   return details ? { ...asset, details } : asset;
+}
+
+/**
+ * 结构化设定的字段行（剔除内部判别字段 `kind`），顺序即 details 的键顺序。
+ * 展示层（资产编辑器「完整设定」）与下游文本链路共用，避免各处各写一遍。
+ */
+export function detailEntries(
+  details: AssetDetails | undefined,
+): Array<[string, string]> {
+  if (!details || typeof details !== "object") return [];
+  return Object.entries(details).filter(
+    ([key, value]) => key !== "kind" && typeof value === "string",
+  ) as Array<[string, string]>;
+}
+
+/**
+ * 把 details 拼成「字段名: 值」多行文本，供需要**完整设定**的下游链路使用
+ * （角色英文外貌提示词派生等）。资产的结构化数据独立存放在 details，
+ * 而 `description` 只保留一句话简介，直接拿 description 喂模型会丢信息。
+ * 空值字段自动剔除；字段名用英文键名（发给模型的 payload 不做 i18n）。
+ */
+export function composeDetailsText(details: AssetDetails | undefined): string {
+  return detailEntries(details)
+    .filter(([, value]) => value.trim() !== "")
+    .map(([key, value]) => `${key}: ${value.trim()}`)
+    .join("\n");
 }
 
 /**

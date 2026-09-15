@@ -13,7 +13,7 @@ import {
   type Asset,
 } from "@/stores/projectStore";
 import { useSettingsStore } from "@/stores/settingsStore";
-import { useT } from "@/i18n";
+import { useT, type TranslationKey } from "@/i18n";
 import { chatCompletion } from "@/services/chatService";
 import {
   SYSTEM_PROMPT_CHARACTER_DESCRIPTION_ZH,
@@ -24,13 +24,11 @@ import { generateImage, aspectRatioToImageParams } from "@/services/imageService
 import { generateAssetNamespace, generateFullPrompt } from "@/lib/assetNamespace";
 import {
   composePortraitPrompt,
-  composeStyleAnchorInstruction,
   getStylePrompt,
-  getStyleReferenceUrl,
   normalizeCharacterDescription,
   parseCharacterDescription,
 } from "@/lib/promptComposer";
-import { normalizeAssetDetails } from "@/lib/assetDetails";
+import { composeDetailsText, detailEntries, extractAssetSummary, mergeDetailsPreferDerived } from "@/lib/assetDetails";
 import {
   AssetDetailShell,
   AssetDetailsBlock,
@@ -98,6 +96,11 @@ export function CharacterEditor({ character, onClose }: CharacterEditorProps) {
   const deriveAppearance = useCallback(
     async (desc: string, charName: string): Promise<string | null> => {
       if (!desc.trim() || !providerConfig.apiKey || !providerConfig.baseUrl) return null;
+      // description 只存一句话简介：desc 本身没有结构化字段时（如刚打开编辑器），
+      // 派生输入必须并上结构化设定，否则信息严重衰减；desc 已带字段（AI 刚改写）则不并旧值
+      const parsedDesc = parseCharacterDescription(desc);
+      const detailsText =
+        parsedDesc.fields.length > 0 ? "" : composeDetailsText(character?.details);
       try {
         const result = await chatCompletion({
           apiKey: providerConfig.apiKey,
@@ -115,6 +118,7 @@ export function CharacterEditor({ character, onClose }: CharacterEditorProps) {
               content: [
                 `Name: ${charName}`,
                 `Description: ${desc.trim()}`,
+                ...(detailsText ? [`Structured details:\n${detailsText}`] : []),
                 "",
                 "Write the appearance description for THIS subject. Keep its species/type exactly as given above.",
               ].join("\n"),
@@ -127,7 +131,7 @@ export function CharacterEditor({ character, onClose }: CharacterEditorProps) {
         return null;
       }
     },
-    [providerConfig],
+    [providerConfig, character],
   );
 
   /**
@@ -141,10 +145,10 @@ export function CharacterEditor({ character, onClose }: CharacterEditorProps) {
       setIsGeneratingPortrait(true);
       setError(null);
       try {
-        // 物种锁定拼装器（与批量链路一致）；同时继承项目级视觉方向，
-        // 让手动生成与批量生成的角色定妆照使用同一套风格约束与参考图。
+        // 物种锁定拼装器（与批量链路一致）；风格由 stylePrompt 文本承载。
+        // ⚠️ 2026-09-15：风格母版不再作为 i2i 参考图 —— 参考图内容会被整体复制
+        // （实测：母版里的猫让定妆照变猫，抽象样张让定妆照背景变成样张板）。
         const stylePrompt = project ? getStylePrompt(project) : undefined;
-        const styleReferenceUrl = project ? getStyleReferenceUrl(project) : undefined;
         const prompt = composePortraitPrompt({
           appearancePrompt: effectiveAppearance,
           stylePrompt,
@@ -154,13 +158,10 @@ export function CharacterEditor({ character, onClose }: CharacterEditorProps) {
         const url = await generateImage({
           apiKey: providerConfig.apiKey,
           baseUrl: providerConfig.baseUrl,
-          prompt: styleReferenceUrl
-            ? `${composeStyleAnchorInstruction()} ${prompt}`
-            : prompt,
+          prompt,
           size,
           ratio,
           seed: randomSeed(),
-          ...(styleReferenceUrl ? { referenceImageUrls: [styleReferenceUrl] } : {}),
         });
         // Save portrait to character（统一资产 imageUrl 字段）
         if (character) {
@@ -184,6 +185,12 @@ export function CharacterEditor({ character, onClose }: CharacterEditorProps) {
    * 勾选「自动重新生成定妆照」时：英文派生成功后继续自动生图，整条链路期间
    * 编辑器内相关按钮保持禁用，全部返回后才恢复。
    */
+  // 结构化设定文本：description 只存一句话简介，AI 指令必须看到完整设定；
+  // 若 description 本身已带字段行（AI 刚改写过、尚未保存），则不再附加旧 details
+  const characterDetailsText =
+    parseCharacterDescription(description).fields.length > 0
+      ? ""
+      : composeDetailsText(character?.details);
   const handleApplyInstruction = useCallback(async () => {
     const requirement = instruction.trim();
     if (isApplyingInstruction || !providerConfig.apiKey || !providerConfig.baseUrl) return;
@@ -203,6 +210,9 @@ export function CharacterEditor({ character, onClose }: CharacterEditorProps) {
             content: [
               `角色名：${name.trim() || "（未命名）"}`,
               `当前描述：${description.trim() || "（暂无）"}`,
+              ...(characterDetailsText
+                ? [`当前设定（结构化，内容以此为准）：\n${characterDetailsText}`]
+                : []),
               requirement
                 ? `修改要求：${requirement}`
                 : "修改要求：无——请根据角色名与现有描述，输出/补全为完整角色描述",
@@ -247,7 +257,7 @@ export function CharacterEditor({ character, onClose }: CharacterEditorProps) {
     if (autoPortraitAppearance && useSettingsStore.getState().autoRegeneratePortrait) {
       await generatePortraitFrom(autoPortraitAppearance);
     }
-  }, [instruction, isApplyingInstruction, providerConfig, name, description, appearancePrompt, deriveAppearance, generatePortraitFrom, t]);
+  }, [instruction, isApplyingInstruction, providerConfig, name, description, characterDetailsText, appearancePrompt, deriveAppearance, generatePortraitFrom, t]);
 
   /** 撤销最近一次 AI 描述修改（逐级回退快照栈，描述与对应英文一并恢复） */
   const handleUndoDescription = useCallback(() => {
@@ -328,16 +338,23 @@ export function CharacterEditor({ character, onClose }: CharacterEditorProps) {
     const namespace = generateAssetNamespace(trimmedName);
     const fullPrompt = generateFullPrompt({ name: trimmedName, appearancePrompt: trimmedAppearance });
 
+    // description 只存一句话简介（SSOT：完整设定在 details）；
+    // details 以「刚确认的描述」解析值优先、旧 details 补空 —— 保证 AI 指令的修改能落到结构化字段
+    const nextDetails = mergeDetailsPreferDerived(
+      { type: "character", description: trimmedDescription },
+      character?.details,
+    );
+
     const updates = {
       type: "character" as const,
       name: trimmedName,
-      description: trimmedDescription,
+      description: extractAssetSummary(trimmedDescription) || trimmedDescription,
       prompt: trimmedAppearance,
       appearancePrompt: trimmedAppearance,
       imageUrl: portraitUrl || undefined,
       assetNamespace: namespace,
       fullPrompt,
-      details: normalizeAssetDetails({ type: "character", description: trimmedDescription }, character?.details),
+      details: nextDetails,
     };
     if (character) {
       // avatarUrl 已不在编辑器暴露：保存时沿用原值，避免误清
@@ -360,10 +377,16 @@ export function CharacterEditor({ character, onClose }: CharacterEditorProps) {
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [busy, onClose]);
-  // 描述结构化解析：首行总述 → 一句话简介；8 要素 → 完整设定（无法解析时整段兜底）
+  // 描述解析：一句话简介取自 description（只存 summary）；
+  // 完整设定以 details 为权威（结构化独立存储），无 details 时回落描述解析（旧数据/新建中）
   const parsedDescription = parseCharacterDescription(description);
   const summary = parsedDescription.summary ?? "";
-  const detailFields = parsedDescription.fields;
+  const detailsFieldRows = detailEntries(character?.details).map(([key, value]) => ({
+    label: t(("assetField." + key) as TranslationKey),
+    value,
+  }));
+  const detailFields =
+    detailsFieldRows.length > 0 ? detailsFieldRows : parsedDescription.fields;
   const promptHint = isDerivingAppearance
     ? t("characters.deriving")
     : appearanceStale

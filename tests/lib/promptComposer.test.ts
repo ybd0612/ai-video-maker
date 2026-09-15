@@ -7,7 +7,6 @@ import { describe, expect, it } from "vitest";
 import type { Asset, Shot } from "@/stores/projectStore";
 import {
   composeTextToImagePrompt,
-  composeImageToImagePrompt,
   composeMultiReferencePrompt,
   composePortraitPrompt,
   pickShotReferences,
@@ -15,7 +14,6 @@ import {
   getStylePrompt,
   assetImageBoundary,
   composeStyleReferencePrompt,
-  composeStyleAnchorInstruction,
   collectSubjectVocabulary,
   normalizeCharacterDescription,
   parseCharacterDescription,
@@ -75,30 +73,7 @@ describe("composeTextToImagePrompt", () => {
   });
 });
 
-/* ── composeImageToImagePrompt ────────────────────────────────────────────── */
-
-describe("composeImageToImagePrompt", () => {
-  it("结构为 [改变要求]+[新风格]+[Keep unchanged: 保留主体]", () => {
-    const out = composeImageToImagePrompt({
-      change: "Render as a clean product reference",
-      newStyle: "anime style",
-      keep: "a ceramic cup with a blue rim",
-    });
-    expect(out).toBe(
-      "Render as a clean product reference, anime style, Keep unchanged: a ceramic cup with a blue rim",
-    );
-  });
-
-  it("newStyle 缺省时剔除该段；keep 为空时不产生空的 Keep 段", () => {
-    const out = composeImageToImagePrompt({
-      change: "change",
-      keep: "  ",
-    });
-    expect(out).toBe("change");
-  });
-});
-
-/* ── composeMultiReferencePrompt ──────────────────────────────────────────── */
+/* ── 资产图拼装（composeTextToImagePrompt + assetImageBoundary） ──────────── */
 
 describe("资产主体边界与视觉方向", () => {
   it("按资产类型生成最小主体边界，同时保留让模型生成具体提示词的空间", () => {
@@ -128,14 +103,6 @@ describe("资产主体边界与视觉方向", () => {
     const prompt = composeStyleReferencePrompt("warm tones and soft light.");
     expect(prompt).toContain("soft light. Render this as");
     expect(prompt).not.toContain("..");
-  });
-
-  it("图生图风格锚点声明正向主体归属，不再只靠否定句", () => {
-    const out = composeStyleAnchorInstruction();
-    expect(out).toContain("style and palette sample only");
-    expect(out).toContain(
-      "discard any subject, character, animal or scene visible in the reference image",
-    );
   });
 
   it("审计禁止清单只来自项目自身非风格资产名，去重且不硬编码关键词", () => {
@@ -175,12 +142,12 @@ describe("composeMultiReferencePrompt", () => {
     expect(out).toContain("Image 3 is the style reference: 整体风格: anime");
     expect(out).toContain("Target scene / subject: the fox walks in the forest");
     expect(out).toContain(
-      "The reference images are style, palette and identity anchors only: the subject and scene of this image are exactly those described above and nothing else — discard any subject visible in the references that is not described above.",
+      "The reference images anchor the identity, appearance and art style of the subjects described above; keep those subjects consistent with their references, but compose the picture from the text description — do not copy the references' layout or background.",
     );
     // 顺序：参考图说明 → 目标场景 → 图像关系（末尾）
     const idx1 = out.indexOf("Image 1");
     const idxScene = out.indexOf("Target scene");
-    const idxAnchor = out.indexOf("The reference images are style, palette and identity anchors");
+    const idxAnchor = out.indexOf("The reference images anchor the identity");
     expect(idx1).toBeLessThan(idxScene);
     expect(idxScene).toBeLessThan(idxAnchor);
   });
@@ -281,37 +248,28 @@ describe("pickShotReferences", () => {
     imageUrl: "http://img/style.png",
   });
 
-  it("顺序：场景 → 角色 → 产品 → 风格（style 恒末位）", () => {
+  it("顺序：场景 → 角色 → 产品；风格图不再进入参考图（2026-09-15 决策）", () => {
     const project = { assets: [sceneAsset, charAsset, styleAsset], styleReferenceUrl: undefined };
     const shot = makeShot({ sceneDesc: "walking in the Forest", activeCharacterIds: ["char_1"] });
     const refs = pickShotReferences(shot, project);
     expect(refs).toEqual([
       "http://img/scene.png",
       "http://img/char.png",
-      "http://img/style.png",
     ]);
+    expect(refs).not.toContain("http://img/style.png");
   });
 
-  it("风格图恒保留：场景+角色+产品足够填满时，风格图仍在且总数=3（挤掉产品）", () => {
+  it("风格图退出后非风格上限放宽为 3：场景+角色+产品全部保留", () => {
     const project = { assets: [sceneAsset, charAsset, productAsset, styleAsset], styleReferenceUrl: undefined };
-    const shot = makeShot({ sceneDesc: "Forest", activeCharacterIds: ["char_1"] });
+    const shot = makeShot({ sceneDesc: "Forest", activeCharacterIds: ["char_1"], activeProductIds: ["prod_1"] });
     const refs = pickShotReferences(shot, project);
     expect(refs).toEqual([
       "http://img/scene.png",
       "http://img/char.png",
-      "http://img/style.png",
+      "http://img/product.png",
     ]);
     expect(refs).toHaveLength(3);
-    expect(refs[refs.length - 1]).toBe("http://img/style.png");
-  });
-
-  it("非风格参考合计最多 2 张：无风格图时产品（低优先级）被舍弃", () => {
-    const project = { assets: [sceneAsset, charAsset, productAsset], styleReferenceUrl: undefined };
-    const shot = makeShot({ sceneDesc: "walking in the Forest", activeCharacterIds: ["char_1"] });
-    expect(pickShotReferences(shot, project)).toEqual([
-      "http://img/scene.png",
-      "http://img/char.png",
-    ]);
+    expect(refs).not.toContain("http://img/style.png");
   });
 
   it("去重：同一 URL 只出现一次", () => {
@@ -327,19 +285,16 @@ describe("pickShotReferences", () => {
     expect(refs.filter((u) => u === "http://img/scene.png")).toHaveLength(1);
   });
 
-  it("场景匹配失败时回退首个有图场景", () => {
+  it("场景匹配失败时回退首个有图场景；旧风格字段也不兜底进参考图", () => {
     const sceneB = makeAsset({ id: "scene_2", type: "scene", name: "Beach", imageUrl: "http://img/beach.png" });
     const project = { assets: [sceneB, styleAsset], styleReferenceUrl: undefined };
     const shot = makeShot({ sceneDesc: "somewhere unrelated" });
-    expect(pickShotReferences(shot, project)).toEqual([
-      "http://img/beach.png",
-      "http://img/style.png",
-    ]);
+    expect(pickShotReferences(shot, project)).toEqual(["http://img/beach.png"]);
   });
 
-  it("风格图兜底：无场景/角色/产品时只用风格图（旧字段亦可）", () => {
+  it("无场景/角色/产品时返回空数组（纯文生图；风格图不再兜底）", () => {
     const project = { assets: [], styleReferenceUrl: "http://img/legacy-style.png" };
-    expect(pickShotReferences(makeShot(), project)).toEqual(["http://img/legacy-style.png"]);
+    expect(pickShotReferences(makeShot(), project)).toEqual([]);
   });
 
   it("角色参考优先 imageUrl，缺图时回退 avatarUrl", () => {
