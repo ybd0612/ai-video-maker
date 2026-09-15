@@ -93,73 +93,98 @@ export function useScriptActions(
     const trace = beginTrace("logmsg.trace.extractFromIdea", { projectId: targetProjectId });
 
     try {
-      const visualDirectionResult = await refineWithAudit<RawVisualDirection>({
-        produce: () =>
-          extractVisualDirectionFromIdea({
-            apiKey: providerConfig.apiKey,
-            baseUrl: providerConfig.baseUrl,
-            prompt,
-            language: project.language,
-            aspectRatio: project.aspectRatio,
-            assets: project.assets,
-          }),
-        // 自检：禁止清单来自项目自身非风格资产名（数据驱动），是否越界与如何重写由模型判断。
-        audit: (current) =>
-          auditVisualDirection({
-            apiKey: providerConfig.apiKey,
-            baseUrl: providerConfig.baseUrl,
-            language: project.language,
-            direction: current,
-            forbiddenSubjects: collectSubjectVocabulary(project),
-          }),
-        maxRounds: VISUAL_DIRECTION_MAX_ROUNDS,
-      });
-      const visualDirection: VisualDirection = {
-        name: visualDirectionResult.name,
-        description: visualDirectionResult.description,
-        details: visualDirectionResult.details,
-        revision: (project.visualDirection?.revision ?? 0) + 1,
-        status: "draft" as const,
-      };
-      useProjectStore.getState().updateProjectById(targetProjectId, (p) => ({ ...p, visualDirection }));
-
-      const result = await extractAssetsFromIdea({
+      const baseOpts = {
         apiKey: providerConfig.apiKey,
         baseUrl: providerConfig.baseUrl,
         prompt,
         language: project.language,
         aspectRatio: project.aspectRatio,
         assets: project.assets,
-      }, visualDirectionResult);
+      };
 
-      const newCharacters = extractNewAssets(project.assets, result.characters, "character", manualAssets);
-      const newProducts = extractNewAssets(project.assets, result.products, "product", manualAssets);
-      const newProps = extractNewAssets(project.assets, result.props, "prop", manualAssets);
-      const newScenes = extractNewAssets(project.assets, result.scenes, "scene", manualAssets);
-      const newStyles = extractNewAssets(project.assets, result.styles, "style", manualAssets);
-      const newAssets = [
-        ...newStyles.assets,
-        ...newCharacters.assets,
-        ...newScenes.assets,
-        ...newProducts.assets,
-        ...newProps.assets,
-      ];
-      const manualNames = new Set(manualAssets.map((a) => a.name.trim().toLocaleLowerCase()));
-      const dedupedNew = newAssets.filter(
-        (a) => !manualNames.has(a.name.trim().toLocaleLowerCase()),
-      );
+      // 链 A：视觉方向（提取 → 自检 → 写回）。
+      // 完成即写回并切到步骤 2：用户 ~35-55s 就能看到/编辑视觉方向，
+      // 不必等资产提取（~53s）与后续图片链路全部结束。
+      const directionTask = (async () => {
+        const refined = await refineWithAudit<RawVisualDirection>({
+          produce: () => extractVisualDirectionFromIdea(baseOpts),
+          // 自检：禁止清单来自项目自身非风格资产名（数据驱动），是否越界与如何重写由模型判断。
+          audit: (current) =>
+            auditVisualDirection({
+              apiKey: providerConfig.apiKey,
+              baseUrl: providerConfig.baseUrl,
+              language: project.language,
+              direction: current,
+              forbiddenSubjects: collectSubjectVocabulary(project),
+            }),
+          maxRounds: VISUAL_DIRECTION_MAX_ROUNDS,
+        });
+        const visualDirection: VisualDirection = {
+          name: refined.name,
+          description: refined.description,
+          details: refined.details,
+          revision: (project.visualDirection?.revision ?? 0) + 1,
+          status: "draft" as const,
+        };
+        useProjectStore.getState().updateProjectById(targetProjectId, (p) => ({
+          ...p,
+          visualDirection,
+          status: "idle",
+          wizardStep: 2,
+        }));
+        return visualDirection;
+      })();
 
-      useProjectStore.getState().updateProjectById(targetProjectId, (p) => ({
-        ...p,
-        assets: [...manualAssets, ...dedupedNew],
-        visualDirection,
-        status: "idle",
-        error: undefined,
-        wizardStep: 2,
-        styleReferenceUrl: undefined,
-        styleReferenceError: undefined,
-        assetsReviewed: false,
-      }));
+      // 链 B：资产提取。与链 A 并行（视觉方向参数可省——资产 prompt 的风格一致性
+      // 由生图时的 stylePrompt 文本兜底）；成功后整体替换旧 auto 资产。
+      const assetsTask = (async () => {
+        const result = await extractAssetsFromIdea(baseOpts);
+
+        const newCharacters = extractNewAssets(project.assets, result.characters, "character", manualAssets);
+        const newProducts = extractNewAssets(project.assets, result.products, "product", manualAssets);
+        const newProps = extractNewAssets(project.assets, result.props, "prop", manualAssets);
+        const newScenes = extractNewAssets(project.assets, result.scenes, "scene", manualAssets);
+        const newStyles = extractNewAssets(project.assets, result.styles, "style", manualAssets);
+        const newAssets = [
+          ...newStyles.assets,
+          ...newCharacters.assets,
+          ...newScenes.assets,
+          ...newProducts.assets,
+          ...newProps.assets,
+        ];
+        const manualNames = new Set(manualAssets.map((a) => a.name.trim().toLocaleLowerCase()));
+        const dedupedNew = newAssets.filter(
+          (a) => !manualNames.has(a.name.trim().toLocaleLowerCase()),
+        );
+
+        // 提取成功才替换旧 auto 资产（失败时保留现状供用户重试）；
+        // 旧风格图对应旧 style 资产，一并作废
+        useProjectStore.getState().updateProjectById(targetProjectId, (p) => ({
+          ...p,
+          assets: [...manualAssets, ...dedupedNew],
+          styleReferenceUrl: undefined,
+          styleReferenceError: undefined,
+          assetsReviewed: false,
+          error: undefined,
+        }));
+        return dedupedNew.length;
+      })();
+
+      // 两链并行；任一失败保留另一链已写回的内容并按失败收尾（用户重试走原确认弹窗）
+      const [directionOutcome, assetsOutcome] = await Promise.allSettled([directionTask, assetsTask]);
+      const directionError = directionOutcome.status === "rejected" ? directionOutcome.reason : null;
+      const assetsError = assetsOutcome.status === "rejected" ? assetsOutcome.reason : null;
+
+      if (directionError || assetsError) {
+        const failure = directionError ?? assetsError;
+        trace.finish(failure);
+        useProjectStore.getState().updateProjectById(targetProjectId, (p) => ({
+          ...p,
+          status: "failed",
+          error: failure instanceof Error ? failure.message : String(failure),
+        }));
+        throw failure;
+      }
 
       // 后台生成链路仍按原顺序执行：先风格参考图，再生成角色/场景/产品图。
       void (async () => {
