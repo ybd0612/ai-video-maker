@@ -10,6 +10,7 @@ import { fetchWithRetry } from "@/lib/fetchWithRetry";
 import { rateLimiter, imageSizeToTier } from "@/services/rateLimit";
 import { generateVideo as rawGenerateVideo } from "@/services/videoService";
 import { getTranslation } from "@/i18n";
+import { startSpan } from "@/lib/logger";
 import type {
   AIService,
   ChatParams,
@@ -36,6 +37,14 @@ export class OpenAIService implements AIService {
   /* ── Chat ──────────────────────────────────────────────────────────────── */
 
   async chatCompletion(params: ChatParams): Promise<ChatResult> {
+    const span = startSpan("llm", "POST /chat/completions", {
+      model: MODELS.text,
+      temperature: params.temperature ?? 0.7,
+      topP: params.topP,
+      enableThinking: params.enableThinking ?? false,
+      messages: params.messages.map((m) => `${m.role}:${m.content.length}`).join(" "),
+    });
+    try {
     // 用量控制：文本 RPM（按当前套餐节流，超限自动等待）
     await rateLimiter.acquire("text");
 
@@ -106,6 +115,14 @@ export class OpenAIService implements AIService {
       );
     }
 
+    span.end({
+      finishReason: choice?.finish_reason ?? "",
+      promptTokens: json.usage?.prompt_tokens,
+      completionTokens: json.usage?.completion_tokens,
+      contentChars: content.length,
+      content: content.length <= 4000 ? content : `${content.slice(0, 4000)}…(truncated)`,
+    });
+
     return {
       content: content.trim(),
       usage: json.usage
@@ -115,11 +132,24 @@ export class OpenAIService implements AIService {
           }
         : undefined,
     };
+    } catch (error) {
+      span.fail(error);
+      throw error;
+    }
   }
 
   /* ── Image ─────────────────────────────────────────────────────────────── */
 
   async generateImage(params: ImageParams): Promise<ImageResult> {
+    const span = startSpan("image", "POST /images/generations", {
+      model: MODELS.image,
+      size: params.size,
+      ratio: params.ratio ?? "1:1",
+      seed: params.seed,
+      referenceImages: params.referenceImageUrls?.length ?? 0,
+      prompt: params.prompt,
+    });
+    try {
     // 用量控制：图片 RPM（按尺寸档位 1K/2K/3K/4K 区分限制）
     await rateLimiter.acquire("image", { sizeTier: imageSizeToTier(params.size) });
 
@@ -195,7 +225,12 @@ export class OpenAIService implements AIService {
       throw new Error("Image API returned no URL.");
     }
 
+    span.end({ imageUrl });
     return { url: imageUrl };
+    } catch (error) {
+      span.fail(error);
+      throw error;
+    }
   }
 
   /* ── Video ─────────────────────────────────────────────────────────────── */

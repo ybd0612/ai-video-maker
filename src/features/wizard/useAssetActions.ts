@@ -20,6 +20,7 @@ import {
   collectSubjectVocabulary,
 } from "@/lib/promptComposer";
 import { parseJsonFromResponse } from "@/lib/jsonResponse";
+import { beginTrace } from "@/lib/logger";
 import { resolveGenerationParams } from "@/lib/generationParams";
 import { refineWithAudit, type AuditOutcome } from "@/lib/refineContent";
 import { buildSystemPrompt as buildRulesSystemPrompt, getActiveRules } from "@/lib/promptRules";
@@ -182,6 +183,8 @@ export function useAssetActions(): AssetActions {
     if (getStyleReferenceUrl(project) && !force) return;
     if (hasActiveTask(activeAssetTasks, pid)) return;
 
+    const trace = beginTrace("生成视觉方向图", { projectId: pid, force });
+
     const controller = new AbortController();
     activeAssetTasks.set(pid, controller);
 
@@ -280,6 +283,7 @@ export function useAssetActions(): AssetActions {
       console.error("Failed to generate style reference:", err);
     } finally {
       activeAssetTasks.delete(pid);
+      trace.finish();
     }
   }, []);
 
@@ -299,6 +303,8 @@ export function useAssetActions(): AssetActions {
     const targetProjectId = project.id;
 
     if (hasActiveTask(activeAssetTasks, targetProjectId)) return;
+
+    const trace = beginTrace("生成资产图", { projectId: targetProjectId, options: { ...opts } });
 
     const generatePortraits = opts?.generatePortraits !== false;
     const generateScenes = opts?.generateScenes !== false;
@@ -488,7 +494,13 @@ export function useAssetActions(): AssetActions {
       },
     });
 
-    await runAssetBatch({ projectId: targetProjectId, concurrency: 3 });
+    try {
+      await runAssetBatch({ projectId: targetProjectId, concurrency: 3 });
+      trace.finish();
+    } catch (error) {
+      trace.finish(error);
+      throw error;
+    }
   }, [generateStyleReference]);
 
   return { generateAssetImages, generateStyleReference };

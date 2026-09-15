@@ -39,6 +39,12 @@ interface SettingsState {
    */
   autoRegeneratePortrait: boolean;
   autoRegenerateAssetImages: boolean;
+  /**
+   * 运行日志与链路追踪开关（默认开启）。
+   * 日志仅存内存环形缓冲（最多 1000 条），不上报网络；旧存储缺该字段时
+   * 由 persist 浅合并回退到默认值 true，无需迁移。
+   */
+  loggingEnabled: boolean;
 
   setTheme: (theme: Theme) => void;
   setLanguage: (lang: Language) => void;
@@ -48,6 +54,7 @@ interface SettingsState {
   setPromptRules: (rules: PromptRule[]) => void;
   setAutoRegeneratePortrait: (value: boolean) => void;
   setAutoRegenerateAssetImages: (value: boolean) => void;
+  setLoggingEnabled: (value: boolean) => void;
 }
 
 /**
@@ -102,6 +109,7 @@ export const useSettingsStore = create<SettingsState>()(
       promptRules: [],
       autoRegeneratePortrait: true,
       autoRegenerateAssetImages: true,
+      loggingEnabled: true,
 
       setTheme: (theme) => set({ theme }),
       setLanguage: (language) => set({ language }),
@@ -111,6 +119,7 @@ export const useSettingsStore = create<SettingsState>()(
       setPromptRules: (promptRules) => set({ promptRules }),
       setAutoRegeneratePortrait: (autoRegeneratePortrait) => set({ autoRegeneratePortrait }),
       setAutoRegenerateAssetImages: (autoRegenerateAssetImages) => set({ autoRegenerateAssetImages }),
+      setLoggingEnabled: (loggingEnabled) => set({ loggingEnabled }),
     }),
     {
       name: "wxhb-settings",

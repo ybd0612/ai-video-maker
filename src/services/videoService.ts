@@ -15,6 +15,7 @@
 //   - Flash 限制：参考图 ≤5 张、参考音频 ≤3 段、不支持参考视频（本项目均未使用）
 // ────────────────────────────────────────────────────────────────────────────
 
+import { startSpan } from "@/lib/logger";
 import { MODELS } from "@/lib/models";
 import { fetchWithRetry } from "@/lib/fetchWithRetry";
 import { clampNumber } from "@/lib/validation";
@@ -165,6 +166,8 @@ export async function generateVideo(
   {
     if (signal?.aborted) throw new Error("视频生成已取消。");
 
+    const createStartedAt = Date.now();
+
     const createResp = await fetchWithRetry(`${baseUrl}/videos`, {
       method: "POST",
       headers: {
@@ -194,6 +197,16 @@ export async function generateVideo(
 
     // Extract video_id from create response
     videoId = (createJson.video_id as string) ?? (createJson.task_id as string) ?? (createJson.id as string) ?? undefined;
+    startSpan("video", "POST /videos", {
+      model: MODELS.video,
+      mode: body.mode,
+      size: body.size,
+      aspectRatio: body.aspect_ratio,
+      seconds: body.seconds,
+      hasFirstFrame,
+      hasLastFrame,
+      prompt: body.prompt,
+    }).end({ videoId, createMs: Date.now() - createStartedAt });
     if (!videoId) {
       throw new Error(
         `Video API 未返回 video_id。响应: ${JSON.stringify(createJson).slice(0, 300)}`,
@@ -210,6 +223,8 @@ export async function generateVideo(
   // model_name 必带：2.5 Flash 的 keyframe / reference 模式不带会查不到任务。
   const origin = new URL(baseUrl).origin;
   const pollUrl = `${origin}/agnesapi?video_id=${encodeURIComponent(videoId)}&model_name=${encodeURIComponent(MODELS.video)}`;
+  const pollStartedAt = Date.now();
+  let pollRounds = 0;
   const deadline = Date.now() + VIDEO_POLL_TIMEOUT_MS;
   let videoUrl = "";
   let coverImageUrl: string | undefined;
@@ -261,6 +276,7 @@ export async function generateVideo(
     const rawStatus: string = pollJson.status ?? "pending";
     const progress: number = pollJson.progress ?? 0;
 
+    pollRounds++;
     onProgress?.(progress);
 
     if (rawStatus === "completed" || rawStatus === "succeeded" || pollJson.internal_status === "completed") {
@@ -285,6 +301,13 @@ export async function generateVideo(
           false,
         );
       }
+      startSpan("video", "视频生成完成", { videoId }).end({
+        videoUrl,
+        coverImageUrl,
+        seconds: duration,
+        pollRounds,
+        pollMs: Date.now() - pollStartedAt,
+      });
       break;
     }
 
@@ -294,6 +317,7 @@ export async function generateVideo(
         : pollJson.error
           ? JSON.stringify(pollJson.error)
           : "unknown error";
+      startSpan("video", "视频生成失败", { videoId }).fail(new Error(errDetail));
       throw new VideoTaskCreatedError(`视频生成失败: ${errDetail}`, videoId, false);
     }
   }

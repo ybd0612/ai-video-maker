@@ -3,6 +3,7 @@ import { X, Eye, EyeOff, CheckCircle2, Loader2, AlertTriangle, Plus, Trash2, Rot
 import { useSettingsStore } from "@/stores/settingsStore";
 import { useProjectStore } from "@/stores/projectStore";
 import { motion, AnimatePresence } from "framer-motion";
+import { LogViewerPanel } from "@/components/LogViewerPanel";
 import { resolveBaseUrl } from '@/lib/resolveBaseUrl';
 import { useT } from '@/i18n';
 import type { Language } from '@/stores/settingsStore';
@@ -338,7 +339,7 @@ export function SettingsDialog() {
   const providerConfig = useSettingsStore((s) => s.providerConfig);
   const setProviderConfig = useSettingsStore((s) => s.setProviderConfig);
 
-  const [tab, setTab] = useState<"general" | "rules">("general");
+  const [tab, setTab] = useState<"general" | "rules" | "logs">("general");
   const [apiKey, setApiKey] = useState("");
   const [baseUrl, setBaseUrl] = useState("https://api.agnes-ai.cn/v1");
   const [plan, setPlan] = useState<PlanId>("default");
@@ -459,7 +460,8 @@ export function SettingsDialog() {
                 {([
                   ["general", t("settings.tabGeneral") as string],
                   ["rules", t("settings.tabRules") as string],
-                ] as Array<["general" | "rules", string]>).map(([id, label]) => (
+                  ["logs", t("settings.tabLogs") as string],
+                ] as Array<["general" | "rules" | "logs", string]>).map(([id, label]) => (
                   <button
                     key={id}
                     type="button"
@@ -605,8 +607,10 @@ export function SettingsDialog() {
                   <span className="ml-auto text-[0.625rem] text-ink-4">{t("settings.github.desc")}</span>
                 </a>
               </div>
-              ) : (
+              ) : tab === "rules" ? (
                 <PromptRulesSettings t={t} language={language} showToast={showToast} />
+              ) : (
+                <LogViewerPanel />
               )}
             </motion.div>
           </motion.div>

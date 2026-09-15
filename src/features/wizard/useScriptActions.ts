@@ -14,6 +14,7 @@ import { extractAssetsFromIdea, extractVisualDirectionFromIdea, generateScript, 
 import { extractNewAssets } from "@/lib/extractAssets";
 import { collectSubjectVocabulary } from "@/lib/promptComposer";
 import { refineWithAudit } from "@/lib/refineContent";
+import { beginTrace } from "@/lib/logger";
 import { pickShotFields } from "@/lib/shotFields";
 import { restoreProjectStatusIfReady } from "./wizardActionUtils";
 
@@ -89,6 +90,8 @@ export function useScriptActions(
 
     useProjectStore.getState().setProjectStatusById(targetProjectId, "scripting");
 
+    const trace = beginTrace("从想法提取视觉方向与资产", { projectId: targetProjectId });
+
     try {
       const visualDirectionResult = await refineWithAudit<RawVisualDirection>({
         produce: () =>
@@ -163,8 +166,10 @@ export function useScriptActions(
         await generateStyleReference(targetProjectId);
         await generateAssetImages(undefined, targetProjectId);
       })();
+      trace.finish();
       return true;
     } catch (err) {
+      trace.finish(err);
       useProjectStore.getState().updateProjectById(targetProjectId, (p) => ({
         ...p,
         status: "failed",
