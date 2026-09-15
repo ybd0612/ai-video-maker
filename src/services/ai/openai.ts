@@ -38,6 +38,18 @@ interface OpenAIConfig {
   baseUrl: string;
 }
 
+/**
+ * 文本调用的单次尝试超时（毫秒）。
+ *
+ * ⚠️ 结构问题，不走参数决策（与 max_tokens 同类）：
+ * 分镜/资产提取等调用要一次性输出整组大 JSON，实测 55-120s，紧贴默认 60s 线。
+ * 60s 超时对这类调用是纯伤害 —— 重试也会在同一点被掐断（输出时长只取决于
+ * 服务端生成速度，不随重试变化），表现为「一直生成中」3 分钟后报错。
+ * 180s 给足生成时间；正常短调用（参数决策等）提前返回，不受影响。
+ * 2026-09-15 实测：分镜请求在 60s 超时 + 3 次重试循环里全军覆没。
+ */
+const TEXT_TIMEOUT_MS = 180_000;
+
 export class OpenAIService implements AIService {
   private config: OpenAIConfig;
 
@@ -67,6 +79,7 @@ export class OpenAIService implements AIService {
         "Content-Type": "application/json",
         Authorization: `Bearer ${this.config.apiKey}`,
       },
+      timeoutMs: TEXT_TIMEOUT_MS,
       body: JSON.stringify({
         model: MODELS.text,
         messages: params.messages,
