@@ -411,6 +411,9 @@ const zh = {
   "log.hidePanel": "隐藏日志面板",
   "log.record": "记录运行日志（内存最多 1000 条）",
   "log.localHint": "开发模式：日志同时以 NDJSON 追加写入 debug-dump/runtime.log（可直接交给 AI 分析）",
+  "log.persist": "刷新后保留日志",
+  "log.persistHint": "日志另存到本机浏览器（最多 300 条，超长提示词会自动截断），刷新或重开标签页后仍在；关闭后只保留当前会话。",
+  "log.persistedMark": "日志已存入本机浏览器",
 
   // 日志消息：logger 的 message 用这里的中性键（logmsg.*），
   // 渲染、导出与落盘时按当前语言翻译，保证界面与 runtime.log 一致可读。
@@ -834,6 +837,9 @@ const en = {
   "log.hidePanel": "Hide log panel",
   "log.record": "Record runtime log (max 1000 entries in memory)",
   "log.localHint": "Dev mode: entries are also appended as NDJSON to debug-dump/runtime.log (ready for AI analysis)",
+  "log.persist": "Keep logs after reload",
+  "log.persistHint": "Also stores logs in this browser (max 300 entries, long prompts truncated), so they survive a reload or reopening the tab. When off, logs live only in the current session.",
+  "log.persistedMark": "Logs are stored in this browser",
 
   // Log messages: logger messages use neutral logmsg.* keys,
   // translated on render / export / disk flush so the UI and runtime.log stay readable.

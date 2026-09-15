@@ -13,10 +13,19 @@
 //   });
 //   服务层无需改签名：currentTrace() 自动挂到当前 trace 上。
 //
-// 开关：settingsStore.loggingEnabled（默认开启）；关闭后所有写入变为空操作。
+// 开关：
+//   settingsStore.loggingEnabled（默认开启）—— 关闭后所有写入变为空操作；
+//   settingsStore.persistLog（默认开启）—— 日志另存到 localStorage，刷新后仍在。
+// 持久化：内存环形缓冲（1000 条）为主，变更后防抖写入 localStorage（收敛到 300 条、
+//   单条超长字段截断、总字节封顶）；页面隐藏 / 卸载时立即落盘，避免丢失尾部日志。
 // ────────────────────────────────────────────────────────────────────────────
 
 import { useSettingsStore } from "@/stores/settingsStore";
+import {
+  createLocalStorageLogAdapter,
+  selectEntriesForStorage,
+  type LogStorageAdapter,
+} from "@/lib/logStorage";
 
 export type LogLevel = "debug" | "info" | "warn" | "error";
 
@@ -56,6 +65,7 @@ function emit(entry: Omit<LogEntry, "id" | "ts">): LogEntry {
   if (buffer.length > MAX_ENTRIES) buffer = buffer.slice(buffer.length - MAX_ENTRIES);
   snapshot = buffer.slice();
   for (const listener of listeners) listener();
+  schedulePersist();
   return full;
 }
 
@@ -72,7 +82,113 @@ export function getLogSnapshot(): readonly LogEntry[] {
 export function clearLog(): void {
   buffer = [];
   snapshot = [];
+  clearPersistedLog();
   for (const listener of listeners) listener();
+}
+
+/* ── 浏览器侧持久化（刷新后日志仍在） ──────────────────────────────────── */
+
+const PERSIST_FLUSH_MS = 800;
+
+let storage: LogStorageAdapter | null = null;
+let persistTimer: ReturnType<typeof setTimeout> | undefined;
+let hydrated = false;
+
+/** 持久化开关：日志采集关掉时不写盘，也不恢复历史 */
+function persistenceEnabled(): boolean {
+  try {
+    return (
+      useSettingsStore.getState().loggingEnabled !== false &&
+      useSettingsStore.getState().persistLog !== false
+    );
+  } catch {
+    return true;
+  }
+}
+
+function getStorage(): LogStorageAdapter {
+  if (!storage) storage = createLocalStorageLogAdapter();
+  return storage;
+}
+
+/**
+ * 注入存储实现（单测用内存 adapter，或需要换用其它存储介质时）。
+ * 传 null 恢复默认的 localStorage 适配器。
+ */
+export function setLogStorage(adapter: LogStorageAdapter | null): void {
+  storage = adapter;
+}
+
+/** 立即把当前缓冲写入存储（幂等、可反复调用） */
+export function flushLogPersist(): void {
+  if (persistTimer !== undefined) {
+    clearTimeout(persistTimer);
+    persistTimer = undefined;
+  }
+  if (!persistenceEnabled()) return;
+  const adapter = getStorage();
+  const entries = selectEntriesForStorage(buffer);
+  if (entries.length === 0) {
+    adapter.clear();
+    return;
+  }
+  if (adapter.save(entries)) return;
+  // 配额超限：逐级减半重试，尽量保住最近的日志
+  let reduced = entries;
+  while (reduced.length > 1) {
+    reduced = reduced.slice(Math.ceil(reduced.length / 2));
+    if (adapter.save(reduced)) return;
+  }
+  console.warn("[logger] 日志持久化失败：浏览器存储配额不足，已放弃本次写入");
+}
+
+function schedulePersist(): void {
+  if (!persistenceEnabled()) return;
+  if (persistTimer !== undefined) return;
+  persistTimer = setTimeout(() => {
+    persistTimer = undefined;
+    flushLogPersist();
+  }, PERSIST_FLUSH_MS);
+}
+
+/** 清空持久化日志（不影响内存缓冲） */
+export function clearPersistedLog(): void {
+  try {
+    getStorage().clear();
+  } catch {
+    /* 存储不可用时忽略 */
+  }
+}
+
+/**
+ * 从存储恢复历史日志（幂等：重复调用只生效一次）。
+ * force=true 时忽略幂等标记，用于测试或手动重载历史。
+ */
+export function hydrateLog(opts?: { force?: boolean }): void {
+  if (hydrated && !opts?.force) return;
+  hydrated = true;
+  if (!persistenceEnabled()) return;
+  const restored = getStorage().load();
+  if (!restored || restored.length === 0) return;
+  buffer = restored.slice(-MAX_ENTRIES);
+  // id 从历史最大值续起，避免恢复后的新日志与历史 id 冲突（面板用它做 key）
+  nextId = Math.max(...buffer.map((entry) => entry.id), 0) + 1;
+  snapshot = buffer.slice();
+  for (const listener of listeners) listener();
+}
+
+/**
+ * 注册持久化：启动时恢复历史，并在页面隐藏 / 卸载时立即落盘。
+ * 由 main.tsx 调用一次（SSR / 测试环境安全）。
+ */
+export function setupLogPersistence(): void {
+  hydrateLog();
+  if (typeof window === "undefined") return;
+  // pagehide 比 beforeunload 更可靠（移动端与 bfcache 场景）
+  window.addEventListener("pagehide", flushLogPersist);
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "hidden") flushLogPersist();
+  });
 }
 
 /** 导出为可下载的 JSON（用于问题反馈） */

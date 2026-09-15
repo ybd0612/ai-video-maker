@@ -15,6 +15,7 @@ import {
   ChevronsUpDown,
   Copy,
   Download,
+  Save,
   Trash2,
   X,
 } from "lucide-react";
@@ -91,6 +92,7 @@ export function LogConsoleDock() {
   const height = useSettingsStore((s) => s.logPanelHeight);
   const setHeight = useSettingsStore((s) => s.setLogPanelHeight);
   const setShowLogPanel = useSettingsStore((s) => s.setShowLogPanel);
+  const persistLog = useSettingsStore((s) => s.persistLog);
 
   const [level, setLevel] = useState<LogLevel | "all">("all");
   const [scope, setScope] = useState<(typeof SCOPES)[number]>("all");
@@ -210,6 +212,11 @@ export function LogConsoleDock() {
       <div className="flex flex-wrap items-center gap-2 border-b border-line-soft px-2 py-1">
         <span className="flex items-center gap-1.5 text-[0.6875rem] font-semibold text-ink">
           {t("log.title")}
+          {persistLog && (
+            <span title={t("log.persistedMark")} className="text-ink-5">
+              <Save size={10} />
+            </span>
+          )}
           {errorCount > 0 && (
             <span className="rounded border border-danger/50 px-1 text-[0.5625rem] text-danger">
               {errorCount}

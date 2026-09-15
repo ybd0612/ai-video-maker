@@ -46,6 +46,12 @@ interface SettingsState {
    * 采集恒开的好处：打开日志面板时，刚刚失败的那次调用已经在里面。
    */
   loggingEnabled: boolean;
+  /**
+   * 是否把日志持久化到浏览器 localStorage（默认开启）。
+   * 开启后刷新 / 重开标签页日志仍在；写入受条数、单条截断与总字节三重限制，
+   * 配额不足时自动减半重试，绝不阻塞主流程。
+   */
+  persistLog: boolean;
   /** 是否在主界面底部展示日志面板（DevTools 风格，默认关闭） */
   showLogPanel: boolean;
   /** 日志面板高度（px，可拖拽调整并持久化） */
@@ -60,6 +66,7 @@ interface SettingsState {
   setAutoRegeneratePortrait: (value: boolean) => void;
   setAutoRegenerateAssetImages: (value: boolean) => void;
   setLoggingEnabled: (value: boolean) => void;
+  setPersistLog: (value: boolean) => void;
   setShowLogPanel: (value: boolean) => void;
   setLogPanelHeight: (value: number) => void;
 }
@@ -117,6 +124,7 @@ export const useSettingsStore = create<SettingsState>()(
       autoRegeneratePortrait: true,
       autoRegenerateAssetImages: true,
       loggingEnabled: true,
+      persistLog: true,
       showLogPanel: false,
       logPanelHeight: 260,
 
@@ -129,6 +137,7 @@ export const useSettingsStore = create<SettingsState>()(
       setAutoRegeneratePortrait: (autoRegeneratePortrait) => set({ autoRegeneratePortrait }),
       setAutoRegenerateAssetImages: (autoRegenerateAssetImages) => set({ autoRegenerateAssetImages }),
       setLoggingEnabled: (loggingEnabled) => set({ loggingEnabled }),
+      setPersistLog: (persistLog) => set({ persistLog }),
       setShowLogPanel: (showLogPanel) => set({ showLogPanel }),
       setLogPanelHeight: (logPanelHeight) => set({ logPanelHeight }),
     }),

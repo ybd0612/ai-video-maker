@@ -129,7 +129,10 @@ const LOG_SESSION = Math.random().toString(36).slice(2, 10);
 export function setupLogDump(): void {
   if (!import.meta.env.DEV) return;
 
-  let lastId = 0;
+  // 已存在的条目（含本次刷新从 localStorage 恢复的历史日志）不应重复落盘，
+  // 故从当前快照的最大 id 起算，只发送此后新增的条目。
+  const initial = getLogSnapshot();
+  let lastId = initial.length > 0 ? initial[initial.length - 1].id : 0;
   let pending: LogEntry[] = [];
   let timer: ReturnType<typeof setTimeout> | undefined;
 

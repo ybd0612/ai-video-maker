@@ -10,19 +10,26 @@ import {
   clearLog,
   createTrace,
   exportLog,
+  flushLogPersist,
   getLogSnapshot,
+  hydrateLog,
   isLogMessageKey,
   logger,
   renderLogMessage,
+  setLogStorage,
   startSpan,
   subscribeLog,
   withTrace,
 } from "@/lib/logger";
+import { createMemoryLogAdapter } from "@/lib/logStorage";
 import { useSettingsStore } from "@/stores/settingsStore";
 
 beforeEach(() => {
+  // 每个用例注入全新内存存储，避免用例间互相影响（logger 的 adapter 是模块级状态）
+  useSettingsStore.setState({ loggingEnabled: true, persistLog: true });
+  setLogStorage(createMemoryLogAdapter());
   clearLog();
-  useSettingsStore.setState({ loggingEnabled: true });
+  hydrateLog({ force: true });
 });
 
 describe("logger 基础记录", () => {
@@ -204,5 +211,75 @@ describe("日志消息本地化（logmsg.* 约定）", () => {
     ) as { entries: Array<{ message: string }> };
     expect(parsed.entries[0].message).toBe("页面会话开始");
     expect(parsed.entries[1].message).toBe("POST /chat/completions");
+  });
+});
+
+describe("浏览器侧持久化（刷新后日志仍在）", () => {
+  it("flushLogPersist 把内存缓冲写入存储", () => {
+    const adapter = createMemoryLogAdapter();
+    setLogStorage(adapter);
+    logger.info("app", "logmsg.sessionStart");
+    flushLogPersist();
+    const restored = adapter.load();
+    expect(restored?.map((e) => e.message)).toEqual(["logmsg.sessionStart"]);
+  });
+
+  it("hydrateLog 恢复历史并续接 id，避免与既有条目 id 冲突", () => {
+    // 直接预置"上次会话留下的历史"，模拟刷新后从存储读回
+    const persisted = [
+      { id: 5, ts: 1_700_000_000_000, level: "info", scope: "app", message: "first" },
+    ];
+    setLogStorage(createMemoryLogAdapter(JSON.stringify(persisted)));
+    hydrateLog({ force: true });
+
+    const restored = getLogSnapshot();
+    expect(restored.map((e) => e.message)).toEqual(["first"]);
+
+    logger.info("app", "second");
+    const all = getLogSnapshot();
+    expect(all).toHaveLength(2);
+    // 新条目 id 必须大于历史最大值，否则面板以 id 作 key 会冲突
+    expect(all[1].id).toBeGreaterThan(5);
+    expect(new Set(all.map((e) => e.id)).size).toBe(2);
+  });
+
+  it("clearLog 同时清空持久化存储（面板「清空」不留残影）", () => {
+    const adapter = createMemoryLogAdapter();
+    setLogStorage(adapter);
+    logger.info("app", "to-be-cleared");
+    flushLogPersist();
+    expect(adapter.load()).not.toBeNull();
+
+    clearLog();
+    expect(adapter.load()).toBeNull();
+    expect(getLogSnapshot()).toHaveLength(0);
+  });
+
+  it("关闭 persistLog 后既不写盘也不恢复历史", () => {
+    const adapter = createMemoryLogAdapter();
+    setLogStorage(adapter);
+    logger.info("app", "before-off");
+    flushLogPersist();
+    expect(adapter.load()).not.toBeNull();
+
+    useSettingsStore.setState({ persistLog: false });
+    logger.info("app", "while-off");
+    flushLogPersist();
+    // 存储保持关闭前的内容，未被覆盖
+    expect(adapter.load()?.map((e) => e.message)).toEqual(["before-off"]);
+
+    clearLog();
+    hydrateLog({ force: true });
+    expect(getLogSnapshot()).toHaveLength(0);
+  });
+
+  it("关闭 loggingEnabled 时不记录也不持久化", () => {
+    const adapter = createMemoryLogAdapter();
+    setLogStorage(adapter);
+    useSettingsStore.setState({ loggingEnabled: false });
+    logger.info("app", "ignored");
+    flushLogPersist();
+    expect(getLogSnapshot()).toHaveLength(0);
+    expect(adapter.load()).toBeNull();
   });
 });
