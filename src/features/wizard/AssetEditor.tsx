@@ -5,7 +5,7 @@ import { useSettingsStore } from "@/stores/settingsStore";
 import { useT, type TranslationKey } from "@/i18n";
 import { chatCompletion } from "@/services/chatService";
 import { SYSTEM_PROMPT_ASSET_EDIT_ZH } from "@/lib/promptRules";
-import { createDefaultAssetDetails } from "@/lib/assetDetails";
+import { createDefaultAssetDetails, extractAssetSummary } from "@/lib/assetDetails";
 import type { AssetDetails } from "@/stores/projectStore";
 import {
   AssetDetailShell,
@@ -185,9 +185,10 @@ export function AssetEditor({ asset, onClose, onGenerate, generating }: AssetEdi
         value={draft.name}
         onChange={(name) => setDraft({ ...draft, name })}
       />
+      {/* 一句话简介只取描述首行；此前误传整段 description（含全部要素行） */}
       <AssetSummaryBlock
         label={t("assetEditor.summary")}
-        summary={draft.description}
+        summary={extractAssetSummary(draft.description)}
         emptyHint={t("assetEditor.summaryEmpty")}
       />
       {draft.details && (

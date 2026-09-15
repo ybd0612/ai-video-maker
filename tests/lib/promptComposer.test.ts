@@ -437,15 +437,42 @@ describe("parseCharacterDescription", () => {
     expect(normalizeCharacterDescription(desc)).toBe(desc);
   });
 
-  it("自由文本即使包含字段词也不强行结构化", () => {
+  it("自由文本即使包含字段词也不强行结构化（首行含冒号 → 非「总述+要素」结构，保持原文）", () => {
     const desc = "说明：这是一段自由文本。物种：兔。身份：主角。年龄：幼年。性格：安静。外貌：白色。服饰：围巾。记忆点：蓝眼睛。背景：森林。";
     expect(normalizeCharacterDescription(desc)).toBe(desc);
-    expect(parseCharacterDescription(desc).fields).toHaveLength(0);
   });
 
-  it("字段缺失、乱序或重复时保持原文", () => {
+  it("单行压缩描述命中 ≥6 个角色字段即规范化（容忍缺字段）", () => {
     const desc = "一只兔子。物种：兔。身份：主角。年龄：幼年。性格：安静。外貌：白色。服饰：围巾。背景：森林。";
-    expect(normalizeCharacterDescription(desc)).toBe(desc);
+    expect(normalizeCharacterDescription(desc).split("\n")).toEqual([
+      "一只兔子",
+      "物种：兔",
+      "身份：主角",
+      "年龄：幼年",
+      "性格：安静",
+      "外貌：白色",
+      "服饰：围巾",
+      "背景：森林",
+    ]);
+  });
+
+  it("模型改用长标签措辞时仍能解析（回归：曾因标签超 6 字导致简介与设定全丢）", () => {
+    const desc = [
+      "一只圆润贪玩、憨态可掬的小猪仔，毛茸茸的粉色身体透着天真与温柔",
+      "物种：猪（幼年小猪仔）",
+      "身份：故事主角，乡间小猪",
+      "年龄：幼年（小猪仔）",
+      "性格与行为倾向：贪玩、好奇心强，喜欢用鼻子拱动地面探索",
+      "外貌：全身圆润饱满，比例偏短粗",
+      "服饰与配饰：无服饰，保持自然体态",
+      "记忆点：圆滚滚的粉色身体、水汪汪大眼",
+      "来历与角色关系：乡间长大的小猪仔，在篱笆旁与小狗意外相遇",
+    ].join("\n");
+    const parsed = parseCharacterDescription(desc);
+    expect(parsed.summary).toBe("一只圆润贪玩、憨态可掬的小猪仔，毛茸茸的粉色身体透着天真与温柔");
+    expect(parsed.fields).toHaveLength(8);
+    expect(parsed.fields.map((f) => f.label)).toContain("性格与行为倾向");
+    expect(parsed.fields.map((f) => f.label)).toContain("服饰与配饰");
   });
 
   it("规范化保持幂等", () => {
@@ -454,20 +481,23 @@ describe("parseCharacterDescription", () => {
     expect(normalizeCharacterDescription(normalized)).toBe(normalized);
   });
 
-  it("旧版一句话描述（单行无前缀）：fields 为空 → 调用方整段兜底", () => {
+  it("旧版一句话描述（单行无前缀）：整段作为简介，fields 为空", () => {
     const parsed = parseCharacterDescription("一只安详入睡的小兔子，怀里抱着胡萝卜。");
-    expect(parsed.summary).toBeUndefined();
+    expect(parsed.summary).toBe("一只安详入睡的小兔子，怀里抱着胡萝卜。");
     expect(parsed.fields).toHaveLength(0);
   });
 
-  it("中间出现无前缀行：fields 为空（不半解析）", () => {
+  it("字段后出现无前缀行：续接到上一字段值（模型偶发换行，不丢信息）", () => {
     const parsed = parseCharacterDescription("物种：小白兔\n这是一句没有前缀的说明文字。\n身份：主角");
-    expect(parsed.fields).toHaveLength(0);
+    expect(parsed.fields).toEqual([
+      { label: "物种", value: "小白兔 这是一句没有前缀的说明文字。" },
+      { label: "身份", value: "主角" },
+    ]);
   });
 
-  it("前缀超长（>6 字）视为自由文本，fields 为空", () => {
-    const parsed = parseCharacterDescription("这是一个超长前缀不止六字：内容\n物种：兔");
-    expect(parsed.fields).toHaveLength(0);
+  it("标签长度上限放宽到 24 字（真实标签如「前景、中景、背景与空间层次」需容纳）", () => {
+    const parsed = parseCharacterDescription("这是一个较长的标签名称：内容\n物种：兔");
+    expect(parsed.fields[0]).toEqual({ label: "这是一个较长的标签名称", value: "内容" });
   });
 
   it("空文本：fields 为空", () => {

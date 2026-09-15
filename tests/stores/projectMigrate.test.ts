@@ -242,7 +242,9 @@ describe("migratePersistedState：v13 → v14（视觉方向与风格资产结�
     const assets = (migrated.projects as Array<Record<string, unknown>>)[0].assets as Array<Record<string, unknown>>;
 
     expect(assets[0].details).toMatchObject({ kind: "style", mediumMaterial: "水彩插画" });
-    expect(assets[1].details).toBeUndefined();
+    // v14 只物化 style 资产、不动其他；但 v15→v16 会用描述补全缺失的 details，
+    // 故非 style 资产的 details 到此已由描述派生（不再是 undefined）。
+    expect(assets[1].details).toMatchObject({ kind: "scene" });
     expect(assets[2].details).toEqual({ kind: "style", mediumMaterial: "keep" });
   });
 

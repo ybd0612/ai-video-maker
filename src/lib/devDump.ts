@@ -99,7 +99,8 @@ export async function dumpExtractLog(payload: {
   usage?: { promptTokens?: number; completionTokens?: number };
 }): Promise<void> {
   // 统一进日志流：面板可见 + 落进 runtime.log（与 extract-logs/ 文件同步取证）
-  logger.warn("llm", "logmsg.extractRawResponse", {
+  // 正常取证信息（每次提取都记录），用 debug 级避免污染用户可见的「警告」
+  logger.debug("llm", "logmsg.extractRawResponse", {
     ideaChars: payload.idea.length,
     raw: payload.raw,
     ...payload.usage,

@@ -14,6 +14,8 @@ import {
   AssetInstructionRow,
   AssetNameField,
   AssetPreviewColumn,
+  AssetPromptBlock,
+  AssetSummaryBlock,
 } from "./AssetEditorTemplate";
 
 interface VisualDirectionEditorProps {
@@ -147,6 +149,8 @@ export function VisualDirectionEditor({ onClose, onGenerate, generating = false 
   }
 
   const referenceUrl = getStyleReferenceUrl(project);
+  // 视觉方向的英文风格提示词挂在 style 资产上（由 AI 派生，供风格图与各资产继承）
+  const stylePrompt = project?.assets.find((asset) => asset.type === "style")?.prompt ?? "";
   return (
     <AssetDetailShell
       title={t("wizard.editVisualDirection")}
@@ -195,6 +199,12 @@ export function VisualDirectionEditor({ onClose, onGenerate, generating = false 
         onChange={(name) => setDraft({ ...draft, name })}
         disabled={busy}
       />
+      {/* 一句话简介：直接取自视觉方向的 description（本身就是一句话） */}
+      <AssetSummaryBlock
+        label={t("assetEditor.summary")}
+        summary={draft.description ?? ""}
+        emptyHint={t("assetEditor.summaryEmpty")}
+      />
       <AssetDetailsBlock
         label={t("wizard.visualDirectionContent")}
         fields={DETAIL_FIELDS.map((key) => ({
@@ -203,6 +213,13 @@ export function VisualDirectionEditor({ onClose, onGenerate, generating = false 
         }))}
         emptyHint={t("assetEditor.detailsEmpty")}
         labelWidth="w-16"
+      />
+      {/* 英文风格提示词：由 AI 派生并用于生成风格参考图，只读展示 */}
+      <AssetPromptBlock
+        label={t("assetEditor.prompt")}
+        prompt={stylePrompt}
+        emptyHint={t("assetEditor.promptEmpty")}
+        hint={t("assetEditor.promptHint")}
       />
       <AssetInstructionRow
         instruction={instruction}

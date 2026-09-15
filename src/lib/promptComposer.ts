@@ -11,6 +11,7 @@
 // ────────────────────────────────────────────────────────────────────────────
 
 import type { Asset, Project, Shot } from "@/stores/projectStore";
+import { CHARACTER_FIELD_ALIASES, splitAssetDescription } from "@/lib/assetDetails";
 
 /** 多图合成中参考图的角色语义 */
 export type ReferenceRole = "scene" | "character" | "product" | "prop" | "style";
@@ -306,42 +307,39 @@ export interface ParsedCharacterDescription {
 
 /**
  * 解析角色描述：
- * - 「要素名：内容」行 → fields（中英文冒号均可，前缀 1-6 字）
- * - 首行若不含前缀且后随要素行 → 识别为一句话总述（summary）
- * - 含任何无法归类的行，或整体不是"总述+要素行"结构 → fields 为空，
- *   调用方整段展示原始文本（兼容旧版一句话描述，不半解析）。
+ * - 「要素名：内容」行 → fields（中英文冒号均可）
+ * - 首行（字段出现前）不含前缀 → 识别为一句话总述（summary）
+ * - 自由文本（无任何字段行）→ 整段作为 summary，fields 为空（调用方整段展示）
+ *
+ * ⚠️ 2026-09-15 修复：原实现硬编码 8 个旧标签、且限制标签长度 1-6 字符，
+ * 模型改用新措辞（如「性格与行为倾向」7 字）后整段解析直接放弃、连 summary 也丢，
+ * 表现为"角色的一句话简介为空、完整设定里混着简介"。现改为结构驱动解析（见
+ * assetDetails.splitAssetDescription），标签叫什么都能拆。
  */
-const CHARACTER_FIELDS = [
-  "物种",
-  "身份",
-  "年龄",
-  "性格",
-  "外貌",
-  "服饰",
-  "记忆点",
-  "背景",
-] as const;
-
-const CHARACTER_FIELD_PATTERN = /(?:^|[。；;])\s*(物种|身份|年龄|性格|外貌|服饰|记忆点|背景)[：:]\s*/g;
+/** 单行压缩描述的标签识别：按角色字段别名表构建，模型换措辞同样可识别。
+ *  别名均为中英文文字，不含正则元字符，故直接拼接即可。 */
+const CHARACTER_FIELD_PATTERN = new RegExp(
+  "(?:^|[。；;\\n])\\s*(?:" + CHARACTER_FIELD_ALIASES.join("|") + ")[：:]\\s*",
+  "g",
+);
 
 /**
- * 将模型偶尔压成单行、用句号/分号连接的角色描述恢复为规范 9 行格式。
- * 已经是换行格式或无法识别为完整 8 要素时保持原文，避免破坏自由文本。
+ * 将模型偶尔压成单行、用句号/分号连接的角色描述恢复为规范换行格式。
+ * 识别门槛：至少命中 6 个已知角色字段标签，否则视为自由文本保持原文。
  */
 export function normalizeCharacterDescription(description: string): string {
   const original = description.trim();
   if (!original || /\r?\n/.test(original)) return original;
 
   const matches = [...original.matchAll(CHARACTER_FIELD_PATTERN)];
-  if (matches.length === 0) return original;
+  if (matches.length < 6) return original;
 
-  // 已是规范换行时，换行属于字段边界，不应留在上一个字段值中。
   const firstFieldStart = matches[0].index ?? -1;
   const summary = original.slice(0, firstFieldStart).trim().replace(/[。；;]\s*$/, "");
   if (!summary || /[：:]/.test(summary)) return original;
 
   const fields = matches.map((match, index) => {
-    const label = match[1];
+    const label = match[0].trim().replace(/^[。；;]\s*/, "").replace(/[：:]\s*$/, "");
     const valueStart = (match.index ?? 0) + match[0].length;
     const nextStart = index + 1 < matches.length
       ? (matches[index + 1].index ?? original.length)
@@ -349,44 +347,16 @@ export function normalizeCharacterDescription(description: string): string {
     return `${label}：${original.slice(valueStart, nextStart).trim().replace(/[。；;]\s*$/, "")}`;
   });
 
-  const labels = fields.map((field) => field.slice(0, field.indexOf("：")));
-  const isComplete =
-    matches.length === CHARACTER_FIELDS.length &&
-    labels.every((label, index) => label === CHARACTER_FIELDS[index]) &&
-    fields.every((field) => field.includes("：") && field.slice(field.indexOf("：") + 1).trim());
-  if (!isComplete) return original;
-
+  if (!fields.every((field) => field.slice(field.indexOf("：") + 1).trim())) return original;
   return [summary, ...fields].filter(Boolean).join("\n");
 }
 
 export function parseCharacterDescription(description: string): ParsedCharacterDescription {
-  const normalized = normalizeCharacterDescription(description);
-  const lines = normalized
-    .split(/\r?\n/)
-    .map((l) => l.trim())
-    .filter(Boolean);
-
-  const fields: Array<{ label: string; value: string }> = [];
-  let summary: string | undefined;
-
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
-    const m = line.match(/^([^：:]{1,6})[：:]\s*(.+)$/);
-    if (m) {
-      if (!CHARACTER_FIELDS.includes(m[1] as (typeof CHARACTER_FIELDS)[number])) {
-        return { fields: [] };
-      }
-      fields.push({ label: m[1], value: m[2].trim() });
-      continue;
-    }
-    // 无前缀行：仅首行（不含冒号、且后面还有要素行）可作总述；否则视为自由文本 → 兜底
-    if (i === 0 && lines.length > 1 && !/[：:]/.test(line)) {
-      summary = line;
-      continue;
-    }
-    return { fields: [] };
-  }
-
-  if (fields.length === 0) return { fields: [] };
-  return { summary, fields };
+  // 先做单行压缩 → 换行的规范化，再按结构拆分；否则"一句话。物种：兔。…"整行
+  // 会被当成一个超长标签的字段。
+  const parts = splitAssetDescription(normalizeCharacterDescription(description));
+  return {
+    summary: parts.summary || undefined,
+    fields: parts.fields,
+  };
 }

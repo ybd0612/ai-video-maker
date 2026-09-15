@@ -8,7 +8,7 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 // 仅类型导入（verbatimModuleSyntax 下运行时零依赖，无循环加载风险）
 import { normalizeCharacterDescription } from "@/lib/promptComposer";
-import { normalizeAssetDetails } from "@/lib/assetDetails";
+import { normalizeAssetDetails, repairAssetDetails } from "@/lib/assetDetails";
 
 /* ── Status enums ───────────────────────────────────────────────────────── */
 
@@ -912,6 +912,24 @@ export function migratePersistedState(
     if ("history" in withHistory) delete withHistory.history;
   }
 
+  // Migrate from v15 to v16: 用结构驱动的解析重算资产 details。
+  // 旧实现按硬编码短标签正则取值，模型改用长标签后出现两类脏数据：
+  //   ① 值被前缀污染（personality = "与行为倾向：贪玩…"）；
+  //   ② 模型返回的 details 因缺 kind 被整份丢弃 → 视觉方向等设定全空。
+  // 修复只补空与纠正污染值，不覆盖看起来正常的既有值。幂等。
+  if (version < 16) {
+    const projects = (state as { projects?: Array<{ assets?: Asset[] } | null> }).projects;
+    if (Array.isArray(projects)) {
+      for (const project of projects) {
+        // 历史持久化数据可能是坏结构（null / 非对象），一律跳过而非抛错
+        if (!project || typeof project !== "object") continue;
+        if (Array.isArray(project.assets)) {
+          project.assets = project.assets.map(repairAssetDetails);
+        }
+      }
+    }
+  }
+
   return state;
 }
 
@@ -1528,7 +1546,7 @@ export const useProjectStore = create<ProjectState>()(
     }),
     {
       name: "wxhb-project",
-      version: 15,
+      version: 16,
       // 迁移主体提取为导出纯函数 migratePersistedState（见文件上方），便于单测
       migrate: (persisted: unknown, version: number) =>
         migratePersistedState(persisted, version),
