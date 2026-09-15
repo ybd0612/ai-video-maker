@@ -12,10 +12,9 @@ import {
 } from "@/stores/projectStore";
 import { useSettingsStore } from "@/stores/settingsStore";
 import { useT } from "@/i18n";
-import {
-  UserPlus, Trash2, ImageIcon, Loader2, Plus, Wand2,
-} from "lucide-react";
+import { ImageIcon, Loader2, Wand2 } from "lucide-react";
 import { CharacterEditor } from "@/features/characters/CharacterEditor";
+import { AssetListSection } from "./AssetListSection";
 import { VisualDirectionEditor } from "./VisualDirectionEditor";
 import { AssetEditor } from "./AssetEditor";
 import { useWizardActions, hasActiveAssetTask } from "./useWizardActions";
@@ -333,288 +332,74 @@ export function StepAssets() {
         </div>
         <p className="mt-3 text-[0.6875rem] text-ink-4">{t("wizard.readinessSummary", { ready: readyAssetCount, total: totalAssetCount })}</p>
       </section>
+      {/* ── Characters（列表模板复用） ──────────────────────────────────── */}
+      <AssetListSection
+        title={t("characters.title")}
+        assets={characters}
+        emptyHint={t("wizard.noAssetsHint")}
+        addLabel={t("characters.add")}
+        addIcon="userPlus"
+        onAdd={handleAdd}
+        onOpen={handleEdit}
+        onDelete={handleDelete}
+        deleteLabel={t("characters.delete")}
+        imageOf={(a) => a.imageUrl || a.avatarUrl}
+        unnamedLabel="?"
+        summaryOf={(a) => (a.description || a.appearancePrompt || "—").split("\n")[0]}
+        errorOf={(a) => a.error}
+      />
 
-      {/* ── Characters section ────────────────────────────────────────── */}
-      <section className="flex flex-col gap-3">
-        <div className="flex items-center justify-between">
-          <h3 className="text-sm font-semibold text-ink-2">
-            {t("characters.title")} ({characters.length})
-          </h3>
-        </div>
+      {/* ── Scene references ──────────────────────────────────────────── */}
+      <AssetListSection
+        title={t("wizard.sceneReferences")}
+        hint={t("wizard.sceneReferencesHint")}
+        assets={sceneReferences}
+        emptyHint={t("wizard.noAssetsHint")}
+        addLabel={t("wizard.addScene")}
+        onAdd={handleAddScene}
+        onOpen={setEditingAsset}
+        onDelete={handleDeleteAsset}
+        deleteLabel={t("assetEditor.delete")}
+        imageOf={(a) => a.imageUrl}
+        unnamedLabel={t("assetEditor.unnamedScene")}
+        summaryOf={(a) => (a.description || a.prompt || "—").split("\n")[0]}
+        errorOf={(a) => a.error}
+      />
 
-        {characters.length > 0 ? (
-          <div className="grid gap-3 md:grid-cols-2">
-            {characters.map((char) => (
-              <div
-                key={char.id}
-                role="button"
-                tabIndex={0}
-                onClick={() => handleEdit(char)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" || e.key === " ") {
-                    e.preventDefault();
-                    handleEdit(char);
-                  }
-                }}
-                title={t("characters.edit")}
-                className="group relative flex cursor-pointer items-center gap-3 overflow-hidden rounded-xl border border-line bg-raised/50 p-2.5 transition hover:border-line-strong focus:border-success focus:outline-none"
-              >
-                <div className="relative flex h-16 w-24 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-line bg-app">
-                  {(char.imageUrl || char.avatarUrl) ? (
-                    <Lightbox src={char.imageUrl || char.avatarUrl} alt={char.name}>
-                      <img
-                        src={char.imageUrl || char.avatarUrl}
-                        alt={char.name}
-                        className="h-full w-full object-contain"
-                      />
-                    </Lightbox>
-                  ) : (
-                    <div className="flex h-full w-full items-center justify-center text-sm text-ink-4">
-                      {char.name.charAt(0).toUpperCase()}
-                    </div>
-                  )}
-                </div>
-                <div className="min-w-0 flex-1 py-1 pr-1">
-                  <p className="text-sm font-medium text-ink">{char.name}</p>
-                  <p className="mt-0.5 text-xs text-ink-4 line-clamp-2">
-                    {(char.description || char.appearancePrompt || "—").split("\n")[0]}
-                  </p>
-                  {char.error && (
-                    <p className="mt-0.5 truncate text-[0.625rem] text-danger" title={char.error}>
-                      {t("assetEditor.generateFailedWith", { message: char.error })}
-                    </p>
-                  )}
-                </div>
-                <div className="absolute right-2 top-2 flex shrink-0 gap-1 opacity-0 transition group-hover:opacity-100">
-                  <button
-                    onClick={(e) => {
-                      // 阻止冒泡，避免点删除时同时触发卡片的「进入编辑」
-                      e.stopPropagation();
-                      handleDelete(char);
-                    }}
-                    className="rounded p-1.5 text-ink-4 hover:bg-danger-deep hover:text-danger"
-                    title={t("characters.delete")}
-                  >
-                    <Trash2 size={12} />
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div className="flex flex-col items-center gap-3 py-4 text-center">
-            <ImageIcon size={24} className="text-ink-5" />
-            <p className="text-xs text-ink-5">{t("wizard.noAssetsHint")}</p>
-          </div>
-        )}
+      {/* ── Product references（产品主体一致性锚点） ────────────────────── */}
+      <AssetListSection
+        title={t("wizard.productReferences")}
+        hint={t("wizard.productReferencesHint")}
+        assets={products}
+        emptyHint={t("wizard.noAssetsHint")}
+        addLabel={t("wizard.addProduct")}
+        onAdd={handleAddProduct}
+        onOpen={setEditingAsset}
+        onDelete={handleDeleteAsset}
+        deleteLabel={t("assetEditor.delete")}
+        imageOf={(a) => a.imageUrl}
+        unnamedLabel={t("assetEditor.unnamedProduct")}
+        summaryOf={(a) => (a.description || a.prompt || "—").split("\n")[0]}
+        errorOf={(a) => a.error}
+      />
 
-        <button
-          onClick={handleAdd}
-          className="flex items-center justify-center gap-2 rounded-xl border border-dashed border-line-strong bg-raised/30 px-4 py-2.5 text-xs text-ink-3 transition hover:border-success hover:text-success"
-        >
-          <UserPlus size={14} />
-          {t("characters.add")}
-        </button>
-      </section>
+      {/* ── Props / key objects ─────────────────────────────────────────── */}
+      <AssetListSection
+        title={t("wizard.propReferences")}
+        hint={t("wizard.propReferencesHint")}
+        assets={props}
+        emptyHint={t("wizard.noAssetsHint")}
+        addLabel={t("wizard.addProp")}
+        onAdd={handleAddProp}
+        onOpen={setEditingAsset}
+        onDelete={handleDeleteAsset}
+        deleteLabel={t("assetEditor.delete")}
+        imageOf={(a) => a.imageUrl}
+        unnamedLabel={t("assetEditor.unnamedProp")}
+        summaryOf={(a) => (a.description || a.prompt || "—").split("\n")[0]}
+        errorOf={(a) => a.error}
+      />
 
-      {/* ── Scene references section ──────────────────────────────────── */}
-      <section className="flex flex-col gap-3">
-        <div className="flex items-center justify-between">
-          <div>
-            <h3 className="text-sm font-semibold text-ink-2">
-              {t("wizard.sceneReferences")} ({sceneReferences.length})
-            </h3>
-            <p className="text-[0.6875rem] text-ink-5 mt-0.5">
-              {t("wizard.sceneReferencesHint")}
-            </p>
-          </div>
-        </div>
-
-        <div className="grid gap-3 md:grid-cols-2">
-          {sceneReferences.map((scene) => (
-          <div
-            key={scene.id}
-            role="button"
-            tabIndex={0}
-            onClick={() => setEditingAsset(scene)}
-            onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setEditingAsset(scene); } }}
-            className="group relative flex cursor-pointer items-center gap-3 overflow-hidden rounded-xl border border-line bg-raised/50 p-2.5 transition hover:border-line-strong focus:border-accent focus:outline-none"
-          >
-            {/* Scene image preview（点击放大查看） */}
-            <div className="relative flex h-16 w-24 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-line bg-app" onClick={(e) => e.stopPropagation()}>
-              {scene.imageUrl ? (
-                <Lightbox src={scene.imageUrl} alt={scene.name}>
-                  <img
-                    src={scene.imageUrl}
-                    alt={scene.name}
-                    className="h-full w-full object-contain"
-                  />
-                </Lightbox>
-              ) : (
-                <div className="flex h-full w-full items-center justify-center text-ink-5">
-                  <ImageIcon size={16} />
-                </div>
-              )}
-            </div>
-
-            <div className="min-w-0 flex-1 py-1 pr-1">
-              <p className="text-sm font-medium text-ink">{scene.name || t("assetEditor.unnamedScene")}</p>
-              <p className="mt-0.5 line-clamp-2 text-xs text-ink-4">{(scene.description || scene.prompt || "—").split("\n")[0]}</p>
-              {scene.error && <p className="mt-0.5 truncate text-[0.625rem] text-danger" title={scene.error}>{t("assetEditor.generateFailedWith", { message: scene.error })}</p>}
-            </div>
-
-            {/* Actions */}
-            <div className="absolute right-2 top-2 flex shrink-0 flex-col gap-1 opacity-0 transition group-hover:opacity-100" onClick={(e) => e.stopPropagation()}>
-              <button
-                onClick={() => void handleDeleteAsset(scene)}
-                className="rounded p-1.5 text-ink-4 hover:bg-danger-deep hover:text-danger"
-                title={t("assetEditor.delete")}
-              >
-                <Trash2 size={12} />
-              </button>
-            </div>
-          </div>
-          ))}
-        </div>
-
-        <button
-          onClick={handleAddScene}
-          className="flex items-center justify-center gap-2 rounded-xl border border-dashed border-line-strong bg-raised/30 px-4 py-2.5 text-xs text-ink-3 transition hover:border-success hover:text-success"
-        >
-          <Plus size={14} />
-          {t("wizard.addScene")}
-        </button>
-      </section>
-
-      {/* ── Product references section（产品主体一致性锚点） ─────────────── */}
-      <section className="flex flex-col gap-3">
-        <div className="flex items-center justify-between">
-          <div>
-            <h3 className="text-sm font-semibold text-ink-2">
-              {t("wizard.productReferences")} ({products.length})
-            </h3>
-            <p className="text-[0.6875rem] text-ink-5 mt-0.5">
-              {t("wizard.productReferencesHint")}
-            </p>
-          </div>
-        </div>
-
-        <div className="grid gap-3 md:grid-cols-2">
-          {products.map((product) => (
-          <div
-            key={product.id}
-            role="button"
-            tabIndex={0}
-            onClick={() => setEditingAsset(product)}
-            onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setEditingAsset(product); } }}
-            className="group relative flex cursor-pointer items-center gap-3 overflow-hidden rounded-xl border border-line bg-raised/50 p-2.5 transition hover:border-line-strong focus:border-accent focus:outline-none"
-          >
-            {/* Product image preview（点击放大查看） */}
-            <div className="relative flex h-16 w-24 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-line bg-app" onClick={(e) => e.stopPropagation()}>
-              {product.imageUrl ? (
-                <Lightbox src={product.imageUrl} alt={product.name}>
-                  <img
-                    src={product.imageUrl}
-                    alt={product.name}
-                    className="h-full w-full object-contain"
-                  />
-                </Lightbox>
-              ) : (
-                <div className="flex h-full w-full items-center justify-center text-ink-5">
-                  <ImageIcon size={16} />
-                </div>
-              )}
-            </div>
-
-            <div className="min-w-0 flex-1 py-1 pr-1">
-              <p className="text-sm font-medium text-ink">{product.name || t("assetEditor.unnamedProduct")}</p>
-              <p className="mt-0.5 line-clamp-2 text-xs text-ink-4">{(product.description || product.prompt || "—").split("\n")[0]}</p>
-              {product.error && <p className="mt-0.5 truncate text-[0.625rem] text-danger" title={product.error}>{t("assetEditor.generateFailedWith", { message: product.error })}</p>}
-            </div>
-
-            {/* Actions */}
-            <div className="absolute right-2 top-2 flex shrink-0 flex-col gap-1 opacity-0 transition group-hover:opacity-100" onClick={(e) => e.stopPropagation()}>
-              <button
-                onClick={() => void handleDeleteAsset(product)}
-                className="rounded p-1.5 text-ink-4 hover:bg-danger-deep hover:text-danger"
-                title={t("assetEditor.delete")}
-              >
-                <Trash2 size={12} />
-              </button>
-            </div>
-          </div>
-          ))}
-        </div>
-
-        <button
-          onClick={handleAddProduct}
-          className="flex items-center justify-center gap-2 rounded-xl border border-dashed border-line-strong bg-raised/30 px-4 py-2.5 text-xs text-ink-3 transition hover:border-success hover:text-success"
-        >
-          <Plus size={14} />
-          {t("wizard.addProduct")}
-        </button>
-      </section>
-
-      {/* ── Props / key objects section ─────────────────────────────────── */}
-      <section className="flex flex-col gap-3">
-        <div className="flex items-center justify-between">
-          <div>
-            <h3 className="text-sm font-semibold text-ink-2">
-              {t("wizard.propReferences")} ({props.length})
-            </h3>
-            <p className="mt-0.5 text-[0.6875rem] text-ink-5">
-              {t("wizard.propReferencesHint")}
-            </p>
-          </div>
-        </div>
-
-        <div className="grid gap-3 md:grid-cols-2">
-          {props.map((prop) => (
-          <div
-            key={prop.id}
-            role="button"
-            tabIndex={0}
-            onClick={() => setEditingAsset(prop)}
-            onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setEditingAsset(prop); } }}
-            className="group relative flex cursor-pointer items-center gap-3 overflow-hidden rounded-xl border border-line bg-raised/50 p-2.5 transition hover:border-line-strong focus:border-accent focus:outline-none"
-          >
-            <div className="relative flex h-16 w-24 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-line bg-app" onClick={(e) => e.stopPropagation()}>
-              {prop.imageUrl ? (
-                <Lightbox src={prop.imageUrl} alt={prop.name}>
-                  <img src={prop.imageUrl} alt={prop.name} className="h-full w-full object-contain" />
-                </Lightbox>
-              ) : (
-                <div className="flex h-full w-full items-center justify-center text-ink-5">
-                  <ImageIcon size={16} />
-                </div>
-              )}
-            </div>
-            <div className="min-w-0 flex-1 py-1 pr-1">
-              <p className="text-sm font-medium text-ink">{prop.name || t("assetEditor.unnamedProp")}</p>
-              <p className="mt-0.5 line-clamp-2 text-xs text-ink-4">{(prop.description || prop.prompt || "—").split("\n")[0]}</p>
-              {prop.error && <p className="mt-0.5 truncate text-[0.625rem] text-danger" title={prop.error}>{t("assetEditor.generateFailedWith", { message: prop.error })}</p>}
-            </div>
-            <div className="absolute right-2 top-2 flex shrink-0 flex-col gap-1 opacity-0 transition group-hover:opacity-100" onClick={(e) => e.stopPropagation()}>
-              <button
-                onClick={() => void handleDeleteAsset(prop)}
-                className="rounded p-1.5 text-ink-4 hover:bg-danger-deep hover:text-danger"
-                title={t("assetEditor.delete")}
-              >
-                <Trash2 size={12} />
-              </button>
-            </div>
-          </div>
-          ))}
-        </div>
-
-        <button
-          onClick={handleAddProp}
-          className="flex items-center justify-center gap-2 rounded-xl border border-dashed border-line-strong bg-raised/30 px-4 py-2.5 text-xs text-ink-3 transition hover:border-success hover:text-success"
-        >
-          <Plus size={14} />
-          {t("wizard.addProp")}
-        </button>
-      </section>
 
 
       {/* ── Asset review gate ──────────────────────────────────────────── */}
