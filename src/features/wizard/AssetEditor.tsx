@@ -5,7 +5,7 @@ import { useSettingsStore } from "@/stores/settingsStore";
 import { useT, type TranslationKey } from "@/i18n";
 import { chatCompletion } from "@/services/chatService";
 import { SYSTEM_PROMPT_ASSET_EDIT_ZH } from "@/lib/promptRules";
-import { createDefaultAssetDetails, extractAssetSummary } from "@/lib/assetDetails";
+import { createDefaultAssetDetails, detailEntries, extractAssetSummary } from "@/lib/assetDetails";
 import type { AssetDetails } from "@/stores/projectStore";
 import {
   AssetDetailShell,
@@ -52,11 +52,6 @@ function parseAsset(content: string, fallbackDetails: AssetDetails | undefined):
   } catch {
     return null;
   }
-}
-
-function detailEntries(details: AssetDetails | undefined): Array<[string, string]> {
-  if (!details) return [];
-  return Object.entries(details).filter(([key]) => key !== "kind") as Array<[string, string]>;
 }
 
 export function AssetEditor({ asset, onClose, onGenerate, generating }: AssetEditorProps) {
