@@ -14,6 +14,7 @@ import { extractJsonFromResponse, parseJsonFromResponse } from "@/lib/jsonRespon
 import { getTranslation } from "@/i18n";
 import { resolveGenerationParams } from "@/lib/generationParams";
 import { composeAssetDescription } from "@/lib/assetDetails";
+import { toIdRef, toIdRefList } from "@/lib/shotReferences";
 import type { AuditOutcome } from "@/lib/refineContent";
 
 interface GenerateScriptOptions {
@@ -26,16 +27,16 @@ interface GenerateScriptOptions {
   assets?: Asset[];
 }
 
-interface RawShot {
+export interface RawShot {
   scriptText: string;
   visualPrompt: string;
   motionPrompt: string;
   duration: number;
   dialogues?: Array<{ characterId: string | null; text: string; delivery?: string }>;
-  activeCharacterIds?: string[];
-  activeSceneId?: string;
-  activeProductIds?: string[];
-  activePropIds?: string[];
+  activeCharacterIds?: unknown;
+  activeSceneId?: unknown;
+  activeProductIds?: unknown;
+  activePropIds?: unknown;
   sceneDesc?: string;
   detailDesc?: string;
   lightingDesc?: string;
@@ -293,23 +294,23 @@ export async function generateStoryboardOutline(
   };
 }
 
-/** 单镜头输出归一化：字段补默认 + 空 prompt 兜底（跨阶段共享） */
+/** 单镜头输出归一化：字段补默认、引用容错 + 空 prompt 兜底（跨阶段共享） */
 function normalizeRawShot(s: RawShot): RawShot {
+  const dialogues = Array.isArray(s.dialogues) ? s.dialogues : [];
   const shot: RawShot = {
     ...s,
-    scriptText: s.scriptText ?? "",
-    visualPrompt: s.visualPrompt ?? "",
-    motionPrompt: s.motionPrompt ?? "",
-    dialogues: (s.dialogues ?? []).map((d) => ({
-      id: `dlg_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
-      characterId: d.characterId ?? null,
-      text: d.text ?? "",
-      delivery: d.delivery,
+    scriptText: typeof s.scriptText === "string" ? s.scriptText : "",
+    visualPrompt: typeof s.visualPrompt === "string" ? s.visualPrompt : "",
+    motionPrompt: typeof s.motionPrompt === "string" ? s.motionPrompt : "",
+    dialogues: dialogues.map((d) => ({
+      characterId: toIdRef(d.characterId) ?? null,
+      text: typeof d.text === "string" ? d.text : "",
+      delivery: typeof d.delivery === "string" ? d.delivery : undefined,
     })),
-    activeCharacterIds: s.activeCharacterIds ?? [],
-    activeSceneId: s.activeSceneId,
-    activeProductIds: s.activeProductIds ?? [],
-    activePropIds: s.activePropIds ?? [],
+    activeCharacterIds: toIdRefList(s.activeCharacterIds),
+    activeSceneId: toIdRefList(s.activeSceneId)[0],
+    activeProductIds: toIdRefList(s.activeProductIds),
+    activePropIds: toIdRefList(s.activePropIds),
     sceneDesc: s.sceneDesc ?? "",
     detailDesc: s.detailDesc ?? "",
     lightingDesc: s.lightingDesc ?? "",

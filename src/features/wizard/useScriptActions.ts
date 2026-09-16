@@ -3,8 +3,6 @@ import { confirmDialog } from "@/components/ui/ConfirmDialog";
 import {
   useProjectStore,
   selectActiveProject,
-  type Asset,
-  type AssetType,
   type Shot,
   type VisualDirection,
 } from "@/stores/projectStore";
@@ -25,6 +23,7 @@ import { refineWithAudit } from "@/lib/refineContent";
 import { beginTrace } from "@/lib/logger";
 import { hasActiveTask, runWithConcurrency } from "@/lib/batchRunner";
 import { pickShotFields } from "@/lib/shotFields";
+import { resolveAssetId, resolveAssetIds } from "@/lib/shotReferences";
 import { restoreProjectStatusIfReady, resetStuckShots } from "./wizardActionUtils";
 
 /** 视觉方向自检轮数上限（2026-09-15 由 2 → 1：审计+重写已合一，第 2 轮边际收益低于 ~40s 耗时）。 */
@@ -66,20 +65,6 @@ export function useScriptActions(
   ) => Promise<void>,
 ): ScriptActions {
   const t = useT();
-
-  const resolveAssetId = (ref: string | undefined, assets: Asset[], type: AssetType): string | undefined => {
-    if (!ref?.trim()) return undefined;
-    const candidates = assets.filter((asset) => asset.type === type);
-    const direct = candidates.find((asset) => asset.id === ref);
-    if (direct) return direct.id;
-    const normalized = ref.trim().toLocaleLowerCase();
-    return candidates.find((asset) => asset.name.trim().toLocaleLowerCase() === normalized)?.id;
-  };
-
-  const resolveAssetIds = (refs: string[], assets: Asset[], type: AssetType): string[] =>
-    refs
-      .map((ref) => resolveAssetId(ref, assets, type))
-      .filter((id): id is string => !!id);
 
   /**
    * Step 1→2: Extract characters from idea, advance to assets step.
@@ -330,26 +315,25 @@ export function useScriptActions(
             index: i,
             total: placeholderShots.length,
           });
-          // 名字/引用 → 资产 ID 解析（用最新 assets，含大纲补建的新资产）
+          // 名字/引用 → 资产 ID 解析（用最新 assets，含大纲补建的新资产）。
+          // 引用未命中只降级为空，不得阻断已成功生成的镜头内容写回。
           const latestAssets = useProjectStore.getState().projects.find((p) => p.id === targetProjectId)?.assets ?? [];
-          const resolvedDialogues = (raw.dialogues ?? []).map((d) => ({
+          const resolvedDialogues = (Array.isArray(raw.dialogues) ? raw.dialogues : []).map((d) => ({
             id: `dlg_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
-            characterId: d.characterId ? resolveAssetId(d.characterId, latestAssets, "character") ?? null : null,
+            characterId: resolveAssetId(d.characterId, latestAssets, "character") ?? null,
             text: d.text ?? "",
             delivery: d.delivery,
           }));
+          const activeCharacterIds = resolveAssetIds(raw.activeCharacterIds, latestAssets, "character");
+          const activeSceneId = resolveAssetId(raw.activeSceneId, latestAssets, "scene");
+          const activeProductIds = resolveAssetIds(raw.activeProductIds, latestAssets, "product");
+          const activePropIds = resolveAssetIds(raw.activePropIds, latestAssets, "prop");
           useProjectStore.getState().updateShotByProjectId(targetProjectId, shot.id, {
-            ...pickShotFields({ ...raw, dialogues: resolvedDialogues, activeCharacterIds: raw.activeCharacterIds ?? [], activeProductIds: raw.activeProductIds ?? [], activePropIds: raw.activePropIds ?? [], useDualFrame: raw.useDualFrame ?? false }),
-            activeCharacterIds: (raw.activeCharacterIds ?? [])
-              .map((ref) => resolveAssetId(ref, latestAssets, "character"))
-              .filter((x): x is string => !!x),
-            activeSceneId: resolveAssetId(raw.activeSceneId, latestAssets, "scene"),
-            activeProductIds: (raw.activeProductIds ?? [])
-              .map((ref) => resolveAssetId(ref, latestAssets, "product"))
-              .filter((x): x is string => !!x),
-            activePropIds: (raw.activePropIds ?? [])
-              .map((ref) => resolveAssetId(ref, latestAssets, "prop"))
-              .filter((x): x is string => !!x),
+            ...pickShotFields({ ...raw, dialogues: resolvedDialogues, activeCharacterIds, activeProductIds, activePropIds, activeSceneId, useDualFrame: raw.useDualFrame ?? false }),
+            activeCharacterIds,
+            activeSceneId,
+            activeProductIds,
+            activePropIds,
             dialogues: resolvedDialogues,
             status: "scripted" as const,
           });
@@ -416,21 +400,23 @@ export function useScriptActions(
         variationOf: { scriptText: shot.scriptText, visualPrompt: shot.visualPrompt },
       });
 
-      const resolvedDialogues = (raw.dialogues ?? []).map((d) => ({
+      const resolvedDialogues = (Array.isArray(raw.dialogues) ? raw.dialogues : []).map((d) => ({
         id: `dlg_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
-        characterId: d.characterId ? resolveAssetId(d.characterId, project.assets, "character") ?? null : null,
+        characterId: resolveAssetId(d.characterId, project.assets, "character") ?? null,
         text: d.text ?? "",
         delivery: d.delivery,
       }));
+      const activeCharacterIds = resolveAssetIds(raw.activeCharacterIds, project.assets, "character");
+      const activeSceneId = resolveAssetId(raw.activeSceneId, project.assets, "scene");
+      const activeProductIds = resolveAssetIds(raw.activeProductIds, project.assets, "product");
+      const activePropIds = resolveAssetIds(raw.activePropIds, project.assets, "prop");
       useProjectStore.getState().updateShotByProjectId(targetProjectId, shotId, {
-        ...pickShotFields({ ...raw, dialogues: resolvedDialogues, activeCharacterIds: raw.activeCharacterIds ?? [], activeProductIds: raw.activeProductIds ?? [], activePropIds: raw.activePropIds ?? [], useDualFrame: raw.useDualFrame ?? false }),
-        activeSceneId: resolveAssetId(raw.activeSceneId, project.assets, "scene"),
-        activeProductIds: resolveAssetIds(raw.activeProductIds ?? [], project.assets, "product"),
-        activePropIds: resolveAssetIds(raw.activePropIds ?? [], project.assets, "prop"),
+        ...pickShotFields({ ...raw, dialogues: resolvedDialogues, activeCharacterIds, activeProductIds, activePropIds, activeSceneId, useDualFrame: raw.useDualFrame ?? false }),
+        activeSceneId,
+        activeProductIds,
+        activePropIds,
         dialogues: resolvedDialogues,
-        activeCharacterIds: (raw.activeCharacterIds ?? [])
-          .map((ref) => resolveAssetId(ref, project.assets, "character"))
-          .filter((x): x is string => !!x),
+        activeCharacterIds,
         status: "scripted",
         error: undefined,
       });
