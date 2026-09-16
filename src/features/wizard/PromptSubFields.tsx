@@ -1,6 +1,6 @@
 // ────────────────────────────────────────────────────────────────────────────
 // src/features/wizard/PromptSubFields.tsx
-// Structured sub-element editor for visual and motion prompts.
+// Structured review/editor for visual and motion sub-fields; full prompts remain the API SSOT.
 // 每个子字段都带框内「润色 / 撤销」（AiPolishField）。
 // ────────────────────────────────────────────────────────────────────────────
 
@@ -46,15 +46,6 @@ export function PromptSubFields({
             <Image size={11} />
             {t("wizard.sectionImage")}
           </div>
-          <PromptField
-            label={t("wizard.promptSubject")}
-            value={shot.subjectDesc ?? ""}
-            onChange={(v) => handleChange("subjectDesc", v)}
-            systemPrompt={SYSTEM_PROMPT_VISUAL_PROMPT}
-            resetKey={shotId}
-            placeholder={t("promptPh.subject")}
-            color="violet"
-          />
           <PromptField
             label={t("wizard.promptScene")}
             value={shot.sceneDesc ?? ""}

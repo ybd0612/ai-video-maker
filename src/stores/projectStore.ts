@@ -27,7 +27,7 @@ export type {
   ProjectStatus, ShotStatus, AspectRatio, WizardStep, AutomationMode,
   StyleDetails, VisualDirection, AssetType, AssetDerivation,
   CharacterDetails, SceneDetails, ProductDetails, PropDetails, AssetDetails,
-  ShotDerivation, Asset, DialogueLine, Shot, ChatTurn, Project, ProjectState,
+  Asset, DialogueLine, Shot, ChatTurn, Project, ProjectState,
 } from "./projectTypes";
 export { newId, applyShotUpdates, applyAssetUpdate } from "./projectOps";
 export { migratePersistedState } from "./projectMigrations";

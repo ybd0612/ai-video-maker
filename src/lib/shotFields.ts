@@ -28,7 +28,7 @@ export type ShotContentFields = Omit<
 >;
 
 /**
- * 从分镜中提取全部内容字段（脚本/画面/动态提示词、结构化子元素、时长、首帧、派生锁）。
+ * 从分镜中提取全部内容字段（脚本/画面/动态提示词、结构化子元素、时长、首帧）。
  * 入参为「去掉 id/index/status 的 Shot」：完整 Shot 与 generateScript 返回的
  * 新分镜（Omit<Shot, "id" | "index" | "status">）均可直接传入。
  * 不拷贝：
@@ -46,7 +46,6 @@ export function pickShotFields(
     visualPrompt: shot.visualPrompt,
     motionPrompt: shot.motionPrompt,
     duration: shot.duration,
-    subjectDesc: shot.subjectDesc,
     sceneDesc: shot.sceneDesc,
     detailDesc: shot.detailDesc,
     lightingDesc: shot.lightingDesc,
@@ -61,6 +60,5 @@ export function pickShotFields(
     activeSceneId: shot.activeSceneId,
     activeProductIds: shot.activeProductIds,
     activePropIds: shot.activePropIds,
-    derivation: shot.derivation,
   };
 }

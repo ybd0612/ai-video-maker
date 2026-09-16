@@ -24,7 +24,6 @@ function makeShot(): Shot {
     videoProgress: 42,
     videoRetryCount: 1,
     error: "some error",
-    subjectDesc: "a young woman",
     sceneDesc: "in a sunlit cafe",
     detailDesc: "white blouse",
     lightingDesc: "warm golden hour",
@@ -38,7 +37,6 @@ function makeShot(): Shot {
     firstFrameUrl: "https://img.example/first.png",
     lastFrameUrl: "https://img.example/last.png",
     useDualFrame: true,
-    derivation: { visualLocked: true, motionDirty: true },
   };
 }
 
@@ -51,7 +49,6 @@ describe("pickShotFields", () => {
     expect(picked.visualPrompt).toBe("a girl in a cafe");
     expect(picked.motionPrompt).toBe("camera slowly dollies in");
     expect(picked.duration).toBe(6);
-    expect(picked.subjectDesc).toBe("a young woman");
     expect(picked.sceneDesc).toBe("in a sunlit cafe");
     expect(picked.detailDesc).toBe("white blouse");
     expect(picked.lightingDesc).toBe("warm golden hour");
@@ -63,7 +60,6 @@ describe("pickShotFields", () => {
     expect(picked.motionSpeedDesc).toBe("slow-motion");
     expect(picked.negativeMotionPrompt).toBe("morphing");
     expect(picked.firstFrameUrl).toBe("https://img.example/first.png");
-    expect(picked.derivation).toEqual({ visualLocked: true, motionDirty: true });
   });
 
   it("身份/状态/生成产物/运行时字段不拷贝", () => {
@@ -98,8 +94,6 @@ describe("pickShotFields", () => {
     };
     const picked = pickShotFields(shot);
 
-    expect(picked.subjectDesc).toBeUndefined();
-    expect(picked.derivation).toBeUndefined();
     expect(picked.firstFrameUrl).toBeUndefined();
   });
 

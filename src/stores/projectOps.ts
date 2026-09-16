@@ -35,7 +35,6 @@ export type AssetUpdates = Partial<Omit<Asset, "id">>;
 export const VISUAL_SHOT_FIELDS = [
   "scriptText",
   "visualPrompt",
-  "subjectDesc",
   "sceneDesc",
   "detailDesc",
   "lightingDesc",

@@ -36,7 +36,6 @@ interface RawShot {
   activeSceneId?: string;
   activeProductIds?: string[];
   activePropIds?: string[];
-  subjectDesc?: string;
   sceneDesc?: string;
   detailDesc?: string;
   lightingDesc?: string;
@@ -313,7 +312,6 @@ function normalizeRawShot(s: RawShot): RawShot {
     activeSceneId: s.activeSceneId,
     activeProductIds: s.activeProductIds ?? [],
     activePropIds: s.activePropIds ?? [],
-    subjectDesc: s.subjectDesc ?? "",
     sceneDesc: s.sceneDesc ?? "",
     detailDesc: s.detailDesc ?? "",
     lightingDesc: s.lightingDesc ?? "",

@@ -13,6 +13,7 @@ import { createBatchRunner } from "@/lib/batchRunner";
 import {
   composeMultiReferencePrompt,
   composeTextToImagePrompt,
+  getStylePrompt,
   pickShotReferences,
 } from "@/lib/promptComposer";
 import { restoreProjectStatusIfReady } from "./wizardActionUtils";
@@ -49,16 +50,17 @@ function describeReferenceNote(
 
 /**
  * Compose the complete image prompt and the multi-reference list for a shot.
- * - 参考图：pickShotReferences（场景 → 角色 → 产品 → 风格，≤3 张）
+ * - 参考图：pickShotReferences（场景 → 角色 → 产品/道具，≤3 张；风格通过文本注入）
  * - 有参考图：composeMultiReferencePrompt（参考图角色说明 + 图像关系指令）
  * - 无参考图：composeTextToImagePrompt 六段式
  */
 function buildImageGenerationInput(
   shot: Shot,
-  project: { style: string; assets: Asset[]; styleReferenceUrl?: string },
+  project: { style: string; assets: Asset[] },
 ): ImageGenerationInput {
   const referenceImageUrls = pickShotReferences(shot, project);
   const subject = injectShotAssetDescriptions(composeVisualPrompt(shot), shot, project.assets);
+  const stylePrompt = getStylePrompt(project);
 
   if (referenceImageUrls.length > 0) {
     const references = referenceImageUrls.map((url, i) => ({
@@ -67,7 +69,11 @@ function buildImageGenerationInput(
       note: describeReferenceNote(url, project),
     }));
     return {
-      prompt: composeMultiReferencePrompt({ references, scene: subject }),
+      prompt: composeMultiReferencePrompt({
+        references,
+        scene: subject,
+        style: stylePrompt,
+      }),
       referenceImageUrls,
     };
   }
@@ -75,7 +81,7 @@ function buildImageGenerationInput(
   return {
     prompt: composeTextToImagePrompt({
       subject,
-      style: project.style || undefined,
+      style: (stylePrompt ?? project.style) || undefined,
       quality: "high quality, 8k",
     }),
     referenceImageUrls: [],

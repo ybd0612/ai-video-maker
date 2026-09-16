@@ -336,7 +336,7 @@ Return strict JSON in exactly this format, no other text:
 1. scriptText：该镜头的叙事脚本（含动作与情绪，语言随用户输入）
 2. visualPrompt：完整英文画面提示词——主体外观（直接沿用所给资产的英文外观描述）、动作、环境、构图与镜头；只描述该镜头
 3. motionPrompt：完整英文运动提示词——主体动作、镜头运动、环境变化
-4. 其余描述字段（sceneDesc/detailDesc/lightingDesc/styleDesc/actionDesc/cameraDesc/envChangeDesc/motionSpeedDesc/negativePrompt/negativeMotionPrompt）逐项填写
+4. 其余描述字段（sceneDesc/detailDesc/lightingDesc/styleDesc/actionDesc/cameraDesc/envChangeDesc/motionSpeedDesc/negativePrompt/negativeMotionPrompt）逐项填写；主体信息只写入 visualPrompt，不再单独生成 subjectDesc
 5. dialogues 按需给对白（characterId 用角色名），activeCharacterIds/activeSceneId 用涉及资产的原名，duration 从 4/5/8 中选
 {{assets}}
 {{#rules}}
@@ -356,7 +356,7 @@ Return strict JSON in exactly this format, no other text:
 1. scriptText: the narrative script for this shot (action and emotion, follow the user's language)
 2. visualPrompt: a complete ENGLISH image prompt — subject appearance (reuse the provided asset appearance descriptions verbatim), action, environment, composition and camera; describe only this shot
 3. motionPrompt: a complete ENGLISH motion prompt — subject motion, camera movement, environmental changes
-4. Fill every other description field (sceneDesc/detailDesc/lightingDesc/styleDesc/actionDesc/cameraDesc/envChangeDesc/motionSpeedDesc/negativePrompt/negativeMotionPrompt)
+4. Fill every other description field (sceneDesc/detailDesc/lightingDesc/styleDesc/actionDesc/cameraDesc/envChangeDesc/motionSpeedDesc/negativePrompt/negativeMotionPrompt); put subject information only in visualPrompt, with no separate subjectDesc
 5. dialogues when needed (characterId = character name); activeCharacterIds/activeSceneId use exact asset names; duration from 4/5/8
 {{assets}}
 {{#rules}}
@@ -839,8 +839,8 @@ export const BUILTIN_RULES: PromptRule[] = [
     task: "storyboardShot",
     section: "rules",
     content: {
-      zh: "- 中文子字段给用户在界面上看，用中文填写",
-      en: "- Sub-fields (subjectDesc etc.) are shown to users in their language",
+      zh: "- 画面与动态子字段给用户在界面上看，用中文填写；完整英文提示词仍是 API 的唯一来源",
+      en: "- Visual and motion sub-fields are shown to users in their language; the complete English prompts remain the API source of truth",
     },
     enabled: true,
     source: "builtin",

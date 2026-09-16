@@ -127,14 +127,6 @@ export interface PropDetails {
 
 export type AssetDetails = CharacterDetails | SceneDetails | ProductDetails | PropDetails | StyleDetails;
 
-/** 分镜派生锁定（画面/动态提示词各自独立） */
-export interface ShotDerivation {
-  visualLocked?: boolean;
-  motionLocked?: boolean;
-  visualDirty?: boolean;
-  motionDirty?: boolean;
-}
-
 export interface Asset {
   id: string;
   type: AssetType;
@@ -198,14 +190,13 @@ export interface Shot {
   videoProgress?: number;
   videoRetryCount?: number;
   error?: string;
-  // Structured sub-elements for text-to-image (optional, composed into visualPrompt)
-  subjectDesc?: string;      // Subject: "A young woman with long dark hair"
+  // Structured visual sub-fields for review and editing; visualPrompt is the API SSOT
   sceneDesc?: string;        // Scene/background: "sitting in a sunlit cafe"
   detailDesc?: string;       // Details/clothing: "wearing a white blouse"
   lightingDesc?: string;     // Lighting/color: "warm golden hour light"
   styleDesc?: string;        // Art style: "photorealistic, 8k"
   negativePrompt?: string;   // Negative prompt: "bad anatomy, extra limbs"
-  // Structured sub-elements for image-to-video (optional, composed into motionPrompt)
+  // Structured motion sub-fields for review and editing; motionPrompt is the API SSOT
   actionDesc?: string;       // Subject action: "slowly turns her head"
   cameraDesc?: string;       // Camera movement: "camera slowly dollies in"
   envChangeDesc?: string;    // Environment changes: "steam rising from cup"
@@ -215,8 +206,6 @@ export interface Shot {
   firstFrameUrl?: string;
   lastFrameUrl?: string;
   useDualFrame: boolean;
-  /** 提示词派生锁定（画面/动态各自独立，B 方案新增） */
-  derivation?: ShotDerivation;
   /** 画面/动态输入版本；用于丢弃修改发生后返回的过期异步生成结果 */
   renderRevision?: number;
 }
