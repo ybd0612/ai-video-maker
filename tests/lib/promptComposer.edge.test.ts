@@ -51,7 +51,7 @@ function styleAsset(url: string | undefined): Asset {
 /* ── pickShotReferences 边界 ─────────────────────────────────────────────── */
 
 describe("pickShotReferences 边界", () => {
-  it("场景图与风格图为同一 URL：去重后只保留一份（风格图视为已保留，不重复）", () => {
+  it("场景图与风格图同 URL 也不进入分镜参考图", () => {
     const scene = makeAsset({
       id: "scene_1",
       type: "scene",
@@ -62,11 +62,10 @@ describe("pickShotReferences 边界", () => {
     const shot = makeShot({ sceneDesc: "in the Forest" });
 
     const refs = pickShotReferences(shot, project);
-    expect(refs.filter((u) => u === STYLE_URL)).toHaveLength(1);
-    expect(refs).toEqual([STYLE_URL]);
+    expect(refs).toEqual([]);
   });
 
-  it("旧字段风格图与场景图同 URL：同样去重", () => {
+  it("旧字段风格图也不作为分镜参考图", () => {
     const scene = makeAsset({
       id: "scene_1",
       type: "scene",
@@ -75,10 +74,10 @@ describe("pickShotReferences 边界", () => {
     });
     const project = { assets: [scene], styleReferenceUrl: STYLE_URL };
     const refs = pickShotReferences(makeShot({ sceneDesc: "Forest" }), project);
-    expect(refs).toEqual([STYLE_URL]);
+    expect(refs).toEqual([]);
   });
 
-  it("sceneDesc 命中的场景无 imageUrl：回退首个有图场景", () => {
+  it("sceneDesc 命中的场景无图时仍不回退场景参考图", () => {
     const namedNoImage = makeAsset({
       id: "scene_a",
       type: "scene",
@@ -97,10 +96,7 @@ describe("pickShotReferences 边界", () => {
     };
     const shot = makeShot({ sceneDesc: "walking in the Forest" });
 
-    // 2026-09-15 决策：风格图退出参考图，回退结果只含资产形象图
-    expect(pickShotReferences(shot, project)).toEqual([
-      "http://img/beach.png",
-    ]);
+    expect(pickShotReferences(shot, project)).toEqual([]);
   });
 
   it("全部为空的退化：无场景/角色/产品/风格图 → 空数组", () => {
@@ -110,7 +106,7 @@ describe("pickShotReferences 边界", () => {
     expect(pickShotReferences(makeShot(), { assets: [], styleReferenceUrl: undefined })).toEqual([]);
   });
 
-  it("四类来源齐全：风格图退出后取前三个（场景+两角色），产品被舍弃", () => {
+  it("场景图退出后仅取显式角色，避免旧场景回退污染", () => {
     const scene = makeAsset({ id: "s", type: "scene", name: "Forest", imageUrl: "http://img/scene.png" });
     const char1 = makeAsset({ id: "c1", type: "character", name: "A", imageUrl: "http://img/c1.png" });
     const char2 = makeAsset({ id: "c2", type: "character", name: "B", imageUrl: "http://img/c2.png" });
@@ -125,8 +121,8 @@ describe("pickShotReferences 边界", () => {
     });
 
     const refs = pickShotReferences(shot, project);
-    expect(refs).toEqual(["http://img/scene.png", "http://img/c1.png", "http://img/c2.png"]);
-    expect(refs).toHaveLength(3);
+    expect(refs).toEqual(["http://img/c1.png", "http://img/c2.png"]);
+    expect(refs).toHaveLength(2);
     expect(refs).not.toContain(STYLE_URL);
   });
 

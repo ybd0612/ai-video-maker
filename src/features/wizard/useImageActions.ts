@@ -7,7 +7,6 @@ import {
 } from "@/stores/projectStore";
 import { useSettingsStore } from "@/stores/settingsStore";
 import { generateImage, aspectRatioToImageParams } from "@/services/imageService";
-import { injectShotAssetDescriptions } from "@/lib/characterUtils";
 import { composeVisualPrompt } from "@/lib/promptUtils";
 import { createBatchRunner } from "@/lib/batchRunner";
 import {
@@ -43,9 +42,9 @@ function describeReferenceNote(
 ): string {
   const asset = project.assets.find((a) => a.imageUrl === url || a.avatarUrl === url);
   if (!asset) return "overall art style / mood reference";
-  // note 拼进英文图像 prompt：英文 prompt（appearancePrompt/场景描述）优先，
-  // description（一句话中文简介）只作兜底 —— 中文长句混在英文指令里遵循差
-  return `${asset.name}: ${(asset.prompt || asset.description).trim()}`;
+  // 资产图本身已经承载身份/外观；镜头 visualPrompt 也已是唯一文本 SSOT。
+  // 这里仅保留名称，避免把同一段资产英文描述再次复制进请求。
+  return asset.name.trim();
 }
 
 /**
@@ -59,7 +58,8 @@ function buildImageGenerationInput(
   project: { style: string; assets: Asset[] },
 ): ImageGenerationInput {
   const referenceImageUrls = pickShotReferences(shot, project);
-  const subject = injectShotAssetDescriptions(composeVisualPrompt(shot), shot, project.assets);
+  // visualPrompt 已包含镜头主体与动作；参考图说明只保留一次，避免资产描述重复注入。
+  const subject = composeVisualPrompt(shot);
   const stylePrompt = getStylePrompt(project);
 
   if (referenceImageUrls.length > 0) {

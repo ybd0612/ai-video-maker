@@ -337,7 +337,7 @@ Return strict JSON in exactly this format, no other text:
 2. visualPrompt：完整英文画面提示词——主体外观（直接沿用所给资产的英文外观描述）、动作、环境、构图与镜头；只描述该镜头
 3. motionPrompt：完整英文运动提示词——主体动作、镜头运动、环境变化
 4. 其余描述字段（sceneDesc/detailDesc/lightingDesc/styleDesc/actionDesc/cameraDesc/envChangeDesc/motionSpeedDesc/negativePrompt/negativeMotionPrompt）逐项填写；主体信息只写入 visualPrompt，不再单独生成 subjectDesc
-5. dialogues 按需给对白（characterId 用角色名），activeCharacterIds/activeSceneId 用涉及资产的原名，duration 从 4/5/8 中选
+5. dialogues 按需给对白（characterId 用角色名），activeCharacterIds/activeSceneId/activeProductIds/activePropIds 用涉及资产的原名；visualPrompt 或 scriptText 中出现的可识别道具/产品必须同步写入对应 active ID，duration 从 4/5/8 中选
 {{assets}}
 {{#rules}}
 重要规则：
@@ -357,7 +357,7 @@ Return strict JSON in exactly this format, no other text:
 2. visualPrompt: a complete ENGLISH image prompt — subject appearance (reuse the provided asset appearance descriptions verbatim), action, environment, composition and camera; describe only this shot
 3. motionPrompt: a complete ENGLISH motion prompt — subject motion, camera movement, environmental changes
 4. Fill every other description field (sceneDesc/detailDesc/lightingDesc/styleDesc/actionDesc/cameraDesc/envChangeDesc/motionSpeedDesc/negativePrompt/negativeMotionPrompt); put subject information only in visualPrompt, with no separate subjectDesc
-5. dialogues when needed (characterId = character name); activeCharacterIds/activeSceneId use exact asset names; duration from 4/5/8
+5. dialogues when needed (characterId = character name); activeCharacterIds/activeSceneId/activeProductIds/activePropIds use exact asset names; any identifiable prop or product mentioned in visualPrompt or scriptText must also be included in the matching active ID list; duration from 4/5/8
 {{assets}}
 {{#rules}}
 Important rules:
@@ -427,16 +427,16 @@ Return ONLY the appearance description, with no explanations and no bullet point
 
   /* ── 风格提示词派生（useWizardActions.deriveStylePrompt） ── */
   styleRef: {
-    zh: `You are a visual style director. Based only on the desired visual direction fields, produce ONE English image-style prompt that will be used to generate a STYLE SAMPLE SHEET (a style master board), not an illustration.
+    zh: `You are a visual style director. Based only on the desired visual direction fields, produce ONE English reusable image-style prompt. It will be reused for asset images and storyboard shot images; a separate assembly layer adds the abstract style sample-sheet carrier.
 
 The prompt MUST describe ONLY reusable visual language:
 - medium / art form
-- color palette
-- lighting mood
+- color palette and colour relationships
+- lighting mood as a general rendering quality, not a fixed time of day
 - atmosphere / material / texture
-- composition and camera treatment
+- camera rendering texture only, never shot composition, framing or layout
 
-CARRIER RULE (critical, 2026-09-15 revised): this prompt will be appended to EVERY image call in the project (asset images, shot images), not only the style master. So it must be PURE reusable visual language — medium, colour relationships, lighting, material handling, camera texture and mood. It must NOT carry any sheet/board composition words (sample sheet, swatches, colour chips, grid, carrier, symmetric layout on a board): that carrier composition belongs ONLY to the style-master assembly layer and will otherwise make every asset image render swatch-board squares.
+CARRIER RULE (critical, 2026-09-16 revised): produce only reusable visual language. Never include sample sheet, swatches, colour chips, grid, carrier, symmetric layout, negative space, subject placement, a specific shot composition, a fixed camera angle, a readable scene, or a fixed time-of-day lighting condition. Those belong to the style-master assembly or the individual shot prompt.
 
 SUBJECT-BOUND MATERIAL RULE: words that normally belong to a living subject (fur, hair, feather, plush, skin, scale, fin) must be worded as abstract material handling (e.g. "fur-like fibre texture", "plush-surface material feel"), never left as a bare overall style word ("fine fur textures"), because a bare material word plus a soft/healing mood reads to the image model as an animal.
 
@@ -451,16 +451,16 @@ Examples:
 {{/examples}}
 
 Output ONLY the prompt text itself, one to three sentences, no quotes, no explanation.`,
-    en: `You are a visual style director. Based only on the desired visual direction fields, produce ONE English image-style prompt that will be used to generate a STYLE SAMPLE SHEET (a style master board), not an illustration.
+    en: `You are a visual style director. Based only on the desired visual direction fields, produce ONE English reusable image-style prompt. It will be reused for asset images and storyboard shot images; a separate assembly layer adds the abstract style sample-sheet carrier.
 
 The prompt MUST describe ONLY reusable visual language:
 - medium / art form
-- color palette
-- lighting mood
+- color palette and colour relationships
+- lighting mood as a general rendering quality, not a fixed time of day
 - atmosphere / material / texture
-- composition and camera treatment
+- camera rendering texture only, never shot composition, framing or layout
 
-CARRIER RULE (critical, 2026-09-15 revised): this prompt will be appended to EVERY image call in the project (asset images, shot images), not only the style master. So it must be PURE reusable visual language — medium, colour relationships, lighting, material handling, camera texture and mood. It must NOT carry any sheet/board composition words (sample sheet, swatches, colour chips, grid, carrier, symmetric layout on a board): that carrier composition belongs ONLY to the style-master assembly layer and will otherwise make every asset image render swatch-board squares.
+CARRIER RULE (critical, 2026-09-16 revised): produce only reusable visual language. Never include sample sheet, swatches, colour chips, grid, carrier, symmetric layout, negative space, subject placement, a specific shot composition, a fixed camera angle, a readable scene, or a fixed time-of-day lighting condition. Those belong to the style-master assembly or the individual shot prompt.
 
 SUBJECT-BOUND MATERIAL RULE: words that normally belong to a living subject (fur, hair, feather, plush, skin, scale, fin) must be worded as abstract material handling (e.g. "fur-like fibre texture", "plush-surface material feel"), never left as a bare overall style word ("fine fur textures"), because a bare material word plus a soft/healing mood reads to the image model as an animal.
 

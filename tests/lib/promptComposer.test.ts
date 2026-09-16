@@ -128,7 +128,7 @@ describe("资产主体边界与视觉方向", () => {
 });
 
 describe("composeMultiReferencePrompt", () => {
-  it("参考图说明在前（按 index），目标场景在后，尾部固定图像关系指令", () => {
+  it("目标镜头差异前置，参考图只作资产身份锚点", () => {
     const out = composeMultiReferencePrompt({
       references: [
         { index: 1, role: "scene", note: "森林: misty forest" },
@@ -140,16 +140,16 @@ describe("composeMultiReferencePrompt", () => {
     expect(out).toContain("Image 1 is the scene reference: 森林: misty forest");
     expect(out).toContain("Image 2 is the character reference: 小狐狸: a small fox");
     expect(out).toContain("Image 3 is the style reference: 整体风格: anime");
-    expect(out).toContain("Target scene / subject: the fox walks in the forest");
+    expect(out).toContain("Target shot: the fox walks in the forest");
     expect(out).toContain(
-      "The reference images anchor the identity, appearance and art style of the subjects described above; keep those subjects consistent with their references, but compose the picture from the text description — do not copy the references' layout or background.",
+      "Use the target shot as the source of composition, action and environment.",
     );
-    // 顺序：参考图说明 → 目标场景 → 图像关系（末尾）
+    // 顺序：镜头差异 → 参考图说明 → 图像关系
     const idx1 = out.indexOf("Image 1");
-    const idxScene = out.indexOf("Target scene");
-    const idxAnchor = out.indexOf("The reference images anchor the identity");
-    expect(idx1).toBeLessThan(idxScene);
-    expect(idxScene).toBeLessThan(idxAnchor);
+    const idxScene = out.indexOf("Target shot");
+    const idxAnchor = out.indexOf("Use the target shot");
+    expect(idxScene).toBeLessThan(idx1);
+    expect(idx1).toBeLessThan(idxAnchor);
   });
 
   it("note 为空的参考图被剔除，不产生空说明；style/lighting/composition 空段剔除", () => {
@@ -248,25 +248,24 @@ describe("pickShotReferences", () => {
     imageUrl: "http://img/style.png",
   });
 
-  it("顺序：场景 → 角色 → 产品；风格图不再进入参考图（2026-09-15 决策）", () => {
+  it("场景图退出分镜参考图，显式角色仍保留；风格图也不进入参考图", () => {
     const project = { assets: [sceneAsset, charAsset, styleAsset], styleReferenceUrl: undefined };
     const shot = makeShot({ sceneDesc: "walking in the Forest", activeCharacterIds: ["char_1"] });
     const refs = pickShotReferences(shot, project);
-    expect(refs).toEqual([
-      "http://img/scene.png",
-      "http://img/char.png",
-    ]);
+    expect(refs).toEqual(["http://img/char.png"]);
+    expect(refs).not.toContain("http://img/scene.png");
     expect(refs).not.toContain("http://img/style.png");
   });
 
-  it("风格图退出后非风格上限放宽为 3：场景+角色+产品全部保留", () => {
-    const project = { assets: [sceneAsset, charAsset, productAsset, styleAsset], styleReferenceUrl: undefined };
-    const shot = makeShot({ sceneDesc: "Forest", activeCharacterIds: ["char_1"], activeProductIds: ["prod_1"] });
+  it("场景图退出后按显式资产保留角色、产品和道具，最多 4 张", () => {
+    const propAsset = makeAsset({ id: "prop_1", type: "prop", name: "Fence", imageUrl: "http://img/prop.png" });
+    const project = { assets: [sceneAsset, charAsset, productAsset, propAsset, styleAsset], styleReferenceUrl: undefined };
+    const shot = makeShot({ sceneDesc: "Forest", activeCharacterIds: ["char_1"], activeProductIds: ["prod_1"], activePropIds: ["prop_1"] });
     const refs = pickShotReferences(shot, project);
     expect(refs).toEqual([
-      "http://img/scene.png",
       "http://img/char.png",
       "http://img/product.png",
+      "http://img/prop.png",
     ]);
     expect(refs).toHaveLength(3);
     expect(refs).not.toContain("http://img/style.png");
@@ -285,11 +284,11 @@ describe("pickShotReferences", () => {
     expect(refs.filter((u) => u === "http://img/scene.png")).toHaveLength(1);
   });
 
-  it("场景匹配失败时回退首个有图场景；旧风格字段也不兜底进参考图", () => {
+  it("没有显式资产引用时返回空数组，不回退场景图", () => {
     const sceneB = makeAsset({ id: "scene_2", type: "scene", name: "Beach", imageUrl: "http://img/beach.png" });
     const project = { assets: [sceneB, styleAsset], styleReferenceUrl: undefined };
     const shot = makeShot({ sceneDesc: "somewhere unrelated" });
-    expect(pickShotReferences(shot, project)).toEqual(["http://img/beach.png"]);
+    expect(pickShotReferences(shot, project)).toEqual([]);
   });
 
   it("无场景/角色/产品时返回空数组（纯文生图；风格图不再兜底）", () => {

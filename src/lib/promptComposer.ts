@@ -130,27 +130,26 @@ export function composeMultiReferencePrompt(i: {
   composition?: string;
 }): string {
   const parts: string[] = [];
+  const scene = i.scene.trim();
 
-  // 参考图角色说明（note 为空的参考图跳过，避免出现空描述）
+  // 镜头差异必须前置，避免被共同的参考图说明淹没。
+  if (scene) parts.push(`Target shot: ${scene}`);
+
+  // 参考图只锚定显式引用资产的身份/外观，不提供场景构图。
   for (const r of i.references) {
     const note = r.note.trim();
     if (note) parts.push(`Image ${r.index} is the ${r.role} reference: ${note}`);
   }
 
-  const scene = i.scene.trim();
-  if (scene) parts.push(`Target scene / subject: ${scene}`);
-
   const style = i.style?.trim();
-  if (style) parts.push(`Style: ${style}`);
+  if (style) parts.push(`Reusable visual style: ${style}`);
   const lighting = i.lighting?.trim();
-  if (lighting) parts.push(`Lighting: ${lighting}`);
+  if (lighting) parts.push(`Shot lighting: ${lighting}`);
   const composition = i.composition?.trim();
-  if (composition) parts.push(`Composition: ${composition}`);
+  if (composition) parts.push(`Shot composition: ${composition}`);
 
-  // 图像关系：参考图都是「我方资产形象」（场景/角色/产品/道具），锚定主体身份与画风；
-  // 画面构图由文本决定，勿照抄参考图排版。（风格母版已退出参考图，见 pickShotReferences）
   parts.push(
-    "The reference images anchor the identity, appearance and art style of the subjects described above; keep those subjects consistent with their references, but compose the picture from the text description — do not copy the references' layout or background.",
+    "Use the target shot as the source of composition, action and environment. Use each reference only to preserve the identity and appearance of its explicitly named asset; do not copy any reference layout, camera angle, background or lighting.",
   );
 
   return parts.join(", ");
@@ -250,23 +249,13 @@ export function pickShotReferences(
   const out: string[] = [];
 
   const push = (url: string | undefined | null): void => {
-    if (url && !out.includes(url) && out.length < 3) out.push(url);
+    if (url && !out.includes(url) && out.length < 4) out.push(url);
   };
 
-  // 1. 场景参考：优先使用镜头显式场景，其次才用旧数据的文本匹配/首个场景兜底。
-  const scenes = project.assets.filter((a) => a.type === "scene");
-  const explicitScene = scenes.find((scene) => scene.id === shot.activeSceneId);
-  if (explicitScene?.imageUrl) push(explicitScene.imageUrl);
-  if (!explicitScene && shot.sceneDesc?.trim() && scenes.length > 0) {
-    const shotScene = shot.sceneDesc.toLowerCase();
-    const matched = scenes.find(
-      (s) => s.imageUrl && shotScene.includes(s.name.toLowerCase()),
-    );
-    if (matched?.imageUrl) push(matched.imageUrl);
-  }
-  if (out.length === 0) push(scenes.find((s) => !!s.imageUrl)?.imageUrl);
+  // 场景图不进入分镜图 i2i：场景参考图是成品构图，会压平同组镜头差异；
+  // 环境由 visualPrompt/sceneDesc 的文本描述重新构图。
 
-  // 2. 角色定妆照（activeCharacterIds 命中；imageUrl 优先，avatarUrl 兜底）
+  // 1. 角色定妆照（activeCharacterIds 命中；imageUrl 优先，avatarUrl 兜底）
   for (const id of shot.activeCharacterIds ?? []) {
     const c = project.assets.find((a) => a.id === id && a.type === "character");
     push(c?.imageUrl ?? c?.avatarUrl);
