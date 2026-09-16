@@ -12,7 +12,7 @@ import { PromptSubFields } from "./PromptSubFields";
 import { PromptField } from "./PromptField";
 import { SYSTEM_PROMPT_SCRIPT_TEXT } from "@/services/chatService";
 import { DialogueEditor } from "@/features/shots/DialogueEditor";
-import { useWizardActions } from "./useWizardActions";
+import { useWizardActions, hasActiveScriptTask } from "./useWizardActions";
 import { confirmDialog } from "@/components/ui/ConfirmDialog";
 import { Plus, Sparkles, Loader2 } from "lucide-react";
 
@@ -93,6 +93,9 @@ export function StepStoryboard() {
   useEffect(() => {
     if (autoStoryboardRef.current) return;
     if (!ideaPromptTrimmed || !project) return;
+    // 已有分镜任务在飞（模块级注册表跨组件实例存活）时不重复启动：
+    // 重挂载会重置 autoStoryboardRef，只靠 ref 挡不住重复请求。
+    if (hasActiveScriptTask(project.id)) return;
     const hasContent = shots.some((s) => s.scriptText.trim() || s.visualPrompt.trim());
     if (hasContent) return;
     autoStoryboardRef.current = true;

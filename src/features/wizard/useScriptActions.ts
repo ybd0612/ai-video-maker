@@ -23,8 +23,9 @@ import { extractNewAssets } from "@/lib/extractAssets";
 import { collectSubjectVocabulary } from "@/lib/promptComposer";
 import { refineWithAudit } from "@/lib/refineContent";
 import { beginTrace } from "@/lib/logger";
+import { hasActiveTask, runWithConcurrency } from "@/lib/batchRunner";
 import { pickShotFields } from "@/lib/shotFields";
-import { restoreProjectStatusIfReady } from "./wizardActionUtils";
+import { restoreProjectStatusIfReady, resetStuckShots } from "./wizardActionUtils";
 
 /** 视觉方向自检轮数上限（2026-09-15 由 2 → 1：审计+重写已合一，第 2 轮边际收益低于 ~40s 耗时）。 */
 const VISUAL_DIRECTION_MAX_ROUNDS = 1;
@@ -32,22 +33,23 @@ const VISUAL_DIRECTION_MAX_ROUNDS = 1;
 /** 逐镜头生成的并发上限（文本 RPM 由 rateLimiter 统一节流） */
 const SHOT_CONCURRENCY = 3;
 
+/**
+ * 分镜批量任务注册表（模块级共享，跨组件实例幂等守卫）。
+ * 图片 / 视频 / 资产三个域都走 createBatchRunner 的注册表守卫，分镜此前缺失：
+ * 向导 effect 在页面重载 / 多实例挂载时会重新触发，同一份大纲请求被并发发出（token 翻倍），
+ * 且并发批次的镜头 id 不同，先完成的一批写回会因 id 不匹配而静默失效。
+ */
+const activeScriptTasks = new Map<string, AbortController>();
+
+/** 查询某项目是否仍有存活的分镜任务（供向导 effect 判断，避免重复启动） */
+export function hasActiveScriptTask(projectId: string): boolean {
+  return hasActiveTask(activeScriptTasks, projectId);
+}
+
 export interface ScriptActions {
   extractCharactersFromIdea: (prompt: string) => Promise<boolean>;
   generateStoryboard: (prompt: string) => Promise<void>;
   rerollShot: (shotId: string) => Promise<void>;
-}
-
-/** 简单并发池：按 limit 同时执行 tasks，全部 settle 后返回 */
-async function runWithConcurrency(tasks: Array<() => Promise<void>>, limit: number): Promise<void> {
-  let cursor = 0;
-  const workers = Array.from({ length: Math.max(1, Math.min(limit, tasks.length)) }, async () => {
-    while (cursor < tasks.length) {
-      const task = tasks[cursor++];
-      await task;
-    }
-  });
-  await Promise.all(workers);
 }
 
 export function useScriptActions(
@@ -260,6 +262,13 @@ export function useScriptActions(
     if (!project) throw new Error("No active project.");
     const targetProjectId = project.id;
 
+    // 幂等守卫：同一项目已有分镜任务在飞时不重复启动（防 effect 重入 / 重挂载导致的重复请求）
+    if (hasActiveTask(activeScriptTasks, targetProjectId)) return;
+
+    // 中断恢复：上一轮遗留的 scripting 占位（流程被打断）先复位，再开始新一轮
+    resetStuckShots(targetProjectId);
+
+    activeScriptTasks.set(targetProjectId, new AbortController());
     store.setProjectStatusById(targetProjectId, "scripting");
 
     try {
@@ -355,12 +364,16 @@ export function useScriptActions(
 
       useProjectStore.getState().setProjectStatusById(targetProjectId, "idle");
     } catch (err) {
+      // 清理本轮已写入的占位：留 scripting 会让卡片永久停在"生成中"，刷新也不会恢复
+      resetStuckShots(targetProjectId);
       useProjectStore.getState().updateProjectById(targetProjectId, (p) => ({
         ...p,
         status: "failed",
         error: err instanceof Error ? err.message : String(err),
       }));
       throw err;
+    } finally {
+      activeScriptTasks.delete(targetProjectId);
     }
   }, []);
 
