@@ -195,13 +195,11 @@ export interface Shot {
   detailDesc?: string;       // Details/clothing: "wearing a white blouse"
   lightingDesc?: string;     // Lighting/color: "warm golden hour light"
   styleDesc?: string;        // Art style: "photorealistic, 8k"
-  negativePrompt?: string;   // Negative prompt: "bad anatomy, extra limbs"
   // Structured motion sub-fields for review and editing; motionPrompt is the API SSOT
   actionDesc?: string;       // Subject action: "slowly turns her head"
   cameraDesc?: string;       // Camera movement: "camera slowly dollies in"
   envChangeDesc?: string;    // Environment changes: "steam rising from cup"
   motionSpeedDesc?: string;  // Motion speed: "cinematic slow-motion, 24fps"
-  negativeMotionPrompt?: string; // Negative motion: "morphing, flickering"
   // 首尾帧控制
   firstFrameUrl?: string;
   lastFrameUrl?: string;

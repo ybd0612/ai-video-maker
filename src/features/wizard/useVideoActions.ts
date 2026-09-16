@@ -119,7 +119,19 @@ const runVideoBatch = createBatchRunner({
               expectedRevision,
               { videoProgress: 0, videoRetryCount: attempt + 1 },
             );
-            await new Promise<void>((resolve) => setTimeout(resolve, RETRY_DELAY_MS * (attempt + 1)));
+            await new Promise<void>((resolve, reject) => {
+              const delay = RETRY_DELAY_MS * (attempt + 1);
+              const timer = window.setTimeout(() => {
+                signal.removeEventListener("abort", onAbort);
+                resolve();
+              }, delay);
+              const onAbort = () => {
+                window.clearTimeout(timer);
+                reject(new DOMException("Video generation aborted", "AbortError"));
+              };
+              if (signal.aborted) onAbort();
+              else signal.addEventListener("abort", onAbort, { once: true });
+            });
           }
         }
       }

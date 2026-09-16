@@ -16,6 +16,7 @@ import { resolvePolishSystemPrompt } from "@/lib/promptRules";
 interface AiPolishFieldProps {
   value: string;
   onChange: (value: string) => void;
+  onBlur?: () => void;
   /** 润色所用的专家系统提示词；未提供时不显示润色按钮 */
   systemPrompt?: string;
   placeholder?: string;
@@ -52,6 +53,7 @@ const ACTION_BUTTON =
 export function AiPolishField({
   value,
   onChange,
+  onBlur,
   systemPrompt,
   placeholder,
   rows = 2,
@@ -143,6 +145,7 @@ export function AiPolishField({
     onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
       onChange(e.target.value),
     onKeyDown,
+    onBlur,
     placeholder,
     disabled,
     className: inputClass,

@@ -9,6 +9,7 @@ interface PromptFieldProps {
   label: string;
   value: string;
   onChange: (value: string) => void;
+  onCommit?: () => void;
   /** 润色所用的专家系统提示词；提供后输入框内显示「润色」按钮 */
   systemPrompt?: string;
   placeholder?: string;
@@ -30,6 +31,7 @@ export function PromptField({
   label,
   value,
   onChange,
+  onCommit,
   systemPrompt,
   placeholder,
   rows = 2,
@@ -44,6 +46,7 @@ export function PromptField({
       <AiPolishField
         value={value}
         onChange={onChange}
+        onBlur={onCommit}
         systemPrompt={systemPrompt}
         placeholder={placeholder}
         rows={rows}

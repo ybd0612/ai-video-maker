@@ -219,7 +219,7 @@ export function StepVideos() {
               )}
             </div>
 
-            <PromptSubFields shotId={shot.id} sections={["motion", "negative"]} />
+            <PromptSubFields shotId={shot.id} sections={["motion"]} />
 
             {/* 首尾帧控制 */}
             <DualFrameToggle shot={shot} />

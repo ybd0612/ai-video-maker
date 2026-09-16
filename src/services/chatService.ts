@@ -44,7 +44,6 @@ export {
   SYSTEM_PROMPT_MAIN_PROMPT,
   SYSTEM_PROMPT_MOTION_PROMPT,
   SYSTEM_PROMPT_DESCRIPTION_ZH,
-  SYSTEM_PROMPT_NEGATIVE_PROMPT,
   SYSTEM_PROMPT_CHARACTER,
   SYSTEM_PROMPT_DIALOGUE,
 } from "@/lib/promptRules";
@@ -117,6 +116,44 @@ const POLISH_INSTRUCTION_EN =
  * 一键润色：把字段当前内容交给对应专家角色优化，返回润色后的完整内容。
  * 供输入框内嵌的「润色」按钮使用（用户无需额外输入指令）。
  */
+export interface RewritePromptFromFieldsOptions {
+  apiKey: string;
+  baseUrl: string;
+  kind: "visual" | "motion";
+  currentPrompt: string;
+  fields: Record<string, string>;
+}
+
+/** 根据结构化分镜字段重写 API 使用的完整英文提示词。 */
+export async function rewritePromptFromFields(
+  opts: RewritePromptFromFieldsOptions,
+): Promise<string> {
+  const fieldText = Object.entries(opts.fields)
+    .filter(([, value]) => value.trim())
+    .map(([key, value]) => `${key}: ${value.trim()}`)
+    .join("\n");
+  const kindLabel = opts.kind === "visual" ? "image" : "image-to-video motion";
+  const result = await chatCompletion({
+    apiKey: opts.apiKey,
+    baseUrl: opts.baseUrl,
+    purpose: "fieldAssist",
+    paramContext: `Rewrite the ${kindLabel} prompt from structured storyboard fields. Return a complete English API prompt.`,
+    messages: [
+      {
+        role: "system",
+        content: `You are an expert ${kindLabel} prompt editor. Rewrite the complete prompt in English. Preserve all valid information from the existing prompt, apply the edited structured fields, remove contradictions and do not add unrelated subjects. Return only the final prompt, with no explanation.`,
+      },
+      {
+        role: "user",
+        content: `Existing prompt:\n${opts.currentPrompt.trim()}\n\nCurrent structured fields:\n${fieldText}`,
+      },
+    ],
+  });
+  const prompt = result.content.trim();
+  if (!prompt) throw new Error(getTranslation("error.polishEmptyResult"));
+  return prompt;
+}
+
 export async function polishText(opts: PolishOptions): Promise<string> {
   const content = opts.value.trim();
   // 非 React 上下文的瞬时错误：经 getTranslation 定格当前语言（可接受）

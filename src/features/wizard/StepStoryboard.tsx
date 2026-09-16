@@ -244,7 +244,7 @@ export function StepStoryboard() {
             {/* Structured sub-elements */}
             <PromptSubFields
               shotId={shot.id}
-              sections={["image", "motion", "negative"]}
+              sections={["image", "motion"]}
             />
 
             {/* Dialogue editor (drama mode only) */}

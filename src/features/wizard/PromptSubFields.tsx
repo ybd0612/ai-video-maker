@@ -10,9 +10,12 @@ import { PromptField } from "./PromptField";
 import {
   SYSTEM_PROMPT_VISUAL_PROMPT,
   SYSTEM_PROMPT_MOTION_PROMPT,
-  SYSTEM_PROMPT_NEGATIVE_PROMPT,
+  rewritePromptFromFields,
 } from "@/services/chatService";
 import { Image, Video } from "lucide-react";
+import { useSettingsStore } from "@/stores/settingsStore";
+
+const activeRewrites = new Map<string, Promise<void>>();
 
 interface PromptSubFieldsProps {
   shotId: string;
@@ -22,7 +25,7 @@ interface PromptSubFieldsProps {
 
 export function PromptSubFields({
   shotId,
-  sections = ["image", "motion", "negative"],
+  sections = ["image", "motion"],
 }: PromptSubFieldsProps) {
   const t = useT();
   const shot = useProjectStore((s) => {
@@ -30,11 +33,30 @@ export function PromptSubFields({
     return project?.shots.find((sh) => sh.id === shotId);
   });
   const updateShot = useProjectStore((s) => s.updateShot);
+  const apiKey = useSettingsStore((s) => s.providerConfig.apiKey);
+  const baseUrl = useSettingsStore((s) => s.providerConfig.baseUrl);
 
   if (!shot) return null;
 
   const handleChange = (field: string, value: string) => {
     updateShot(shotId, { [field]: value });
+  };
+
+  const commitPrompt = (kind: "visual" | "motion") => {
+    const latest = useProjectStore.getState().projects
+      .flatMap((project) => project.shots)
+      .find((item) => item.id === shotId);
+    if (!latest || !apiKey || !baseUrl) return;
+    const fields: Record<string, string> = kind === "visual"
+      ? { scene: latest.sceneDesc ?? "", detail: latest.detailDesc ?? "", lighting: latest.lightingDesc ?? "", style: latest.styleDesc ?? "" }
+      : { action: latest.actionDesc ?? "", camera: latest.cameraDesc ?? "", environment: latest.envChangeDesc ?? "", speed: latest.motionSpeedDesc ?? "" };
+    const key = `${shotId}:${kind}`;
+    if (activeRewrites.has(key)) return;
+    const task = rewritePromptFromFields({ apiKey, baseUrl, kind, currentPrompt: kind === "visual" ? latest.visualPrompt : latest.motionPrompt, fields })
+      .then((prompt) => useProjectStore.getState().updateShot(shotId, kind === "visual" ? { visualPrompt: prompt } : { motionPrompt: prompt }))
+      .catch(() => undefined)
+      .finally(() => activeRewrites.delete(key));
+    activeRewrites.set(key, task);
   };
 
   return (
@@ -51,6 +73,7 @@ export function PromptSubFields({
             value={shot.sceneDesc ?? ""}
             onChange={(v) => handleChange("sceneDesc", v)}
             systemPrompt={SYSTEM_PROMPT_VISUAL_PROMPT}
+            onCommit={() => commitPrompt("visual")}
             resetKey={shotId}
             placeholder={t("promptPh.scene")}
             color="violet"
@@ -60,6 +83,7 @@ export function PromptSubFields({
             value={shot.detailDesc ?? ""}
             onChange={(v) => handleChange("detailDesc", v)}
             systemPrompt={SYSTEM_PROMPT_VISUAL_PROMPT}
+            onCommit={() => commitPrompt("visual")}
             resetKey={shotId}
             placeholder={t("promptPh.style")}
             color="violet"
@@ -69,6 +93,7 @@ export function PromptSubFields({
             value={shot.lightingDesc ?? ""}
             onChange={(v) => handleChange("lightingDesc", v)}
             systemPrompt={SYSTEM_PROMPT_VISUAL_PROMPT}
+            onCommit={() => commitPrompt("visual")}
             resetKey={shotId}
             placeholder={t("promptPh.lighting")}
             color="violet"
@@ -78,6 +103,7 @@ export function PromptSubFields({
             value={shot.styleDesc ?? ""}
             onChange={(v) => handleChange("styleDesc", v)}
             systemPrompt={SYSTEM_PROMPT_VISUAL_PROMPT}
+            onCommit={() => commitPrompt("visual")}
             resetKey={shotId}
             placeholder={t("promptPh.quality")}
             color="violet"
@@ -97,6 +123,7 @@ export function PromptSubFields({
             value={shot.actionDesc ?? ""}
             onChange={(v) => handleChange("actionDesc", v)}
             systemPrompt={SYSTEM_PROMPT_MOTION_PROMPT}
+            onCommit={() => commitPrompt("motion")}
             resetKey={shotId}
             placeholder={t("promptPh.motion")}
             color="amber"
@@ -106,6 +133,7 @@ export function PromptSubFields({
             value={shot.cameraDesc ?? ""}
             onChange={(v) => handleChange("cameraDesc", v)}
             systemPrompt={SYSTEM_PROMPT_MOTION_PROMPT}
+            onCommit={() => commitPrompt("motion")}
             resetKey={shotId}
             placeholder={t("promptPh.camera")}
             color="amber"
@@ -115,6 +143,7 @@ export function PromptSubFields({
             value={shot.envChangeDesc ?? ""}
             onChange={(v) => handleChange("envChangeDesc", v)}
             systemPrompt={SYSTEM_PROMPT_MOTION_PROMPT}
+            onCommit={() => commitPrompt("motion")}
             resetKey={shotId}
             placeholder={t("promptPh.environment")}
             color="amber"
@@ -124,6 +153,7 @@ export function PromptSubFields({
             value={shot.motionSpeedDesc ?? ""}
             onChange={(v) => handleChange("motionSpeedDesc", v)}
             systemPrompt={SYSTEM_PROMPT_MOTION_PROMPT}
+            onCommit={() => commitPrompt("motion")}
             resetKey={shotId}
             placeholder={t("promptPh.motionQuality")}
             color="amber"
@@ -131,31 +161,6 @@ export function PromptSubFields({
         </div>
       )}
 
-      {/* Negative prompts */}
-      {sections.includes("negative") && (
-        <div className="space-y-2">
-          <PromptField
-            label={t("wizard.negativePrompt")}
-            value={shot.negativePrompt ?? ""}
-            onChange={(v) => handleChange("negativePrompt", v)}
-            systemPrompt={SYSTEM_PROMPT_NEGATIVE_PROMPT}
-            resetKey={shotId}
-            placeholder={t("promptPh.negativeImage")}
-            color="red"
-            rows={1}
-          />
-          <PromptField
-            label={t("wizard.negativeMotionPrompt")}
-            value={shot.negativeMotionPrompt ?? ""}
-            onChange={(v) => handleChange("negativeMotionPrompt", v)}
-            systemPrompt={SYSTEM_PROMPT_NEGATIVE_PROMPT}
-            resetKey={shotId}
-            placeholder={t("promptPh.negativeMotion")}
-            color="red"
-            rows={1}
-          />
-        </div>
-      )}
     </div>
   );
 }

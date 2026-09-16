@@ -336,7 +336,7 @@ Return strict JSON in exactly this format, no other text:
 1. scriptText：该镜头的叙事脚本（含动作与情绪，语言随用户输入）
 2. visualPrompt：完整英文画面提示词——主体外观（直接沿用所给资产的英文外观描述）、动作、环境、构图与镜头；只描述该镜头
 3. motionPrompt：完整英文运动提示词——主体动作、镜头运动、环境变化
-4. 其余描述字段（sceneDesc/detailDesc/lightingDesc/styleDesc/actionDesc/cameraDesc/envChangeDesc/motionSpeedDesc/negativePrompt/negativeMotionPrompt）逐项填写；主体信息只写入 visualPrompt，不再单独生成 subjectDesc
+4. 其余描述字段（sceneDesc/detailDesc/lightingDesc/styleDesc/actionDesc/cameraDesc/envChangeDesc/motionSpeedDesc）逐项填写；主体信息只写入 visualPrompt，不再单独生成 subjectDesc
 5. dialogues 按需给对白（characterId 用角色名），activeCharacterIds/activeSceneId/activeProductIds/activePropIds 用涉及资产的原名；visualPrompt 或 scriptText 中出现的可识别道具/产品必须同步写入对应 active ID，duration 从 4/5/8 中选
 {{assets}}
 {{#rules}}
@@ -351,12 +351,12 @@ Return strict JSON in exactly this format, no other text:
 ⚠️ 内容安全要求：
 {{safety}}
 {{/safety}}
-只输出这一个镜头的 JSON 对象（不是数组），不要包含任何其他文字。所有字段都必须非空（negativePrompt 可以是简短的质量负面词）。`,
+只输出这一个镜头的 JSON 对象（不是数组），不要包含任何其他文字。所有返回字段都必须非空。`,
     en: `You are a professional video storyboard designer. You get the storyboard outline and the plan of ONE shot. Write that single shot completely:
 1. scriptText: the narrative script for this shot (action and emotion, follow the user's language)
 2. visualPrompt: a complete ENGLISH image prompt — subject appearance (reuse the provided asset appearance descriptions verbatim), action, environment, composition and camera; describe only this shot
 3. motionPrompt: a complete ENGLISH motion prompt — subject motion, camera movement, environmental changes
-4. Fill every other description field (sceneDesc/detailDesc/lightingDesc/styleDesc/actionDesc/cameraDesc/envChangeDesc/motionSpeedDesc/negativePrompt/negativeMotionPrompt); put subject information only in visualPrompt, with no separate subjectDesc
+4. Fill every other description field (sceneDesc/detailDesc/lightingDesc/styleDesc/actionDesc/cameraDesc/envChangeDesc/motionSpeedDesc); put subject information only in visualPrompt, with no separate subjectDesc
 5. dialogues when needed (characterId = character name); activeCharacterIds/activeSceneId/activeProductIds/activePropIds use exact asset names; any identifiable prop or product mentioned in visualPrompt or scriptText must also be included in the matching active ID list; duration from 4/5/8
 {{assets}}
 {{#rules}}
@@ -371,7 +371,7 @@ Examples:
 Content safety:
 {{safety}}
 {{/safety}}
-Output ONLY this single shot as a JSON object (not an array), no other text. Every field must be non-empty (negativePrompt may be a short quality negative).`,
+Output ONLY this single shot as a JSON object (not an array), no other text. Every returned field must be non-empty.`,
   },
 
   /* ── 角色外貌生成（CharacterEditor 外貌 AI 生成） ──
@@ -619,16 +619,6 @@ export const SYSTEM_PROMPT_CHARACTER_DESCRIPTION_ZH = `你是一位 AI 角色设
 - 要素内容保持通用，不要绑定单一时长、平台或内容形态
 - 直接返回完整角色描述，不要任何解释说明
 - 即使输出通道会压缩空白，也必须保留 9 行结构；每个要素前使用换行，禁止用句号或分号把 8 个要素连成一行`;
-
-export const SYSTEM_PROMPT_NEGATIVE_PROMPT = `你是一位 AI 图像/视频生成的负向提示词专家。用户会给你一段负向提示词（描述画面中需要避免的瑕疵），请帮助优化。
-
-要求：
-- 只保留与画面质量、解剖结构、伪影、变形相关的通用负面项
-- 用中文、逗号分隔的短语列表
-- 表达简洁，合并重复项，避免互相冲突的条目
-- 直接返回优化后的负向提示词，不要任何解释说明
-
-如果用户有特定要求，按照要求调整。`;
 
 export const SYSTEM_PROMPT_CHARACTER = `You are an expert at writing character appearance descriptions used as consistency anchors for AI image generation.
 
@@ -1023,14 +1013,6 @@ export const BUILTIN_RULES: PromptRule[] = [
     task: "polish",
     section: "rules",
     content: monolingual(SYSTEM_PROMPT_CHARACTER_DESCRIPTION_ZH),
-    enabled: true,
-    source: "builtin",
-  },
-  {
-    id: "polish.negative-prompt",
-    task: "polish",
-    section: "rules",
-    content: monolingual(SYSTEM_PROMPT_NEGATIVE_PROMPT),
     enabled: true,
     source: "builtin",
   },

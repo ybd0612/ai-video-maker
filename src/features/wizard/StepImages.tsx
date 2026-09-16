@@ -149,7 +149,7 @@ export function StepImages() {
                 </div>
               </Lightbox>
             )}
-            <PromptSubFields shotId={shot.id} sections={["image", "negative"]} />
+            <PromptSubFields shotId={shot.id} sections={["image"]} />
           </ShotCard>
         ))}
       </div>

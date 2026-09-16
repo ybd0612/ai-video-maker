@@ -28,12 +28,10 @@ function makeShot(): Shot {
     detailDesc: "white blouse",
     lightingDesc: "warm golden hour",
     styleDesc: "photorealistic, 8k",
-    negativePrompt: "bad anatomy",
     actionDesc: "slowly turns her head",
     cameraDesc: "dolly in",
     envChangeDesc: "steam rising",
     motionSpeedDesc: "slow-motion",
-    negativeMotionPrompt: "morphing",
     firstFrameUrl: "https://img.example/first.png",
     lastFrameUrl: "https://img.example/last.png",
     useDualFrame: true,
@@ -53,12 +51,10 @@ describe("pickShotFields", () => {
     expect(picked.detailDesc).toBe("white blouse");
     expect(picked.lightingDesc).toBe("warm golden hour");
     expect(picked.styleDesc).toBe("photorealistic, 8k");
-    expect(picked.negativePrompt).toBe("bad anatomy");
     expect(picked.actionDesc).toBe("slowly turns her head");
     expect(picked.cameraDesc).toBe("dolly in");
     expect(picked.envChangeDesc).toBe("steam rising");
     expect(picked.motionSpeedDesc).toBe("slow-motion");
-    expect(picked.negativeMotionPrompt).toBe("morphing");
     expect(picked.firstFrameUrl).toBe("https://img.example/first.png");
   });
 

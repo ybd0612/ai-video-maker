@@ -40,12 +40,10 @@ interface RawShot {
   detailDesc?: string;
   lightingDesc?: string;
   styleDesc?: string;
-  negativePrompt?: string;
   actionDesc?: string;
   cameraDesc?: string;
   envChangeDesc?: string;
   motionSpeedDesc?: string;
-  negativeMotionPrompt?: string;
   useDualFrame?: boolean;
 }
 
@@ -316,12 +314,10 @@ function normalizeRawShot(s: RawShot): RawShot {
     detailDesc: s.detailDesc ?? "",
     lightingDesc: s.lightingDesc ?? "",
     styleDesc: s.styleDesc ?? "",
-    negativePrompt: s.negativePrompt ?? "",
     actionDesc: s.actionDesc ?? "",
     cameraDesc: s.cameraDesc ?? "",
     envChangeDesc: s.envChangeDesc ?? "",
     motionSpeedDesc: s.motionSpeedDesc ?? "",
-    negativeMotionPrompt: s.negativeMotionPrompt ?? "",
     duration: [4, 5, 8].includes(s.duration) ? s.duration : 5,
     useDualFrame: s.useDualFrame ?? false,
   };
