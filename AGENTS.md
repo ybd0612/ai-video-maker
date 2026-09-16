@@ -28,8 +28,11 @@ src/
 │   │   ├── StepVideos.tsx         # 步骤5：视频生成
 │   │   ├── StepAssembly.tsx       # 步骤6：成片拼接
 │   │   ├── useWizardActions.ts    # 向导操作编排（含模块级幂等守卫注册表）
-│   │   ├── ShotCard.tsx           # 分镜卡片（状态徽标 + 展开详情）
-│   │   ├── PromptSubFields.tsx    # 提示词子字段编辑
+│   │   ├── ShotListSection.tsx    # 分镜列表卡（整卡点击进入详情）
+│   │   ├── ShotDetail.tsx         # 分镜详情（内容全只读 + 一句话交给 AI 改）
+│   │   ├── shotStatus.tsx         # 镜头状态 → 图标/语义色（列表卡与镜头卡共用）
+│   │   ├── ShotCard.tsx           # 镜头卡（图片/视频步骤用，展开式）
+│   │   ├── PromptSubFields.tsx    # 提示词子字段编辑（图片/视频步骤用）
 │   │   ├── DualFrameToggle.tsx    # 首尾帧开关
 │   │   └── ReviewCheckpoint.tsx   # 审核卡点
 │   ├── characters/                # 角色编辑器（CharacterEditor）/ 面板（CharacterPanel）
@@ -313,7 +316,9 @@ src/
 
 ## 多项目管理
 
-- 左侧面板四个标签：**项目**（ProjectSidebar）、**分镜**（ShotList）、**角色**（CharacterPanel）、**历史**（HistoryPanel）
+- 左侧面板只保留**项目**（ProjectSidebar）；分镜列表与镜头详情在向导步骤 3（`ShotListSection` → `ShotDetail`），角色编辑在步骤 2，操作历史已整体停用
+- **分镜内容全只读**：镜头文案 / 结构化子字段 / 英文提示词 / 对白 / 资产引用都不可手改，唯一修改入口是步骤 3 详情页的「交给 AI 修改」（`ShotDetail` + `useScriptActions.reviseShot` → `reviseShotWithInstruction`）；禁再加回逐字段输入框，也禁新增第二套分镜详情布局（必须复用 `AssetDetailShell` 系列）
+- **进入分镜步骤前先在资产页等首个镜头**：`StepAssets.enterStoryboard` 触发 `generateStoryboard` 并在首个镜头写回时切页（与「想法 → 资产」同构）；禁改回「先切页再生成」的一屏转圈体验
 - 项目操作：创建 / 切换 / 删除 / 复制
 - 复制项目时保留分镜结构，重置状态为 idle
 - v1 → v11 持续存储迁移：旧单项目、多轮字段和角色描述格式逐步转换为当前多项目结构；新增持久化字段必须增加版本迁移与回归测试

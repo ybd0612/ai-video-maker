@@ -36,7 +36,7 @@ export function StepAssets() {
   const updateAssetByProjectIdIfRevision = useProjectStore((s) => s.updateAssetByProjectIdIfRevision);
   const setWizardStep = useProjectStore((s) => s.setWizardStep);
   const providerConfig = useSettingsStore((s) => s.providerConfig);
-  const { generateAssetImages, generateStyleReference } = useWizardActions();
+  const { generateAssetImages, generateStyleReference, generateStoryboard } = useWizardActions();
 
   const [editingChar, setEditingChar] = useState<Asset | null>(null);
   const [showEditor, setShowEditor] = useState(false);
@@ -46,6 +46,19 @@ export function StepAssets() {
   const [generatingProducts, setGeneratingProducts] = useState<Set<string>>(new Set());
   const [generatingProps, setGeneratingProps] = useState<Set<string>>(new Set());
   const [generatingStyle, setGeneratingStyle] = useState(false);
+  // 「进入分镜」过程态：在本页等待分镜首个镜头就绪后再切到步骤 3，
+  // 与「想法 → 资产」同构（不在生成前切页，避免用户进去先看一屏转圈）。
+  const [enteringStoryboard, setEnteringStoryboard] = useState(false);
+  const [storyboardError, setStoryboardError] = useState<string | null>(null);
+
+  // 卸载守卫：切页后 onProgress / finally 里的 setState 已无意义
+  const mountedRef = useRef(true);
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
   // 本页任一生成请求进行中（批量 / 风格 / 单项场景 / 单项产品）：
   // 统一禁用所有生成按钮 —— 批量与单项可能重复提交同一资产（双倍配额消耗），
   // 且共用集中式限流器，逐个排队不如明确禁用直观。全部请求返回后恢复。
@@ -79,6 +92,49 @@ export function StepAssets() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [project?.id]);
 
+  /**
+   * 进入分镜页：先在资产页触发生成分镜，首个镜头就绪后再切页
+   * （与「想法 → 资产」同构，避免用户进去先看一屏转圈）。
+   * - 已有分镜内容：直接切页，绝不覆盖用户已确认的内容；
+   * - 生成失败（大纲阶段异常）：留在资产页展示错误，用户可重试。
+   */
+  const enterStoryboard = async () => {
+    const targetProjectId = project?.id;
+    if (!targetProjectId) return;
+    const idea = (project?.ideaPrompt ?? "").trim();
+    const hasContent = (project?.shots ?? []).some((s) => s.scriptText.trim() || s.visualPrompt.trim());
+    if (hasContent || !idea) {
+      setWizardStep(3);
+      return;
+    }
+
+    setEnteringStoryboard(true);
+    setStoryboardError(null);
+    let navigated = false;
+    try {
+      await generateStoryboard(idea, {
+        onProgress: () => {
+          // 首个镜头就该绪（成功或失败）即切页：进去立刻有内容可审，其余镜头继续填充
+          if (navigated) return;
+          navigated = true;
+          setWizardStep(3);
+        },
+      });
+    } catch (err) {
+      setStoryboardError(err instanceof Error ? err.message : String(err));
+    } finally {
+      if (mountedRef.current) setEnteringStoryboard(false);
+    }
+  };
+
+  /** 审核卡点确认：置审核标记后进入分镜（生成与切页统一由 enterStoryboard 处理） */
+  const handleConfirmAssets = async () => {
+    const targetProjectId = project?.id;
+    if (!targetProjectId) return;
+    useProjectStore.getState().updateProjectById(targetProjectId, (p) => ({ ...p, assetsReviewed: true }));
+    await enterStoryboard();
+  };
+
   // auto 模式：全部资产有图后自动推进到 Step 3（分镜页挂载后会自动生成分镜）。
   // 仅在本次观察期间「从缺到齐」（false→true）时推进：挂载时已全部就绪
   // （如从后续步骤返回）不推进，避免用户无法返回上一步修改。
@@ -91,7 +147,8 @@ export function StepAssets() {
     const prev = prevAllImagedByProjectRef.current[pid] ?? allAssetsImaged;
     prevAllImagedByProjectRef.current[pid] = allAssetsImaged;
     if (allAssetsImaged && !prev && project?.automationMode === "auto") {
-      setWizardStep(3);
+      // 与半自动一致：先在资产页等待分镜首个镜头就绪，再切页（避免进去看一屏转圈）
+      void enterStoryboard();
     }
   }, [allAssetsImaged, project?.id, project?.automationMode, setWizardStep]);
 
@@ -408,15 +465,19 @@ export function StepAssets() {
           <h3 className="text-sm font-semibold text-ink">{t("review.assetsQualityCheck")}</h3>
           <p className="mt-1 text-xs text-ink-3">{t("review.assetsHint")}</p>
           <button
-            onClick={() => {
-              useProjectStore.getState().updateProject({ assetsReviewed: true });
-              setWizardStep(3);
-            }}
-            disabled={anyGenerating}
-            className="mt-3 rounded-lg bg-success-solid px-4 py-2 text-xs font-medium text-white transition hover:bg-success-solid disabled:cursor-not-allowed disabled:opacity-50"
+            onClick={() => void handleConfirmAssets()}
+            disabled={anyGenerating || enteringStoryboard}
+            className="mt-3 flex items-center gap-1.5 rounded-lg bg-success-solid px-4 py-2 text-xs font-medium text-white transition hover:bg-success-solid disabled:cursor-not-allowed disabled:opacity-50"
           >
-            {t("review.confirmAssets")}
+            {enteringStoryboard && <Loader2 size={12} className="animate-spin" />}
+            {enteringStoryboard ? t("wizard.storyboardPreparing") : t("review.confirmAssets")}
           </button>
+          {enteringStoryboard && (
+            <p className="mt-2 text-[0.625rem] text-ink-5">{t("wizard.storyboardEnterHint")}</p>
+          )}
+          {storyboardError && (
+            <p className="mt-2 text-[0.625rem] text-danger">{storyboardError}</p>
+          )}
         </div>
       )}
     </div>

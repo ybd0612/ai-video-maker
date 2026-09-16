@@ -9,6 +9,8 @@ import { createAIService } from "@/services/ai/factory";
 import {
   buildSystemPrompt as buildTaskSystemPrompt,
   getActiveRules,
+  SYSTEM_PROMPT_SHOT_EDIT_EN,
+  SYSTEM_PROMPT_SHOT_EDIT_ZH,
 } from "@/lib/promptRules";
 import { extractJsonFromResponse, parseJsonFromResponse } from "@/lib/jsonResponse";
 import { getTranslation } from "@/i18n";
@@ -294,8 +296,8 @@ export async function generateStoryboardOutline(
   };
 }
 
-/** 单镜头输出归一化：字段补默认、引用容错 + 空 prompt 兜底（跨阶段共享） */
-function normalizeRawShot(s: RawShot): RawShot {
+/** 单镜头输出归一化：字段补默认、引用容错 + 空 prompt 兜底（跨阶段共享，导出供单测） */
+export function normalizeRawShot(s: RawShot): RawShot {
   const dialogues = Array.isArray(s.dialogues) ? s.dialogues : [];
   const shot: RawShot = {
     ...s,
@@ -418,6 +420,128 @@ export async function generateStoryboardShot(
     }
   }
   throw lastError ?? new Error("Shot generation failed after retries.");
+}
+
+/* ── 单镜头指令改写（步骤 3 详情页，AI 修改的唯一入口） ─────────────────── */
+
+/**
+ * 交给模型的镜头载荷：只含内容字段，不含 id / status / imageUrl / videoUrl 等运行时数据。
+ * 资产引用统一转成资产名称（模型更容易把名称写对，且与 {{assets}} 上下文一致）。
+ */
+function buildShotEditPayload(shot: Shot, assets: Asset[]): Record<string, unknown> {
+  const nameOf = (id: string | undefined, type: Asset["type"]): string | undefined => {
+    if (!id) return undefined;
+    return assets.find((asset) => asset.id === id && asset.type === type)?.name ?? id;
+  };
+  return {
+    scriptText: shot.scriptText,
+    visualPrompt: shot.visualPrompt,
+    motionPrompt: shot.motionPrompt,
+    sceneDesc: shot.sceneDesc ?? "",
+    detailDesc: shot.detailDesc ?? "",
+    lightingDesc: shot.lightingDesc ?? "",
+    styleDesc: shot.styleDesc ?? "",
+    actionDesc: shot.actionDesc ?? "",
+    cameraDesc: shot.cameraDesc ?? "",
+    envChangeDesc: shot.envChangeDesc ?? "",
+    motionSpeedDesc: shot.motionSpeedDesc ?? "",
+    duration: shot.duration,
+    dialogues: shot.dialogues.map((line) => ({
+      characterName: nameOf(line.characterId ?? undefined, "character") ?? "",
+      text: line.text,
+      ...(line.delivery ? { delivery: line.delivery } : {}),
+    })),
+    activeCharacterNames: shot.activeCharacterIds
+      .map((id) => nameOf(id, "character"))
+      .filter((name): name is string => !!name),
+    activeSceneName: nameOf(shot.activeSceneId, "scene"),
+    activeProductNames: shot.activeProductIds
+      .map((id) => nameOf(id, "product"))
+      .filter((name): name is string => !!name),
+    activePropNames: shot.activePropIds
+      .map((id) => nameOf(id, "prop"))
+      .filter((name): name is string => !!name),
+  };
+}
+
+/**
+ * 单镜头指令改写：把已有镜头 + 用户修改要求交给文本模型，返回重写后的完整镜头。
+ * 字段规格复用 storyboardShot 骨架（避免两处规格漂移），重试策略与逐镜头生成一致。
+ */
+export async function reviseShotWithInstruction(opts: {
+  apiKey: string;
+  baseUrl: string;
+  language: "zh" | "en";
+  aspectRatio: string;
+  assets?: Asset[];
+  shot: Shot;
+  instruction: string;
+}): Promise<RawShot> {
+  const spec = buildTaskSystemPrompt("storyboardShot", opts.language, getActiveRules())
+    .replace("{{assets}}", () => buildAssetsContext(opts.language, opts.assets));
+  const editIntro =
+    opts.language === "en" ? SYSTEM_PROMPT_SHOT_EDIT_EN : SYSTEM_PROMPT_SHOT_EDIT_ZH;
+  const systemPrompt = `${editIntro}\n\n---\n\n${spec}`;
+
+  const service = createAIService({
+    provider: "openai",
+    apiKey: opts.apiKey,
+    baseUrl: opts.baseUrl,
+  });
+
+  const params = await resolveGenerationParams({
+    purpose: "shotEdit",
+    apiKey: opts.apiKey,
+    baseUrl: opts.baseUrl,
+    context: [
+      "Task: revise ONE existing storyboard shot per the user's instruction and return the complete updated shot as strict JSON.",
+      `Language: ${opts.language}`,
+      `Aspect ratio: ${opts.aspectRatio}`,
+    ].join("\n"),
+  });
+
+  const userContent = [
+    `Current shot (complete JSON):\n${JSON.stringify(buildShotEditPayload(opts.shot, opts.assets ?? []), null, 2)}`,
+    `Revision request:\n${opts.instruction.trim() || "Improve this shot's script and prompts while keeping its intent."}`,
+    "Return the complete updated shot as strict JSON (single object, no array).",
+  ].join("\n\n");
+
+  let lastError: Error | null = null;
+  for (let attempt = 0; attempt <= MAX_SCRIPT_RETRIES; attempt++) {
+    const result = await service.chatCompletion({
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userContent },
+      ],
+      temperature: params.temperature,
+      ...(params.topP === undefined ? {} : { topP: params.topP }),
+      enableThinking: params.enableThinking,
+    });
+
+    const jsonStr = extractJsonFromResponse(result.content);
+    if (!jsonStr) {
+      lastError = new Error(
+        `${getTranslation("error.scriptJsonExtractFailed", { attempt: attempt + 1 })} ${getTranslation("error.scriptNotJson", { body: result.content.slice(0, 200) })}`,
+      );
+      if (attempt < MAX_SCRIPT_RETRIES) continue;
+      throw lastError;
+    }
+
+    try {
+      const parsed = parseJsonFromResponse<RawShot>(result.content);
+      if (!parsed) throw new Error(getTranslation("error.shotsInvalid"));
+      const shot = normalizeRawShot(parsed);
+      if (!shot.visualPrompt.trim() || !shot.motionPrompt.trim()) {
+        throw new Error(getTranslation("error.shotMissingPromptRetry"));
+      }
+      return shot;
+    } catch (parseErr) {
+      lastError = parseErr instanceof Error ? parseErr : new Error(String(parseErr));
+      if (attempt < MAX_SCRIPT_RETRIES) continue;
+      throw lastError;
+    }
+  }
+  throw lastError ?? new Error("Shot revision failed after retries.");
 }
 
 /* ── 轻量资产提取（步骤 1 使用，不生成分镜，节省 token） ──────────────────── */

@@ -1,39 +1,41 @@
 // ────────────────────────────────────────────────────────────────────────────
 // src/features/wizard/StepStoryboard.tsx
-// Step 3: Generate and edit storyboard shots with structured sub-elements.
-// Uses asset context (characters + scene references) for consistency.
+// Step 3: 分镜列表 + 生成 / 重新生成 / 审核卡点。
+// 2026-09-16 布局改造：原「卡片折叠展开 + 8 个子字段各自润色」收敛为
+// 「列表卡 → 详情页（内容全只读 + 一句话交给 AI 改）」，与资产链同一交互模型。
 // ────────────────────────────────────────────────────────────────────────────
 
 import { useEffect, useRef, useState } from "react";
-import { useProjectStore, selectActiveProject, type Asset } from "@/stores/projectStore";
+import { useProjectStore, selectActiveProject, type Asset, type Shot } from "@/stores/projectStore";
 import { useT, type TranslationKey } from "@/i18n";
-import { ShotCard } from "./ShotCard";
-import { PromptSubFields } from "./PromptSubFields";
-import { PromptField } from "./PromptField";
-import { SYSTEM_PROMPT_SCRIPT_TEXT } from "@/services/chatService";
-import { DialogueEditor } from "@/features/shots/DialogueEditor";
+import { ShotListSection } from "./ShotListSection";
+import { ShotDetail } from "./ShotDetail";
 import { useWizardActions, hasActiveScriptTask } from "./useWizardActions";
+import { useSettingsStore } from "@/stores/settingsStore";
 import { confirmDialog } from "@/components/ui/ConfirmDialog";
-import { Plus, Sparkles, Loader2 } from "lucide-react";
+import { Sparkles, Loader2 } from "lucide-react";
 
 export function StepStoryboard() {
   const t = useT();
   const project = useProjectStore(selectActiveProject);
-  const updateShot = useProjectStore((s) => s.updateShot);
   const removeShot = useProjectStore((s) => s.removeShot);
   const addShot = useProjectStore((s) => s.addShot);
   const setWizardStep = useProjectStore((s) => s.setWizardStep);
   const updateProject = useProjectStore((s) => s.updateProject);
-  const { rerollShot, generateStoryboard } = useWizardActions();
+  const hasApiKey = useSettingsStore((s) => Boolean(s.providerConfig.apiKey && s.providerConfig.baseUrl));
+  const { rerollShot, generateStoryboard, reviseShot } = useWizardActions();
+  const [editingShotId, setEditingShotId] = useState<string | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const shots = project?.shots ?? [];
   const assets = project?.assets ?? [];
-  const hasCharacters = assets.some((a) => a.type === "character");
   const ideaPrompt = project?.ideaPrompt ?? "";
   const allShotsHaveScript = shots.length > 0 && shots.every((shot) => shot.scriptText.trim());
   const allShotsHaveVisualPrompt = shots.length > 0 && shots.every((shot) => shot.visualPrompt.trim());
+  // 「生成中」以 store 为准：从资产页切进来时任务已在飞，只靠局部 isGenerating 会漏判
+  const generating = isGenerating || shots.some((shot) => shot.status === "scripting");
+  const editingShot = editingShotId ? shots.find((shot) => shot.id === editingShotId) ?? null : null;
 
   const handleGenerateStoryboard = async () => {
     if (!ideaPrompt.trim() || !project) return;
@@ -51,10 +53,6 @@ export function StepStoryboard() {
     setIsGenerating(true);
     setError(null);
     try {
-      // generateStoryboard 已由 AI 直接输出完整的 visualPrompt + motionPrompt（英文），
-      // 无需再调用 translateToMotion 翻译覆盖 —— 该步骤 JSON 解析失败时
-      // 会用 "Camera slowly pans, gentle movement" 等兜底文案覆盖完整提示词，
-      // 导致视频生成请求体 prompt 内容缺失（用户实测发现的提示词丢失问题）。
       await generateStoryboard(ideaPrompt.trim());
       // auto 模式：分镜生成成功后自动推进到图片步骤（无需确认）
       const latest = useProjectStore.getState().projects.find((p) => p.id === project.id);
@@ -80,6 +78,18 @@ export function StepStoryboard() {
       duration: 5,
       useDualFrame: false,
     });
+  };
+
+  const handleDeleteShot = async (shot: Shot) => {
+    const ok = await confirmDialog({
+      title: t("dialog.delete"),
+      message: t("wizard.shotDeleteConfirm", { index: shot.index + 1 }),
+      confirmLabel: t("dialog.confirm"),
+      variant: "danger",
+    });
+    if (!ok) return;
+    removeShot(shot.id);
+    if (editingShotId === shot.id) setEditingShotId(null);
   };
 
   // 自动生成分镜：挂载 / 镜头数变化时触发一次（与 StepImages 自动生成同模式）。
@@ -118,6 +128,20 @@ export function StepStoryboard() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [shots.length, ideaPromptTrimmed]);
 
+  // ── 详情视图（整页替换，与资产详情同一模式） ──────────────────────────
+  if (editingShot) {
+    return (
+      <ShotDetail
+        shot={editingShot}
+        assets={assets}
+        hasApiKey={hasApiKey}
+        onClose={() => setEditingShotId(null)}
+        onRevise={(instruction) => reviseShot(editingShot.id, instruction)}
+        onReroll={() => rerollShot(editingShot.id)}
+      />
+    );
+  }
+
   // Show generate prompt when no shots exist
   if (shots.length === 0) {
     return (
@@ -144,15 +168,15 @@ export function StepStoryboard() {
 
         <button
           onClick={handleGenerateStoryboard}
-          disabled={!ideaPrompt.trim() || isGenerating}
+          disabled={!ideaPrompt.trim() || generating}
           className="flex items-center gap-2 rounded-xl bg-success-solid px-8 py-3 text-sm font-semibold text-white transition hover:bg-success-solid disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          {isGenerating ? (
+          {generating ? (
             <Loader2 size={16} className="animate-spin" />
           ) : (
             <Sparkles size={16} />
           )}
-          {isGenerating ? t("wizard.generating") : t("wizard.generate")}
+          {generating ? t("wizard.generating") : t("wizard.generate")}
         </button>
 
         {error && (
@@ -161,12 +185,10 @@ export function StepStoryboard() {
           </div>
         )}
 
-        {/* Manual add option */}
         <button
           onClick={handleAddShot}
-          className="flex items-center gap-1.5 text-xs text-ink-4 hover:text-ink-2 transition"
+          className="text-xs text-ink-4 transition hover:text-ink-2"
         >
-          <Plus size={12} />
           {t("wizard.addShotManual")}
         </button>
       </div>
@@ -180,78 +202,35 @@ export function StepStoryboard() {
         <h2 className="text-sm font-bold text-ink">
           {t("wizard.step2")} ({shots.length})
         </h2>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={handleGenerateStoryboard}
-            disabled={isGenerating}
-            className="flex items-center gap-1 rounded px-2 py-1 text-[0.6875rem] text-accent hover:bg-accent-deep/30 transition disabled:opacity-50"
-          >
-            {isGenerating ? <Loader2 size={11} className="animate-spin" /> : <Sparkles size={11} />}
-            {isGenerating ? t("wizard.generating") : t("wizard.reroll")}
-          </button>
-          <button
-            onClick={handleAddShot}
-            className="flex items-center gap-1 rounded px-2 py-1 text-[0.6875rem] text-success hover:bg-success-deep/30 transition"
-          >
-            <Plus size={12} />
-            {t("wizard.addShot")}
-          </button>
-        </div>
+        <button
+          onClick={handleGenerateStoryboard}
+          disabled={generating}
+          className="flex items-center gap-1 rounded px-2 py-1 text-[0.6875rem] text-accent transition hover:bg-accent-deep/30 disabled:opacity-50"
+        >
+          {generating ? <Loader2 size={11} className="animate-spin" /> : <Sparkles size={11} />}
+          {generating ? t("wizard.generating") : t("wizard.reroll")}
+        </button>
       </div>
 
       {/* 资产摘要：常驻显示，让用户感知分镜生成时自动提取的资产 */}
       <AssetSummaryBar assets={assets} t={t} styleReady={!!project?.styleReferenceUrl} />
 
-      {/* Shot cards */}
-      <div className="flex flex-col gap-2">
-        {shots.map((shot) => (
-          <ShotCard
-            key={shot.id}
-            shot={shot}
-            mode="storyboard"
-            onReroll={() => rerollShot(shot.id)}
-            onDelete={() => removeShot(shot.id)}
-            // 单镜头重写脚本期间（status="scripting"）禁用重roll按钮，防止重复提交重复计费
-            isGenerating={shot.status === "scripting"}
-          >
-            {/* Script text */}
-            <PromptField
-              label={t("pipeline.scriptText")}
-              value={shot.scriptText}
-              onChange={(v) => updateShot(shot.id, { scriptText: v })}
-              systemPrompt={SYSTEM_PROMPT_SCRIPT_TEXT}
-              resetKey={shot.id}
-              rows={2}
-              color="sky"
-            />
+      {/* Shot list：整卡点击进入详情 */}
+      <ShotListSection
+        shots={shots}
+        emptyHint={t("shotList.emptyHint")}
+        addLabel={t("wizard.addShot")}
+        deleteLabel={t("dialog.delete")}
+        onOpen={(shot) => setEditingShotId(shot.id)}
+        onDelete={(shot) => void handleDeleteShot(shot)}
+        onAdd={handleAddShot}
+      />
 
-            {/* Duration */}
-            <div className="flex items-center gap-2">
-              <label className="text-[0.6875rem] font-medium text-ink-4">
-                {t("pipeline.duration")}
-              </label>
-              <select
-                value={shot.duration}
-                onChange={(e) => updateShot(shot.id, { duration: parseInt(e.target.value) })}
-                className="rounded border border-line bg-raised px-2 py-1 text-xs text-ink-2 focus:outline-none"
-              >
-                <option value={4}>4s</option>
-                <option value={5}>5s</option>
-                <option value={8}>8s</option>
-              </select>
-            </div>
-
-            {/* Structured sub-elements */}
-            <PromptSubFields
-              shotId={shot.id}
-              sections={["image", "motion"]}
-            />
-
-            {/* Dialogue editor (drama mode only) */}
-            {hasCharacters && <DialogueEditor shotId={shot.id} />}
-          </ShotCard>
-        ))}
-      </div>
+      {error && (
+        <div className="rounded-lg border border-danger bg-danger-deep/30 p-3 text-sm text-danger">
+          {error}
+        </div>
+      )}
 
       {/* 分镜确认卡：semi-auto 模式下确认后进入图片生成（auto 模式已自动推进） */}
       {project?.automationMode !== "auto" && (

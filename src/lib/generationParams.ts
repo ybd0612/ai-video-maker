@@ -29,6 +29,7 @@ export type GenerationPurpose =
   | "assetExtraction"
   | "storyboard"
   | "storyboardOutline"
+  | "shotEdit"
   | "shotReroll"
   | "styleRef"
   | "stylePromptAudit"

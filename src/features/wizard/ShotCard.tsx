@@ -6,9 +6,10 @@
 import { useState } from "react";
 import type { Shot } from "@/stores/projectStore";
 import { useT } from "@/i18n";
-import { ChevronDown, RefreshCw, Trash2, Loader2, Check, AlertCircle } from "lucide-react";
+import { ChevronDown, RefreshCw, Trash2 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Lightbox } from "@/components/ui/Lightbox";
+import { shotStatusInfo } from "./shotStatus";
 
 type ShotCardMode = "storyboard" | "image" | "video";
 
@@ -21,17 +22,6 @@ interface ShotCardProps {
   children?: React.ReactNode;
 }
 
-const STATUS_ICONS: Record<string, { icon: typeof Check; color: string }> = {
-  idle: { icon: ChevronDown, color: "text-ink-4" },
-  scripting: { icon: Loader2, color: "text-info animate-spin" },
-  scripted: { icon: Check, color: "text-info" },
-  imaging: { icon: Loader2, color: "text-accent animate-spin" },
-  imaged: { icon: Check, color: "text-accent" },
-  videoing: { icon: Loader2, color: "text-warn animate-spin" },
-  videoed: { icon: Check, color: "text-warn" },
-  failed: { icon: AlertCircle, color: "text-danger" },
-};
-
 export function ShotCard({
   shot,
   mode,
@@ -42,7 +32,7 @@ export function ShotCard({
 }: ShotCardProps) {
   const t = useT();
   const [expanded, setExpanded] = useState(false);
-  const statusInfo = STATUS_ICONS[shot.status] ?? STATUS_ICONS.idle;
+  const statusInfo = shotStatusInfo(shot.status);
   const StatusIcon = statusInfo.icon;
 
   // Summary text based on mode

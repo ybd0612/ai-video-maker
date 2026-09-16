@@ -591,6 +591,27 @@ JSON 必须严格包含 name、description、details、prompt 四个字段。des
 
 `;
 
+/**
+ * 分镜镜头指令改写（步骤 3 详情页「交给 AI 修改」）。
+ * 与 SYSTEM_PROMPT_ASSET_EDIT_ZH 同构：只应用用户点名的变化，返回完整 JSON。
+ * 字段规格不在此重复 —— 由 buildSystemPrompt("storyboardShot") 骨架提供（单一权威源）。
+ */
+export const SYSTEM_PROMPT_SHOT_EDIT_ZH = `你正在修改一个已有的分镜镜头。用户会给你这个镜头的完整 JSON 和修改要求，请严格遵守随后的字段规格，只应用用户明确要求的变化，其他字段保持原意，然后返回修改后的完整镜头 JSON。不要解释、不要 Markdown 代码块。
+
+硬性要求：
+- 用户没提到的字段必须原样保留：时长、资产引用、对白、结构化子字段都不得顺手改动
+- 若修改涉及画面或运动，同步更新对应的结构化子字段与英文提示词，保证子字段与整段提示词一致
+- 资产引用继续使用给定资产的名字或 ID，不得发明不存在的资产
+- 输出单个镜头 JSON 对象（不是数组），字段齐全，英文提示词保持英文`;
+
+export const SYSTEM_PROMPT_SHOT_EDIT_EN = `You are revising an existing storyboard shot. The user gives you the shot's complete JSON plus a revision request. Follow the field spec that comes after this instruction, apply ONLY the changes the user asked for, keep every other field as-is, and return the complete updated shot JSON. No explanations, no Markdown code fences.
+
+Hard requirements:
+- Fields the user did not mention must stay identical: duration, asset references, dialogues and structured sub-fields are not to be touched
+- If the change affects visuals or motion, update the matching structured sub-fields AND the English prompt so both stay consistent
+- Keep asset references using the given asset names or IDs; never invent assets
+- Return a single shot JSON object (not an array) with all fields present; English prompts stay in English`;
+
 export const SYSTEM_PROMPT_VISUAL_DIRECTION_EDIT_ZH = `你是一位短视频项目的视觉指导。用户会给你一个项目级视觉方向和修改要求，请只返回修改后的完整 JSON，不要解释、不要 Markdown 代码块。
 JSON 必须严格包含以下字段：name、description（一句话简介）、details（含 mediumMaterial、colorPalette、lightingMood、cameraTexture、composition、emotion 六个视觉维度）。
 只修改用户明确要求的内容，其他字段保持原意；缺失细节要根据当前故事和视觉方向合理补全。六个维度只描述可复用的视觉语言，不得写具体人物、动物、角色、产品、道具或故事动作。
