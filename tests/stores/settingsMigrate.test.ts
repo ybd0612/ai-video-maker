@@ -4,6 +4,7 @@
 // - v0 → v1：apihub.agnes-ai.com 旧域名迁移到中国站（旧分支不回归）
 // - v1 → v2：promptRules 缺失/非法兜底 []；合法数组原样保留
 // - v2 → v3：theme 缺失兜底 light（默认白色）；显式 dark 保留
+// - v3 → v4：移除 persistLog 开关（日志持久化恒开），旧存储残留字段被删除
 // - 坏结构不抛错
 // 用 tests/helpers/localStorage.ts 桩（node 环境，persist 模块加载期读 storage）。
 // ────────────────────────────────────────────────────────────────────────────
@@ -119,6 +120,25 @@ describe("migratePersistedSettings：v2 → v3（theme 默认白色）", () => {
   it("version >= 3 时不再兜底（幂等 no-op）", () => {
     const migrated = migratePersistedSettings({}, 3);
     expect(migrated.theme).toBeUndefined();
+  });
+});
+
+describe("migratePersistedSettings：v3 → v4（persistLog 开关移除）", () => {
+  it("旧存储残留的 persistLog 字段被删除，其余日志开关不受影响", () => {
+    const migrated = migratePersistedSettings(
+      { persistLog: false, loggingEnabled: true, showLogPanel: true },
+      3,
+    );
+    // 字段已从 SettingsState 类型中移除；若残留会被 zustand persist 浅合并塞回 state
+    expect("persistLog" in migrated).toBe(false);
+    expect(migrated.loggingEnabled).toBe(true);
+    expect(migrated.showLogPanel).toBe(true);
+  });
+
+  it("version >= 4 时该分支为 no-op（不误删其它字段）", () => {
+    const migrated = migratePersistedSettings({ theme: "dark", showLogPanel: false }, 4);
+    expect(migrated.theme).toBe("dark");
+    expect(migrated.showLogPanel).toBe(false);
   });
 });
 

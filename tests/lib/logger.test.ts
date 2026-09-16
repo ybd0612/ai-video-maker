@@ -26,7 +26,7 @@ import { useSettingsStore } from "@/stores/settingsStore";
 
 beforeEach(() => {
   // 每个用例注入全新内存存储，避免用例间互相影响（logger 的 adapter 是模块级状态）
-  useSettingsStore.setState({ loggingEnabled: true, persistLog: true });
+  useSettingsStore.setState({ loggingEnabled: true });
   setLogStorage(createMemoryLogAdapter());
   clearLog();
   hydrateLog({ force: true });
@@ -252,24 +252,6 @@ describe("浏览器侧持久化（刷新后日志仍在）", () => {
 
     clearLog();
     expect(adapter.load()).toBeNull();
-    expect(getLogSnapshot()).toHaveLength(0);
-  });
-
-  it("关闭 persistLog 后既不写盘也不恢复历史", () => {
-    const adapter = createMemoryLogAdapter();
-    setLogStorage(adapter);
-    logger.info("app", "before-off");
-    flushLogPersist();
-    expect(adapter.load()).not.toBeNull();
-
-    useSettingsStore.setState({ persistLog: false });
-    logger.info("app", "while-off");
-    flushLogPersist();
-    // 存储保持关闭前的内容，未被覆盖
-    expect(adapter.load()?.map((e) => e.message)).toEqual(["before-off"]);
-
-    clearLog();
-    hydrateLog({ force: true });
     expect(getLogSnapshot()).toHaveLength(0);
   });
 

@@ -14,10 +14,10 @@
 //   服务层无需改签名：currentTrace() 自动挂到当前 trace 上。
 //
 // 开关：
-//   settingsStore.loggingEnabled（默认开启）—— 关闭后所有写入变为空操作；
-//   settingsStore.persistLog（默认开启）—— 日志另存到 localStorage，刷新后仍在。
+//   settingsStore.loggingEnabled（默认开启）—— 关闭后所有写入变为空操作。
 // 持久化：内存环形缓冲（1000 条）为主，变更后防抖写入 localStorage（收敛到 300 条、
 //   单条超长字段截断、总字节封顶）；页面隐藏 / 卸载时立即落盘，避免丢失尾部日志。
+//   持久化是系统固有行为（刷新 / 重开标签页日志仍在），**不设开关**。
 // ────────────────────────────────────────────────────────────────────────────
 
 import { useSettingsStore } from "@/stores/settingsStore";
@@ -94,16 +94,9 @@ let storage: LogStorageAdapter | null = null;
 let persistTimer: ReturnType<typeof setTimeout> | undefined;
 let hydrated = false;
 
-/** 持久化开关：日志采集关掉时不写盘，也不恢复历史 */
+/** 持久化跟随采集开关：采集关闭时既不写盘，也不恢复历史 */
 function persistenceEnabled(): boolean {
-  try {
-    return (
-      useSettingsStore.getState().loggingEnabled !== false &&
-      useSettingsStore.getState().persistLog !== false
-    );
-  } catch {
-    return true;
-  }
+  return loggingEnabled();
 }
 
 function getStorage(): LogStorageAdapter {

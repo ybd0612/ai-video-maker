@@ -338,8 +338,6 @@ export function SettingsDialog() {
   const setLanguage = useSettingsStore((s) => s.setLanguage);
   const loggingEnabled = useSettingsStore((s) => s.loggingEnabled);
   const setLoggingEnabled = useSettingsStore((s) => s.setLoggingEnabled);
-  const persistLog = useSettingsStore((s) => s.persistLog);
-  const setPersistLog = useSettingsStore((s) => s.setPersistLog);
   const showLogPanel = useSettingsStore((s) => s.showLogPanel);
   const setShowLogPanel = useSettingsStore((s) => s.setShowLogPanel);
   const t = useT();
@@ -623,16 +621,6 @@ export function SettingsDialog() {
                     />
                     {t("log.record")}
                   </label>
-                  <label className="flex select-none items-center gap-2 py-1 text-xs text-ink-2">
-                    <input
-                      type="checkbox"
-                      checked={persistLog}
-                      onChange={(e) => setPersistLog(e.target.checked)}
-                      className="h-3.5 w-3.5 accent-accent"
-                    />
-                    {t("log.persist")}
-                  </label>
-                  <p className="mt-1 text-[0.625rem] leading-relaxed text-ink-5">{t("log.persistHint")}</p>
                   <p className="mt-1 text-[0.625rem] leading-relaxed text-ink-5">{t("log.hint")}</p>
                 </div>
 
