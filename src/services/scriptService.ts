@@ -129,13 +129,31 @@ function buildAssetsContext(language: "zh" | "en", assets?: Asset[]): string {
   const products = (assets ?? []).filter((a) => a.type === "product");
   const props = (assets ?? []).filter((a) => a.type === "prop");
 
+  // 取资产的英文外观提示词（appearancePrompt）：角色存于专属字段 appearancePrompt，
+  // 场景/产品/道具存于 prompt（extractAssets 提取时同源拷贝），这里兼容两种落库位置。
+  const firstNonEmpty = (...values: unknown[]): string =>
+    values.find((value): value is string => typeof value === "string" && value.trim() !== "")?.trim() ?? "";
+  const assetAppearancePrompt = (a: Asset): string =>
+    firstNonEmpty(a.appearancePrompt, a.prompt);
+
+  // 每个资产条目显式注入英文外观提示词（appearancePrompt），同时保留 composeAssetDescription
+  // 的 details；storyboardShot 骨架明确要求「主体外观直接沿用所给资产的英文外观描述」，
+  // 缺了这段，模型就只能凭空捏造外观，破坏跨镜头一致性。
+  const withAppearance = (line: string, ap: string): string =>
+    ap ? `${line}\n  appearancePrompt: ${ap}` : line;
+
   if (language === "en") {
     let charSection = "";
     if (characters.length > 0) {
       charSection =
-        "\nExisting characters (use corresponding IDs if content involves them):\n" +
+        "\nExisting characters (use corresponding IDs if content involves them). Reuse the character's English appearancePrompt verbatim in visualPrompt:\n" +
         characters
-          .map((c) => `- ${c.name} (ID: ${c.id}): ${composeAssetDescription(c) || "No description"}`)
+          .map((c) =>
+            withAppearance(
+              `- ${c.name} (ID: ${c.id}): ${composeAssetDescription(c) || "No description"}`,
+              assetAppearancePrompt(c),
+            ),
+          )
           .join("\n") +
         "\n";
     }
@@ -143,9 +161,11 @@ function buildAssetsContext(language: "zh" | "en", assets?: Asset[]): string {
     let sceneSection = "";
     if (scenes.length > 0) {
       sceneSection =
-        "\nAvailable scene references (use these scenes, keep sceneDesc consistent with scene names):\n" +
+        "\nAvailable scene references (use these scenes, keep sceneDesc consistent with scene names). Reuse the scene's English appearancePrompt verbatim in visualPrompt:\n" +
         scenes
-          .map((s) => `- ${s.name}: ${composeAssetDescription(s)}`)
+          .map((s) =>
+            withAppearance(`- ${s.name} (ID: ${s.id}): ${composeAssetDescription(s)}`, assetAppearancePrompt(s)),
+          )
           .join("\n") +
         "\n";
     }
@@ -153,9 +173,11 @@ function buildAssetsContext(language: "zh" | "en", assets?: Asset[]): string {
     let productSection = "";
     if (products.length > 0) {
       productSection =
-        "\nExisting product subjects (if content involves these products, keep the subject consistent across shots):\n" +
+        "\nExisting product subjects (if content involves these products, keep the subject consistent across shots). Reuse the product's English appearancePrompt verbatim in visualPrompt:\n" +
         products
-          .map((p) => `- ${p.name}: ${composeAssetDescription(p)}`)
+          .map((p) =>
+            withAppearance(`- ${p.name} (ID: ${p.id}): ${composeAssetDescription(p)}`, assetAppearancePrompt(p)),
+          )
           .join("\n") +
         "\n";
     }
@@ -163,9 +185,14 @@ function buildAssetsContext(language: "zh" | "en", assets?: Asset[]): string {
     let propSection = "";
     if (props.length > 0) {
       propSection =
-        "\nExisting props / key objects (use IDs when they appear in a shot):\n" +
+        "\nExisting props / key objects (use IDs when they appear in a shot). Reuse the prop's English appearancePrompt verbatim in visualPrompt:\n" +
         props
-          .map((p) => `- ${p.name} (ID: ${p.id}): ${composeAssetDescription(p)}`)
+          .map((p) =>
+            withAppearance(
+              `- ${p.name} (ID: ${p.id}): ${composeAssetDescription(p)}`,
+              assetAppearancePrompt(p),
+            ),
+          )
           .join("\n") +
         "\n";
     }
@@ -176,9 +203,14 @@ function buildAssetsContext(language: "zh" | "en", assets?: Asset[]): string {
   let charSection = "";
   if (characters.length > 0) {
     charSection =
-      "\n已有角色（如内容涉及这些角色，请使用对应 ID）：\n" +
+      "\n已有角色（如内容涉及这些角色，请使用对应 ID）。visualPrompt 中的主体外观请直接沿用该角色的英文 appearancePrompt：\n" +
       characters
-        .map((c) => `- ${c.name}（ID: ${c.id}）：${composeAssetDescription(c) || "无描述"}`)
+        .map((c) =>
+          withAppearance(
+            `- ${c.name}（ID: ${c.id}）：${composeAssetDescription(c) || "无描述"}`,
+            assetAppearancePrompt(c),
+          ),
+        )
         .join("\n") +
       "\n";
   }
@@ -186,9 +218,11 @@ function buildAssetsContext(language: "zh" | "en", assets?: Asset[]): string {
   let sceneSection = "";
   if (scenes.length > 0) {
     sceneSection =
-      "\n已有场景参考（请在分镜中使用这些场景，保持 sceneDesc 与场景名称一致）：\n" +
+      "\n已有场景参考（请在分镜中使用这些场景，保持 sceneDesc 与场景名称一致）。visualPrompt 请直接沿用该场景的英文 appearancePrompt：\n" +
       scenes
-        .map((s) => `- ${s.name}：${composeAssetDescription(s)}`)
+        .map((s) =>
+          withAppearance(`- ${s.name}（ID: ${s.id}）：${composeAssetDescription(s)}`, assetAppearancePrompt(s)),
+        )
         .join("\n") +
       "\n";
   }
@@ -196,9 +230,11 @@ function buildAssetsContext(language: "zh" | "en", assets?: Asset[]): string {
   let productSection = "";
   if (products.length > 0) {
     productSection =
-      "\n已有产品主体（如内容涉及这些产品，请确保镜头主体保持一致）：\n" +
+      "\n已有产品主体（如内容涉及这些产品，请确保镜头主体保持一致）。visualPrompt 请直接沿用该产品的英文 appearancePrompt：\n" +
       products
-        .map((p) => `- ${p.name}：${composeAssetDescription(p)}`)
+        .map((p) =>
+          withAppearance(`- ${p.name}（ID: ${p.id}）：${composeAssetDescription(p)}`, assetAppearancePrompt(p)),
+        )
         .join("\n") +
       "\n";
   }
@@ -206,9 +242,14 @@ function buildAssetsContext(language: "zh" | "en", assets?: Asset[]): string {
   let propSection = "";
   if (props.length > 0) {
     propSection =
-      "\n已有道具 / 关键物件（出现在镜头中时请使用对应 ID）：\n" +
+      "\n已有道具 / 关键物件（出现在镜头中时请使用对应 ID）。visualPrompt 请直接沿用该道具的英文 appearancePrompt：\n" +
       props
-        .map((p) => `- ${p.name}（ID: ${p.id}）：${composeAssetDescription(p)}`)
+        .map((p) =>
+          withAppearance(
+            `- ${p.name}（ID: ${p.id}）：${composeAssetDescription(p)}`,
+            assetAppearancePrompt(p),
+          ),
+        )
         .join("\n") +
       "\n";
   }
@@ -296,7 +337,11 @@ export async function generateStoryboardOutline(
   };
 }
 
-/** 单镜头输出归一化：字段补默认、引用容错 + 空 prompt 兜底（跨阶段共享，导出供单测） */
+/**
+ * 单镜头输出归一化：字段补默认、引用容错 + 空 prompt 兜底（跨阶段共享，导出供单测）。
+ * 空 prompt 兜底为「不注入任何风格词」的最小安全兜底：只沿用原 scriptText（或空串），
+ * 视觉风格交由模型生成，代码绝不判断/硬编码 photorealistic、8k、Slow cinematic 之类效果词。
+ */
 export function normalizeRawShot(s: RawShot): RawShot {
   const dialogues = Array.isArray(s.dialogues) ? s.dialogues : [];
   const shot: RawShot = {
@@ -324,12 +369,11 @@ export function normalizeRawShot(s: RawShot): RawShot {
     duration: [4, 5, 8].includes(s.duration) ? s.duration : 5,
     useDualFrame: s.useDualFrame ?? false,
   };
-  if (!shot.visualPrompt.trim() && shot.scriptText.trim()) {
-    shot.visualPrompt = `Cinematic shot: ${shot.scriptText.trim()}, professional lighting, high quality, detailed composition, photorealistic, 8k`;
-  }
-  if (!shot.motionPrompt.trim() && shot.scriptText.trim()) {
-    shot.motionPrompt = `Slow cinematic camera movement, gentle ambient motion, subtle environmental changes, natural physics`;
-  }
+  // 最小安全兜底：不注入任何风格词（严禁 photorealistic/8k/Slow cinematic 等硬编码），
+  // 仅沿用脚本原文，视觉效果交由模型生成；原文为空则保留空串（由上层重试让模型补全）。
+  // 缺失时保持为空，让调用方的重试/失败处理识别为无效结果；不能把叙事脚本伪装成 API 提示词。
+  if (!shot.visualPrompt.trim()) shot.visualPrompt = "";
+  if (!shot.motionPrompt.trim()) shot.motionPrompt = "";
   return shot;
 }
 

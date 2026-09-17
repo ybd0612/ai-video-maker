@@ -209,10 +209,10 @@ export function useScriptActions(
         return visualDirection;
       })();
 
-      // 链 B：资产按类型并行提取（5 路小请求）。单类完成即写回；
-      // 单类失败不拖垮整体（该类资产缺失，用户可重试），全部失败才算失败。
+      // 链 B：资产按类型并行提取（4 路小请求）。风格由视觉方向链唯一负责；
+      // 单类完成即写回，单类失败不拖垮整体，全部失败才算失败。
       const assetsTask = (async () => {
-        const types: ExtractableAssetType[] = ["style", "character", "scene", "product", "prop"];
+        const types: ExtractableAssetType[] = ["character", "scene", "product", "prop"];
         let added = 0;
         const failures: Array<{ type: ExtractableAssetType; error: unknown }> = [];
 
@@ -223,8 +223,7 @@ export function useScriptActions(
               type === "character" ? result.characters
               : type === "scene" ? result.scenes
               : type === "product" ? result.products
-              : type === "prop" ? result.props
-              : result.styles;
+              : result.props;
             const built = extractNewAssets(project.assets, list as never, type, manualAssets).assets;
             const manualNames = new Set(manualAssets.map((a) => a.name.trim().toLocaleLowerCase()));
             const deduped = built.filter(

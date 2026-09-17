@@ -17,6 +17,8 @@ import {
   collectSubjectVocabulary,
   normalizeCharacterDescription,
   parseCharacterDescription,
+  appendRegistryRules,
+  type RegistryRuleText,
 } from "@/lib/promptComposer";
 
 /* ── 测试数据工厂 ─────────────────────────────────────────────────────────── */
@@ -168,6 +170,96 @@ describe("composeMultiReferencePrompt", () => {
 });
 
 /* ── composePortraitPrompt：物种锁定 ──────────────────────────────────────── */
+
+describe("appendRegistryRules", () => {
+  it("无规则返回原提示词（保持纯函数、零副作用）", () => {
+    expect(appendRegistryRules("a fox in a forest")).toBe("a fox in a forest");
+    expect(appendRegistryRules("a fox", undefined)).toBe("a fox");
+  });
+
+  it("composeShot 规则作为正向「Composition rules」约束追加", () => {
+    const out = appendRegistryRules("the fox walks", {
+      composeShot: "declare each reference image role, never copy composition",
+    });
+    expect(out).toBe(
+      "the fox walks, Composition rules: declare each reference image role, never copy composition",
+    );
+  });
+
+  it("negativeStrategy 规则作为正向「Quality requirements」约束追加（不新增 negative 字段）", () => {
+    const out = appendRegistryRules("the fox walks", {
+      negativeStrategy: "keep negatives to generic defects; phrase avoid-items as positive",
+    });
+    expect(out).toBe(
+      "the fox walks, Quality requirements: keep negatives to generic defects; phrase avoid-items as positive",
+    );
+  });
+
+  it("两者同时注入时顺序为 composeShot → negativeStrategy", () => {
+    const out = appendRegistryRules("base", {
+      composeShot: "multi-reference role declaration",
+      negativeStrategy: "quality defects only",
+    });
+    const iComp = out.indexOf("Composition rules");
+    const iQual = out.indexOf("Quality requirements");
+    expect(iComp).toBeGreaterThan(-1);
+    expect(iQual).toBeGreaterThan(iComp);
+  });
+
+  it("空字符串规则不追加任何 block（等同无规则）", () => {
+    expect(appendRegistryRules("base", { composeShot: "  ", negativeStrategy: "" })).toBe("base");
+  });
+});
+
+describe("composeMultiReferencePrompt 注入注册表规则", () => {
+  const refs = [
+    { index: 1, role: "character" as const, note: "小狐狸: a small fox" },
+    { index: 2, role: "product" as const, note: "杯子: a cup" },
+  ];
+  const rules: RegistryRuleText = {
+    composeShot: "declare each reference role, never copy composition",
+    negativeStrategy: "keep negatives to generic defects only",
+  };
+
+  it("rules 进入分镜图提示词，且位于参考图关系指令之后", () => {
+    const out = composeMultiReferencePrompt({ references: refs, scene: "the fox walks", rules });
+    expect(out).toContain("Composition rules: declare each reference role, never copy composition");
+    expect(out).toContain("Quality requirements: keep negatives to generic defects only");
+    const iAnchor = out.indexOf("Use the target shot as the source of composition");
+    const iComp = out.indexOf("Composition rules");
+    expect(iComp).toBeGreaterThan(iAnchor);
+  });
+
+  it("无 rules 时输出与旧行为一致（向后兼容，默认空 block 不污染）", () => {
+    const withRules = composeMultiReferencePrompt({ references: refs, scene: "the fox walks" });
+    expect(withRules).not.toContain("Composition rules");
+    expect(withRules).not.toContain("Quality requirements");
+  });
+
+  it("规则文本不含风格母版载体词（抽象样张等）—— 保持风格母版隔离铁律", () => {
+    const out = composeMultiReferencePrompt({ references: refs, scene: "s", rules });
+    expect(out).not.toContain("abstract style sample sheet");
+    expect(out).not.toContain("material and texture swatches");
+  });
+});
+
+describe("composeTextToImagePrompt 注入注册表规则", () => {
+  it("rules 作为尾部正向约束拼入六段式结果", () => {
+    const out = composeTextToImagePrompt({
+      subject: "a small fox",
+      style: "anime style",
+      quality: "8k",
+      rules: { composeShot: "reuse appearancePrompt verbatim", negativeStrategy: "no extra limbs" },
+    });
+    expect(out).toBe(
+      "a small fox, anime style, 8k, Composition rules: reuse appearancePrompt verbatim, Quality requirements: no extra limbs",
+    );
+  });
+
+  it("无 rules 时六段式行为不变", () => {
+    expect(composeTextToImagePrompt({ subject: "a red apple" })).toBe("a red apple");
+  });
+});
 
 describe("composePortraitPrompt", () => {
   it("动物角色：含物种锁定句（禁止人化），且不含 Portrait of / head and shoulders", () => {

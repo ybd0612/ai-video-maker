@@ -19,6 +19,38 @@ export type ReferenceRole = "scene" | "character" | "product" | "prop" | "style"
 /** 风格参考图读取所需的最小项目形状（兼容旧字段，零新列） */
 type StyleRefProject = Pick<Project, "assets" | "styleReferenceUrl">;
 
+/**
+ * 提示词拼装链可用的注册表规则文本。
+ * 纯数据：由调用方从 getActiveRules() 按语言提取后传入（见 promptRules.getActiveRuleText）。
+ * lib 不读 store —— 保证 promptComposer 全为纯函数，便于单测。
+ */
+export interface RegistryRuleText {
+  /** composeShot 生效规则文本（分镜画面拼装规范） */
+  composeShot?: string;
+  /** negativeStrategy 生效规则文本（负向策略，需改写为正向约束注入） */
+  negativeStrategy?: string;
+}
+
+/**
+ * 把注册表生效规则作为「正向约束/质量要求」拼接到提示词尾部。
+ * 纯函数：规则文本由调用方从 getActiveRules() 提取后传入；lib 不读 store。
+ * - composeShot：画面拼装规范，直接作为正向约束追加；
+ * - negativeStrategy：负向策略改写为正向质量要求追加（不新增 API negative 字段，
+ *   也不污染 stylePrompt）。
+ * 规则文本只描述约束意图，不含风格母版载体词（抽象样张等）；风格母版隔离铁律不变。
+ */
+export function appendRegistryRules(prompt: string, rules?: RegistryRuleText): string {
+  if (!rules) return prompt;
+  const blocks: string[] = [];
+  const compose = rules.composeShot?.trim();
+  if (compose) blocks.push(`Composition rules: ${compose}`);
+  const negative = rules.negativeStrategy?.trim();
+  if (negative) blocks.push(`Quality requirements: ${negative}`);
+  if (blocks.length === 0) return prompt;
+  const base = prompt.trim();
+  return base ? `${base}, ${blocks.join(", ")}` : blocks.join(", ");
+}
+
 /* ── 风格读取 helper ─────────────────────────────────────────────────────── */
 
 /**
@@ -75,11 +107,14 @@ export function composeTextToImagePrompt(i: {
   lighting?: string;
   composition?: string;
   quality?: string;
+  /** 来自 getActiveRules() 的 composeShot / negativeStrategy 生效规则文本 */
+  rules?: RegistryRuleText;
 }): string {
-  return [i.subject, i.scene, i.style, i.lighting, i.composition, i.quality]
+  const base = [i.subject, i.scene, i.style, i.lighting, i.composition, i.quality]
     .map((s) => s?.trim())
     .filter((s): s is string => !!s)
     .join(", ");
+  return appendRegistryRules(base, i.rules);
 }
 
 /* ── 资产图（角色/场景/产品/道具） ─────────────────────────────────────── */
@@ -128,6 +163,8 @@ export function composeMultiReferencePrompt(i: {
   style?: string;
   lighting?: string;
   composition?: string;
+  /** 来自 getActiveRules() 的 composeShot / negativeStrategy 生效规则文本 */
+  rules?: RegistryRuleText;
 }): string {
   const parts: string[] = [];
   const scene = i.scene.trim();
@@ -152,7 +189,7 @@ export function composeMultiReferencePrompt(i: {
     "Use the target shot as the source of composition, action and environment. Use each reference only to preserve the identity and appearance of its explicitly named asset; do not copy any reference layout, camera angle, background or lighting.",
   );
 
-  return parts.join(", ");
+  return appendRegistryRules(parts.join(", "), i.rules);
 }
 
 /* ── 定妆照（物种锁定） ──────────────────────────────────────────────────── */

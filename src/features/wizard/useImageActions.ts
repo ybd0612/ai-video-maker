@@ -14,7 +14,9 @@ import {
   composeTextToImagePrompt,
   getStylePrompt,
   pickShotReferences,
+  type RegistryRuleText,
 } from "@/lib/promptComposer";
+import { getActiveRules, getActiveRuleText } from "@/lib/promptRules";
 import { restoreProjectStatusIfReady } from "./wizardActionUtils";
 
 const activeImageTasks = new Map<string, AbortController>();
@@ -48,14 +50,30 @@ function describeReferenceNote(
 }
 
 /**
+ * 从注册表提取分镜图提示词拼装所需的正向约束文本。
+ * visualPrompt / motionPrompt 恒为英文（见 promptRules 的 storyboard 约束），故取 en。
+ * 调用方（非 lib）读 store 取生效规则，lib 保持纯函数。
+ */
+function extractShotImageRules(): RegistryRuleText {
+  const rules = getActiveRules();
+  return {
+    composeShot: getActiveRuleText("composeShot", "en", rules),
+    negativeStrategy: getActiveRuleText("negativeStrategy", "en", rules),
+  };
+}
+
+/**
  * Compose the complete image prompt and the multi-reference list for a shot.
  * - 参考图：pickShotReferences（场景 → 角色 → 产品/道具，≤3 张；风格通过文本注入）
  * - 有参考图：composeMultiReferencePrompt（参考图角色说明 + 图像关系指令）
  * - 无参考图：composeTextToImagePrompt 六段式
+ * - rules：composeShot / negativeStrategy 注册表生效规则，作为正向约束拼入提示词
+ *   （不新增 API negative 字段、不污染 stylePrompt、不动风格母版隔离铁律）。
  */
 function buildImageGenerationInput(
   shot: Shot,
   project: { style: string; assets: Asset[] },
+  rules?: RegistryRuleText,
 ): ImageGenerationInput {
   const referenceImageUrls = pickShotReferences(shot, project);
   // visualPrompt 已包含镜头主体与动作；参考图说明只保留一次，避免资产描述重复注入。
@@ -73,6 +91,7 @@ function buildImageGenerationInput(
         references,
         scene: subject,
         style: stylePrompt,
+        rules,
       }),
       referenceImageUrls,
     };
@@ -83,6 +102,7 @@ function buildImageGenerationInput(
       subject,
       style: (stylePrompt ?? project.style) || undefined,
       quality: "high quality, 8k",
+      rules,
     }),
     referenceImageUrls: [],
   };
@@ -108,6 +128,7 @@ const runImageBatch = createBatchRunner({
       (shot) => !shot.imageUrl && shot.status !== "imaging" && shot.visualPrompt.trim(),
     );
     const { size: imageSize, ratio: imageRatio } = aspectRatioToImageParams(latestProject.aspectRatio);
+    const rules = extractShotImageRules();
 
     return shotsNeedingImages.map((shot) => async () => {
       if (signal.aborted) return;
@@ -115,7 +136,11 @@ const runImageBatch = createBatchRunner({
       useProjectStore.getState().setShotStatusByProjectId(pid, shot.id, "imaging");
 
       try {
-        const { prompt: enrichedPrompt, referenceImageUrls } = buildImageGenerationInput(shot, latestProject);
+        const { prompt: enrichedPrompt, referenceImageUrls } = buildImageGenerationInput(
+          shot,
+          latestProject,
+          rules,
+        );
         const imageUrl = await generateImage({
           apiKey: providerConfig.apiKey,
           baseUrl: providerConfig.baseUrl,
@@ -196,7 +221,11 @@ export function useImageActions(): ImageActions {
     store.setShotStatusByProjectId(targetProjectId, shotId, "imaging");
 
     try {
-      const { prompt: enrichedPrompt, referenceImageUrls } = buildImageGenerationInput(shot, project);
+      const { prompt: enrichedPrompt, referenceImageUrls } = buildImageGenerationInput(
+        shot,
+        project,
+        extractShotImageRules(),
+      );
       const { size, ratio } = aspectRatioToImageParams(project.aspectRatio);
 
       const imageUrl = await generateImage({

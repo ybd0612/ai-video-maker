@@ -55,7 +55,7 @@ function PlanLimitSummary({
 /* ── 提示词规则设置（T05） ─────────────────────────────────────────────────── */
 
 const RULE_TASKS: PromptTask[] = [
-  "extractAssets", "storyboardShot", "characterAppearance",
+  "extractAssets", "storyboardOutline", "storyboardShot", "characterAppearance",
   "styleRef", "composeShot", "negativeStrategy", "polish",
 ];
 const RULE_SECTIONS: RuleSection[] = ["rules", "examples", "safety"];

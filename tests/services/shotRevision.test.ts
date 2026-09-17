@@ -145,8 +145,8 @@ describe("normalizeRawShot 运行时归一化", () => {
     });
 
     expect(shot.duration).toBe(5);
-    expect(shot.visualPrompt).toContain("Cinematic shot: 镜头文案");
-    expect(shot.motionPrompt).toContain("Slow cinematic camera movement");
+    expect(shot.visualPrompt).toBe("");
+    expect(shot.motionPrompt).toBe("");
   });
 });
 

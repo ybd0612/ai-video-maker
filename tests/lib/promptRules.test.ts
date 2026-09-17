@@ -15,6 +15,7 @@ import {
   SKELETONS,
   buildSystemPrompt,
   mergeRules,
+  getActiveRuleText,
   type PromptRule,
 } from "@/lib/promptRules";
 
@@ -214,5 +215,51 @@ describe("buildSystemPrompt", () => {
   it("条目不串任务：polish 条目不会出现在 storyboard 渲染中", () => {
     const rendered = buildSystemPrompt("storyboardShot", "zh", BUILTIN_RULES);
     expect(rendered).not.toContain("视频文案优化专家");
+  });
+});
+
+/* ── getActiveRuleText（供提示词拼装链注入正向约束） ──────────────────────── */
+
+describe("getActiveRuleText", () => {
+  it("默认（无显式 rules）从内置条目提取某 task 的生效规则文本，按语言拼接", () => {
+    const compose = getActiveRuleText("composeShot", "en");
+    expect(compose).toContain("In multi-reference composition, declare each reference image's role");
+    expect(compose).toContain("reuse the asset's appearancePrompt from the registry");
+    const negative = getActiveRuleText("negativeStrategy", "en");
+    expect(negative).toContain("Keep negative prompts to generic quality defects");
+  });
+
+  it("剥离前导 bullet（- / • / *），避免注入提示词出现孤立列表符", () => {
+    const compose = getActiveRuleText("composeShot", "en");
+    expect(compose.startsWith("-")).toBe(false);
+    expect(compose.startsWith("•")).toBe(false);
+  });
+
+  it("zh 与 en 文本互不串语言", () => {
+    const zh = getActiveRuleText("composeShot", "zh");
+    const en = getActiveRuleText("composeShot", "en");
+    expect(zh).toContain("多图合成时逐张声明参考图用途");
+    expect(en).not.toContain("多图合成时逐张声明参考图用途");
+    expect(zh).not.toContain("In multi-reference composition");
+  });
+
+  it("enabled=false 的条目被剔除", () => {
+    const disabled = BUILTIN_RULES.map((r) =>
+      r.id === "compose.registry-reuse" ? { ...r, enabled: false } : r,
+    );
+    const text = getActiveRuleText("composeShot", "en", disabled);
+    expect(text).not.toContain("reuse the asset's appearancePrompt from the registry");
+    // 另一条仍生效
+    expect(text).toContain("In multi-reference composition, declare each reference image's role");
+  });
+
+  it("仅取目标 task：negativeStrategy 文本不含 composeShot 内容", () => {
+    const negative = getActiveRuleText("negativeStrategy", "en");
+    expect(negative).not.toContain("declare each reference image's role");
+    expect(negative).toContain("Keep negative prompts to generic quality defects");
+  });
+
+  it("无任何生效条目时返回空串", () => {
+    expect(getActiveRuleText("composeShot", "en", [])).toBe("");
   });
 });

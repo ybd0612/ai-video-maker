@@ -8,9 +8,23 @@ import { resolvePlan, type PlanId } from "@/lib/plans";
 import { generateVideo, aspectRatioToVideoAspect, VideoTaskCreatedError } from "@/services/videoService";
 import { composeMotionPrompt } from "@/lib/promptUtils";
 import { createBatchRunner } from "@/lib/batchRunner";
+import { appendRegistryRules, type RegistryRuleText } from "@/lib/promptComposer";
+import { getActiveRules, getActiveRuleText } from "@/lib/promptRules";
 import { restoreProjectStatusIfReady } from "./wizardActionUtils";
 
 const activeVideoTasks = new Map<string, AbortController>();
+
+/**
+ * 从注册表提取视频提示词所需的正向约束文本（negativeStrategy）。
+ * motionPrompt 恒为英文，故取 en；调用方读 store，lib 保持纯函数。
+ * 不新增 API negative 字段、不污染 stylePrompt。
+ */
+function extractVideoRules(): RegistryRuleText {
+  const rules = getActiveRules();
+  return {
+    negativeStrategy: getActiveRuleText("negativeStrategy", "en", rules),
+  };
+}
 
 const runVideoBatch = createBatchRunner({
   registry: activeVideoTasks,
@@ -37,6 +51,7 @@ const runVideoBatch = createBatchRunner({
         (shot.motionPrompt.trim() || shot.actionDesc?.trim()),
     );
     const videoAspect = aspectRatioToVideoAspect(latestProject.aspectRatio);
+    const rules = extractVideoRules();
 
     return shotsNeedingVideos.map((shot) => async () => {
       if (signal.aborted) return;
@@ -52,7 +67,10 @@ const runVideoBatch = createBatchRunner({
         if (signal.aborted) return;
 
         try {
-          const motionPrompt = composeMotionPrompt(shot);
+          const motionPrompt = appendRegistryRules(
+            composeMotionPrompt(shot),
+            rules,
+          );
           const result = await generateVideo(
             {
               apiKey: providerConfig.apiKey,
@@ -205,7 +223,10 @@ export function useVideoActions(): VideoActions {
     const signal = controller.signal;
 
     try {
-      const motionPrompt = composeMotionPrompt(shot);
+      const motionPrompt = appendRegistryRules(
+        composeMotionPrompt(shot),
+        extractVideoRules(),
+      );
       const result = await generateVideo(
         {
           apiKey: providerConfig.apiKey,
