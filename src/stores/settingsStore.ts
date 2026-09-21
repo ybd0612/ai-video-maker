@@ -7,6 +7,7 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import type { PlanId } from "@/lib/plans";
 import type { PromptRule } from "@/lib/promptRules";
+import type { VideoConsistency } from "@/lib/videoPlan";
 
 export type Language = 'zh' | 'en';
 
@@ -50,6 +51,17 @@ interface SettingsState {
   showLogPanel: boolean;
   /** 日志面板高度（px，可拖拽调整并持久化） */
   logPanelHeight: number;
+  /**
+   * 视频一致性策略（默认 "chain"）：
+   * - `off`：只用本镜画面图作首帧（2026-09-21 之前的行为）；
+   * - `chain`：额外把同场景下一镜的画面图当本镜尾帧，让镜头之间接得上（实测末帧准确落在目标构图）；
+   * - `identity`：在 chain 取不到尾帧时（跨场景、换场后重新出场），改走 reference 模式，
+   *   以 [角色定妆照, 风格母版] 锚定身份与画风（实测与首尾帧互斥，故不叠加）。
+   * 旧存储缺该字段时由 persist 浅合并回退到默认值，无需迁移。
+   */
+  videoConsistency: VideoConsistency;
+
+  setVideoConsistency: (value: VideoConsistency) => void;
 
   setTheme: (theme: Theme) => void;
   setLanguage: (lang: Language) => void;
@@ -125,7 +137,9 @@ export const useSettingsStore = create<SettingsState>()(
       loggingEnabled: true,
       showLogPanel: false,
       logPanelHeight: 260,
+      videoConsistency: "chain",
 
+      setVideoConsistency: (videoConsistency) => set({ videoConsistency }),
       setTheme: (theme) => set({ theme }),
       setLanguage: (language) => set({ language }),
       setSettingsDialogOpen: (open) => set({ settingsDialogOpen: open }),

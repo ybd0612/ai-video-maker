@@ -40,7 +40,7 @@
 
 ## 2. 步骤 0：前置配置（不进步骤条，但缺它整条链第一步就抛错）
 
-`settingsStore`（persist key `wxhb-settings`，**version 4**，`settingsStore.ts:142-143`）默认值：`baseUrl = https://api.agnes-ai.cn/v1`、`plan = default`、`language = zh`、`theme = light`、`apiKey = ""`、`autoRegeneratePortrait = true`、`autoRegenerateAssetImages = true`、`promptRules = []`（只存用户差异条目）。
+`settingsStore`（persist key `wxhb-settings`，**version 4**，`settingsStore.ts:142-143`）默认值：`baseUrl = https://api.agnes-ai.cn/v1`、`plan = default`、`language = zh`、`theme = light`、`apiKey = ""`、`autoRegeneratePortrait = true`、`autoRegenerateAssetImages = true`、`videoConsistency = "chain"`（2026-09-21 新增，靠 persist 浅合并回退默认，未升版本、无迁移）、`promptRules = []`（只存用户差异条目）。
 
 缺 Key 时的行为分两类，不一致：
 
@@ -178,17 +178,21 @@
 2. 筛选：`!videoUrl && imageUrl && status !== "videoing" && (motionPrompt || actionDesc)`（:46-52）
 3. 提示词：`composeMotionPrompt(shot)`（恒直接返回 `shot.motionPrompt`，子字段不二次拼装，`lib/promptUtils.ts:21`）+ `appendRegistryRules(negativeStrategy)`
 4. 单镜头内部自带重试环：`MAX_TASK_RETRIES = 2`、退避 `8s * (attempt+1)`（:63-64,140-152），退避等待监听 abort 事件；但**当前没有任何入口会触发这个 abort**（见 9.3）
-5. `generateVideo`（`videoService.ts`）：
+5. `generateVideo`（`videoService.ts`）—— 素材由 `src/lib/videoPlan.ts:planShotVideoMedia` 按设置项 `videoConsistency` 决策，批量与单项重摇共用同一函数（`useVideoActions.ts` 不再自己拼素材）：
    - **先限流**：`rateLimiter.acquire("video", { cost: duration || 1, signal })`（:135），配额按秒计、在 HTTP 之前扣
-   - 创建体：`mode = 有首帧或尾帧 ? "keyframe" : "text"`（:149）、`size 恒 "720P"`（:71）、`aspect_ratio` 白名单、`seconds = clamp(round(duration), 4, 12)` 转字符串（:139-143）、`first_frame = shot.imageUrl` / `last_frame` 仅在提供时带（:156-161）
-   - ⚠️ 批量与单项重摇的筛选条件都要求 `shot.imageUrl` 非空，所以 `hasFirstFrame` 恒真 —— **当前 UI 实际永远走 `keyframe`，`text` 模式不可达**（`useVideoActions.ts:48-50,215`）
+   - 创建体：`size 恒 "720P"`（:71）、`aspect_ratio` 白名单、`seconds = clamp(round(duration), 4, 12)` 转字符串（:139-143）、`n:1`
+   - **`mode` 三选一，帧素材与参考图绝不同时出现**：
+     - `keyframe`：优先级 用户手动双帧 > 同场景自动衔接尾帧 > 仅本镜画面图作首帧；
+     - `reference` + `images`（≤5）：`videoConsistency === "identity"` 且同场景衔接取不到尾帧时（换场景、末镜），改送 `[出场角色定妆照…, 风格母版]` 锚身份与画风；
+     - `text`：无素材（当前筛选要求有 `imageUrl`，实际不可达）。
+   - ⚠️ 实测依据见 `docs/roadmap/competitive-gap-2026-09-21.md` §6：`reference` 与 `first_frame`/`last_frame` 同时传，服务端 400「首尾帧素材与参考素材不能同时使用」。
    - 创建 POST `{baseUrl}/videos`（`videoService.ts:173-181`），`maxRetries 3` + 10s base delay（针对 429）；`video_id ?? task_id ?? id`
    - 轮询 `GET {origin}/agnesapi?video_id=...&model_name=agnes-video-2.5-flash`（:227），间隔 5s、超时 30 分钟、`task_not_exist` 最多容忍 24 轮（:25-27）
    - 完成 URL 顺序（:288-294）：`url → metadata.url → video_url → output.url → output.video_url → remixed_from_video_id`；函数返回 `{ videoUrl, coverImageUrl, duration }`（:64-68,342），但**两个调用点只取 `result.videoUrl`**，cover 与实际时长被丢弃
    - **创建后失败的错误类型是 `VideoTaskCreatedError{videoId, stillRunning}`**（`videoService.ts:35-48`）；上层 `useVideoActions.ts:100-122` 对 `stillRunning=true` **只等待不再创建新任务**（避免双倍消耗），false 才判失败
 6. 写回 `videoUrl` + `status:"videoed"`（revision 校验）；`onFinally`：全有视频 → `idle`；全落定（有视频或失败）→ 复位 started + `failed`（`useVideoActions.ts:174-180`，硬编码中文文案）
 
-首尾帧：`DualFrameToggle`（步骤 5 卡内）可勾选双帧并从其他镜头图点选 `lastFrameUrl`，关闭时清尾帧。**注意这是本流程中唯一还保留手写 URL 输入框的地方**（`DualFrameToggle.tsx:82-90`）。另：`shot.firstFrameUrl` 只被 `normalizeRawShot` / `pickShotFields` 搬运，请求侧从不读取它（`first_frame` 用的是 `shot.imageUrl`），当前是**无消费者的死字段**。
+尾帧来源有两个：**用户手动**（`DualFrameToggle` 勾选后点选其他镜头图或手输 URL，`DualFrameToggle.tsx:82-90`）与**同场景自动衔接**（`shotContinuity` 把下一镜的画面图当本镜尾帧，受设置项 `videoConsistency` 控制，手动值永远优先）。自动衔接**不写 store** —— `useDualFrame` / `lastFrameUrl` 属于 MOTION 字段，写回会清空已生成视频（见 9.4），所以只在发请求那一刻派生。另：`shot.firstFrameUrl` 只被 `normalizeRawShot` / `pickShotFields` 搬运，请求侧从不读取它（`first_frame` 用的是 `shot.imageUrl`），当前是**无消费者的死字段**。
 
 推进：步骤 5 没有审核卡点，auto 模式全视频 false→true 时 `setWizardStep(6)`（`StepVideos.tsx:67-76`）；半自动靠底部「下一步」，门禁 `case 5 = 每个镜头都有 videoUrl`（`CreationWizard.tsx:39`）。
 

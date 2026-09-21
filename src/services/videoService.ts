@@ -12,7 +12,9 @@
 //   - 首帧 / 尾帧字段为 first_frame / last_frame（旧版为 image / last_image），
 //     有首帧时 mode="keyframe"，无图时 mode="text"
 //   - 轮询需带 model_name，keyframe 模式不带会查不到任务
-//   - Flash 限制：参考图 ≤5 张、参考音频 ≤3 段、不支持参考视频（本项目均未使用）
+//   - Flash 限制：参考图 ≤5 张、参考音频 ≤3 段、不支持参考视频
+//   - ⚠ 实测（2026-09-21）：reference 与 first_frame / last_frame 服务端硬互斥，
+//     同时传返回 400「首尾帧素材与参考素材不能同时使用」→ 只能二选一
 // ────────────────────────────────────────────────────────────────────────────
 
 import { startSpan } from "@/lib/logger";
@@ -20,6 +22,7 @@ import { getTranslation } from "@/i18n";
 import { MODELS } from "@/lib/models";
 import { fetchWithRetry } from "@/lib/fetchWithRetry";
 import { clampNumber } from "@/lib/validation";
+import { MAX_VIDEO_REFERENCE_IMAGES } from "@/lib/videoPlan";
 import { rateLimiter } from "@/services/rateLimit";
 
 const VIDEO_POLL_INTERVAL_MS = 5_000;
@@ -55,6 +58,12 @@ interface CreateVideoOptions {
   imageUrl?: string;
   /** 尾帧图片 URL（双图流模式下使用，需同时提供首帧） */
   lastFrameUrl?: string;
+  /**
+   * reference 模式的参考图 URL（身份 + 画风，≤5 张）。
+   * ⚠ 与 imageUrl / lastFrameUrl 互斥：服务端对同时使用返回 400，
+   * 传入本字段时帧素材会被丢弃。
+   */
+  referenceImageUrls?: string[];
   /** 画幅比例，如 "16:9" / "9:16" / "1:1" */
   aspectRatio: string;
   /** 视频时长（秒），发送前会收敛到官方支持的 4~12 秒 */
@@ -136,6 +145,16 @@ export async function generateVideo(
 
   const hasFirstFrame = !!opts.imageUrl;
   const hasLastFrame = !!opts.lastFrameUrl;
+  // reference 模式：以参考图锚定身份与画风。实测与 first_frame / last_frame
+  // 服务端硬互斥（同时传返回 400「首尾帧素材与参考素材不能同时使用」），
+  // 因此一旦有参考图就丢弃帧素材，绝不叠加。
+  const referenceImages = (opts.referenceImageUrls ?? []).slice(0, MAX_VIDEO_REFERENCE_IMAGES);
+  const hasReference = referenceImages.length > 0;
+  if (hasReference && (hasFirstFrame || hasLastFrame)) {
+    console.warn(
+      "[video] reference 与首尾帧互斥，已按 reference 优先丢弃 first_frame/last_frame 素材",
+    );
+  }
   const seconds = clampNumber(
     Math.round(opts.duration) || DEFAULT_SECONDS,
     VIDEO_MIN_SECONDS,
@@ -145,20 +164,24 @@ export async function generateVideo(
   const body: Record<string, unknown> = {
     model: MODELS.video,
     prompt: sanitizePrompt(opts.prompt),
-    // 有首帧/尾帧走 keyframe（首尾帧控制），纯文本走 text
-    mode: hasFirstFrame || hasLastFrame ? "keyframe" : "text",
+    // 有参考图走 reference；否则有首/尾帧走 keyframe；再否则纯文本
+    mode: hasReference ? "reference" : (hasFirstFrame || hasLastFrame ? "keyframe" : "text"),
     size: VIDEO_SIZE,
     aspect_ratio: aspectRatioToVideoAspect(opts.aspectRatio),
     seconds: String(seconds),
     n: 1,
   };
 
-  // keyframe 模式：first_frame / last_frame 至少提供一个
-  if (opts.imageUrl) {
-    body.first_frame = opts.imageUrl;
-  }
-  if (opts.lastFrameUrl) {
-    body.last_frame = opts.lastFrameUrl;
+  if (hasReference) {
+    body.images = referenceImages;
+  } else {
+    // keyframe 模式：first_frame / last_frame 至少提供一个
+    if (opts.imageUrl) {
+      body.first_frame = opts.imageUrl;
+    }
+    if (opts.lastFrameUrl) {
+      body.last_frame = opts.lastFrameUrl;
+    }
   }
 
   let createJson: Record<string, unknown> = {};

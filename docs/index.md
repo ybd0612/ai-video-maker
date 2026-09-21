@@ -37,7 +37,7 @@
 | `docs/execution-flow.md` | 6 步链路「谁触发 → 发什么请求 → 写回什么 → 门禁如何放行」，§11 文档漂移清单、§12 代码可疑点、§13 持久化迁移 | 改任何生成链路之前 | 🟢 2026-09-21 快照 | **流程、门禁与代码级待办的权威**；§12 是待裁决清单，不是缺陷定论 |
 | `docs/execution-flow-diagrams.md` | 全参数进出与请求体的 ASCII 图集 + 图 A 术语对照总表 | 想知道某个字段叫什么、喂给谁 | 🟢 2026-09-21 快照 | **字段命名与术语的权威**（与上者分工：那边管流程，这边管参数） |
 | `docs/idea-breakdown.md` | 一句想法被拆成哪些字段 + 提示词原文 + 引用去向表 | 调提示词 / 看拆解形态 | 🟢 2026-09-21 已同步「镜头数由模型判断」的新提示词原文 | 提示词原文的**快照**；生效版 = 骨架 + 用户条目，以设置里「导出」为准 |
-| `docs/flow-map.html` | 交互式引用图（56 节点含 20 个动作节点），点方块按跳数高亮下游 | 追一个字段的全部消费者 | 🟢 2026-09-21 同步镜头数口径 | 与 `execution-flow.md` 同源、**手工同步**，改链路须一并更新 |
+| `docs/flow-map.html` | 交互式引用图（57 节点 / 129 条边，含 20 个动作节点与视频一致性策略），点方块按跳数高亮下游 | 追一个字段的全部消费者 | 🟢 2026-09-21 同步镜头数口径与 reference 模式 | 与 `execution-flow.md` 同源、**手工同步**，改链路须一并更新 |
 | `docs/all-assets-structured-plan.md` | 「代码管结构与流程、效果判断归大模型」的落地方案与两阶段取舍 | 想改提示词职责边界 / 加参数前 | 🟢 状态「已实施 2026-09-15」与代码一致 | 该原则的决策依据（下一步建议提炼为 ADR） |
 
 ### 1.3 `docs/roadmap/`（演进规划）
@@ -106,13 +106,14 @@ CI 测试门禁           ⬜ .github/workflows/deploy.yml 仍只构建不跑测
 | 级联失效规则 | `src/stores/projectOps.ts` | `applyShotUpdates` `:80-145`、`applyAssetUpdate` `:182-213` | 2026-09-21 |
 | 持久化键与版本 | `projectStore.ts:647-650`（`wxhb-project`, v16）、`settingsStore.ts:142-143`（`wxhb-settings`, v4）、`rateLimit.ts:30`（`wxhb-usage`） | 迁移逐版内容见 `execution-flow.md` §13 | 2026-09-21 |
 | 向导步骤与门禁 | `src/features/wizard/CreationWizard.tsx` | `TOTAL_STEPS` `:19`、`canAdvance` `:29-43` | 2026-09-21 |
+| **视频一致性策略** | `src/lib/videoPlan.ts`（素材决策）+ `settingsStore.videoConsistency`（默认 `chain`）+ `src/lib/shotContinuity.ts`（同场景尾帧派生） | 实测约束：`reference` 与 `first_frame`/`last_frame` 服务端互斥（400）；衔接结果只在发请求时派生，**不写 store** | 2026-09-21 |
 | 步骤显示名 | `src/i18n/index.ts` | `wizard.step1~6`（zh `:177-182`、en `:607-612`）——第 6 步 UI 作「后期 / Post-production」 | 2026-09-21 |
 | **对外名称（口径）** | 中文「AI 一键成片」/ 英文与仓库名 `AI Video Maker`；载体：`index.html` 标题、`i18n` 的 `pipeline.title`（zh `:76` / en `:506`） | 2026-09-21 已统一，旧变体全仓零残留 | 2026-09-21 |
 | 命令、端口、包版本、Node 要求 | `package.json`、`vite.config.ts`、`vitest.config.ts` | dev **5188** / preview 5180（5173 被本机另一项目占用，已永久改端口） | 2026-09-21 |
 | CI 行为 | `.github/workflows/deploy.yml` | push `main` → 构建 + 部署 Pages，**不含 `npm run test`** | 2026-09-21 |
 | **验证方式（口径）** | 只做 Vitest 代码单元测试，**不用浏览器 / E2E / preview 验证界面**，界面由维护者本地确认 | 无工具载体，故在此写定 | 2026-09-21 |
 | **许可证（口径）** | **未定**：无 `LICENSE`，`package.json:3` 为 `private: true` → 默认保留所有权利，任何文档不得声称 MIT | 2026-09-21 决定暂不补 | 2026-09-21 |
-| 测试规模基线 | `npm run test` | 31 文件 / 406 用例通过（**仅当日快照**，不承诺恒定，现行以运行结果为准） | 2026-09-21 |
+| 测试规模基线 | `npm run test` | 33 文件 / 426 用例通过（**仅当日快照**，不承诺恒定，现行以运行结果为准） | 2026-09-21 |
 
 ---
 

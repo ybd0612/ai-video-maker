@@ -8,6 +8,7 @@ import type { Language } from '@/stores/settingsStore';
 import { isValidUrl } from "@/lib/validation";
 import { MODELS } from "@/lib/models";
 import { PLANS, resolvePlan, type PlanId } from "@/lib/plans";
+import { VIDEO_CONSISTENCY_VALUES, type VideoConsistency } from "@/lib/videoPlan";
 import type { TranslationKey } from "@/i18n";
 import { BUILTIN_RULES, mergeRules, type PromptRule, type PromptTask, type RuleSection } from "@/lib/promptRules";
 import { AiPolishField } from "@/components/ui/AiPolishField";
@@ -340,6 +341,8 @@ export function SettingsDialog() {
   const setLoggingEnabled = useSettingsStore((s) => s.setLoggingEnabled);
   const showLogPanel = useSettingsStore((s) => s.showLogPanel);
   const setShowLogPanel = useSettingsStore((s) => s.setShowLogPanel);
+  const videoConsistency = useSettingsStore((s) => s.videoConsistency);
+  const setVideoConsistency = useSettingsStore((s) => s.setVideoConsistency);
   const t = useT();
   const setOpen = useSettingsStore((s) => s.setSettingsDialogOpen);
   const providerConfig = useSettingsStore((s) => s.providerConfig);
@@ -598,6 +601,27 @@ export function SettingsDialog() {
                     ))}
                   </div>
                 </div>
+                {/* 视频一致性策略：镜头之间如何接力 */}
+                <div className="rounded-lg border border-line/50 bg-raised/40 p-3">
+                  <label className="mb-1 block text-[0.6875rem] font-medium text-ink-3">
+                    {t("settings.videoConsistency")}
+                  </label>
+                  <select
+                    value={videoConsistency}
+                    onChange={(e) => setVideoConsistency(e.target.value as VideoConsistency)}
+                    className="w-full rounded-lg border border-line bg-raised px-3 py-2 text-xs text-ink focus:border-success focus:outline-none"
+                  >
+                    {VIDEO_CONSISTENCY_VALUES.map((value) => (
+                      <option key={value} value={value}>
+                        {t(`settings.videoConsistency.${value}` as TranslationKey)}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="mt-1 text-[0.625rem] leading-relaxed text-ink-5">
+                    {t("settings.videoConsistencyHint")}
+                  </p>
+                </div>
+
                 {/* 运行日志：面板显示开关 + 采集开关 */}
                 <div className="rounded-lg border border-line/50 bg-raised/40 p-3">
                   <label className="mb-1 block text-[0.6875rem] font-medium text-ink-3">

@@ -6,6 +6,7 @@ import {
 import { useSettingsStore } from "@/stores/settingsStore";
 import { resolvePlan, type PlanId } from "@/lib/plans";
 import { generateVideo, aspectRatioToVideoAspect, VideoTaskCreatedError } from "@/services/videoService";
+import { planShotVideoMedia } from "@/lib/videoPlan";
 import { composeMotionPrompt } from "@/lib/promptUtils";
 import { createBatchRunner } from "@/lib/batchRunner";
 import { appendRegistryRules, type RegistryRuleText } from "@/lib/promptComposer";
@@ -40,7 +41,7 @@ const runVideoBatch = createBatchRunner({
     }
   },
   buildTasks: (pid, signal) => {
-    const { providerConfig } = useSettingsStore.getState();
+    const { providerConfig, videoConsistency } = useSettingsStore.getState();
     const latestProject = useProjectStore.getState().projects.find((p) => p.id === pid);
     if (!latestProject) return [];
     const shotsNeedingVideos = latestProject.shots.filter(
@@ -71,13 +72,19 @@ const runVideoBatch = createBatchRunner({
             composeMotionPrompt(shot),
             rules,
           );
+          const { media } = planShotVideoMedia({
+            shot,
+            shots: latestProject.shots,
+            assets: latestProject.assets,
+            styleReferenceUrl: latestProject.styleReferenceUrl,
+            consistency: videoConsistency,
+          });
           const result = await generateVideo(
             {
               apiKey: providerConfig.apiKey,
               baseUrl: providerConfig.baseUrl,
               prompt: motionPrompt,
-              imageUrl: shot.imageUrl!,
-              ...(shot.useDualFrame && shot.lastFrameUrl ? { lastFrameUrl: shot.lastFrameUrl } : {}),
+              ...media,
               aspectRatio: videoAspect,
               duration: shot.duration,
             },
@@ -203,7 +210,7 @@ export function useVideoActions(): VideoActions {
   }, []);
 
   const rerollVideo = useCallback(async (shotId: string) => {
-    const { providerConfig } = useSettingsStore.getState();
+    const { providerConfig, videoConsistency } = useSettingsStore.getState();
     if (!providerConfig.apiKey || !providerConfig.baseUrl) return;
 
     const store = useProjectStore.getState();
@@ -227,13 +234,19 @@ export function useVideoActions(): VideoActions {
         composeMotionPrompt(shot),
         extractVideoRules(),
       );
+      const { media } = planShotVideoMedia({
+        shot,
+        shots: project.shots,
+        assets: project.assets,
+        styleReferenceUrl: project.styleReferenceUrl,
+        consistency: videoConsistency,
+      });
       const result = await generateVideo(
         {
           apiKey: providerConfig.apiKey,
           baseUrl: providerConfig.baseUrl,
           prompt: motionPrompt,
-          imageUrl: shot.imageUrl,
-          ...(shot.useDualFrame && shot.lastFrameUrl ? { lastFrameUrl: shot.lastFrameUrl } : {}),
+          ...media,
           aspectRatio: aspectRatioToVideoAspect(project.aspectRatio),
           duration: shot.duration,
         },

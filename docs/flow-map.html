@@ -168,6 +168,10 @@ const NODES = [
     src: "src/lib/promptRules.ts:692",
     mean: "34 条内置条目按 rules → examples → safety 注入骨架；设置里可改/关/加，同 ID 覆盖内置。",
     producer: "代码内置 + 设置对话框", consumers: "文本系统提示词、生图与生视频的正向约束" },
+  { id: "vcons", col: 0, kind: "input", zh: "视频一致性策略", en: "settings.videoConsistency",
+    src: "src/lib/videoPlan.ts:20",
+    mean: "三档：off 只用本镜画面图作首帧；chain 追加同场景首尾帧衔接；identity 在接不上时（换场景、末镜）改送参考图锚身份与画风。默认 chain。⚠ 实测 keyframe 与 reference 服务端互斥，不能同时给。",
+    producer: "设置对话框「视频一致性策略」", consumers: "素材决策 planShotVideoMedia、视频批量与单项重摇" },
 
   /* ── 列 1 动作① 提取与派生 ── */
   { id: "actVd", col: 1, kind: "act", zh: "提取视觉方向", en: "extractVisualDirectionFromIdea",
@@ -328,7 +332,7 @@ const NODES = [
     producer: "步骤 4 挂载自动触发 / 重试", consumers: "镜头画面图" },
   { id: "actVideoBatch", col: 5, kind: "act", zh: "镜头视频批量", en: "runVideoBatch",
     src: "src/features/wizard/useVideoActions.ts:29",
-    mean: "并发按套餐（订阅 3 / RPM 大于 1 用 2 / 免费档 1）；单镜头内部再重试 2 次，任务已创建则只等待不重建。",
+    mean: "并发按套餐（订阅 3 / RPM 大于 1 用 2 / 免费档 1）；单镜头内部再重试 2 次，任务已创建则只等待不重建。素材由 lib/videoPlan 的 planShotVideoMedia 按 videoConsistency 决策，批量与单项重摇共用同一函数。",
     producer: "步骤 5 挂载自动触发 / 重试", consumers: "镜头视频" },
 
   /* ── 列 6 端点与横切 ── */
@@ -342,7 +346,7 @@ const NODES = [
     producer: "imageService.generateImage", consumers: "三类图片 URL" },
   { id: "apiVideo", col: 6, kind: "api", zh: "生视频端点", en: "POST /videos + 轮询 GET /agnesapi",
     src: "src/services/videoService.ts:125",
-    mean: "创建拿 video_id，5 秒一轮最多 30 分钟，轮询必须带 model_name；创建后失败抛 VideoTaskCreatedError 区分是否仍在跑。",
+    mean: "创建拿 video_id，5 秒一轮最多 30 分钟，轮询必须带 model_name；创建后失败抛 VideoTaskCreatedError 区分是否仍在跑。⚠ mode 三选一（keyframe / reference / text），reference 与 first_frame/last_frame 服务端互斥（同时传 400）。",
     producer: "videoService.generateVideo", consumers: "镜头视频 URL" },
   { id: "apiFfmpeg", col: 6, kind: "api", zh: "本地拼接", en: "FFmpeg.wasm concat",
     src: "src/services/renderService.ts:160",
@@ -496,15 +500,18 @@ const EDGES = [
   { f: "apiImage", t: "assetImg", type: "artifact", label: "资产参考图 URL" },
   { f: "apiImage", t: "shotImg", type: "artifact", label: "镜头画面图 URL" },
   { f: "shMotion", t: "actVideoBatch", type: "text", label: "视频 prompt 全文" },
-  { f: "shotImg", t: "actVideoBatch", type: "image", label: "first_frame 首帧（恒存在 → mode 恒 keyframe）" },
+  { f: "shotImg", t: "actVideoBatch", type: "image", label: "本镜 first_frame；同时作为上一镜的自动 last_frame（chain）" },
+  { f: "vcons", t: "actVideoBatch", type: "artifact", label: "决定走 keyframe 还是 reference" },
+  { f: "assetImg", t: "actVideoBatch", type: "image", label: "identity 时把角色定妆照作为 images 参考（锚身份）" },
+  { f: "styleImg", t: "actVideoBatch", type: "image", label: "identity 时把风格母版作为 images 参考（锚画风）" },
   { f: "shDual", t: "actVideoBatch", type: "image", label: "last_frame 尾帧" },
   { f: "shDur", t: "actVideoBatch", type: "text", label: "seconds = clamp(round(时长), 4, 12)" },
   { f: "apiVideo", t: "shotVideo", type: "artifact", label: "轮询完成后的视频地址" },
   { f: "shotVideo", t: "apiFfmpeg", type: "artifact", label: "videoUrls 数组，顺序即分镜顺序" },
   { f: "apiFfmpeg", t: "final", type: "artifact", label: "blob 播放地址" },
   { f: "reviews", t: "final", type: "artifact", label: "半自动逐级放行到成片" },
-  { f: "styleImg", t: "shotRefs", type: "image", off: true, label: "已停用：母版内容会被整体复制" },
-  { f: "aScene", t: "shotRefs", type: "image", off: true, label: "已停用：场景图会压平镜头差异" },
+  { f: "styleImg", t: "shotRefs", type: "image", off: true, label: "生图阶段已停用：母版内容会被整体复制（生视频 reference 另走 images）" },
+  { f: "aScene", t: "shotRefs", type: "image", off: true, label: "生图阶段已停用：场景图会压平镜头差异" },
 
   /* 失效级联（改了前者，后者成果被清空） */
   { f: "shVisual", t: "shotImg", type: "invalidate", label: "改画面字段 → 图片与视频一并作废" },

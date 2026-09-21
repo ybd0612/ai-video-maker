@@ -58,6 +58,8 @@ src/
 │   ├── promptUtils.ts / validation.ts / resolveBaseUrl.ts / fetchWithRetry.ts
 │   ├── assetDetails.ts / extractAssets.ts / assetNamespace.ts / characterUtils.ts
 │   ├── shotFields.ts / shotReferences.ts / generationParams.ts / refineContent.ts
+│   ├── shotContinuity.ts           # 同场景首尾帧衔接派生（纯函数，不写 store）
+│   ├── videoPlan.ts                # 视频一致性策略：mode 选择 + 素材互斥（keyframe/reference/text）
 │   ├── batchRunner.ts              # createBatchRunner：注册表 + recoverStuck + 受控并发 + finally 清理
 │   ├── jsonResponse.ts             # 模型 JSON 响应解析与容错
 │   └── logger.ts / logStorage.ts / devDump.ts / dumpSanitize.ts   # 运行日志与调试落盘（会读写 store / localStorage）
@@ -207,9 +209,10 @@ scripts/run-vitest.mjs              # Windows 盘符规范化后启动 Vitest
 `docs/execution-flow-diagrams.md`（参数进出）；本节只留跨阶段稳定约定：
 
 - 提示词双轨：`visualPrompt` 喂生图、`motionPrompt` 喂视频，均由分镜阶段一次产出，禁止二次翻译覆盖。
-- 参考图注入走 `extra_body.image[]`；风格母版与场景图不进参考图（只以文本注入）。
+- 参考图注入走 `extra_body.image[]`；**生图阶段**风格母版与场景图不进参考图（只以文本注入，参考图内容会被整体复制）。⚠ 生视频阶段不同：`reference` 模式实测可送 `images`（≤5）锚身份与画风。
 - 并发：资产 / 镜头图片 / 分镜逐镜头各 3；视频按套餐 1（免费）/ 2（企业）/ 3（Token Plan）。
-- 视频参数体系：`mode=keyframe`（有首帧或尾帧，字段 `first_frame` / `last_frame`）或 `mode=text`，`size` 固定 `"720P"`，画幅 `aspect_ratio`，时长 `seconds`（4–12 秒字符串）；轮询必须带 `model_name`。
+- 视频参数体系：`mode` 三选一 —— `keyframe`（`first_frame` / `last_frame`）、`reference`（`images` ≤5，可含 `audios` ≤3，不支持 `videos`）、`text`；⚠ **`reference` 与首尾帧服务端互斥**，同时传返回 400「首尾帧素材与参考素材不能同时使用」。`size` 固定 `"720P"`，画幅 `aspect_ratio`，时长 `seconds`（4–12 秒字符串）；轮询必须带 `model_name`。
+- 视频一致性策略：设置项 `videoConsistency`（`off` / `chain` / `identity`，默认 `chain`），素材统一由 `src/lib/videoPlan.ts:planShotVideoMedia` 决定（批量与单项重摇共用）；同场景尾帧由 `src/lib/shotContinuity.ts` 派生，**只在发请求时计算、绝不写回 store**（`useDualFrame` / `lastFrameUrl` 属 MOTION 字段，写回会清空已生成视频）。
 - 成片地址解析链以**实测**为准：`url`（顶层）→ `metadata.url` → `video_url` → `output.url` → `output.video_url` → `remixed_from_video_id`。
 - 批量用 `createBatchRunner` + 四张模块级注册表；`Promise.allSettled` 收集全部结果，需要失败即停时才用 `all`。
 - 单镜头重roll 必须回填对白与资产引用（名称→store ID 映射，匹配不到的对白置 `null` 归旁白）。

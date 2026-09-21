@@ -11,7 +11,7 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { installLocalStorageStub, removeLocalStorageStub } from "../helpers/localStorage";
-import { migratePersistedSettings } from "@/stores/settingsStore";
+import { migratePersistedSettings, useSettingsStore } from "@/stores/settingsStore";
 
 beforeEach(() => {
   installLocalStorageStub();
@@ -146,5 +146,16 @@ describe("migratePersistedSettings：坏结构不抛错", () => {
   it("空对象 / null providerConfig 均不抛错", () => {
     expect(() => migratePersistedSettings({}, 0)).not.toThrow();
     expect(() => migratePersistedSettings({ providerConfig: undefined }, 1)).not.toThrow();
+  });
+});
+
+describe("新增持久化字段 videoConsistency（靠默认值兜底，不加迁移分支）", () => {
+  it("v4 旧数据迁移后不注入该字段，交由 store 初始值兜底", () => {
+    const migrated = migratePersistedSettings({ theme: "light", providerConfig: { apiKey: "k", baseUrl: "https://api.agnes-ai.cn/v1", plan: "default" } }, 4);
+    expect("videoConsistency" in (migrated as Record<string, unknown>)).toBe(false);
+  });
+
+  it("store 默认策略为 chain（同场景自动衔接）", () => {
+    expect(useSettingsStore.getState().videoConsistency).toBe("chain");
   });
 });

@@ -106,16 +106,3 @@ export function buildContinuityMap(
   }
   return map;
 }
-
-/**
- * 发给视频接口的尾帧取值：手动值优先，其次自动衔接。
- * 注意与现行代码的差别 —— 现行实现要求 `useDualFrame` 为真才带 last_frame，
- * 自动衔接不依赖该开关。
- */
-export function resolveRequestLastFrame(
-  shot: Pick<Shot, "id" | "useDualFrame" | "lastFrameUrl">,
-  links: ReadonlyMap<string, string>,
-): string | undefined {
-  if (shot.useDualFrame && shot.lastFrameUrl) return shot.lastFrameUrl;
-  return links.get(shot.id);
-}

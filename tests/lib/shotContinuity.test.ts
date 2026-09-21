@@ -7,7 +7,6 @@ import { describe, expect, it } from "vitest";
 import {
   buildContinuityMap,
   planShotContinuity,
-  resolveRequestLastFrame,
   type ContinuityDecision,
   type ShotForContinuity,
 } from "@/lib/shotContinuity";
@@ -114,30 +113,9 @@ describe("planShotContinuity", () => {
   });
 });
 
-describe("buildContinuityMap 与 resolveRequestLastFrame", () => {
-  it("映射只收录已衔接的镜头", () => {
+describe("buildContinuityMap", () => {
+  it("映射只收录已衔接的镜头（手动尾帧优先等取舍在 videoPlan 判定）", () => {
     const links = buildContinuityMap(planShotContinuity(SAMPLE));
     expect([...links.entries()]).toEqual([["s0", IMG(1)], ["s3", IMG(4)]]);
-  });
-
-  it("自动衔接不依赖 useDualFrame 开关", () => {
-    const links = new Map([["s0", IMG(1)]]);
-    expect(resolveRequestLastFrame({ id: "s0", useDualFrame: false, lastFrameUrl: undefined }, links))
-      .toBe(IMG(1));
-  });
-
-  it("手动尾帧优先于自动衔接；手动开双帧但没填地址时回落到自动值", () => {
-    const links = new Map([["s0", IMG(1)]]);
-    expect(resolveRequestLastFrame(
-      { id: "s0", useDualFrame: true, lastFrameUrl: "https://cdn.test/manual.png" },
-      links,
-    )).toBe("https://cdn.test/manual.png");
-    expect(resolveRequestLastFrame({ id: "s0", useDualFrame: true, lastFrameUrl: undefined }, links))
-      .toBe(IMG(1));
-  });
-
-  it("未衔接且无手动值时返回 undefined（保持单帧生成）", () => {
-    expect(resolveRequestLastFrame({ id: "x", useDualFrame: false, lastFrameUrl: undefined }, new Map()))
-      .toBeUndefined();
   });
 });

@@ -442,23 +442,29 @@ Promise.allSettled([链A, 链B])                                      :251
   筛选待生成: 无 videoUrl && 有 imageUrl && status!="videoing"
               && (motionPrompt 动态提示词 或 actionDesc 动作 非空)
   |
+  +-- [lib] planShotVideoMedia({shot, shots 全项目镜头, assets, styleReferenceUrl,
+  |          consistency = settings.videoConsistency})            lib/videoPlan.ts
+  |        先由 planShotContinuity 派生同场景下一镜画面图作尾帧   lib/shotContinuity.ts
+  |        优先级：手动双帧 > 同场景自动衔接尾帧 > (identity 时) 参考图 > 仅首帧
+  |        out: media = {imageUrl?, lastFrameUrl?, referenceImageUrls?}
+  |             ⚠ 互斥：reference 时不带首尾帧（服务端 400「首尾帧素材与参考素材不能同时使用」）
   +-- prompt = appendRegistryRules(composeMotionPrompt(shot) -> shot.motionPrompt,
   |                                {negativeStrategy 负向策略文本})
   +-- [srv] generateVideo(opts, onProgress 进度回调, signal 取消信号)  videoService.ts:125
-  |      in : {apiKey, baseUrl, prompt 动态描述, imageUrl 首帧地址,
-  |            lastFrameUrl? 尾帧地址, aspectRatio 画幅, duration 时长(秒)}
+  |      in : {apiKey, baseUrl, prompt 动态描述, ...media, aspectRatio 画幅, duration 时长(秒)}
   |      槽位: acquire("video", {cost 计费量: duration||1, signal})  <-- HTTP 之前就扣秒数
   |      req1: POST {baseUrl}/videos   (maxRetries 3, baseDelay 退避基数 10s)
   |            {model:"agnes-video-2.5-flash",
   |             prompt: sanitizePrompt(清洗后的动态描述),
-  |             mode: (有首帧或尾帧) ? "keyframe 关键帧" : "text 纯文本",  // 向导恒 keyframe
-  |             size:"720P",                                      // 固定档位
+  |             mode: "reference" 有参考图 | "keyframe" 有首/尾帧 | "text" 无素材,
+  |             size:"720P",                                      // Flash 固定档位
   |             aspect_ratio(画幅): <白名单，否则 "16:9">,
   |             seconds(时长): String(clamp(round(duration),4,12)),  // 只能是 4..12
   |             n:1,
-  |             first_frame(首帧)?:imageUrl,
-  |             last_frame(尾帧)?:lastFrameUrl}
-  |            注：first_frame 取 opts.imageUrl（= 镜头画面图），与 shot.firstFrameUrl 无关
+  |             first_frame(首帧)?:imageUrl,   // 仅 keyframe
+  |             last_frame(尾帧)?:lastFrameUrl,// 仅 keyframe
+  |             images?(身份/画风参考): [定妆照…, 风格母版]}  // 仅 reference，≤5 张
+  |            注：first_frame 取 media.imageUrl（= 镜头画面图），与 shot.firstFrameUrl 无关
   |            out: video_id(任务号) ?? task_id ?? id
   |      req2: 循环 GET {origin}/agnesapi?video_id=..&model_name=agnes-video-2.5-flash
   |            间隔 5s / 上限 30 分钟 / task_not_exist|404 容忍 24 轮（等任务注册）
