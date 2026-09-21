@@ -3,6 +3,7 @@
 > 用途：供主理人核对「程序实际怎么跑」是否与预期一致。
 > 全部结论来自当前源码，关键处标 `文件:行`。与 AGENTS.md/README 不一致的地方集中在第 11 节，代码可疑点在第 12 节。
 > 本文不描述界面外观，只描述：谁触发 → 调什么 → 发什么请求 → 写回什么 → 门禁如何放行。
+> 配套的 ASCII 数据流图集（每一步吃什么参数、吐什么参数）：`docs/execution-flow-diagrams.md`。
 
 ---
 
@@ -185,7 +186,7 @@
    - **创建后失败的错误类型是 `VideoTaskCreatedError{videoId, stillRunning}`**（`videoService.ts:35-48`）；上层 `useVideoActions.ts:100-122` 对 `stillRunning=true` **只等待不再创建新任务**（避免双倍消耗），false 才判失败
 6. 写回 `videoUrl` + `status:"videoed"`（revision 校验）；`onFinally`：全有视频 → `idle`；全落定（有视频或失败）→ 复位 started + `failed`（`useVideoActions.ts:174-180`，硬编码中文文案）
 
-首尾帧：`DualFrameToggle`（步骤 5 卡内）可勾选双帧并从其他镜头图点选 `lastFrameUrl`，关闭时清尾帧。**注意这是本流程中唯一还保留手写 URL 输入框的地方**（`DualFrameToggle.tsx:82-90`）。
+首尾帧：`DualFrameToggle`（步骤 5 卡内）可勾选双帧并从其他镜头图点选 `lastFrameUrl`，关闭时清尾帧。**注意这是本流程中唯一还保留手写 URL 输入框的地方**（`DualFrameToggle.tsx:82-90`）。另：`shot.firstFrameUrl` 只被 `normalizeRawShot` / `pickShotFields` 搬运，请求侧从不读取它（`first_frame` 用的是 `shot.imageUrl`），当前是**无消费者的死字段**。
 
 推进：步骤 5 没有审核卡点，auto 模式全视频 false→true 时 `setWizardStep(6)`（`StepVideos.tsx:67-76`）；半自动靠底部「下一步」，门禁 `case 5 = 每个镜头都有 videoUrl`（`CreationWizard.tsx:39`）。
 
