@@ -176,6 +176,8 @@ in:      吃进的参数        out:   吐出的结果            req:   真正�
 
 ## 图 1　步骤 1：想法 → 两链并行提取
 
+> 导读：本图是**执行时序版**（守卫、重试、槽位、写回顺序）。想知道"一句想法被拆成什么、每样东西有哪些字段、提示词原文长什么样、之后在哪里被引用"，看 `docs/idea-breakdown.md`。
+
 ```
 [UI] StepIdea.tsx:83 handleGenerate()
   in : prompt(想法原文, str)（textarea 本地态，500ms 防抖写回 ideaPrompt）
