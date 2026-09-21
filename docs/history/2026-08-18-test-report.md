@@ -1,5 +1,12 @@
 # AI Video Maker 测试报告
 
+> **归档说明（2026-09-21 迁入 `docs/history/`，正文自该日起冻结）**
+> 本文是 2026-08-18 的构建快照 + 手工 API 探测记录，**不是 Vitest 报告**，也不得作为现行测试或模型口径引用。
+> 顶部修订：① 文中 `agnes-2.5-flash` / `agnes-image-2.1-flash` / `agnes-video-v2.0` 及 `num_frames`、`frame_rate`
+> 参数体系已全部废弃，现行模型与参数见 `src/lib/models.ts` 与 `src/services/videoService.ts`；
+> ② 「限流器设计验证」的 RPM 数字属复述，现行唯一事实源是 `src/lib/plans.ts`；
+> ③ 本项目现行测试口径是「只做代码单元测试，不用浏览器/E2E」，`npm run test` 实测通过情况见 `docs/index.md` §4-C4。
+
 > ⚠️ **历史报告（2026-08-18）**：本文仅保留当时的实测证据，不是当前模型、API 参数或测试规范的权威来源。当前项目只做 Vitest 代码单元测试，不做浏览器 / E2E 验证；历史凭证已脱敏。
 
 **测试时间**: 2026-08-18  

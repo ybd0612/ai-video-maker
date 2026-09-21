@@ -1,5 +1,7 @@
 # 全资产结构化方案：代码管结构流程，效果归大模型
 
+> **函数名对照（2026-09-21）**：本文 §5 改动清单里的 `generateScript` 与 `extractAssetsFromIdea` 是 2026-09-15 当时的命名，现已重构为 `generateStoryboardOutline` + `generateStoryboardShot`（分镜两阶段）与 `extractAssetsByType`（按类资产提取）；`useWizardActions` 也已拆为四个域 hook。其余结论与「代码管结构、效果归模型」原则仍与代码一致。
+
 > 状态：**已实施**（2026-09-15）
 > 背景：资产生图多轮修补中积累的代码特化逻辑（动画专用风格板模板、全局关键词清洗）跨风格会误伤；且风格资产提取后 6 个结构化字段在部分链路被丢弃。
 ## 1. 用户确立的原则（不可违背）

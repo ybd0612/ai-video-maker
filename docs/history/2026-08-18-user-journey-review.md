@@ -1,5 +1,12 @@
 # AI 一键成片：用户视角完整走查报告
 
+> **归档说明（2026-09-21 迁入 `docs/history/`，正文自该日起冻结）**
+> 顶部修订：① 两条 P0（异步任务绑定 projectId、StepAssembly / FinalPreview 统一）与「删除按钮语义」
+> 「localhost 代理」均已修复；`FinalPreview.tsx` 未删除而是残留为零引用孤儿组件。
+> ② 本文的验证方式是真实浏览器走查，**已被项目铁律禁止**（本项目只做 Vitest 单元测试，界面由维护者本地确认）。
+> ③ 走查记录中的页面标题「AI Canvas Creator」已于 2026-09-21 统一为「AI Video Maker / AI 一键成片」。
+> ④ 第四节问题清单仍可作为回归线索，但优先级已过期，须按 `docs/execution-flow.md` §12 重新核对。
+
 **日期**：2026-08-18  
 **范围**：真实浏览器交互 + 源码实现审查  
 **结论**：当前产品主流程可用，但存在一个高优先级的多项目异步写入风险，以及“最终预览组件不可达”等流程断点。建议先修复数据正确性，再修复成片交付链路。
@@ -41,7 +48,7 @@
 
 ### 3. 产品优化报告已过时，容易误导后续迭代
 
-`docs/product-optimization.md` 仍写着“无加载反馈”“数据丢失”“下载缺失”“IndexedDB 待实现”，但源码已具备 loading、Zustand localStorage 持久化和 StepAssembly 下载；报告末尾还把已完成事项写成“下一步建议”。
+`docs/history/2026-08-18-product-optimization.md` 仍写着“无加载反馈”“数据丢失”“下载缺失”“IndexedDB 待实现”，但源码已具备 loading、Zustand localStorage 持久化和 StepAssembly 下载；报告末尾还把已完成事项写成“下一步建议”。
 
 **建议**：将旧报告标记为历史基线，或直接同步为当前状态，避免团队按过时 P0 清单重复开发。
 

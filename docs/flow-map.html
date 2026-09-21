@@ -236,7 +236,7 @@ const NODES = [
   /* ── 列 3 动作② 规划与细化 ── */
   { id: "actOutline", col: 3, kind: "act", zh: "出镜头大纲", en: "generateStoryboardOutline",
     src: "src/services/scriptService.ts:287",
-    mean: "把想法规划成 4-8 条镜头计划（只规划不写提示词）；要求复用已有资产原名，缺人时才补建新资产。这一步没有重试。",
+    mean: "把想法规划成镜头大纲（镜头数量由模型按叙事复杂度自行判断，不写固定区间；只规划不写提示词）；要求复用已有资产原名，缺人时才补建新资产。这一步没有重试。",
     producer: "步骤 3 第一次调用", consumers: "产出大纲，顺带补建 newCharacters / newScenes" },
   { id: "actShot", col: 3, kind: "act", zh: "逐镜头细化", en: "generateStoryboardShot",
     src: "src/services/scriptService.ts:384",
@@ -387,7 +387,7 @@ const EDGES = [
   /* 输入 → 动作 */
   { f: "idea", t: "actVd", type: "text", label: "作为想法原文，提炼六维视觉语言" },
   { f: "idea", t: "actAssets", type: "text", label: "作为想法原文，四类各请求一次" },
-  { f: "idea", t: "actOutline", type: "text", label: "作为想法原文，规划 4-8 个镜头" },
+  { f: "idea", t: "actOutline", type: "text", label: "作为想法原文，规划镜头大纲（数量由模型判断）" },
   { f: "idea", t: "actShot", type: "text", label: "连同大纲全文一起喂入" },
   { f: "idea", t: "actReroll", type: "text", label: "重摇首选提示词，缺失退回镜头文案" },
   { f: "idea", t: "actPolish", type: "text", label: "步骤 1 输入框的润色对象" },

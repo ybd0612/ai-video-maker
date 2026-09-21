@@ -1,5 +1,15 @@
 # B 方案设计稿：中文主数据 + AI 派生提示词架构
 
+> **归档说明（2026-09-21 迁入 `docs/history/`，正文自该日起冻结）**
+> 状态更正：文首「设计稿，未实施」**不成立** —— 本方案已于 2026-09-12 落地：规则条目注册表
+> （`src/lib/promptRules.ts` + `settingsStore.promptRules`）、`Asset.type` 新增 `style`、L1/L2/L3 三层数据、
+> 定妆照物种锁定与多参考图链路均已在代码中（现行描述见 `docs/execution-flow.md`、`docs/idea-breakdown.md`）。
+> 顶部修订：① §5.3「分镜图多参考 = [场景参考图, 角色定妆照, 风格图]」**已被 2026-09-15 事故决策推翻**，
+> 现行只取 角色定妆照 → 主体 → 道具，**场景图与风格母版都不进参考图**（`src/lib/promptComposer.ts` 的
+> `pickShotReferences`，代码上限 4 张）；② §2.2/§5.4 的 `size` 档位现固定 `1K`
+> （`src/services/imageService.ts` `aspectRatioToImageParams`），2K/3K/4K 仅在 `src/lib/plans.ts` 的限流表中预留；
+> ③ §6 阶段表里的 `pipelineService` / `useWizardActions` 已不存在；④ §4.1 的 `PromptTask` 联合类型已扩为 12 个任务。
+
 > 状态：**设计稿，未实施**（等用户确认后动工）
 > 日期：2026-09-12
 > 背景诊断：「小白兔/兔妈定妆照生成人类」——风格图污染 → img2img 复制人物 → 人像语汇加重（详见当日工作日志）。

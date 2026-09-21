@@ -36,7 +36,7 @@ Step labels match the UI (`wizard.step1~6` in `src/i18n/index.ts`):
 
 1. **Idea** — enter the creative idea plus aspect ratio (`9:16` / `16:9` / `1:1`). Enter triggers extraction, producing the visual direction and four asset categories, then jumps to step 2.
 2. **Assets** — a project-level **visual direction** (six dimensions: medium/material, palette, lighting mood, camera texture, composition, emotion) plus four structured asset types: **character / scene / product / prop** (and a derived `style` asset with its style master image). Each reference image can be regenerated individually.
-3. **Storyboard** — an outline first, then one request per shot, producing Chinese script text plus English **visualPrompt** / **motionPrompt** plus duration (normalized to 4 / 5 / 8 seconds only) plus dialogue and asset references. **Everything is read-only**; the single edit entry is "hand it to AI with one instruction" in the shot detail page.
+3. **Storyboard** — an outline first, then one request per shot, producing Chinese script text plus English **visualPrompt** / **motionPrompt** plus duration (normalized to 4 / 5 / 8 seconds only) plus dialogue and asset references. **The shot count is not fixed — the model decides it from the idea's narrative complexity** (override the `storyboard.shot-count` rule in Settings). **Everything is read-only**; the single edit entry is "hand it to AI with one instruction" in the shot detail page.
 4. **Images** — one image per shot (`visualPrompt` plus character/product/prop references as multi-reference input), concurrency 3, single-shot re-roll supported.
 5. **Videos** — `motionPrompt` plus the shot image as first frame; async creation with 5s polling, `size` fixed to `720P`, 4–12 second durations, optional first/last-frame mode; concurrency drops to 1 / 2 / 3 per plan.
 6. **Post-production** — FFmpeg.wasm concatenates clips into a downloadable MP4; a single clip is downloaded directly without FFmpeg.
@@ -166,7 +166,7 @@ The build uses a relative `base` of `./`, so it works both on a custom domain an
 - After a shot image is invalidated by the cascade, step 4 has no "fill only the missing items" entry, which pushes users into "regenerate everything".
 - Auto mode stops permanently when any stage has a failed item; it never continues with failures.
 - FFmpeg.wasm is bounded by browser memory and cross-origin resources; long or remote videos may fail to assemble.
-- The browser tab title is still `AI Canvas Creator` (`index.html:24`), not yet aligned with the repository name `ai-video-maker`.
+- The shot count is delegated to the model with **no hard ceiling**: the more complex the idea, the more shots, and image/video quota scales linearly (tighten the `storyboard.shot-count` rule in Settings when cost matters).
 
 When reporting a generation bug, include: wizard step, project status, failing shot numbers, browser console errors, and whether you refreshed or switched projects — that is the minimum triage set.
 

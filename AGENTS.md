@@ -1,6 +1,6 @@
 # AI Video Maker — AI 一键成片
 
-面向 AI 创作的短视频制作工具。主流程为 6 步向导（想法 → 角色资产 → 分镜 → 图片 → 视频 → 成片），底层为 Pipeline 架构（脚本 → 图片 → 视频 → 拼接），集成 Agnes AI 的文本、图像、视频三大模型，支持中英文切换。
+面向 AI 创作的短视频制作工具。主流程为 6 步向导（想法 → 资产 → 分镜 → 图片 → 视频 → 后期），底层按生成域编排（想法提取 → 风格母版 → 资产图 → 分镜 → 镜头图 → 镜头视频 → 本地拼接），集成 Agnes AI 的文本、图像、视频三大模型，支持中英文与黑白双主题。
 
 ## 技术栈
 
@@ -9,78 +9,66 @@
 - FFmpeg.wasm — 客户端视频拼接
 - TailwindCSS v4 + Framer Motion — 样式与动画
 - Lucide React — 图标库
+- Vitest 4 — 单元测试（本项目只做代码单测，见「测试约定」）
 
 ## 项目结构
 
 ```
 src/
-├── i18n/                          # 轻量 i18n 系统（无第三方依赖）
-│   └── index.ts                   # zh/en 翻译字典 + useT hook
-├── pages/
-│   └── ProjectWorkspace.tsx       # 主页面外壳（三栏：侧边栏 | 向导 | 编辑器）
+├── main.tsx / App.tsx              # 入口（无路由库；App.tsx effect 同步 <html data-theme>）
+├── pages/ProjectWorkspace.tsx      # 外壳：顶栏 + 左栏项目列表 + 向导主区（+ 可折叠底部日志坞）
+├── i18n/index.ts                   # zh/en 字典 + useT（自研，零第三方依赖）
 ├── features/
-│   ├── wizard/                    # 6 步向导（主流程）
-│   │   ├── CreationWizard.tsx     # 向导容器（步骤路由 + 状态机）
-│   │   ├── StepIdea.tsx           # 步骤1：想法 + 画幅比例 + AI 对话
-│   │   ├── StepAssets.tsx         # 步骤2：角色/场景/风格资产
-│   │   ├── StepStoryboard.tsx     # 步骤3：分镜脚本
-│   │   ├── StepImages.tsx         # 步骤4：镜头图片
-│   │   ├── StepVideos.tsx         # 步骤5：视频生成
-│   │   ├── StepAssembly.tsx       # 步骤6：成片拼接
-│   │   ├── useWizardActions.ts    # 向导操作编排（含模块级幂等守卫注册表）
-│   │   ├── ShotListSection.tsx    # 分镜列表卡（整卡点击进入详情）
-│   │   ├── ShotDetail.tsx         # 分镜详情（内容全只读 + 一句话交给 AI 改）
-│   │   ├── shotStatus.tsx         # 镜头状态 → 图标/语义色（列表卡与镜头卡共用）
-│   │   ├── ShotCard.tsx           # 镜头卡（图片/视频步骤用，展开式）
-│   │   ├── PromptSubFields.tsx    # 提示词子字段编辑（图片/视频步骤用）
-│   │   ├── DualFrameToggle.tsx    # 首尾帧开关
-│   │   └── ReviewCheckpoint.tsx   # 审核卡点
-│   ├── characters/                # 角色编辑器（CharacterEditor）/ 面板（CharacterPanel）
-│   ├── projects/                  # 项目管理面板（ProjectSidebar）
-│   └── history/                   # 操作历史面板（HistoryPanel）
-├── services/                      # 服务层
-│   ├── rateLimit.ts               # 集中式用量限制器（RPM 节流 + Token Plan 配额追踪，单例）
-│   ├── scriptService.ts           # 文本模型调用，生成结构化分镜（含 visualPrompt + motionPrompt）
-│   ├── imageService.ts            # 图片生成（单张，使用 visualPrompt）
-│   ├── videoService.ts            # 视频生成（异步创建 + 轮询 + 完成响应解析，使用 motionPrompt）
-│   ├── chatService.ts             # AI 辅助：字段专家提示词 + 一键润色（polishText）
-│   ├── renderService.ts           # FFmpeg.wasm 视频拼接
-│   └── ai/                        # AI 服务统一入口（OpenAI 兼容）
-│       ├── factory.ts             # 服务工厂
-│       ├── openai.ts              # chatCompletion / generateImage 实现
-│       └── index.ts
-├── stores/                        # Zustand stores
-│   ├── projectStore.ts            # 多项目管理（projects[] + activeProjectId + history[]，localStorage 持久化，v1→v2 迁移）
-│   └── settingsStore.ts           # 全局设置（apiKey/baseUrl/plan/language，localStorage）
+│   ├── wizard/                     # 6 步向导
+│   │   ├── CreationWizard.tsx      # 步骤路由 + 「下一步」唯一门禁表 canAdvance
+│   │   ├── StepIdea / StepAssets / StepStoryboard / StepImages / StepVideos / StepAssembly
+│   │   ├── StepIndicator / AutomationModeSwitch / ReviewCheckpoint
+│   │   ├── useScriptActions.ts     # 分镜域：想法提取、大纲+逐镜头、改写、重roll（activeScriptTasks）
+│   │   ├── useAssetActions.ts      # 资产域：风格母版链、资产图批量（activeAssetTasks）
+│   │   ├── useImageActions.ts      # 镜头图片域（activeImageTasks）
+│   │   ├── useVideoActions.ts      # 镜头视频域（activeVideoTasks）
+│   │   ├── useWizardActions.ts     # 35 行门面，只组合上述四个域（不再是主实现文件）
+│   │   ├── wizardActionUtils.ts    # 域间共享的写回与守卫工具
+│   │   ├── VisualDirectionEditor.tsx / AssetEditor.tsx / AssetEditorTemplate.tsx
+│   │   ├── AssetListSection.tsx / ShotListSection.tsx / ShotDetail.tsx / ShotCard.tsx
+│   │     （统一详情外壳 AssetDetailShell 由 AssetEditorTemplate.tsx 导出，资产与镜头详情共用）
+│   │   ├── shotStatus.tsx / PromptField.tsx / PromptSubFields.tsx / DualFrameToggle.tsx
+│   │   └── ExpandableSection.tsx   # 零引用孤儿，待清理
+│   ├── characters/                 # CharacterEditor.tsx + useCharacterEditorActions.ts（外貌派生与定妆照）
+│   ├── projects/ProjectSidebar.tsx # 项目创建 / 切换 / 复制 / 删除 + 搜索 / 排序
+│   └── script/ScriptPanel.tsx、preview/FinalPreview.tsx、preview/ShotPreview.tsx   # 零引用孤儿，待清理
+├── services/
+│   ├── ai/                         # factory.ts（provider 工厂）+ openai.ts（chatCompletion / generateImage）
+│   ├── scriptService.ts            # 视觉方向提取与自检、按类资产提取、分镜大纲 + 逐镜头、镜头改写
+│   ├── imageService.ts             # 单张生图、aspectRatioToImageParams（size 恒 1K）
+│   ├── videoService.ts             # 视频创建、轮询、完成响应解析、VideoTaskCreatedError
+│   ├── chatService.ts              # 润色与子字段回写；re-export 注册表里的 SYSTEM_PROMPT_*
+│   ├── renderService.ts            # FFmpeg.wasm 拼接（单视频短路、dev CDN 代理、可取消）
+│   └── rateLimit.ts                # rateLimiter 单例：RPM 滑窗 + Token Plan 配额
+├── stores/
+│   ├── projectTypes.ts             # 全部领域类型（AssetType / ShotStatus / VisualDirection / *Details）
+│   ├── projectStore.ts             # 多项目 + persist（key wxhb-project，version 16）
+│   ├── projectMigrations.ts        # v1→v16 迁移，导出纯函数便于单测
+│   ├── projectOps.ts               # 级联失效规则（applyShotUpdates / applyAssetUpdate）
+│   └── settingsStore.ts            # apiKey/baseUrl/plan/theme/language/promptRules（wxhb-settings，v4）
 ├── lib/
-│   ├── models.ts                  # AI 模型标识符常量（集中管理）
-│   ├── plans.ts                   # 访问套餐与用量限制配置（RPM/配额单一事实源）
-│   ├── fetchWithRetry.ts          # fetch 统一封装（超时 + 指数退避重试）
-│   ├── promptUtils.ts             # 画面/运动提示词组合
-│   ├── characterUtils.ts          # 角色描述注入
-│   ├── assetNamespace.ts          # 角色命名空间与完整提示词
-│   ├── promptComposer.ts          # 官方结构拼装器（六段式/图生图/多图合成/定妆照物种锁定/多参考选取）
-│   ├── promptRules.ts             # 规则条目注册表（骨架 + 内置默认条目 + buildSystemPrompt/mergeRules）
-│   ├── resolveBaseUrl.ts          # API 地址解析工具
-│   └── validation.ts              # 校验工具（帧数计算、prompt 清理等）
-├── components/
-│   ├── SettingsDialog.tsx         # 设置对话框（API Key / Base URL / 套餐 / 语言）
-│   ├── ApiKeyBanner.tsx           # API Key 缺失提示横幅
-│   └── ui/                        # 通用 UI 组件
-│       ├── ConfirmDialog.tsx      # 确认对话框
-│       ├── ContextMenu.tsx        # 右键菜单
-│       ├── HelpTooltip.tsx        # 帮助提示
-│       ├── Lightbox.tsx           # 图片灯箱
-│       ├── NumberInput.tsx        # 数字输入框
-│       ├── IMEAwareTextarea.tsx   # 输入法兼容文本框
-│       └── AiPolishField.tsx      # 输入框 + 内嵌「润色 / 撤销」按钮（所有 AI 输入入口）
-├── styles/
-│   └── globals.css                # 全局样式
-├── App.tsx                        # 根组件
-└── main.tsx                       # 入口文件
-```
+│   ├── models.ts / plans.ts        # 模型标识符、套餐与限额（两个单一事实源）
+│   ├── promptRules.ts              # 提示词骨架 SKELETONS + 内置条目 BUILTIN_RULES + buildSystemPrompt
+│   ├── promptComposer.ts           # 六段式 / 图生图 / 多图合成 / 定妆照物种锁定 / 多参考选取
+│   ├── promptUtils.ts / validation.ts / resolveBaseUrl.ts / fetchWithRetry.ts
+│   ├── assetDetails.ts / extractAssets.ts / assetNamespace.ts / characterUtils.ts
+│   ├── shotFields.ts / shotReferences.ts / generationParams.ts / refineContent.ts
+│   ├── batchRunner.ts              # createBatchRunner：注册表 + recoverStuck + 受控并发 + finally 清理
+│   ├── jsonResponse.ts             # 模型 JSON 响应解析与容错
+│   └── logger.ts / logStorage.ts / devDump.ts / dumpSanitize.ts   # 运行日志与调试落盘（会读写 store / localStorage）
+├── components/                     # SettingsDialog / ApiKeyBanner / LogConsoleDock + ui/*
+└── styles/globals.css              # :root 字号缩放 + 黑白主题语义色 token
 
-顶层另有 `tests/`（单元测试目录，见「测试约定」）与 `vitest.config.ts`（单元测试配置）。
+tests/                              # Vitest 用例，按 src 分层镜像；helpers/localStorage.ts 为轻量桩
+docs/                               # 现行参考在顶层；快照在 docs/history/；规划在 docs/roadmap/；索引 docs/index.md
+vite-plugins/debugDumpPlugin.ts     # 仅 dev：脱敏 store 快照写 debug-dump/state.json
+scripts/run-vitest.mjs              # Windows 盘符规范化后启动 Vitest
+```
 
 ## 命令
 
@@ -180,7 +168,8 @@ src/
 
 - 跨 `await` 的操作必须在开始时捕获 `targetProjectId`；完成、失败、进度、定时器和 fire-and-forget 回调都只能按目标 ID 写回。
 - 异步流程禁止使用 `updateProject`、`updateShot`、`updateAsset`、`setWizardStep` 等只作用于 active project 的 action，除非操作已证明不会跨项目；优先使用 `ByProjectId` 版本。
-- 批量任务必须使用模块级注册表做幂等守卫、独立 `AbortController`、受控并发和 `finally` 清理；取消、项目切换、组件卸载时不能遗留任务、监听器、定时器或 Blob URL。
+- 批量任务必须使用模块级注册表做幂等守卫、独立 `AbortController`、受控并发和 `finally` 清理；任务、监听器、定时器与 Blob URL 不得跨批次遗留。
+  - ⚠️ **这是目标态，不是已实现能力**（2026-09-21 实测）：全仓 `controller.abort()` 只有 5 处（`StepAssembly.tsx:114`、`fetchWithRetry.ts:106,115`、`renderService.ts:109,112`），**批量生成没有任何用户级取消入口**；切项目、离开步骤、组件卸载都不中断在飞请求与视频轮询（`docs/execution-flow.md` §9.3）。补齐前禁止宣称「所有 AI 请求可取消」。
 - `Promise.all` / `Promise.allSettled` 的选择必须表达业务语义：需要收集所有任务结果时使用 `allSettled`，需要失败即停时才使用 `all`；禁止无意吞掉异常。
 - fire-and-forget 必须显式处理 rejection；进度回调不得写入已经不存在或已切换的项目。
 
@@ -194,40 +183,36 @@ src/
 - 每次提交前至少完成：结构/硬编码/复用自检、`npx tsc --noEmit`、`git diff --check`、适用的单元测试和 `npm run build`；结果必须如实记录。
 - 功能、接口、模型参数、配置、目录结构或编码规则变更时，同一次工作同步相关文档；关键事实先改 SSOT，再扫描旧值残留。
 
-## 当前审计结论（2026-09-13）
+## 现状与待办（入口）
 
-以下是本轮基于真实源码发现的“规范与现状差异”，仅作为后续整改清单；本轮不做无边界业务重构。处理时按 P0 → P1 → P2 分批，小步修改、每批验证并提交。
+- 本文只承载**长期工程约定**；时点性审计已迁出为 `docs/history/2026-09-13-agents-audit.md`（入库即冻结）。
+- **文档口径冲突 / 未决事实**：看 `docs/index.md` §4 冲突登记（C1–C17，带 `文件:行` 证据）。
+- **代码级待办与可疑点**：看 `docs/execution-flow.md` §12（18 条，按影响排序）。
+- **能力缺口与演进规划**：看 `docs/roadmap/competitive-gap-2026-09-21.md`。
 
-- **P0 安全**：旧 `TEST_REPORT.md` 曾包含历史 API Key；当前文件已脱敏，但凭证是否仍有效、Git 历史是否需要清理，必须由用户先完成轮换/确认。
-- **P1 非幂等重试**：`services/ai/openai.ts` 的图片创建和 `services/videoService.ts` 的视频创建仍复用通用 `fetchWithRetry`；在没有幂等键/任务恢复协议前，不得继续扩大创建请求重试。
-- **P1 多项目写回**：`StepAssets.tsx`、`CharacterEditor.tsx`、`StepIdea.tsx` 等仍存在 active-project action 跨异步边界使用；后续统一捕获 `targetProjectId`，改用 `ByProjectId` action。
-- **P1 取消链路**：文本/图片服务接口、视频轮询、retry backoff 和部分批量入口的 `AbortSignal` 尚未完全贯通；补齐前不得宣称“所有 AI 请求可取消”。
-- **P1 数据契约**：负向提示词目前存在 UI/模型字段但需核实是否完整进入请求；视频时长与分镜数量存在多处口径，须先确定产品策略，再建立单一事实源和运行时校验。
-- **P1 结构化响应**：`scriptService` 已有分镜 JSON 重试，但轻量资产提取仍需统一 `unknown → 解析 → 运行时校验 → 重试/报错` 链路。
-- **P1 质量门禁**：当前 `npm run test` 在收集阶段失败，不能将“测试已通过”写入报告；CI 目前只构建，后续应让单元测试成为部署前门禁。
-- **P2 复用与口径**：Base URL 归一化、单资产/批量资产生成、风格参考图读取、i18n 文案和部分参数仍有重复/绕过统一 helper 的入口；修复一个入口时必须检索同类入口。
-- **P2 维护性**：`useWizardActions.ts` 职责较重；旧组件/历史报告与当前主流程存在漂移，清理前先确认无引用并保留历史证据边界。
+仍然有效的红线（不与上述三份重复，改代码必须遵守）：
 
-### 当前未决口径
+- **P0 安全**：发现疑似密钥泄露时停止提交与传播，先轮换再脱敏，并评估 Git 历史清理范围。
+- **P1 非幂等重试**：图片创建与视频创建在没有幂等键 / 任务恢复协议前，不得继续扩大创建请求的自动重试。
+- **P1 多项目写回**：跨 `await` 一律按 `targetProjectId` 写回，禁止 active-project action 参与异步链路。
+- **P1 取消链路**：新增生成入口必须贯通 `AbortSignal`；补齐前不得宣称「所有 AI 请求可取消」（现状见上方铁律注）。
+- **P1 质量门禁**：`npm run test` 现为 30 文件 / 393 用例通过（2026-09-21 实测）；**CI 仍不跑测试**，把它加成部署前门禁是待办。
+- **P1 数据契约**：镜头时长与数量口径已收敛（时长 `{4,5,8}` 白名单 + 数量交模型判断）；`scriptService` 之外仍缺统一的`unknown → 解析 → 运行时校验 → 重试/报错` 链路（按类资产提取已具备）。
 
-- README/本文件与产品说明采用 **4-6 个分镜**，但 `src/lib/promptRules.ts` 当前规则文本采用 **4-8 个分镜**，服务层也尚未做数量运行时约束；在用户确认产品目标前，禁止继续扩散或擅自统一该数值。
+## Pipeline 架构（现行链路的权威描述在 docs/execution-flow.md）
 
-## Pipeline 架构
+6 步向导即运行期编排：想法提取（视觉方向链 ∥ 资产链）→ 风格母版 → 资产图 → 分镜（大纲 → 逐镜头）→ 镜头图片 → 镜头视频 → 本地拼接。
+旧版一键流水线 `pipelineService.ts` 已删除（零引用死代码），`useWizardActions.ts` 已拆为四个域 hook。
+**逐步骤的触发点、请求体、写回与门禁不要在本文件查证**，看 `docs/execution-flow.md`（现行、带 `文件:行`）与
+`docs/execution-flow-diagrams.md`（参数进出）；本节只留跨阶段稳定约定：
 
-> 主流程已改为 6 步向导（`features/wizard/`）。旧版一键流水线 `pipelineService.ts` 已于 2026-09 结构收敛重构中删除（零引用死代码）；本节保留描述底层编排逻辑的通用规则（提示词/参数/轮询约定现由 `services/` 各服务与 `features/wizard/` 承接）。
-
-四阶段流水线（脚本 → 图片 → 视频 → 拼接，原编排在 `src/services/pipelineService.ts`，现已移除）：
-
-1. **脚本阶段** — 调用文本模型生成 4-6 个结构化分镜（scriptText + visualPrompt + motionPrompt + duration）
-2. **图片阶段** — 为每个分镜生成参考图（使用 visualPrompt，并发度 3）
-3. **视频阶段** — 为每个分镜生成视频（使用 motionPrompt，按套餐并发：免费档 1，企业 2，Token Plan 3；异步创建 + 5 秒轮询，单任务 30 分钟超时，任务注册等待 2 分钟）。请求参数：`mode=keyframe`（有首帧/尾帧时，字段为 `first_frame` / `last_frame`）或 `text`，`size` 固定 `"720P"`，画幅用 `aspect_ratio`，时长用 `seconds`（4-12 秒字符串）；轮询必须带 `model_name`
-4. **拼接阶段** — FFmpeg.wasm concat demuxer 拼接所有视频为最终 MP4（支持 AbortSignal 取消：下载阶段中止 fetch，FFmpeg 阶段 terminate 进程）
-
-- 并发控制使用 `Promise.allSettled`，确保所有 worker 完成后再检查状态
-- 支持 AbortController 取消
-- 支持单镜头重试（`runSingleShot`，跳过脚本阶段）
-- 视频生成自动重试（最多 3 次，针对网络超时/5xx 等临时性故障）
-- 失败视频的自动重试统一由向导视频步骤（`useWizardActions.generateVideosForStep`）接管
+- 提示词双轨：`visualPrompt` 喂生图、`motionPrompt` 喂视频，均由分镜阶段一次产出，禁止二次翻译覆盖。
+- 参考图注入走 `extra_body.image[]`；风格母版与场景图不进参考图（只以文本注入）。
+- 并发：资产 / 镜头图片 / 分镜逐镜头各 3；视频按套餐 1（免费）/ 2（企业）/ 3（Token Plan）。
+- 视频参数体系：`mode=keyframe`（有首帧或尾帧，字段 `first_frame` / `last_frame`）或 `mode=text`，`size` 固定 `"720P"`，画幅 `aspect_ratio`，时长 `seconds`（4–12 秒字符串）；轮询必须带 `model_name`。
+- 成片地址解析链以**实测**为准：`url`（顶层）→ `metadata.url` → `video_url` → `output.url` → `output.video_url` → `remixed_from_video_id`。
+- 批量用 `createBatchRunner` + 四张模块级注册表；`Promise.allSettled` 收集全部结果，需要失败即停时才用 `all`。
+- 单镜头重roll 必须回填对白与资产引用（名称→store ID 映射，匹配不到的对白置 `null` 归旁白）。
 
 ## 向导可靠性铁律（踩坑沉淀，改动时必须遵守）
 
@@ -238,13 +223,15 @@ src/
 - 异步结果一律按项目 ID 写回（`updateXxxByProjectId`），禁止用 active-project 版本，防串写。
 - “重试失败 / 全部重新生成”按钮必须走批量生成函数（幂等 + 并发受控），禁止 forEach 并发 reroll。
 - 视频完成响应解析链：`url`（顶层）→ `metadata.url` → `video_url` → `output.url` → `output.video_url` → `remixed_from_video_id`。
-- **风格参考图必须先于资产图生成**（2026-09-12；B 方案后更新）：`generateAssetImages` 分两阶段——阶段 1 串行生成风格图（`generateStyleReference`，幂等 + activeAssetTasks 互斥，风格提示词由 AI 从 idea + 中文风格描述**零角色派生**，硬性禁止出现人物/生物），阶段 2 的角色/场景/产品任务经 `referenceImageUrls` 参考风格图（生图请求走 `extra_body.image[]` 多参考，`size` 用档位 `"1K"/"2K"` + `ratio`，不用精确像素）；风格图失败不阻塞资产生成（退化为文生图）。角色定妆照 prompt 已移除 `photorealistic` 硬编码与 `Portrait of / head and shoulders / looking at camera` 人像语汇（后者是"动物角色画成人"的推手之一，2026-09-12 实锤），改用 `promptComposer.composePortraitPrompt`（物种锁定句 + 全身设定）。
-- `extractCharactersFromIdea` 成功写回后自动 `void generateStyleReference(targetProjectId)` 后台生成风格图（不阻塞进入步骤 2）；风格资产（`Asset.type="style"`）与风格提示词由 AI 派生（`ensureStyleAsset` 懒派生）。分镜图经 `pickShotReferences` 选取多参考（场景→角色→产品合计 ≤2 张，风格图恒占末位，总数 ≤3）；StepAssets 手动「重新生成风格图」传 `force=true` 覆盖已有图。
+- **风格母版必须先于资产图生成，但不作为 i2i 参考图**（2026-09-12 建立，2026-09-15 修订）：`generateAssetImages` 分两阶段——阶段 1 串行生成风格图（`generateStyleReference`，幂等 + `activeAssetTasks` 互斥；风格提示词由 AI 从中文风格描述 + 视觉方向六维**零角色派生**，再经 `stylePromptAudit` 越界自检），阶段 2 的角色 / 场景 / 主体 / 道具任务**只以英文 `stylePrompt` 文本注入**生图 prompt，不传风格图作参考（参考图内容会被整体复制，2026-09-15 实锤）；风格图失败不阻塞资产生成。生图请求走 `extra_body.image[]` 多参考，`size` 恒 `1K` + `ratio`（`imageService.aspectRatioToImageParams`；2K/3K/4K 仅在 `plans.ts` 预留，全仓无调用点产生）。定妆照用 `promptComposer.composePortraitPrompt`（物种锁定句 + 全身设定，已移除 `photorealistic` 与 `Portrait of / head and shoulders / looking at camera` 人像语汇）。
+- 步骤 1 两条链**并行**（`Promise.allSettled`）：链 A 视觉方向（提取 + `visualDirectionAudit` 自检，完成即写 `wizardStep: 2`），链 B 按类资产提取（character/scene/product/prop 各一次请求）；两链都成功后 fire-and-forget 依次跑 `generateStyleReference(targetProjectId)` → `generateAssetImages(undefined, targetProjectId)`（顺序不可颠倒）。风格资产（`Asset.type="style"`）由 `generateStyleReference` 内部**懒建**（`ensureStyleAsset` 函数已不存在，2026-09-21 已清掉残留注释）。分镜图经 `pickShotReferences` 取多参考：**只有 角色定妆照 → 主体 → 道具**，场景图与风格母版都不进参考（代码上限 4 张，旧口径「≤2 张 / 风格图恒占末位 / 总数 ≤3」全部作废）。StepAssets 手动「重新生成风格图」传 `force=true` 覆盖已有图。
 - **资产防重复（2026-09-12）**：`Asset.source` 标记来源（`extracted`=AI 提取 / `manual`=手动添加，缺省视为 extracted 兼容旧数据；`addAsset` 默认 manual）。重新提取是**替换式**：旧的 extracted 资产整体被新结果取代、manual 保留且与新结果重名时以手动版为准；有 extracted 资产时先弹 `confirmDialog`（列出将替换的名字）确认，取消则返回 `false` 不推进向导。模型对同一故事命名不稳定（「小兔子」/「小白兔」），**禁止改回纯追加式**。
-- 分镜阶段 `generateScript` 已产出完整英文双提示词，**禁止二次翻译覆盖**（translateToMotion 已移除）。
+- 分镜阶段（`generateStoryboardOutline` + 逐镜头 `generateStoryboardShot`）已产出完整英文双提示词，**禁止二次翻译覆盖**（translateToMotion 已移除）。
 - 分镜生成后必须**回填角色 ID 引用**：模型返回的 `activeCharacterIds` / `dialogues.characterId` 可能是自编 ID，需按「角色名 → store 角色 ID」映射统一回填（新资产由 `extractNewAssets` 建映射），匹配不到的对白置 `null`（归旁白），否则角色一致性（图片注入/定妆照参考）与对白归属会失效。
 - 单镜头重roll（`rerollShot`）同样必须**回填对白/角色引用**（映射 + 无效清理），并把 `dialogues` / `activeCharacterIds` 一并写回，否则重roll后对白与脚本脱节。
-- 步骤 1 资产提取走**轻量接口** `extractAssetsFromIdea`（只返回 characters/products/scenes/styles JSON，不生成分镜）；完整分镜生成仅在步骤 3 调用 `generateScript`，禁止用完整分镜生成做资产提取（无谓的重复请求）。**文本模型输出预算统一为 `MAX_OUTPUT_TOKENS`（65536，见 lib/models.ts）——效果优先，禁止为各任务单独设小预算**（预算过小会导致输出截断、JSON 断裂）。
+- 步骤 1 资产提取走**按类轻量接口** `extractAssetsByType`（每类一次请求，只返回该类 JSON，代码再做越界兜底过滤）；完整分镜仅在步骤 3 走 `generateStoryboardOutline` + `generateStoryboardShot`，禁止用完整分镜生成做资产提取（无谓的重复请求）。
+- **镜头数量不写死**（2026-09-21 产品决定）：由模型按想法的叙事复杂度与节奏自行判断，载体是 `promptRules.ts` 的 `storyboardOutline` 骨架第 1 条与内置条目 `storyboard.shot-count`（用户可在设置里覆盖）。**代码与文档一律不得再出现「4-6 个 / 4-8 个」这类固定区间**；镜头时长仍受结构约束（`duration` 只允许 4 / 5 / 8 秒）。
+- **文本模型输出预算统一为 `MAX_OUTPUT_TOKENS`（65536，见 lib/models.ts）——效果优先，禁止为各任务单独设小预算**（预算过小会导致输出截断、JSON 断裂）。
 
 ## 双提示词系统
 
@@ -262,14 +249,14 @@ src/
 - 所有 AI 可辅助的输入框右下角**内嵌「润色」按钮**：一键把当前内容交给该字段的专家角色优化，结果自动回填（用户无需输入额外指令）
 - 润色后可点「撤销」**逐步回退**到上一次润色前的内容；撤销栈为组件本地状态，随镜头 / 资产切换（`resetKey`）与刷新清空
 - 统一走 `components/ui/AiPolishField.tsx`（输入框 + 内嵌按钮），润色请求走 `chatService.polishText`；**禁止再引入旁挂式 AI 入口**（输入框外的 ✨ 按钮 / 抽屉）
-- 字段与专家系统提示词统一由**规则条目注册表** `lib/promptRules.ts` 管理（2026-09-12 B 方案）：`chatService.ts` 的 8 个 `SYSTEM_PROMPT_*` 常量已整体搬迁为注册表内置条目（polish 任务），`AiPolishField` 经 `resolvePolishSystemPrompt` 取生效版；用户可在设置对话框「提示词规则」Tab 查看/编辑/开关/新增/导入导出（存 `settingsStore.promptRules`，persist v2，同 id 覆盖内置，改规则即时生效零构建）；`scriptService` 的分镜/抽资产系统提示词同样走骨架（SKELETONS）+ 生效条目（`buildSystemPrompt`）拼装，动态 assets 上下文段在函数内拼装不入条目。**修改提示词规则优先改条目，不改代码**
+- 字段与专家系统提示词统一由**规则条目注册表** `lib/promptRules.ts` 管理（2026-09-12 B 方案）：`chatService.ts` 早期的 `SYSTEM_PROMPT_*` 常量已迁为注册表内置条目（polish 任务），`chatService` 现在只 re-export 其中 7 个（`chatService.ts:41-49`）；角色 / 资产 / 视觉方向三个编辑提示词实际定义在 `promptRules.ts`，`AiPolishField` 经 `resolvePolishSystemPrompt` 取生效版；用户可在设置对话框「提示词规则」Tab 查看/编辑/开关/新增/导入导出（存 `settingsStore.promptRules`，persist v2，同 id 覆盖内置，改规则即时生效零构建）；`scriptService` 的分镜/抽资产系统提示词同样走骨架（SKELETONS）+ 生效条目（`buildSystemPrompt`）拼装，动态 assets 上下文段在函数内拼装不入条目。**修改提示词规则优先改条目，不改代码**
 - 边界行为：内容为空 / 无 API Key / 请求进行中时按钮自动禁用；失败就地显示原因（不弹窗）；润色结果与原文相同则不入撤销栈
 - 按钮样式（用户两次微调后的定稿）：**只用图标不显示文字**（`h-5 w-5` 方形 + 图标 `size={12}`，含义靠 `title` 提示）；**不得紧贴输入框边框**——多行贴右下角留距（`bottom-2.5 right-2.5`，输入框配 `pb-9`），单行垂直居中（`top-1/2 -translate-y-1/2 right-2`，输入框配 `pr-16`）
 - 旧的多轮对话抽屉 `AiAssistDrawer.tsx` 已于 2026-09 结构收敛重构中删除（零引用死代码）；**禁止再引入旁挂式 AI 入口**
 
 ## UI 交互约定
 
-- **卡片的「进入编辑」统一为点击整张卡片**：`role="button"` + `tabIndex={0}` + Enter/Space 键盘可达 + `cursor-pointer` + 语义化 focus 边框（如 `focus:border-success`），卡片上加 `title={t("characters.edit")}` 作为提示；**不再单独放铅笔按钮**（`Pencil` 图标已全项目移除）。角色卡片见 `wizard/StepAssets.tsx` 与 `characters/CharacterPanel.tsx`
+- **卡片的「进入编辑」统一为点击整张卡片**：`role="button"` + `tabIndex={0}` + Enter/Space 键盘可达 + `cursor-pointer` + 语义化 focus 边框（如 `focus:border-success`），卡片上加 `title={t("characters.edit")}` 作为提示；**不再单独放铅笔按钮**（`Pencil` 图标已全项目移除）。资产卡片入口见 `wizard/StepAssets.tsx` 与 `wizard/AssetListSection.tsx`（`characters/CharacterPanel.tsx` 已删除）
 - 卡片内的次级操作（删除等）**必须 `e.stopPropagation()`**，否则会连带触发卡片的进入编辑
 - 界面整体缩放与字号规则见「编码规范」一节（rem 化，禁止写死 px 字号）
 
@@ -282,11 +269,11 @@ src/
   - 文本 `agnes-3.0-flash` — 512K 上下文 / 最大输出 65,536 Token，支持文本与图像 URL 输入，`chat_template_kwargs.enable_thinking` 控制 Thinking（默认关闭）
   - 图像 `agnes-image-2.5-flash` — 端点 `POST /v1/images/generations`，结果取 `data[0].url`；支持文生图 / 图生图 / 多图合成（image 参数为数组）
   - ⚠️ **图生图 / 多图合成的参考图必须放在 `extra_body.image`**（`"extra_body": {"image": [...], "response_format": "url"}`，官方文档要求）。放在请求体顶层会被服务端拒绝：403 `team_model_access_denied`，报错文案误导为"模型无权限"，实为参数位置错误（2026-09-12 实测踩坑）
-  - ⚠️ **`seed` 服务端校验范围 -1 ~ 999**（官方文档未写，2026-09-12 实测 400 `invalid_request` 得知）：超出范围直接 400。同 seed 同 prompt 输出字节级一致；「重新生成」传 0-999 随机值破除结果趋同（见 `randomSeed()`）
+  - ⚠️ **`seed` 服务端校验范围 -1 ~ 999**（官方文档未写，2026-09-12 实测 400 `invalid_request` 得知）：超出范围直接 400。同 seed 同 prompt 输出字节级一致；「重新生成」传 0-999 随机值破除结果趋同（`randomSeed()` 定义在 `useCharacterEditorActions.ts:38`，**当前只有角色定妆照重生成传 `seed`**，资产图与镜头图片/视频请求都不传）
   - 视频 `agnes-video-2.5-flash` — 仅支持 `size="720P"`，画幅用 `aspect_ratio`（16:9 → 1280x704），时长用 `seconds`（"4"~"12"），有首帧/尾帧时 `mode="keyframe"`（`first_frame` / `last_frame`），无图时 `mode="text"`；轮询必须带 `model_name`，成片 URL 在响应顶层 `url`
 - ⚠️ 视频 2.5 Flash 与旧版 `agnes-video-v2.0` 参数体系不同（旧版 `num_frames`（8n+1、≤441）/ `frame_rate` / `width` / `height` / `image` / `last_image` 均已废弃，`calcNumFrames` 已无调用方），修改 `videoService.ts` 时勿混用两套参数
 - API Key 和 Base URL 由用户在设置对话框中配置，存储在浏览器本地
-- 📌 模型名/参数变更的**文档同步清单**（升级时必须逐处更新，改完 grep 全仓旧名确认零残留）：`src/lib/models.ts`（SSOT）、`README.md` 与 `README_EN.md`（特性表 + MODELS 代码块，中英口径一致）、`AGENTS.md`（本节 + Pipeline 架构章节）。`docs/` 下的历史评审报告与 `TEST_REPORT.md` 属历史实测记录，**不作为当前 SSOT**；除安全脱敏、历史状态警示和明显误导性待办修订外，不改写其原始证据。
+- 📌 模型名/参数变更的**文档同步清单**（升级时必须逐处更新，改完 grep 全仓旧名确认零残留）：`src/lib/models.ts`（SSOT）、`README.md` 与 `README_EN.md`（特性表 + MODELS 代码块，中英口径一致）、`AGENTS.md`（本节 + Pipeline 架构章节）。`docs/history/` 下的归档快照（含原 `TEST_REPORT.md`）属历史实测记录，**不作为当前 SSOT**；除安全脱敏、历史状态警示和明显误导性待办修订外，不改写其原始证据。
 
 ## 用量限制与套餐（Rate Limit / Plan）
 
@@ -305,29 +292,42 @@ src/
 
 ## 数据模型
 
-- **Project**：项目（title / aspectRatio / style / language / shots / status / error / createdAt / updatedAt / styleReferenceUrl / styleReferenceError）
-- **Asset**：统一资产（type: character / scene / product；name / description / prompt / imageUrl / error；character 另有 appearancePrompt / assetNamespace / fullPrompt / avatarUrl）——角色、场景、产品共用一套存储与参考链
-- **Shot**：分镜（scriptText / visualPrompt / motionPrompt / duration / imageUrl / videoUrl / status / videoRetryCount）
-- **HistoryEntry**：操作记录（projectId / action / description / timestamp）
-- 项目状态流转：`idle → scripting → imaging → videoing → rendering → done`（可卡在 `failed`；向导内图片/视频批量完成后会复位为 `idle` 或 `failed`，成片拼接完成才置 `done`）
-- 分镜状态流转：`idle → scripting → scripted → imaging → imaged → videoing → videoed`（可卡在 `failed`）
-- 多项目存储：`projects[]` + `activeProjectId`，通过 `getActiveProject()` 派生活跃项目
-- 历史记录保留最近 200 条，按日期分组展示；`addHistory(action, description, projectId?)` 支持异步任务完成后按发起项目写历史
+类型定义的唯一载体是 `src/stores/projectTypes.ts`（本节只给导航，不复制字段清单）。
+
+- **Project**：`title` / `wizardStep` 1..6 / `automationMode`（`auto` | `semi-auto`）/ `aspectRatio`（`9:16`|`16:9`|`1:1`）/
+  `ideaPrompt` / `style`（中文风格描述）/ `visualDirection`（结构化六维 + `revision` + `status`）/
+  `styleReferenceUrl` 与 `styleReferenceError` / `assets[]` / `shots[]` / 三个 `*Reviewed` 审核标记 /
+  三个 `*GenerationStarted` 幂等标记 / `status` / `error` / `createdAt` / `updatedAt`
+- **Asset**（`type` = `character` | `scene` | `product` | `prop` | `style`）：`source`（`extracted` | `manual`，缺省按 extracted 兼容旧数据）/
+  `name` / `description` / `prompt`（英文派生物；style 资产上即 `stylePrompt`）/ `details`（分类结构化设定）/
+  `imageUrl` / `avatarUrl` / `multiViewUrl` / `error` / `derivation`（`locked` / `dirty`）/ `renderRevision`；
+  角色另有 `appearancePrompt` / `assetNamespace` / `fullPrompt`
+- **Shot**：`scriptText` / `visualPrompt` / `motionPrompt` + 画面 4 子字段与动态 4 子字段 / `duration`（规范化后只可能 4|5|8）/
+  `dialogues[]`（`characterId` 为 `null` 即旁白，`delivery` 为 TTS 预留、不进任何请求）/ `activeCharacterIds` / `activeSceneId` /
+  `activeProductIds` / `activePropIds` / `imageUrl` / `videoUrl` / `videoProgress` / `videoRetryCount` /
+  `useDualFrame` / `lastFrameUrl` / `status` / `error` / `renderRevision`
+  （⚠️ `firstFrameUrl` 是无消费者的死字段，视频首帧实际取 `imageUrl`）
+- 状态流转：项目 `idle → scripting → imaging → videoing → rendering → done`（可卡 `failed`；批量完成后复位 `idle` 或 `failed`，
+  只有成片完成才置 `done`）；分镜 `idle → scripting → scripted → imaging → imaged → videoing → videoed`（可卡 `failed`）
+- `HistoryEntry` / 操作历史已随 persist v15 从持久化中移除，**不再属于数据模型**，勿再加回
+- 多项目：`projects[]` + `activeProjectId`，经 `getActiveProject()` 派生；复制项目保留分镜结构并重置 `idle`
+- persist：`wxhb-project` v16 / `wxhb-settings` v4 / `wxhb-usage`（限流用量）。迁移按版本分块串行，
+  **新增持久化字段必须同时加迁移与 `tests/stores/*` 回归**；块执行顺序与版本号不完全一致（`<11` 排在 `<12`、`<13` 之后），改迁移前先看 `docs/execution-flow.md` §13
 
 ## 多项目管理
 
-- 左侧面板只保留**项目**（ProjectSidebar）；分镜列表与镜头详情在向导步骤 3（`ShotListSection` → `ShotDetail`），角色编辑在步骤 2，操作历史已整体停用
+- 左侧面板只保留**项目**（`ProjectSidebar`）；分镜列表与镜头详情在步骤 3（`ShotListSection` → `ShotDetail`），资产与视觉方向编辑在步骤 2（`AssetListSection` / `AssetEditor` / `VisualDirectionEditor` / `CharacterEditor`），操作历史已整体停用并移出持久化
 - **分镜内容全只读**：镜头文案 / 结构化子字段 / 英文提示词 / 对白 / 资产引用都不可手改，唯一修改入口是步骤 3 详情页的「交给 AI 修改」（`ShotDetail` + `useScriptActions.reviseShot` → `reviseShotWithInstruction`）；禁再加回逐字段输入框，也禁新增第二套分镜详情布局（必须复用 `AssetDetailShell` 系列）
 - **进入分镜步骤前先在资产页等首个镜头**：`StepAssets.enterStoryboard` 触发 `generateStoryboard` 并在首个镜头写回时切页（与「想法 → 资产」同构）；禁改回「先切页再生成」的一屏转圈体验
 - 项目操作：创建 / 切换 / 删除 / 复制
 - 复制项目时保留分镜结构，重置状态为 idle
-- v1 → v11 持续存储迁移：旧单项目、多轮字段和角色描述格式逐步转换为当前多项目结构；新增持久化字段必须增加版本迁移与回归测试
+- v1 → v16 持续存储迁移：旧单项目、多轮字段、角色描述格式与视觉方向平铺字段逐步收敛为当前结构；新增持久化字段必须增加版本迁移与回归测试（迁移明细见 `docs/execution-flow.md` §13）
 
 ## 工作流约定（Agent 必须遵守）
 
 每次完成代码编写任务后，执行以下流程：
 
-1. **文档同步检查** — 审查相关文档（README.md、README_EN.md、AGENTS.md 等），确保与代码变动一致。如有新增/删除/重命名的文件、接口变更、功能变更等，必须同步更新文档（中英双语口径一致）。关键事实先更新 SSOT，再扫描引用方；历史报告必须标明历史状态，不得继续作为现行协议依据。
+1. **文档同步检查** — 先按 `docs/index.md` §3 同步铁律与 §2 SSOT 表定位受影响文档（README.md、README_EN.md、AGENTS.md、`docs/` 现行参考），确保与代码变动一致；关键事实只改权威载体，其余文档改为引用。如有新增/删除/重命名的文件、接口变更、功能变更等，必须同步更新文档（中英双语口径一致）。关键事实先更新 SSOT，再扫描引用方；历史报告必须标明历史状态，不得继续作为现行协议依据。
 2. **安全扫描** — 提交前搜索 API Key、Token、Cookie、真实请求头和个人数据；发现疑似凭证先停止提交，轮换/脱敏后再继续。测试 fixture、日志、截图和 CI artifact 也必须脱敏。
 3. **结构与复用自检** — 检查本次改动是否新增散落 Prompt、业务 magic number、无约束参数类型、active-project 异步写回或重复实现；能复用现有 helper/服务/类型时不得复制。
 4. **提交代码** — 使用 `git add` + `git commit` 提交所有变更，commit message 遵循约定式提交格式（`feat:` / `fix:` / `docs:` / `refactor:` 等）。只精确暂存业务文件，**禁止 `git add -A`**（`.workbuddy/` 等工具数据不入库）。
@@ -339,5 +339,5 @@ src/
 - `.env.example` 中的 `VITE_*` 环境变量仅作参考，实际配置通过应用内设置对话框完成。
 - 模型调用无抽象层：`src/services/` 直接调用 Agnes API，不存在 adapter 中间层（旧 `src/providers/` 已在前一轮重构中移除，勿再引用）。
 - 视频/图片等外部 API 响应字段以**用户实测为准**，不要仅凭官方文档推断（实测：Agnes 视频成片地址在响应顶层 `url` 字段，非文档示例的 `metadata.url`）。
-- `TEST_REPORT.md`、`docs/` 下的旧报告属于历史证据，不能作为当前模型、参数或测试规范的 SSOT；当前口径以源码、`models.ts` / `plans.ts`、本文件和同步后的 README 为准。
+- `docs/history/` 下的归档快照（含原 `TEST_REPORT.md`）属于历史证据，不能作为当前模型、参数或测试规范的 SSOT；当前口径以源码、`models.ts` / `plans.ts`、本文件和同步后的 README 为准。
 - 发现疑似密钥泄露时，不得继续提交或传播原值；先轮换凭证，再脱敏当前文件并评估 Git 历史清理范围。

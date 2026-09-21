@@ -292,7 +292,9 @@ RPM 与配额表（`lib/plans.ts:73-134`，格式 文本 / 图片1K,2K,3K,4K / �
 
 ---
 
-## 11. 与 AGENTS.md / README 现有描述的差异（文档已漂移，代码为准）
+## 11. 与 AGENTS.md / README 现有描述的差异（代码为准）
+
+> **2026-09-21 状态更新**：本节逐条列出的 `AGENTS.md` 漂移已全部订正（项目结构与数据模型整节重写、失效函数名替换、取消能力标注为目标态、persist 版本改 v16 等），结案记录见 `docs/index.md` §4-C1…C16。本节正文按快照原则**保留原文不改**，其中的「AGENTS.md 仍写…」表述读作当时状态，勿再作为待修清单使用。
 
 1. `useWizardActions.ts` 已拆为 `useScriptActions / useAssetActions / useImageActions / useVideoActions` 四个域，前者只剩 35 行门面；AGENTS.md 仍写「向导操作编排（含模块级幂等守卫注册表）」并标注其为主要实现文件
 2. 步骤 2 资产已从 3 类扩为 **4 类 + 风格**：`character / scene / product / prop / style`；AGENTS.md 数据模型仍写 `character / scene / product`

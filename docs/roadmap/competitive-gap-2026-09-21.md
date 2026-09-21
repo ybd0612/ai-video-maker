@@ -58,4 +58,5 @@
 
 ## 五、本轮依据
 
-竞品能力来自下列公开资料；本仓库现状来自 `docs/execution-flow.md`、`docs/execution-flow-diagrams.md`、`docs/idea-breakdown.md`、`docs/flow-map.html` 的 2026-09-21 源码快照（结论均可回源码定位）。既有待办见 `docs/product-optimization.md`，本文不重复其中已列的取消按钮、任务恢复、失败引导、模板、导入导出、模型选择六项，只补充提示词与流程结构层面的缺口。
+竞品能力来自下列公开资料；本仓库现状来自 `docs/execution-flow.md`、`docs/execution-flow-diagrams.md`、`docs/idea-breakdown.md`、`docs/flow-map.html` 的 2026-09-21 源码快照（结论均可回源码定位）。既有代码级待办的现行权威清单是 `docs/execution-flow.md` §12（18 条，含证据行号）；
+`docs/history/2026-08-18-product-optimization.md` §三 另列了取消按钮、任务恢复、失败引导、模板、导入导出、模型选择六项增强建议（属 2026-08-18 基线），本文不重复，只补充提示词与流程结构层面的缺口。

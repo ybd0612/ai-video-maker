@@ -1,5 +1,13 @@
 # 视频生成一直未成功 — 全面调研报告
 
+> **归档说明（2026-09-21 迁入 `docs/history/`，正文自该日起冻结）**
+> 顶部修订（哪些仍有效）：**第七节「成片地址在响应顶层 `url`」与第八节「提示词被兜底文案覆盖」两条实测结论仍有效**，
+> 并已沉淀为现行规则（`docs/execution-flow.md` §7 与 `AGENTS.md` 向导可靠性铁律）。
+> 其余部分已过期：① 第二、三节基于 `agnes-video-v2.0` 的 `num_frames`（8n+1）/`frame_rate`/`width`/`height`
+> 参数体系已随模型升级到 `agnes-video-2.5-flash` 整体废弃（现用 `mode` + `size:"720P"` + `aspect_ratio` + `seconds`）；
+> ② 第四节修复落在 `useWizardActions.ts`，该文件现已拆为 `useScriptActions` / `useAssetActions` /
+> `useImageActions` / `useVideoActions` 四个域，自身只剩 35 行门面；③ `calcNumFrames` 与 `translateToMotion` 均已删除。
+
 > 调研日期：2026-08-18
 > 结论：官方视频实际生成成功（token 已消耗），问题全部出在前端链路，已定位 4 个根因并修复。
 

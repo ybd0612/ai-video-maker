@@ -77,7 +77,7 @@ export function migratePersistedSettings(
   const state = { ...(persisted as Partial<SettingsState>) };
 
   // v0 → v1：仅迁移已知旧域名，用户自定义地址不受影响。
-  // 中国站实测端点/响应与官方文档一致（见 docs/video-generation-investigation-2026-08-18.md）。
+  // 中国站实测端点/响应与官方文档一致（见 docs/history/2026-08-18-video-generation-investigation.md）。
   const baseUrl = state.providerConfig?.baseUrl ?? "";
   if (
     baseUrl.startsWith("https://apihub.agnes-ai.com") ||

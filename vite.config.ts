@@ -22,7 +22,7 @@ export default defineConfig({
     open: true,
     proxy: {
       // 视频/图片输出域名代理（规避浏览器 CORS）。
-      // 实测中国站成片地址域名为 cos-platform-outputs.agnes-ai.cn（见 docs/video-generation-investigation-2026-08-18.md），
+      // 实测中国站成片地址域名为 cos-platform-outputs.agnes-ai.cn（见 docs/history/2026-08-18-video-generation-investigation.md），
       // 旧域名 platform-outputs.agnes-ai.space 已失效，勿改回。
       "/cdn-proxy": {
         target: "https://cos-platform-outputs.agnes-ai.cn",
