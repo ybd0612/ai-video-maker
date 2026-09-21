@@ -6,15 +6,14 @@
 <title>AI Video Maker · 全链路引用关系交互图</title>
 <style>
   :root {
-    --bg: #f6f7f9; --surface: #fff; --ink: #16181d; --ink-3: #5b6472; --ink-4: #8b94a3;
-    --line: #d8dde5; --accent: #4f46e5;
+    --bg: #f5f6f8; --surface: #fff; --ink: #15171c; --ink-3: #59616f; --ink-4: #8b94a3;
+    --line: #d9dee6; --accent: #4f46e5; --tint: #eef0ff;
     --text-edge: #2563eb; --image-edge: #7c3aed; --id-edge: #0d9488;
-    --artifact-edge: #94a3b8; --invalid-edge: #dc2626; --consume-edge: #d97706;
-    --hl: #f59e0b;
+    --artifact-edge: #9aa5b4; --invalid-edge: #dc2626; --consume-edge: #d97706; --hl: #f59e0b;
   }
   html[data-theme="dark"] {
-    --bg: #0e1015; --surface: #171a21; --ink: #e8ebf0; --ink-3: #a3adbd; --ink-4: #6b7688;
-    --line: #2a2f3a; --accent: #8b85f0;
+    --bg: #0e1015; --surface: #171a21; --ink: #e9ecf1; --ink-3: #a3adbd; --ink-4: #6b7688;
+    --line: #2a2f3a; --accent: #8b85f0; --tint: #1d2030;
     --text-edge: #60a5fa; --image-edge: #a78bfa; --id-edge: #2dd4bf;
     --artifact-edge: #64748b; --invalid-edge: #f87171; --consume-edge: #fbbf24;
   }
@@ -25,18 +24,19 @@
     display: flex; flex-direction: column; height: 100vh; overflow: hidden;
   }
   header {
-    display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center;
-    padding: 10px 16px; border-bottom: 1px solid var(--line); background: var(--surface);
+    display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center;
+    padding: 9px 14px; border-bottom: 1px solid var(--line); background: var(--surface);
   }
-  header h1 { font-size: 15px; margin: 0 10px 0 0; font-weight: 700; }
-  header .hint { color: var(--ink-4); font-size: 12px; margin-left: auto; }
+  header h1 { font-size: 15px; margin: 0 6px 0 0; font-weight: 700; white-space: nowrap; }
   button, input, select {
-    font: inherit; color: inherit; background: var(--bg); border: 1px solid var(--line);
-    border-radius: 6px; padding: 5px 10px;
+    font: inherit; font-size: 13px; color: inherit; background: var(--bg);
+    border: 1px solid var(--line); border-radius: 6px; padding: 4px 9px;
   }
-  button { cursor: pointer; }
+  button { cursor: pointer; white-space: nowrap; }
   button.on { background: var(--accent); color: #fff; border-color: var(--accent); }
-  #search { width: 180px; }
+  #search { width: 168px; }
+  #steps { display: flex; gap: 5px; align-items: center; }
+  #steps b { font-size: 12px; color: var(--ink-4); font-weight: 500; }
   main { flex: 1; display: flex; min-height: 0; }
   #stage { flex: 1; overflow: auto; position: relative; cursor: grab; }
   #stage.dragging { cursor: grabbing; }
@@ -44,62 +44,81 @@
   .node { cursor: pointer; }
   .node rect { fill: var(--surface); stroke: var(--line); stroke-width: 1; }
   .node .zh { font-size: 13px; font-weight: 600; fill: var(--ink); }
-  .node .en { font-size: 10.5px; fill: var(--ink-4); font-family: ui-monospace, Consolas, monospace; }
+  .node .en { font-size: 10px; fill: var(--ink-4); font-family: ui-monospace, Consolas, monospace; }
+  .node .badge { font-size: 9.5px; font-weight: 700; fill: var(--hl); }
   .node.k-input rect { stroke-dasharray: 4 3; }
-  .node.k-api rect { stroke: var(--accent); stroke-width: 1.6; }
-  .node.k-out rect { fill: var(--surface); stroke: var(--id-edge); }
-  .node.dim { opacity: .14; }
-  .node.sel rect { stroke: var(--hl); stroke-width: 2.4; }
-  .node.near rect { stroke: var(--accent); stroke-width: 1.8; }
-  .node.hit rect { stroke: var(--hl); stroke-width: 2; }
-  .edge { fill: none; stroke-width: 1.4; }
+  .node.k-act rect { fill: var(--tint); stroke: var(--accent); }
+  .node.k-api rect { stroke: var(--consume-edge); stroke-width: 1.6; }
+  .node.k-out rect { stroke: var(--id-edge); stroke-width: 1.6; }
+  .node.dim { opacity: .11; }
+  .node.gone { display: none; }
+  .node.d1 rect { stroke: var(--hl); stroke-width: 2.6; }
+  .node.d2 rect { stroke: var(--accent); stroke-width: 2; }
+  .node.sel rect { stroke: var(--hl); stroke-width: 3.4; fill: var(--tint); }
+  .node.hit rect { stroke: var(--hl); stroke-width: 2.4; }
+  .edge { fill: none; stroke-width: 1.3; opacity: .8; }
   .edge.t-text { stroke: var(--text-edge); }
-  .edge.t-image { stroke: var(--image-edge); stroke-width: 2.2; }
+  .edge.t-image { stroke: var(--image-edge); stroke-width: 2; }
   .edge.t-id { stroke: var(--id-edge); }
   .edge.t-artifact { stroke: var(--artifact-edge); }
   .edge.t-invalidate { stroke: var(--invalid-edge); stroke-dasharray: 6 3; }
   .edge.t-consume { stroke: var(--consume-edge); stroke-dasharray: 2 3; }
-  .edge.dim { opacity: .06; }
-  .edge.active { stroke-width: 3; opacity: 1; }
-  .edge.off { opacity: .3; }
-  .colhead { font-size: 11px; font-weight: 700; fill: var(--ink-4); letter-spacing: .06em; }
+  .edge.dim { opacity: .05; }
+  .edge.gone { display: none; }
+  .edge.active { stroke-width: 3.2; opacity: 1; }
+  .edge.off { opacity: .26; }
+  .elabel {
+    font-size: 10.5px; fill: var(--ink-3); stroke: var(--bg); stroke-width: 3.5;
+    paint-order: stroke; text-anchor: middle; display: none; pointer-events: none;
+  }
+  .elabel.show { display: block; }
+  .colhead { font-size: 11.5px; font-weight: 700; fill: var(--ink-4); letter-spacing: .04em; }
   #panel {
-    width: 350px; flex: none; border-left: 1px solid var(--line); background: var(--surface);
-    padding: 14px 16px 28px; overflow: auto;
+    width: 360px; flex: none; border-left: 1px solid var(--line);
+    background: var(--surface); padding: 14px 16px 30px; overflow: auto;
   }
   #panel h2 { font-size: 16px; margin: 0 0 2px; }
-  #panel h3 { font-size: 11px; margin: 15px 0 4px; color: var(--ink-3); letter-spacing: .06em; }
-  #panel p, #panel li { font-size: 13px; margin: 0; }
+  #panel h3 { font-size: 11px; margin: 16px 0 5px; color: var(--ink-3); letter-spacing: .06em; }
+  #panel p, #panel li { font-size: 13px; margin: 0 0 4px; }
   #panel ul { margin: 0; padding-left: 18px; }
-  .code, #panel .code { font-family: ui-monospace, Consolas, monospace; font-size: 11.5px; color: var(--ink-4); word-break: break-all; }
-  .edge-row { font-size: 12.5px; padding: 5px 0; border-bottom: 1px dashed var(--line); }
-  .edge-row b { font-weight: 600; }
-  .edge-row .tag { font-size: 11px; color: var(--ink-4); }
-  #legend { display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: center; }
-  #legend span { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; color: var(--ink-3); cursor: pointer; padding: 2px 4px; border-radius: 4px; }
+  .code { font-family: ui-monospace, Consolas, monospace; font-size: 11px; color: var(--ink-4); word-break: break-all; }
+  .grp { font-size: 11px; color: var(--ink-4); margin: 11px 0 3px; font-weight: 700; }
+  .er { font-size: 12.5px; padding: 5px 6px; border-radius: 6px; cursor: pointer; }
+  .er:hover { background: var(--tint); }
+  .er b { font-weight: 600; }
+  .er .tag { font-size: 11px; color: var(--ink-4); }
+  .er .how { color: var(--ink-3); }
+  #legend { display: flex; flex-wrap: wrap; gap: 3px 10px; align-items: center; }
+  #legend span {
+    display: inline-flex; align-items: center; gap: 5px; font-size: 12px; color: var(--ink-3);
+    cursor: pointer; padding: 2px 5px; border-radius: 4px; white-space: nowrap;
+  }
   #legend span.on { background: var(--accent); color: #fff; }
-  #legend i { width: 22px; height: 0; border-top-width: 2.4px; border-top-style: solid; display: inline-block; }
+  #legend i { width: 20px; height: 0; border-top-width: 2.4px; border-top-style: solid; display: inline-block; }
   #tip {
     position: fixed; pointer-events: none; background: var(--ink); color: var(--bg);
     padding: 4px 9px; border-radius: 5px; font-size: 12px; opacity: 0; transition: opacity .12s;
-    z-index: 9; max-width: 520px;
+    z-index: 9; max-width: 560px;
   }
 </style>
 </head>
 <body>
 <header>
   <h1>全链路引用关系图</h1>
+  <div id="steps"><b>跳到</b></div>
   <input id="search" type="search" placeholder="搜中文或英文名…">
   <select id="dir">
-    <option value="both">上下游都高亮</option>
-    <option value="down">只看下游（它流向哪里）</option>
-    <option value="up">只看上游（谁喂了它）</option>
+    <option value="auto">方向自动</option>
+    <option value="down">只看下游</option>
+    <option value="up">只看上游</option>
+    <option value="both">上下游</option>
   </select>
+  <button id="onlyRelated">聚光灯（只留紧邻）</button>
   <button id="onlyInvalid">只看失效级联</button>
   <span id="legend"></span>
-  <button id="reset">清空选择</button>
+  <button id="fit">适应窗口</button>
+  <button id="reset">清空</button>
   <button id="theme">主题</button>
-  <span class="hint">点方块看引用链 · 悬停连线看说明 · Ctrl+滚轮缩放 · 拖拽平移 · 双击空白清空</span>
 </header>
 <main>
   <div id="stage"><svg id="svg"></svg></div>
@@ -108,311 +127,417 @@
 <div id="tip"></div>
 
 <script>
-/* ──────────────────────────────────────────────────────────────────────────
-   数据层：每个节点是一条「数据」（字段 / 提示词 / API 调用 / 产物）
-   kind: input 输入 | art 拆解产物 | param 派生参数 | api 调用 | out 结果
-   col : 所在列
-   说明文字里一律用中文引号，避免与 JS 字符串冲突。
-   ────────────────────────────────────────────────────────────────────────── */
+/* ══════════════════════════════════════════════════════════════════════════
+   数据层。关键是 20 个「动作」节点：没有它们，所有文本调用会被压成一个端点，
+   看不出某个字段到底用在哪一步。
+   kind: input 输入 | act 动作 | art 拆解产物 | param 参数/横切 | out 结果
+   说明文本内只用中文引号，避免与 JS 字符串定界符冲突。
+   ══════════════════════════════════════════════════════════════════════════ */
 const COLS = [
-  "① 用户输入", "② 步骤1 拆解产物", "③ 关键派生参数", "④ 步骤3 镜头字段",
-  "⑤ API 调用", "⑥ 步骤2/4/5 产物", "⑦ 成片", "⑧ 横切：限额与门禁",
+  "输入与配置", "动作① 提取与派生", "拆解产物", "动作② 规划与细化",
+  "步骤3 镜头字段", "动作③ 生成", "端点与横切", "产物与成片",
 ];
 
 const NODES = [
-  /* ① 输入 */
+  /* ── 列 0 输入与配置 ── */
   { id: "idea", col: 0, kind: "input", zh: "想法原文", en: "project.ideaPrompt",
     src: "src/features/wizard/StepIdea.tsx:67",
-    mean: "用户在步骤 1 输入的一段想法（中文或英文），输入框内容 500ms 防抖写回 store。",
-    producer: "用户在步骤 1 输入",
-    consumers: "视觉方向提取、四类资产提取、镜头大纲、单镜头细化与重摇、步骤2 进入分镜的判空" },
+    mean: "用户在步骤 1 输入的一段想法；输入框 500ms 防抖写回 store。",
+    producer: "用户输入", consumers: "6 个提取/规划动作 + 润色 + 进入分镜的判空" },
+  { id: "instruct", col: 0, kind: "input", zh: "用户一句话指令", en: "instruction",
+    src: "src/features/wizard/ShotDetail.tsx:92",
+    mean: "详情页与资产编辑器里那行「交给 AI 改」的要求原文。",
+    producer: "用户输入", consumers: "镜头改写、角色描述改写、资产改写、视觉方向改写" },
   { id: "aspect", col: 0, kind: "input", zh: "画幅比例", en: "project.aspectRatio",
     src: "src/stores/projectTypes.ts:28",
-    mean: "16:9 横屏 / 9:16 竖屏 / 1:1 方。同时决定图片 ratio 与视频 aspect_ratio。",
-    producer: "步骤 1 画幅按钮",
-    consumers: "图片参数归一化、视频画幅、文本请求的画幅上下文" },
+    mean: "16:9 横 / 9:16 竖 / 1:1 方；同时决定图片 ratio 与视频 aspect_ratio。",
+    producer: "步骤 1 画幅按钮", consumers: "文本上下文、生图参数归一化、生视频画幅" },
   { id: "lang", col: 0, kind: "input", zh: "界面语言", en: "project.language",
     src: "src/stores/settingsStore.ts:114",
-    mean: "zh / en。决定系统提示词取中文版还是英文版，也决定镜头文案的语种。",
-    producer: "设置对话框",
-    consumers: "所有文本模型调用" },
+    mean: "zh / en；决定系统提示词取哪个语言版本，也决定镜头文案语种。",
+    producer: "设置对话框", consumers: "所有文本动作" },
   { id: "styleZh", col: 0, kind: "input", zh: "中文风格描述", en: "project.style",
     src: "src/stores/projectTypes.ts:223",
-    mean: "旧字段，现在仍作为英文风格提示词的派生输入之一；派生失败时用它拼兜底句。",
-    producer: "资产提取兜底 / 历史项目遗留",
-    consumers: "风格提示词派生、兜底模板" },
+    mean: "旧字段，现在仍作为英文风格提示词的派生输入之一。",
+    producer: "提取兜底 / 历史项目", consumers: "风格提示词派生、兜底模板" },
+  { id: "plan", col: 0, kind: "input", zh: "套餐档位", en: "providerConfig.plan",
+    src: "src/lib/plans.ts:73",
+    mean: "免费 / 企业认证 / Token Plan 三档订阅，决定 RPM 与配额上限。",
+    producer: "设置对话框", consumers: "限流器、视频批量并发数" },
+  { id: "rules", col: 0, kind: "param", zh: "提示词规则条目", en: "promptRules 骨架 + 已启用条目",
+    src: "src/lib/promptRules.ts:692",
+    mean: "34 条内置条目按 rules → examples → safety 注入骨架；设置里可改/关/加，同 ID 覆盖内置。",
+    producer: "代码内置 + 设置对话框", consumers: "文本系统提示词、生图与生视频的正向约束" },
 
-  /* ② 步骤1 拆解产物 */
-  { id: "vd", col: 1, kind: "art", zh: "视觉方向（六维）", en: "project.visualDirection.details",
+  /* ── 列 1 动作① 提取与派生 ── */
+  { id: "actVd", col: 1, kind: "act", zh: "提取视觉方向", en: "extractVisualDirectionFromIdea",
+    src: "src/services/scriptService.ts:759",
+    mean: "把想法提炼成六维视觉语言（媒介材质/主色调/光影/镜头质感/构图/情绪），硬禁止出现故事主体。",
+    producer: "步骤 1 链A", consumers: "产出视觉方向，随后交给自检" },
+  { id: "actVdAudit", col: 1, kind: "act", zh: "视觉方向越界自检", en: "auditVisualDirection + refineWithAudit",
+    src: "src/services/scriptService.ts:692",
+    mean: "以本项目资产名当禁止清单，让模型自己判断是否越界并负责重写；最多 1 轮，审计报错则保留原文。",
+    producer: "步骤 1 链A", consumers: "可能整份重写视觉方向" },
+  { id: "actAssets", col: 1, kind: "act", zh: "四类资产提取（并行 4 次）", en: "extractAssetsByType(type)",
+    src: "src/services/scriptService.ts:796",
+    mean: "角色/场景/主体/道具各一次小请求，共用同一份骨架，靠「THIS CALL EXTRACTS ONLY X」区分；代码再做类型过滤兜底。",
+    producer: "步骤 1 链B", consumers: "产出四类资产、英文外观提示词、资产 ID" },
+  { id: "actStylePrompt", col: 1, kind: "act", zh: "派生英文风格提示词", en: "deriveStylePrompt",
+    src: "src/features/wizard/useAssetActions.ts:63",
+    mean: "输入刻意只有中文风格描述 + 六维视觉方向，不含故事主体；失败退化为兜底模板句。",
+    producer: "风格母版链", consumers: "产出 stylePrompt" },
+  { id: "actStyleAudit", col: 1, kind: "act", zh: "风格提示词越界审计", en: "auditStylePrompt",
+    src: "src/features/wizard/useAssetActions.ts:122",
+    mean: "同样数据驱动：禁止清单来自项目自身资产名，越界则由模型重写；Thinking 恒关闭。",
+    producer: "风格母版链", consumers: "可能重写 stylePrompt" },
+  { id: "actAppearance", col: 1, kind: "act", zh: "角色英文外观派生", en: "deriveAppearance",
+    src: "src/features/characters/useCharacterEditorActions.ts:88",
+    mean: "由中文角色描述（必要时并上结构化设定）派生英文外观提示词，作为角色一致性锚点。",
+    producer: "角色编辑器", consumers: "产出并刷新 appearancePrompt" },
+
+  /* ── 列 2 拆解产物 ── */
+  { id: "vd", col: 2, kind: "art", zh: "视觉方向（六维）", en: "project.visualDirection.details",
     src: "src/features/wizard/useScriptActions.ts:196",
-    mean: "媒介材质 / 主色调与明暗 / 光影氛围 / 镜头质感 / 构图留白 / 整体情绪。提示词硬约束：不得出现任何故事主体。",
-    producer: "链A 文本模型提取 + 一道越界自检（最多 1 轮）",
-    consumers: "英文风格提示词派生的输入、视觉方向卡展示与编辑器改写目标" },
-  { id: "aChar", col: 1, kind: "art", zh: "角色资产", en: "assets[type=character]",
+    mean: "媒介材质 / 主色调与明暗 / 光影氛围 / 镜头质感 / 构图留白 / 整体情绪。",
+    producer: "提取视觉方向 + 越界自检", consumers: "风格提示词派生、视觉方向卡与编辑器" },
+  { id: "aChar", col: 2, kind: "art", zh: "角色资产", en: "assets[type=character]",
     src: "src/services/scriptService.ts:796",
-    mean: "名称 + 一句话总述 + 8 项设定（物种/身份/年龄阶段/性格/外貌/服饰/跨镜头识别特征/来历）+ 英文外观提示词。",
-    producer: "链B 第 1 次资产提取请求（purpose=assetExtraction）",
-    consumers: "定妆照生成、镜头主体外观来源、镜头引用候选" },
-  { id: "aScene", col: 1, kind: "art", zh: "场景资产", en: "assets[type=scene]",
+    mean: "名称 + 8 项设定（物种/身份/年龄/性格/外貌/服饰/跨镜头识别特征/来历）+ 英文外观提示词。",
+    producer: "四类资产提取", consumers: "定妆照、镜头主体外观来源" },
+  { id: "aScene", col: 2, kind: "art", zh: "场景资产", en: "assets[type=scene]",
     src: "src/services/scriptService.ts:796",
-    mean: "名称 + 9 项设定（空间类型/地理环境/时间/天气/元素/空间层次/光线/色彩氛围/可用于哪些剧情）+ 英文外观提示词。",
-    producer: "链B 第 2 次资产提取请求",
-    consumers: "场景参考图、镜头 activeSceneId" },
-  { id: "aProd", col: 1, kind: "art", zh: "核心主体资产", en: "assets[type=product]",
+    mean: "名称 + 9 项设定（空间/环境/时间/天气/元素/层次/光线/色彩氛围/剧情用途）+ 英文外观提示词。",
+    producer: "四类资产提取", consumers: "场景参考图、镜头 activeSceneId" },
+  { id: "aProd", col: 2, kind: "art", zh: "核心主体资产", en: "assets[type=product]",
     src: "src/services/scriptService.ts:796",
-    mean: "名称 + 11 项设定（产品类型/核心用途/轮廓/尺寸/颜色/材质/结构/表面细节/品牌/不可变识别特征/使用状态）+ 英文外观提示词。",
-    producer: "链B 第 3 次资产提取请求",
-    consumers: "主体参考图、镜头 activeProductIds" },
-  { id: "aProp", col: 1, kind: "art", zh: "关键道具资产", en: "assets[type=prop]",
+    mean: "名称 + 11 项设定（类型/用途/轮廓/尺寸/颜色/材质/结构/表面/品牌/识别特征/使用状态）+ 英文外观提示词。",
+    producer: "四类资产提取", consumers: "主体参考图、镜头 activeProductIds" },
+  { id: "aProp", col: 2, kind: "art", zh: "关键道具资产", en: "assets[type=prop]",
     src: "src/services/scriptService.ts:796",
-    mean: "名称 + 11 项设定（用途/故事作用/物件类型/形状/尺寸/材质/颜色/结构/磨损/识别特征/用法）+ 英文外观提示词。",
-    producer: "链B 第 4 次资产提取请求",
-    consumers: "道具参考图、镜头 activePropIds" },
-  { id: "aStyle", col: 1, kind: "art", zh: "风格资产（承载容器）", en: "assets[type=style]",
+    mean: "名称 + 11 项设定（用途/故事作用/类型/形状/尺寸/材质/颜色/结构/磨损/标记/用法）+ 英文外观提示词。",
+    producer: "四类资产提取", consumers: "道具参考图、镜头 activePropIds" },
+  { id: "aStyle", col: 2, kind: "art", zh: "风格资产（承载容器）", en: "assets[type=style]",
     src: "src/features/wizard/useAssetActions.ts:194",
-    mean: "它的 prompt 字段就是全项目共享的英文风格提示词；懒建于风格母版链。",
-    producer: "风格母版链懒建",
-    consumers: "风格提示词的读写载体；它一变会让全部镜头作废" },
-
-  /* ③ 关键派生参数 */
+    mean: "它的 prompt 字段就是全项目共享的英文风格提示词；由风格母版链懒建。",
+    producer: "风格母版链", consumers: "风格提示词的读写载体；它一变会命中全部镜头" },
   { id: "stylePrompt", col: 2, kind: "param", zh: "英文风格提示词", en: "stylePrompt",
     src: "src/features/wizard/useAssetActions.ts:63",
-    mean: "由「中文风格描述 + 六维视觉方向」派生，刻意不含故事主体；再过一道越界审计。失败则退化为兜底模板句。",
-    producer: "风格链文本模型（purpose=styleRef）",
-    consumers: "资产图 prompt、分镜图 prompt、风格母版图 prompt" },
+    mean: "全项目统一画风文本，只以文字注入，不再当参考图。",
+    producer: "派生 + 越界审计", consumers: "风格母版图、资产图、分镜图三类生图" },
   { id: "appPrompt", col: 2, kind: "param", zh: "英文外观提示词", en: "assets[].appearancePrompt / prompt",
     src: "src/lib/extractAssets.ts:45",
-    mean: "每类资产自己的可视化外观描述，只写本体、不写动作与别的资产。跨镜头一致性的文字锚点。",
-    producer: "资产提取模型；角色另可在编辑器里由中文描述重新派生",
-    consumers: "定妆照与资产图 prompt、镜头提示词的 {{assets}} 清单注入" },
+    mean: "每类资产自己的可视化外观描述，只写本体。跨镜头一致性的文字锚点。",
+    producer: "资产提取 / 角色编辑器派生", consumers: "资产参考图、镜头提示词里的资产清单" },
   { id: "assetId", col: 2, kind: "param", zh: "资产 ID 与名称", en: "asset.id / asset.name",
     src: "src/lib/shotReferences.ts:44",
-    mean: "镜头绑定资产靠它：解析时先按 ID 匹配，再按名称匹配；匹配不到只降级为空，绝不抛错。",
-    producer: "资产入库时生成",
-    consumers: "镜头 active*Ids、对白说话角色" },
-  { id: "rules", col: 2, kind: "param", zh: "提示词规则条目", en: "promptRules 骨架 + 已启用条目",
-    src: "src/lib/promptRules.ts:692",
-    mean: "34 条内置条目按 rules → examples → safety 三段注入骨架。用户可在设置里改/关/加，同 ID 的用户条目整体覆盖内置条目。",
-    producer: "代码内置 + 设置对话框「提示词规则」",
-    consumers: "所有文本调用的系统提示词、生图与生视频 prompt 的正向约束" },
-  { id: "shotRefs", col: 2, kind: "param", zh: "镜头参考图选取", en: "pickShotReferences(shot, project)",
-    src: "src/lib/promptComposer.ts:282",
-    mean: "按 角色 → 主体 → 道具 顺序取已生成的参考图 URL，去重、上限 4。场景图与风格母版都不进（会被整体复制）。",
-    producer: "生图任务组装时计算",
-    consumers: "生图请求的 extra_body.image 数组" },
+    mean: "镜头绑定资产的依据：解析时先按 ID 再按名称，匹配不到只降级为空，绝不抛错。",
+    producer: "资产入库时生成", consumers: "镜头引用列表、对白归属、两道审计的禁止清单" },
 
-  /* ④ 镜头字段 */
-  { id: "shOutline", col: 3, kind: "art", zh: "镜头大纲（N 条计划）", en: "outline.shots[]",
+  /* ── 列 3 动作② 规划与细化 ── */
+  { id: "actOutline", col: 3, kind: "act", zh: "出镜头大纲", en: "generateStoryboardOutline",
     src: "src/services/scriptService.ts:287",
-    mean: "每条含小标题 title、一句话概括 summary、出场角色名 characterNames、场景名 sceneName。现行提示词规定 4-8 个镜头。",
-    producer: "步骤3 第一次文本模型（purpose=storyboardOutline）",
-    consumers: "逐镜头细化的上下文、新资产补建入库" },
-  { id: "shScript", col: 3, kind: "art", zh: "镜头文案", en: "shot.scriptText",
+    mean: "把想法规划成 4-8 条镜头计划（只规划不写提示词）；要求复用已有资产原名，缺人时才补建新资产。这一步没有重试。",
+    producer: "步骤 3 第一次调用", consumers: "产出大纲，顺带补建 newCharacters / newScenes" },
+  { id: "actShot", col: 3, kind: "act", zh: "逐镜头细化", en: "generateStoryboardShot",
+    src: "src/services/scriptService.ts:384",
+    mean: "每条镜头一次请求（3 并发）：产出文案、画面/动态提示词、8 个子字段、对白与引用。",
+    producer: "步骤 3 第二次起", consumers: "产出全部镜头字段" },
+  { id: "actReroll", col: 3, kind: "act", zh: "单镜头重摇", en: "rerollShot",
+    src: "src/features/wizard/useScriptActions.ts:412",
+    mean: "复用逐镜头细化，额外带 variationOf 要求出不同版本；重摇后必须重新回写对白与引用。",
+    producer: "镜头详情页按钮", consumers: "整条镜头字段被替换" },
+  { id: "actShotEdit", col: 3, kind: "act", zh: "一句话改写镜头", en: "reviseShotWithInstruction",
+    src: "src/services/scriptService.ts:515",
+    mean: "步骤 3 唯一的修改入口：只应用被点名的变化，未提及字段保持原样。",
+    producer: "镜头详情页指令行", consumers: "回写镜头内容字段" },
+  { id: "actRewrite", col: 3, kind: "act", zh: "子字段反写整段英文", en: "rewritePromptFromFields",
+    src: "src/services/chatService.ts:128",
+    mean: "步骤 4/5 改完子字段后，让模型重写整段画面/动态提示词（子字段本身不进 API）。",
+    producer: "PromptSubFields 提交时", consumers: "重写 visualPrompt / motionPrompt" },
+  { id: "actPolish", col: 3, kind: "act", zh: "框内一键润色", en: "polishText",
+    src: "src/services/chatService.ts:157",
+    mean: "把输入框当前内容交给该字段的专家角色优化并回填；空内容、无密钥、请求中都会禁用。",
+    producer: "各输入框右下角按钮", consumers: "回填被润色的字段原文" },
+  { id: "actParams", col: 3, kind: "act", zh: "采样参数决策", en: "resolveGenerationParams",
+    src: "src/lib/generationParams.ts:130",
+    mean: "让模型按 purpose 决定 temperature / top_p / Thinking；本身也是一次文本请求，按用途缓存。",
+    producer: "各文本动作前", consumers: "决定同一次内容调用的采样参数" },
+
+  /* ── 列 4 镜头字段 ── */
+  { id: "shOutline", col: 4, kind: "art", zh: "镜头大纲（N 条计划）", en: "outline.shots[]",
+    src: "src/services/scriptService.ts:328",
+    mean: "每条含 title 小标题、summary 一句话概括、characterNames 出场角色名、sceneName 场景名。",
+    producer: "出镜头大纲", consumers: "逐镜头细化的上下文" },
+  { id: "shScript", col: 4, kind: "art", zh: "镜头文案", en: "shot.scriptText",
     src: "src/stores/projectTypes.ts:175",
-    mean: "该镜头的叙事文本（含动作与情绪），语言随界面。",
-    producer: "逐镜头细化",
-    consumers: "详情页展示、单镜头重摇时的输入摘要" },
-  { id: "shVisual", col: 3, kind: "art", zh: "画面提示词（英文）", en: "shot.visualPrompt",
+    mean: "该镜头叙事文本（含动作与情绪），语言随界面。",
+    producer: "逐镜头细化", consumers: "详情页展示、重摇与改写的输入" },
+  { id: "shVisual", col: 4, kind: "art", zh: "画面提示词（英文）", en: "shot.visualPrompt",
     src: "src/lib/promptUtils.ts:16",
-    mean: "生图的唯一权威文本。提示词要求主体外观原样沿用资产的英文外观提示词。",
-    producer: "逐镜头细化",
-    consumers: "生图 prompt 的主体段" },
-  { id: "shMotion", col: 3, kind: "art", zh: "动态提示词（英文）", en: "shot.motionPrompt",
+    mean: "生图的唯一权威文本，代码不二次拼装。",
+    producer: "逐镜头细化 / 子字段反写", consumers: "生图 prompt 主体段" },
+  { id: "shMotion", col: 4, kind: "art", zh: "动态提示词（英文）", en: "shot.motionPrompt",
     src: "src/lib/promptUtils.ts:21",
-    mean: "生视频的权威文本，代码不再二次拼装，直接取用。",
-    producer: "逐镜头细化",
-    consumers: "视频 prompt 全文" },
-  { id: "shSub", col: 3, kind: "art", zh: "8 个结构化子字段", en: "sceneDesc … motionSpeedDesc",
+    mean: "生视频的权威文本。",
+    producer: "逐镜头细化 / 子字段反写", consumers: "视频 prompt 全文" },
+  { id: "shSub", col: 4, kind: "art", zh: "8 个结构化子字段", en: "sceneDesc … motionSpeedDesc",
     src: "src/stores/projectTypes.ts:194",
-    mean: "画面 4 项（场景/细节服饰/光影/画风）+ 动态 4 项（动作/运镜/环境变化/运动速度）。给人逐项审，改完由模型反写整段英文。",
-    producer: "逐镜头细化",
-    consumers: "步骤4/5 的编辑控件；rewritePromptFromFields 的回写来源" },
-  { id: "shIds", col: 3, kind: "art", zh: "镜头资产引用", en: "shot.activeCharacterIds / activeSceneId / activeProductIds / activePropIds",
+    mean: "画面 4 项（场景/细节/光影/画风）+ 动态 4 项（动作/运镜/环境变化/速度），给人逐项审。",
+    producer: "逐镜头细化", consumers: "步骤4/5 编辑控件、反写整段英文" },
+  { id: "shIds", col: 4, kind: "art", zh: "镜头资产引用", en: "shot.activeCharacterIds / activeSceneId / activeProductIds / activePropIds",
     src: "src/features/wizard/useScriptActions.ts:67",
-    mean: "模型给的名字或自编 ID 会被统一回写成真实资产 ID，之后靠它决定取哪几张参考图。",
-    producer: "buildShotUpdate 引用解析",
-    consumers: "镜头参考图选取、详情页引用展示" },
-  { id: "shDlg", col: 3, kind: "art", zh: "对白", en: "shot.dialogues[]",
+    mean: "模型给的名字或自编 ID 会统一回写成真实资产 ID。",
+    producer: "buildShotUpdate 引用解析", consumers: "参考图选取、引用展示" },
+  { id: "shDlg", col: 4, kind: "art", zh: "对白", en: "shot.dialogues[]",
     src: "src/stores/projectTypes.ts:166",
-    mean: "台词 + 说话角色（null 表示旁白）+ 演绎方式。只用于界面展示与再改写，不进任何 API 请求。",
-    producer: "逐镜头细化",
-    consumers: "镜头详情页（delivery 为预留的 TTS 字段，当前未使用）" },
-  { id: "shDur", col: 3, kind: "art", zh: "镜头时长", en: "shot.duration",
+    mean: "台词 + 说话角色（null 为旁白）+ 演绎方式。不进任何 API 请求。",
+    producer: "逐镜头细化", consumers: "镜头详情页；delivery 为预留 TTS 字段" },
+  { id: "shDur", col: 4, kind: "art", zh: "镜头时长", en: "shot.duration",
     src: "src/services/videoService.ts:139",
-    mean: "被规范化两次：模型侧只允许 4/5/8 秒，发请求前再 clamp 到 4..12 并转成字符串。",
-    producer: "逐镜头细化；用户也可在步骤4/5 改",
-    consumers: "视频请求 seconds、视频配额按秒扣减" },
-  { id: "shDual", col: 3, kind: "art", zh: "首尾帧开关与尾帧", en: "shot.useDualFrame / lastFrameUrl",
+    mean: "规范化两次：模型侧只接受 4/5/8 秒，发请求前再 clamp 到 4..12。",
+    producer: "逐镜头细化", consumers: "视频 seconds、按秒扣配额" },
+  { id: "shDual", col: 4, kind: "art", zh: "首尾帧开关与尾帧", en: "shot.useDualFrame / lastFrameUrl",
     src: "src/features/wizard/DualFrameToggle.tsx:29",
-    mean: "勾选后可点选其他镜头图作尾帧，也能手输 URL。两者同时成立，请求才带 last_frame。",
-    producer: "步骤5 卡内开关",
-    consumers: "视频请求 last_frame" },
+    mean: "勾选后可点选其他镜头图当尾帧，也能手输 URL；两者同时成立才带 last_frame。",
+    producer: "步骤 5 卡内开关", consumers: "视频 last_frame" },
 
-  /* ⑤ API 调用 */
-  { id: "apiText", col: 4, kind: "api", zh: "文本模型调用", en: "POST /chat/completions · agnes-3.0-flash",
+  /* ── 列 5 动作③ 生成 ── */
+  { id: "actStyleImg", col: 5, kind: "act", zh: "风格母版链", en: "generateStyleReference",
+    src: "src/features/wizard/useAssetActions.ts:172",
+    mean: "懒建风格资产 → 派生并审计风格提示词 → 包装成抽象样张生图；错误只写 styleReferenceError，不抛出。",
+    producer: "步骤 1 尾部后台链 / 手动重生成", consumers: "风格母版图 + 风格资产" },
+  { id: "actAssetBatch", col: 5, kind: "act", zh: "资产参考图批量", en: "generateAssetImages",
+    src: "src/features/wizard/useAssetActions.ts:290",
+    mean: "先等风格图，再并发 3 出角色/场景/主体/道具图；只按「无图」筛选，不看 prompt 是否为空。",
+    producer: "步骤 1 后台链 / 步骤 2 补全缺失", consumers: "资产参考图" },
+  { id: "actSingleAsset", col: 5, kind: "act", zh: "单项资产重生成", en: "generateSingleAssetImage / 定妆照按钮",
+    src: "src/features/wizard/StepAssets.tsx:228",
+    mean: "同一套拼装与版本写回，但不登记批量注册表；带随机 seed 破除结果趋同。",
+    producer: "资产编辑器 / 角色编辑器", consumers: "该资产的参考图" },
+  { id: "shotRefs", col: 5, kind: "act", zh: "镜头参考图选取", en: "pickShotReferences",
+    src: "src/lib/promptComposer.ts:282",
+    mean: "按 角色 → 主体 → 道具 顺序取 URL，去重、上限 4；场景图与风格母版都不进。",
+    producer: "生图任务组装时", consumers: "生图请求的 extra_body.image" },
+  { id: "actImageAssemble", col: 5, kind: "act", zh: "生图 prompt 拼装", en: "buildImageGenerationInput",
+    src: "src/features/wizard/useImageActions.ts:73",
+    mean: "有参考图走多图合成模板（逐张说明第几张是什么角色），无参考图走六段式文生图 + 固定质量句。",
+    producer: "镜头图批量", consumers: "最终生图 prompt 与参考图数组" },
+  { id: "actImageBatch", col: 5, kind: "act", zh: "镜头图批量", en: "runImageBatch",
+    src: "src/features/wizard/useImageActions.ts:111",
+    mean: "筛选「无图且画面提示词非空」的镜头，并发 3；写回前记期望版本号，丢弃过期结果。",
+    producer: "步骤 4 挂载自动触发 / 重试", consumers: "镜头画面图" },
+  { id: "actVideoBatch", col: 5, kind: "act", zh: "镜头视频批量", en: "runVideoBatch",
+    src: "src/features/wizard/useVideoActions.ts:29",
+    mean: "并发按套餐（订阅 3 / RPM 大于 1 用 2 / 免费档 1）；单镜头内部再重试 2 次，任务已创建则只等待不重建。",
+    producer: "步骤 5 挂载自动触发 / 重试", consumers: "镜头视频" },
+
+  /* ── 列 6 端点与横切 ── */
+  { id: "apiText", col: 6, kind: "api", zh: "文本端点", en: "POST /chat/completions · agnes-3.0-flash",
     src: "src/services/ai/openai.ts:62",
-    mean: "提视觉方向、提四类资产、出大纲、逐镜头细化、编辑器改写、一句话润色、采样参数元调用，全部走这一个端点。max_tokens 恒 65536。",
-    producer: "scriptService / chatService",
-    consumers: "上述各类结构化返回值" },
-  { id: "apiImage", col: 4, kind: "api", zh: "生图调用", en: "POST /images/generations · agnes-image-2.5-flash",
+    mean: "所有文本动作的物理出口；max_tokens 恒 65536，Thinking 由参数决策决定。",
+    producer: "scriptService / chatService", consumers: "各类结构化返回值" },
+  { id: "apiImage", col: 6, kind: "api", zh: "生图端点", en: "POST /images/generations · agnes-image-2.5-flash",
     src: "src/services/ai/openai.ts:169",
-    mean: "size 传档位串（当前恒 1K）、画幅走 ratio；参考图必须放 extra_body.image，放顶层会被 403 拒。seed 合法域 -1..999。",
-    producer: "imageService.generateImage",
-    consumers: "图片 URL（风格母版 / 资产参考图 / 镜头画面图）" },
-  { id: "apiVideo", col: 4, kind: "api", zh: "生视频调用", en: "POST /videos + 轮询 GET /agnesapi",
+    mean: "size 传档位串（当前恒 1K），画幅走 ratio；参考图必须放 extra_body.image，放顶层被 403 拒；seed 合法域 -1..999。",
+    producer: "imageService.generateImage", consumers: "三类图片 URL" },
+  { id: "apiVideo", col: 6, kind: "api", zh: "生视频端点", en: "POST /videos + 轮询 GET /agnesapi",
     src: "src/services/videoService.ts:125",
-    mean: "创建拿到 video_id，再每 5 秒轮询、最多 30 分钟；轮询端点必须带 model_name，且轮询不占限额。",
-    producer: "videoService.generateVideo",
-    consumers: "镜头视频 URL" },
-  { id: "apiFfmpeg", col: 4, kind: "api", zh: "本地拼接", en: "FFmpeg.wasm concat",
+    mean: "创建拿 video_id，5 秒一轮最多 30 分钟，轮询必须带 model_name；创建后失败抛 VideoTaskCreatedError 区分是否仍在跑。",
+    producer: "videoService.generateVideo", consumers: "镜头视频 URL" },
+  { id: "apiFfmpeg", col: 6, kind: "api", zh: "本地拼接", en: "FFmpeg.wasm concat",
     src: "src/services/renderService.ts:160",
-    mean: "在浏览器里完成，零 AI 调用、零配额。只有 1 个视频时完全跳过 FFmpeg，只下载并包成 MP4。",
-    producer: "renderService.concatenateVideos",
-    consumers: "成片播放地址" },
+    mean: "浏览器内拼接，零 AI 零配额；只有 1 个视频时完全跳过 FFmpeg 只下载。取消会 terminate 进程。",
+    producer: "renderService.concatenateVideos", consumers: "成片播放地址" },
+  { id: "limiter", col: 6, kind: "param", zh: "用量限额", en: "rateLimiter.acquire(kind, opts)",
+    src: "src/services/rateLimit.ts:117",
+    mean: "RPM 60 秒滑动窗口 + Token Plan 配额（文本 5h/周、图片按张/日、视频按秒/日）。记账在发请求之前，失败不回滚。",
+    producer: "lib/plans.ts 套餐表", consumers: "文本 1 槽 / 图片按档位 / 视频按秒" },
+  { id: "reviews", col: 6, kind: "param", zh: "三个审核标记", en: "assetsReviewed / storyboardReviewed / imagesReviewed",
+    src: "src/stores/projectTypes.ts:239",
+    mean: "半自动「下一步」闸门，不锁数据；会被资产级联重置为 false。",
+    producer: "步骤2/3/4 审核按钮", consumers: "CreationWizard 的 canAdvance" },
 
-  /* ⑥ 产物 */
-  { id: "styleImg", col: 5, kind: "out", zh: "风格母版图", en: "project.styleReferenceUrl",
+  /* ── 列 7 产物与成片 ── */
+  { id: "styleImg", col: 7, kind: "out", zh: "风格母版图", en: "project.styleReferenceUrl",
     src: "src/features/wizard/useAssetActions.ts:258",
-    mean: "生图时被包装成「抽象样张」：材质纹理色板、色彩色卡、光影与渐变研究、笔触样本，并显式声明不含角色、动物、人物、产品、场景与叙事情节。",
-    producer: "风格链生图调用",
-    consumers: "只用于展示与「是否已有风格图」幂等判定 —— 已不再作为任何参考图" },
-  { id: "assetImg", col: 5, kind: "out", zh: "资产参考图", en: "assets[].imageUrl",
+    mean: "抽象样张图；只用于展示与「是否已有风格图」幂等判定，已不再当参考图。",
+    producer: "风格母版链", consumers: "视觉方向卡缩略图" },
+  { id: "assetImg", col: 7, kind: "out", zh: "资产参考图", en: "assets[].imageUrl",
     src: "src/features/wizard/useAssetActions.ts:341",
-    mean: "角色定妆照 / 场景图 / 主体图 / 道具图。是跨镜头一致性的图像锚点。",
-    producer: "资产图批量与单项重生成",
-    consumers: "镜头参考图选取（只有角色、主体、道具三类会进）" },
-  { id: "shotImg", col: 5, kind: "out", zh: "镜头画面图", en: "shot.imageUrl",
+    mean: "定妆照 / 场景图 / 主体图 / 道具图，跨镜头一致性的图像锚点。",
+    producer: "资产图批量与单项重生成", consumers: "镜头参考图选取（只有角色/主体/道具会进）" },
+  { id: "shotImg", col: 7, kind: "out", zh: "镜头画面图", en: "shot.imageUrl",
     src: "src/features/wizard/useImageActions.ts:144",
     mean: "镜头静帧，同时充当视频首帧。",
-    producer: "步骤4 图片批量",
-    consumers: "视频 first_frame、尾帧候选列表、步骤5 预览" },
-  { id: "shotVideo", col: 5, kind: "out", zh: "镜头视频", en: "shot.videoUrl",
+    producer: "镜头图批量", consumers: "视频 first_frame、尾帧候选、步骤5 预览" },
+  { id: "shotVideo", col: 7, kind: "out", zh: "镜头视频", en: "shot.videoUrl",
     src: "src/features/wizard/useVideoActions.ts:90",
-    mean: "服务端返回的远端地址。响应里的封面地址与实际时长已被解析但上层未使用。",
-    producer: "步骤5 视频批量",
-    consumers: "成片拼接的输入数组" },
-
-  /* ⑦ 成片 */
-  { id: "final", col: 6, kind: "out", zh: "成片", en: "blob objectURL → 下载 项目名.mp4",
+    mean: "远端地址；响应里的封面与实际时长已解析但上层未使用。",
+    producer: "镜头视频批量", consumers: "成片拼接输入" },
+  { id: "final", col: 7, kind: "out", zh: "成片", en: "blob objectURL → 下载 项目名.mp4",
     src: "src/features/wizard/StepAssembly.tsx:80",
-    mean: "浏览器临时播放地址，不写进 store；切换项目或组件卸载时会释放（revokeObjectURL）。",
-    producer: "本地拼接",
-    consumers: "预览与下载按钮" },
-
-  /* ⑧ 横切 */
-  { id: "limiter", col: 7, kind: "param", zh: "用量限额（槽位与配额）", en: "rateLimiter.acquire(kind, opts)",
-    src: "src/services/rateLimit.ts:117",
-    mean: "RPM 60 秒滑动窗口 + Token Plan 订阅配额（文本 5h/周、图片按张/日、视频按秒/日）。记账在发请求之前，失败不回滚。",
-    producer: "lib/plans.ts 套餐表（免费档：文本 20、图片1K 20、视频 1）",
-    consumers: "被三类真实调用点占用：文本 1 槽、图片 1 槽、视频按秒数扣" },
-  { id: "reviews", col: 7, kind: "param", zh: "三个审核标记（半自动门禁）", en: "assetsReviewed / storyboardReviewed / imagesReviewed",
-    src: "src/stores/projectTypes.ts:239",
-    mean: "半自动模式下控制「下一步」能否点。它们不锁数据，只是流程闸门，且会被资产级联重置为 false。",
-    producer: "步骤2/3/4 的审核按钮",
-    consumers: "CreationWizard 的 canAdvance 门禁表" },
+    mean: "浏览器临时播放地址，不写 store；切项目或卸载会释放。",
+    producer: "本地拼接", consumers: "预览与下载" },
 ];
 
-/* from -> to。type: text 文字注入 | image 图像注入 | id 引用绑定 |
-   artifact 产物依赖 | invalidate 失效级联 | consume 消耗限额
-   off: true 表示该引用关系已停用（画成淡显，保留历史痕迹便于审计） */
+/* type: text 文字注入 | image 图像注入 | id 引用绑定 | artifact 产物依赖
+   | invalidate 失效级联 | consume 走这次调用（占限额）
+   off: 该引用已停用（淡显保留，便于审计为什么停） */
 const EDGES = [
-  /* 文字注入 */
-  { f: "idea", t: "apiText", type: "text", label: "作为请求文本（视觉方向 / 四类资产 / 大纲 / 逐镜头都用它）" },
-  { f: "lang", t: "apiText", type: "text", label: "决定骨架取中文版还是英文版" },
-  { f: "aspect", t: "apiText", type: "text", label: "画幅上下文写进请求" },
+  /* 输入 → 动作 */
+  { f: "idea", t: "actVd", type: "text", label: "作为想法原文，提炼六维视觉语言" },
+  { f: "idea", t: "actAssets", type: "text", label: "作为想法原文，四类各请求一次" },
+  { f: "idea", t: "actOutline", type: "text", label: "作为想法原文，规划 4-8 个镜头" },
+  { f: "idea", t: "actShot", type: "text", label: "连同大纲全文一起喂入" },
+  { f: "idea", t: "actReroll", type: "text", label: "重摇首选提示词，缺失退回镜头文案" },
+  { f: "idea", t: "actPolish", type: "text", label: "步骤 1 输入框的润色对象" },
+  { f: "instruct", t: "actShotEdit", type: "text", label: "用户一句话要求原文" },
+  { f: "instruct", t: "actAppearance", type: "text", label: "角色描述改写要求" },
+  { f: "aspect", t: "actAssets", type: "text", label: "画幅上下文" },
+  { f: "aspect", t: "actOutline", type: "text", label: "画幅上下文" },
+  { f: "aspect", t: "actShot", type: "text", label: "画幅上下文" },
+  { f: "aspect", t: "actStyleImg", type: "text", label: "决定母版图 ratio" },
+  { f: "aspect", t: "actAssetBatch", type: "text", label: "决定资产参考图画幅" },
+  { f: "aspect", t: "actImageAssemble", type: "text", label: "size 恒 1K + ratio 白名单" },
+  { f: "aspect", t: "actVideoBatch", type: "text", label: "aspect_ratio 白名单，非法回落 16:9" },
+  { f: "lang", t: "actVd", type: "text", label: "取中/英文骨架" },
+  { f: "lang", t: "actAssets", type: "text", label: "取中/英文骨架" },
+  { f: "lang", t: "actOutline", type: "text", label: "取中/英文骨架" },
+  { f: "lang", t: "actShot", type: "text", label: "骨架版本 + 镜头文案语种" },
+  { f: "styleZh", t: "actStylePrompt", type: "text", label: "派生输入之一" },
   { f: "rules", t: "apiText", type: "text", label: "骨架 + 已启用条目 = 系统提示词" },
-  { f: "styleZh", t: "stylePrompt", type: "text", label: "派生输入之一（另一路是六维视觉方向）" },
-  { f: "vd", t: "stylePrompt", type: "text", label: "六维设定作为派生输入" },
-  { f: "stylePrompt", t: "apiImage", type: "text", label: "以文字形式注入每一次生图 prompt" },
-  { f: "appPrompt", t: "apiImage", type: "text", label: "定妆照与资产图的主体描述" },
-  { f: "appPrompt", t: "shVisual", type: "text", label: "经 {{assets}} 清单注入，并要求原样抄进画面提示词" },
-  { f: "shVisual", t: "apiImage", type: "text", label: "生图 prompt 的主体段" },
-  { f: "shMotion", t: "apiVideo", type: "text", label: "视频 prompt 全文" },
-  { f: "shSub", t: "shVisual", type: "text", label: "改子字段 → 模型重写整段画面提示词" },
-  { f: "shSub", t: "shMotion", type: "text", label: "改子字段 → 模型重写整段动态提示词" },
-  { f: "rules", t: "apiImage", type: "text", label: "composeShot + negativeStrategy 作为正向约束附加" },
-  { f: "rules", t: "apiVideo", type: "text", label: "negativeStrategy 文本追加" },
-  { f: "shDur", t: "apiVideo", type: "text", label: "seconds = clamp(round(时长), 4, 12)" },
-  { f: "aspect", t: "apiImage", type: "text", label: "size 恒 1K + ratio 白名单归一化" },
-  { f: "aspect", t: "apiVideo", type: "text", label: "aspect_ratio 白名单，非法回落 16:9" },
+  { f: "rules", t: "actImageAssemble", type: "text", label: "composeShot + negativeStrategy 注入" },
+  { f: "rules", t: "actVideoBatch", type: "text", label: "negativeStrategy 文本追加" },
+  { f: "rules", t: "actPolish", type: "text", label: "各字段的专家角色提示词" },
+  { f: "rules", t: "actParams", type: "text", label: "generationParams 骨架" },
+  { f: "plan", t: "limiter", type: "artifact", label: "决定 RPM 与配额上限" },
+  { f: "plan", t: "actVideoBatch", type: "artifact", label: "决定视频并发 1 / 2 / 3" },
 
-  /* 产物依赖 */
-  { f: "apiText", t: "vd", type: "artifact", label: "视觉方向提取结果" },
-  { f: "apiText", t: "aChar", type: "artifact", label: "角色类提取结果" },
-  { f: "apiText", t: "aScene", type: "artifact", label: "场景类提取结果" },
-  { f: "apiText", t: "aProd", type: "artifact", label: "主体类提取结果" },
-  { f: "apiText", t: "aProp", type: "artifact", label: "道具类提取结果" },
-  { f: "apiText", t: "aStyle", type: "artifact", label: "懒建于风格母版链" },
-  { f: "apiText", t: "shOutline", type: "artifact", label: "大纲" },
-  { f: "apiText", t: "shScript", type: "artifact", label: "镜头文案" },
-  { f: "apiText", t: "shVisual", type: "artifact", label: "画面提示词" },
-  { f: "apiText", t: "shMotion", type: "artifact", label: "动态提示词" },
-  { f: "apiText", t: "shSub", type: "artifact", label: "8 个子字段" },
-  { f: "apiText", t: "shDlg", type: "artifact", label: "对白" },
-  { f: "apiText", t: "shDur", type: "artifact", label: "时长（只接受 4/5/8）" },
-  { f: "apiText", t: "stylePrompt", type: "artifact", label: "purpose=styleRef 的产出" },
-  { f: "aChar", t: "appPrompt", type: "artifact", label: "角色外观描述" },
-  { f: "aScene", t: "appPrompt", type: "artifact", label: "场景外观描述" },
-  { f: "aProd", t: "appPrompt", type: "artifact", label: "主体外观描述" },
-  { f: "aProp", t: "appPrompt", type: "artifact", label: "道具外观描述" },
+  /* 动作 ↔ 产物 */
+  { f: "actVd", t: "vd", type: "artifact", label: "产出六维视觉方向" },
+  { f: "vd", t: "actVdAudit", type: "text", label: "作为被审计对象" },
+  { f: "assetId", t: "actVdAudit", type: "id", label: "禁止清单 = 本项目资产名" },
+  { f: "actVdAudit", t: "vd", type: "artifact", label: "越界则整份重写" },
+  { f: "actAssets", t: "aChar", type: "artifact", label: "角色类结果" },
+  { f: "actAssets", t: "aScene", type: "artifact", label: "场景类结果" },
+  { f: "actAssets", t: "aProd", type: "artifact", label: "主体类结果" },
+  { f: "actAssets", t: "aProp", type: "artifact", label: "道具类结果" },
+  { f: "actAssets", t: "appPrompt", type: "artifact", label: "随资产返回英文外观" },
+  { f: "actAssets", t: "assetId", type: "artifact", label: "入库生成资产 ID" },
+  { f: "aChar", t: "actAppearance", type: "text", label: "中文描述与结构化设定" },
+  { f: "actAppearance", t: "appPrompt", type: "artifact", label: "派生/刷新角色外观" },
+  { f: "vd", t: "actStylePrompt", type: "text", label: "六维设定作为派生输入" },
+  { f: "actStylePrompt", t: "stylePrompt", type: "artifact", label: "产出英文风格提示词" },
+  { f: "stylePrompt", t: "actStyleAudit", type: "text", label: "作为被审计对象" },
+  { f: "assetId", t: "actStyleAudit", type: "id", label: "禁止清单来源" },
+  { f: "actStyleAudit", t: "stylePrompt", type: "artifact", label: "越界则重写" },
   { f: "stylePrompt", t: "aStyle", type: "artifact", label: "写入风格资产的 prompt 字段" },
-  { f: "apiImage", t: "styleImg", type: "artifact", label: "风格母版图 URL" },
+
+  /* 步骤 3 动作 */
+  { f: "appPrompt", t: "actOutline", type: "text", label: "{{assets}} 注入资产清单" },
+  { f: "assetId", t: "actOutline", type: "id", label: "要求复用已有资产原名与 ID" },
+  { f: "actOutline", t: "shOutline", type: "artifact", label: "产出 N 条镜头计划" },
+  { f: "shOutline", t: "actShot", type: "text", label: "大纲全文 + 本镜头计划" },
+  { f: "appPrompt", t: "actShot", type: "text", label: "要求原样抄进画面提示词" },
+  { f: "assetId", t: "actShot", type: "id", label: "active*Ids 的取值来源" },
+  { f: "actShot", t: "shScript", type: "artifact", label: "镜头文案" },
+  { f: "actShot", t: "shVisual", type: "artifact", label: "画面提示词" },
+  { f: "actShot", t: "shMotion", type: "artifact", label: "动态提示词" },
+  { f: "actShot", t: "shSub", type: "artifact", label: "8 个子字段" },
+  { f: "actShot", t: "shIds", type: "artifact", label: "引用解析后写回" },
+  { f: "actShot", t: "shDlg", type: "artifact", label: "对白" },
+  { f: "actShot", t: "shDur", type: "artifact", label: "时长（只接受 4/5/8）" },
+  { f: "shScript", t: "actReroll", type: "text", label: "作为 variationOf 参考" },
+  { f: "actReroll", t: "shScript", type: "artifact", label: "整条镜头内容被替换" },
+  { f: "actReroll", t: "shVisual", type: "artifact", label: "同上" },
+  { f: "shScript", t: "actShotEdit", type: "text", label: "当前镜头整条数据" },
+  { f: "assetId", t: "actShotEdit", type: "id", label: "用最新资产表解析引用" },
+  { f: "actShotEdit", t: "shVisual", type: "artifact", label: "只改被点名的部分" },
+  { f: "shSub", t: "actRewrite", type: "text", label: "子字段当前值" },
+  { f: "shVisual", t: "actRewrite", type: "text", label: "现有整段画面提示词" },
+  { f: "actRewrite", t: "shVisual", type: "artifact", label: "反写画面提示词" },
+  { f: "actRewrite", t: "shMotion", type: "artifact", label: "反写动态提示词" },
+  { f: "actPolish", t: "shSub", type: "artifact", label: "润色结果回填输入框" },
+
+  /* 动作 → 端点（走这次调用）与端点 → 限额 */
+  { f: "actVd", t: "apiText", type: "consume", label: "1 次文本调用" },
+  { f: "actVdAudit", t: "apiText", type: "consume", label: "1 次文本调用" },
+  { f: "actAssets", t: "apiText", type: "consume", label: "4 次并行文本调用" },
+  { f: "actStylePrompt", t: "apiText", type: "consume", label: "purpose=styleRef" },
+  { f: "actStyleAudit", t: "apiText", type: "consume", label: "purpose=stylePromptAudit" },
+  { f: "actAppearance", t: "apiText", type: "consume", label: "purpose=characterAppearance" },
+  { f: "actOutline", t: "apiText", type: "consume", label: "purpose=storyboardOutline，无重试" },
+  { f: "actShot", t: "apiText", type: "consume", label: "每镜头 1 次，JSON 无效最多 3 次尝试" },
+  { f: "actReroll", t: "apiText", type: "consume", label: "1 次文本调用" },
+  { f: "actShotEdit", t: "apiText", type: "consume", label: "purpose=shotEdit" },
+  { f: "actRewrite", t: "apiText", type: "consume", label: "purpose=fieldAssist" },
+  { f: "actPolish", t: "apiText", type: "consume", label: "purpose=fieldAssist" },
+  { f: "actParams", t: "apiText", type: "consume", label: "元调用本身也是 1 次文本请求" },
+  { f: "actStyleImg", t: "apiImage", type: "consume", label: "1 次生图" },
+  { f: "actAssetBatch", t: "apiImage", type: "consume", label: "每个无图资产 1 次" },
+  { f: "actSingleAsset", t: "apiImage", type: "consume", label: "1 次生图，带随机 seed" },
+  { f: "actImageBatch", t: "apiImage", type: "consume", label: "每个缺图镜头 1 次，并发 3" },
+  { f: "actVideoBatch", t: "apiVideo", type: "consume", label: "创建 + 轮询，按秒扣配额" },
+  { f: "apiText", t: "limiter", type: "consume", label: "每次占 1 个文本槽位" },
+  { f: "apiImage", t: "limiter", type: "consume", label: "按 1K/2K/3K/4K 档位占槽位" },
+  { f: "apiVideo", t: "limiter", type: "consume", label: "按请求秒数扣每日配额" },
+
+  /* 步骤 4/5 生成链 */
+  { f: "shVisual", t: "actImageAssemble", type: "text", label: "作为画面主体段" },
+  { f: "shIds", t: "shotRefs", type: "id", label: "按引用决定取哪几张参考图" },
+  { f: "assetImg", t: "shotRefs", type: "image", label: "角色 / 主体 / 道具参考图" },
+  { f: "shotRefs", t: "actImageAssemble", type: "image", label: "放进 extra_body.image 数组" },
+  { f: "stylePrompt", t: "actImageAssemble", type: "text", label: "画风以文字注入" },
+  { f: "actImageAssemble", t: "actImageBatch", type: "artifact", label: "拼好的 prompt 与参考图" },
+  { f: "appPrompt", t: "actAssetBatch", type: "text", label: "定妆照与资产图的主体描述" },
+  { f: "aStyle", t: "actStyleImg", type: "text", label: "风格提示词取自风格资产" },
+  { f: "stylePrompt", t: "actStyleImg", type: "text", label: "包装成抽象样张" },
+  { f: "apiImage", t: "styleImg", type: "artifact", label: "返回 data 第 0 项 url" },
   { f: "apiImage", t: "assetImg", type: "artifact", label: "资产参考图 URL" },
   { f: "apiImage", t: "shotImg", type: "artifact", label: "镜头画面图 URL" },
-  { f: "apiVideo", t: "shotVideo", type: "artifact", label: "镜头视频 URL" },
-  { f: "shotVideo", t: "apiFfmpeg", type: "artifact", label: "videoUrls 数组（顺序即分镜数组顺序）" },
+  { f: "shMotion", t: "actVideoBatch", type: "text", label: "视频 prompt 全文" },
+  { f: "shotImg", t: "actVideoBatch", type: "image", label: "first_frame 首帧（恒存在 → mode 恒 keyframe）" },
+  { f: "shDual", t: "actVideoBatch", type: "image", label: "last_frame 尾帧" },
+  { f: "shDur", t: "actVideoBatch", type: "text", label: "seconds = clamp(round(时长), 4, 12)" },
+  { f: "apiVideo", t: "shotVideo", type: "artifact", label: "轮询完成后的视频地址" },
+  { f: "shotVideo", t: "apiFfmpeg", type: "artifact", label: "videoUrls 数组，顺序即分镜顺序" },
   { f: "apiFfmpeg", t: "final", type: "artifact", label: "blob 播放地址" },
-  { f: "reviews", t: "final", type: "artifact", label: "半自动逐级放行，走到成片" },
-
-  /* 图像注入 */
-  { f: "assetImg", t: "shotRefs", type: "image", label: "角色 / 主体 / 道具的参考图" },
-  { f: "shotRefs", t: "apiImage", type: "image", label: "放进请求体 extra_body.image 数组" },
-  { f: "shotImg", t: "apiVideo", type: "image", label: "first_frame 首帧（恒存在，故 mode 恒为 keyframe）" },
-  { f: "shDual", t: "apiVideo", type: "image", label: "last_frame 尾帧（开关与地址同时成立才带）" },
-  { f: "styleImg", t: "shotRefs", type: "image", off: true, label: "已停用：母版内容会被整体复制，故不再进参考图" },
-  { f: "aScene", t: "shotRefs", type: "image", off: true, label: "已停用：场景图是成品构图，会压平镜头差异" },
-
-  /* 引用绑定 */
-  { f: "assetId", t: "shIds", type: "id", label: "名称或 ID → 真实资产 ID 回写" },
-  { f: "shOutline", t: "assetId", type: "id", label: "大纲要求复用已有资产原名，缺人才补建" },
-  { f: "shIds", t: "shotRefs", type: "id", label: "按引用决定取哪几张参考图" },
-  { f: "assetId", t: "shDlg", type: "id", label: "说话角色绑定，匹配不到归旁白" },
+  { f: "reviews", t: "final", type: "artifact", label: "半自动逐级放行到成片" },
+  { f: "styleImg", t: "shotRefs", type: "image", off: true, label: "已停用：母版内容会被整体复制" },
+  { f: "aScene", t: "shotRefs", type: "image", off: true, label: "已停用：场景图会压平镜头差异" },
 
   /* 失效级联（改了前者，后者成果被清空） */
   { f: "shVisual", t: "shotImg", type: "invalidate", label: "改画面字段 → 图片与视频一并作废" },
+  { f: "shScript", t: "shotImg", type: "invalidate", label: "改文案 → 图片与视频作废" },
   { f: "shIds", t: "shotImg", type: "invalidate", label: "改引用 → 图片与视频作废" },
   { f: "shSub", t: "shotImg", type: "invalidate", label: "改画面子字段 → 图片与视频作废" },
-  { f: "shScript", t: "shotImg", type: "invalidate", label: "改镜头文案 → 图片与视频作废" },
-  { f: "shMotion", t: "shotVideo", type: "invalidate", label: "改动态字段 → 只作废视频，保留图片" },
+  { f: "shMotion", t: "shotVideo", type: "invalidate", label: "改动态字段 → 只作废视频" },
   { f: "shDur", t: "shotVideo", type: "invalidate", label: "改时长 → 只作废视频" },
   { f: "shDual", t: "shotVideo", type: "invalidate", label: "改首尾帧配置 → 只作废视频" },
-  { f: "assetImg", t: "shotImg", type: "invalidate", label: "资产参考图变化 → 引用它的镜头图片视频作废" },
-  { f: "assetImg", t: "reviews", type: "invalidate", label: "同时把三个审核标记重置为 false（门禁重锁）" },
+  { f: "assetImg", t: "shotImg", type: "invalidate", label: "资产参考图变化 → 引用它的镜头图/视频作废" },
+  { f: "assetImg", t: "reviews", type: "invalidate", label: "同时重置三个审核标记（门禁重锁）" },
   { f: "aStyle", t: "shotImg", type: "invalidate", label: "风格资产变化 → 命中全部镜头，图视频全清" },
+  { f: "aStyle", t: "reviews", type: "invalidate", label: "同样重置三个审核标记" },
+  { f: "appPrompt", t: "assetImg", type: "invalidate", label: "改外观提示词 → 该资产参考图作废" },
+  { f: "aChar", t: "assetImg", type: "invalidate", label: "改设定或名称 → 该资产参考图作废" },
   { f: "vd", t: "assetImg", type: "invalidate", label: "改视觉方向 → 清空所有资产参考图" },
-  { f: "aChar", t: "assetImg", type: "invalidate", label: "改设定/名称/外观 → 该资产参考图作废 + 门禁重锁" },
-
-  /* 消耗限额 */
-  { f: "apiText", t: "limiter", type: "consume", label: "每次占 1 个文本槽位（参数元调用也占一次）" },
-  { f: "apiImage", t: "limiter", type: "consume", label: "按 1K/2K/3K/4K 档位占图片槽位" },
-  { f: "apiVideo", t: "limiter", type: "consume", label: "按请求秒数扣视频配额，发请求前就扣" },
 ];
 </script>
 
 <script>
-/* ──────────────────────────────────────────────────────────────────────────
-   渲染与交互
-   ────────────────────────────────────────────────────────────────────────── */
+/* ══════════════════════════════════════════════════════════════════════════
+   渲染与交互：按跳数分层高亮；选中时在与它直接相连的线上直接写出用途
+   ══════════════════════════════════════════════════════════════════════════ */
 const TYPES = {
   text: { name: "文字注入", color: "var(--text-edge)" },
   image: { name: "图像注入", color: "var(--image-edge)" },
   id: { name: "引用绑定", color: "var(--id-edge)" },
   artifact: { name: "产物依赖", color: "var(--artifact-edge)" },
   invalidate: { name: "失效级联", color: "var(--invalid-edge)", dash: "dashed" },
-  consume: { name: "消耗限额", color: "var(--consume-edge)", dash: "dotted" },
+  consume: { name: "走这次调用/占限额", color: "var(--consume-edge)", dash: "dotted" },
 };
 
-const NW = 214, NH = 52, GAPX = 112, GAPY = 18, PADX = 30, PADY = 62;
+const NW = 216, NH = 52, GAPX = 108, GAPY = 16, PADX = 28, PADY = 60;
 const byId = new Map(NODES.map(n => [n.id, n]));
 NODES.forEach(n => { n.in = []; n.out = []; });
 const EDGES_OK = EDGES.filter(e => {
@@ -429,7 +554,7 @@ buckets.forEach(list => list.forEach((n, ri) => {
 }));
 const maxRows = Math.max(...buckets.map(b => b.length));
 const W = PADX * 2 + COLS.length * NW + (COLS.length - 1) * GAPX;
-const H = PADY + maxRows * rowH + 20;
+const H = PADY + maxRows * rowH + 16;
 
 const NS = "http://www.w3.org/2000/svg";
 const mk = (tag, attrs) => {
@@ -440,29 +565,34 @@ const mk = (tag, attrs) => {
 const svg = document.getElementById("svg");
 svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
 
+const edgeLayer = mk("g"), labelLayer = mk("g"), nodeLayer = mk("g");
 COLS.forEach((title, ci) => {
   const t = mk("text", { x: PADX + ci * (NW + GAPX), y: 30, class: "colhead" });
-  t.textContent = title;
+  t.textContent = `${ci + 1}／${COLS.length} ${title}`;
   svg.appendChild(t);
 });
-
-const edgeLayer = mk("g");
-const nodeLayer = mk("g");
-svg.append(edgeLayer, nodeLayer);
+svg.append(edgeLayer, labelLayer, nodeLayer);
 
 EDGES_OK.forEach(e => {
   const a = byId.get(e.f), b = byId.get(e.t);
   const x1 = a.x + NW, y1 = a.y + NH / 2, x2 = b.x, y2 = b.y + NH / 2;
-  const back = b.col <= a.col;                       // 反向边绕行，减少穿越
-  const dip = back ? 54 : 0;
-  const dx = Math.max(60, Math.abs(x2 - x1) * 0.45);
-  const d = `M ${x1} ${y1} C ${x1 + dx} ${y1 + dip}, ${x2 - dx} ${y2 + dip}, ${x2} ${y2}`;
-  const p = mk("path", { d, class: `edge t-${e.type}${e.off ? " off" : ""}` });
-  const label = `${a.zh} ${e.off ? "【已停用】" : "→"} ${b.zh}：${e.label}`;
-  p.addEventListener("mouseenter", ev => showTip(label, ev));
+  const back = b.col <= a.col;
+  const dip = back ? 56 : 0;
+  const dx = Math.max(56, Math.abs(x2 - x1) * 0.45);
+  const p = mk("path", {
+    d: `M ${x1} ${y1} C ${x1 + dx} ${y1 + dip}, ${x2 - dx} ${y2 + dip}, ${x2} ${y2}`,
+    class: `edge t-${e.type}${e.off ? " off" : ""}`,
+  });
+  const txt = mk("text", { x: (x1 + x2) / 2, y: (y1 + y2) / 2 + dip / 1.5 - 5, class: "elabel" });
+  txt.textContent = e.label.length > 26 ? `${e.label.slice(0, 25)}…` : e.label;
+  const tipText = `${a.zh} ${e.off ? "【已停用】" : "→"} ${b.zh}：${e.label}`;
+  p.addEventListener("mouseenter", ev => showTip(tipText, ev));
   p.addEventListener("mouseleave", hideTip);
+  p.addEventListener("click", ev => { ev.stopPropagation(); select(e.f); });
   edgeLayer.appendChild(p);
+  labelLayer.appendChild(txt);
   e.el = p;
+  e.labelEl = txt;
 });
 
 NODES.forEach(n => {
@@ -470,74 +600,109 @@ NODES.forEach(n => {
   g.appendChild(mk("rect", { x: n.x, y: n.y, width: NW, height: NH, rx: 8 }));
   const t1 = mk("text", { x: n.x + 11, y: n.y + 21, class: "zh" });
   t1.textContent = n.zh;
-  const t2 = mk("text", { x: n.x + 11, y: n.y + 38, class: "en" });
-  t2.textContent = n.en.length > 34 ? `${n.en.slice(0, 33)}…` : n.en;
-  g.append(t1, t2);
+  const t2 = mk("text", { x: n.x + 11, y: n.y + 37, class: "en" });
+  t2.textContent = n.en.length > 36 ? `${n.en.slice(0, 35)}…` : n.en;
+  const badge = mk("text", { x: n.x + NW - 8, y: n.y + 15, class: "badge" });
+  badge.setAttribute("text-anchor", "end");
+  g.append(t1, t2, badge);
   g.addEventListener("click", ev => { ev.stopPropagation(); select(n.id); });
-  g.addEventListener("mouseenter", ev => showTip(`${n.zh} ｜ ${n.en} ｜ 点击查看引用链`, ev));
+  g.addEventListener("mouseenter", ev => showTip(`${n.zh} ｜ ${n.en} ｜ 入 ${n.in.length} 出 ${n.out.length}`, ev));
   g.addEventListener("mouseleave", hideTip);
   nodeLayer.appendChild(g);
   n.el = g;
+  n.badge = badge;
 });
 
-let selected = null, typeFilter = null, invalidOnly = false;
+let selected = null, typeFilter = null, invalidOnly = false, spotlight = false;
 const dirSel = document.getElementById("dir");
 
-function reachable(startId, dir) {
-  const seen = new Set([startId]);
+function autoDir(n) {
+  if (n.kind === "input") return "down";
+  if (n.kind === "out") return "up";
+  if (n.out.length && !n.in.length) return "down";
+  if (n.in.length && !n.out.length) return "up";
+  return "both";
+}
+
+/** BFS 记跳数；maxDepth 用于聚光灯模式 */
+function depths(startId, dir, maxDepth) {
+  const map = new Map([[startId, 0]]);
   const queue = [startId];
   while (queue.length) {
     const cur = queue.shift();
+    const d = map.get(cur);
+    if (d >= maxDepth) continue;
     const node = byId.get(cur);
     const list = dir === "down" ? node.out : dir === "up" ? node.in : node.out.concat(node.in);
-    list.forEach(e => {
+    for (const e of list) {
       const nxt = e.f === cur ? e.t : e.f;
-      if (!seen.has(nxt)) { seen.add(nxt); queue.push(nxt); }
-    });
+      if (!map.has(nxt)) { map.set(nxt, d + 1); queue.push(nxt); }
+    }
   }
-  return seen;
+  return map;
 }
 
 function render() {
   const q = document.getElementById("search").value.trim().toLowerCase();
   const hits = q
-    ? new Set(NODES.filter(n =>
-        `${n.zh} ${n.en} ${n.mean} ${n.consumers} ${n.producer}`.toLowerCase().includes(q)).map(n => n.id))
+    ? new Set(NODES.filter(n => `${n.zh} ${n.en} ${n.mean} ${n.consumers} ${n.producer}`
+        .toLowerCase().includes(q)).map(n => n.id))
     : null;
 
-  let chain = null;
+  let dist = null;
   if (invalidOnly) {
-    chain = new Set();
-    EDGES_OK.filter(e => e.type === "invalidate").forEach(e => { chain.add(e.f); chain.add(e.t); });
+    dist = new Map();
+    EDGES_OK.filter(e => e.type === "invalidate").forEach(e => {
+      dist.set(e.f, 1); dist.set(e.t, 1);
+    });
   } else if (selected) {
-    chain = reachable(selected, dirSel.value);
+    const dir = dirSel.value === "auto" ? autoDir(byId.get(selected)) : dirSel.value;
+    dist = depths(selected, dir, spotlight ? 1 : 2);
   }
 
+  const nodeVisible = new Map();
   NODES.forEach(n => {
     const cls = ["node", `k-${n.kind}`];
-    if (hits && !hits.has(n.id)) cls.push("dim");
-    if (chain) {
-      if (n.id === selected) cls.push("sel");
-      else if (chain.has(n.id)) cls.push("near");
-      else cls.push("dim");
-    } else if (hits && hits.has(n.id)) cls.push("hit");
+    let vis = true;
+    let badge = "";
+    if (dist) {
+      const d = dist.has(n.id) ? dist.get(n.id) : Infinity;
+      if (d === 0) cls.push("sel");
+      else if (d === 1) { cls.push("d1"); badge = "1 跳"; }
+      else if (d === 2) { cls.push("d2"); badge = "2 跳"; }
+      else vis = false;
+    }
+    if (hits) {
+      if (hits.has(n.id)) cls.push("hit");
+      else if (!dist) vis = false;
+    }
+    if (!vis) cls.push((dist || hits) && (onlyHide()) ? "gone" : "dim");
+    nodeVisible.set(n.id, vis);
     n.el.setAttribute("class", cls.join(" "));
+    n.badge.textContent = badge;
   });
 
   EDGES_OK.forEach(e => {
     const cls = ["edge", `t-${e.type}`];
     if (e.off) cls.push("off");
-    let visible = true;
-    if (typeFilter && e.type !== typeFilter) visible = false;
-    if (chain) {
-      const touched = e.f === selected || e.t === selected;
-      const within = chain.has(e.f) && chain.has(e.t);
-      if (!within) visible = false;
-      else if (touched) cls.push("active");
+    let vis = true;
+    if (typeFilter && e.type !== typeFilter) vis = false;
+    if (invalidOnly && e.type !== "invalidate") vis = false;
+    if (!nodeVisible.get(e.f) || !nodeVisible.get(e.t)) vis = false;
+    const direct = selected !== null && (e.f === selected || e.t === selected);
+    if (dist && selected && !direct) {
+      const inChain = dist.has(e.f) && dist.has(e.t);
+      if (!inChain) vis = false;
     }
-    if (!visible) cls.push("dim");
+    if (direct) cls.push("active");
+    if (!vis) cls.push(onlyHide() ? "gone" : "dim");
     e.el.setAttribute("class", cls.join(" "));
+    e.labelEl.setAttribute("class", `elabel${direct && vis ? " show" : ""}`);
   });
+}
+
+function onlyHide() {
+  return spotlight || invalidOnly || !!document.getElementById("search").value.trim();
 }
 
 function select(id) {
@@ -554,50 +719,62 @@ function clearSel() {
   paintIntro();
 }
 
-function edgeRows(list) {
-  return list.map(e => {
-    const other = e.f === document.activePanelId ? byId.get(e.t) : byId.get(e.f);
-    const arrow = e.f === document.activePanelId ? "→" : "←";
-    return `<div class="edge-row"><b>${arrow} ${other.zh}</b>
-      <span class="tag">（${TYPES[e.type].name}${e.off ? " · 已停用" : ""}）</span><br>${e.label}
-      <div class="code">${other.en}</div></div>`;
-  }).join("");
+function edgeRow(e) {
+  const other = e.f === document.activePanelId ? byId.get(e.t) : byId.get(e.f);
+  const arrow = e.f === document.activePanelId ? "→" : "←";
+  return `<div class="er" data-id="${other.id}"><b>${arrow} ${other.zh}</b>
+    <span class="tag">（${TYPES[e.type].name}${e.off ? " · 已停用" : ""}｜列 ${other.col + 1} ${COLS[other.col]}）</span><br>
+    <span class="how">${e.label}</span>
+    <div class="code">${other.en}</div></div>`;
 }
 
 function paintPanel(id) {
   document.activePanelId = id;
   const n = byId.get(id);
+  const all = n.out.concat(n.in);
+  const groups = new Map();
+  all.forEach(e => {
+    const other = e.f === id ? byId.get(e.t) : byId.get(e.f);
+    const key = `列 ${other.col + 1}　${COLS[other.col]}`;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(e);
+  });
+  const body = [...groups.entries()]
+    .map(([g, list]) => `<div class="grp">${g}</div>${list.map(edgeRow).join("")}`)
+    .join("");
   document.getElementById("panelBody").innerHTML = `
-    <h2>${n.zh}</h2>
-    <div class="code">${n.en}</div>
+    <h2>${n.zh}</h2><div class="code">${n.en}</div>
     <h3>是什么</h3><p>${n.mean}</p>
     <h3>谁产生</h3><p>${n.producer}</p>
     <h3>谁消费</h3><p>${n.consumers}</p>
-    <h3>关联 ${n.out.length + n.in.length} 条</h3>
-    ${edgeRows(n.out.concat(n.in)) || "<p>无</p>"}
+    <h3>与它相关的 ${all.length} 条引用（点行跳过去）</h3>
+    ${body || "<p>无关联</p>"}
     <h3>代码出处</h3><p class="code">${n.src}</p>`;
+  document.querySelectorAll("#panelBody .er").forEach(row =>
+    row.addEventListener("click", () => select(row.dataset.id)));
 }
 
 function paintIntro() {
   document.getElementById("panelBody").innerHTML = `
-    <h2>怎么用这张图</h2>
+    <h2>这张图怎么读</h2>
+    <p>左到右：<span class="code">输入 → 动作 → 产物 → 动作 → 端点 → 产物</span>。
+    淡紫底的是<strong>动作</strong>（一次调用或一次拼装），白底的是<strong>数据</strong>。</p>
     <ul>
-      <li><strong>点任意方块</strong>：它的整条引用链高亮，其余淡出；右侧给出中文含义、谁产生、谁消费、代码出处。</li>
-      <li><strong>顶部下拉</strong>切换「只看下游 / 只看上游」。</li>
-      <li><strong>线的颜色 = 引用方式</strong>，点图例可只筛一种。</li>
-      <li><strong>红色虚线 = 失效级联</strong>：改了左边，右边的成果就被清空。点「只看失效级联」一次看完。</li>
-      <li><strong>橙色点线 = 消耗用量限额</strong>。</li>
-      <li><strong>淡紫虚线 = 已停用的引用</strong>（风格母版与场景图不再进参考图），保留是为说明为什么停。</li>
+      <li><strong>点任意方块</strong>：紧邻的标「1 跳」，次级标「2 跳」，更远的淡出；
+          与它直接相连的线上会<strong>直接写出用途</strong>。</li>
+      <li><strong>方向自动</strong>：输入类只展开下游，产物类只展开上游，动作与数据类两侧都展开。</li>
+      <li><strong>聚光灯</strong>：把非紧邻的内容整块隐藏，只留这条链。</li>
+      <li><strong>只看失效级联</strong>：一次看完「改哪里会毁掉哪些已完成产物」。</li>
+      <li>线色＝引用方式（点图例单筛一类）；淡显的线＝已停用的引用，保留是为说明为什么停。</li>
     </ul>
-    <h3>四条最该记住的</h3>
+    <h3>先试这三下</h3>
     <ul>
-      <li>英文外观提示词 → 文字注入；参考图 → 图像注入；资产 ID → 引用绑定。</li>
-      <li>资产参考图一次写回会连带清空引用镜头的图片和视频，并重锁三个审核门禁。</li>
-      <li>镜头时长被规范化两次：4/5/8 → clamp 4..12。</li>
-      <li>配额在发请求前扣，失败不回滚；非幂等的生图/生视频 POST 仍会自动重试。</li>
+      <li>点「想法原文」→ 直接看到它喂给了 6 个动作。</li>
+      <li>点「资产参考图」→ 看它被谁选走，以及它一变会毁掉什么。</li>
+      <li>点顶部「步3 分镜」→ 看逐镜头细化吃了哪三样、吐了哪七样。</li>
     </ul>
     <h3>数据出处</h3>
-    <p class="code">2026-09-21 源码快照，与 docs/execution-flow.md、docs/idea-breakdown.md 同一轮逐条核对结果。</p>`;
+    <p class="code">2026-09-21 源码快照；与 docs/execution-flow.md、docs/idea-breakdown.md 同一轮逐条核对结果。</p>`;
 }
 
 const legend = document.getElementById("legend");
@@ -613,9 +790,27 @@ Object.entries(TYPES).forEach(([key, t]) => {
   legend.appendChild(s);
 });
 
+const STEPS = [
+  ["想法", "idea"], ["步1 提取", "actAssets"], ["步2 资产图", "actAssetBatch"],
+  ["步3 分镜", "actShot"], ["步4 图片", "actImageBatch"], ["步5 视频", "actVideoBatch"],
+  ["步6 成片", "apiFfmpeg"],
+];
+const stepsBox = document.getElementById("steps");
+STEPS.forEach(([label, id]) => {
+  const b = document.createElement("button");
+  b.textContent = label;
+  b.addEventListener("click", () => select(id));
+  stepsBox.appendChild(b);
+});
+
 document.getElementById("search").addEventListener("input", render);
 dirSel.addEventListener("change", render);
 document.getElementById("reset").addEventListener("click", clearSel);
+document.getElementById("onlyRelated").addEventListener("click", ev => {
+  spotlight = !spotlight;
+  ev.currentTarget.classList.toggle("on", spotlight);
+  render();
+});
 const invalidBtn = document.getElementById("onlyInvalid");
 invalidBtn.addEventListener("click", () => {
   invalidOnly = !invalidOnly;
@@ -632,10 +827,14 @@ function applyScale() {
   svg.style.height = `${H * scale}px`;
 }
 applyScale();
+document.getElementById("fit").addEventListener("click", () => {
+  scale = Math.min(1.6, Math.max(.25, (stage.clientWidth - 24) / W));
+  applyScale();
+});
 stage.addEventListener("wheel", ev => {
   if (!ev.ctrlKey) return;
   ev.preventDefault();
-  scale = Math.min(2.4, Math.max(.4, scale * (ev.deltaY < 0 ? 1.12 : 0.9)));
+  scale = Math.min(2.4, Math.max(.25, scale * (ev.deltaY < 0 ? 1.12 : 0.9)));
   applyScale();
 }, { passive: false });
 let drag = null;
@@ -654,7 +853,7 @@ window.addEventListener("mouseup", () => { drag = null; stage.classList.remove("
 const tip = document.getElementById("tip");
 function showTip(text, ev) {
   tip.textContent = text;
-  tip.style.left = `${Math.max(8, Math.min(innerWidth - 540, ev.clientX + 14))}px`;
+  tip.style.left = `${Math.max(8, Math.min(innerWidth - 580, ev.clientX + 14))}px`;
   tip.style.top = `${ev.clientY + 16}px`;
   tip.style.opacity = "1";
 }

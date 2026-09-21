@@ -1,6 +1,6 @@
 # 一个想法进来，会被拆成什么（想法拆解视图）
 
-配套：`docs/execution-flow.md`（文字版流程）、`docs/execution-flow-diagrams.md`（执行时序图集）、`docs/flow-map.html`（**交互式引用图**：点字段即高亮整条链，本文图 4 的可点版本）。
+配套：`docs/execution-flow.md`（文字版流程）、`docs/execution-flow-diagrams.md`（执行时序图集）、`docs/flow-map.html`（**交互式引用图**：本文图 4 的可点版本，把每一次调用与拼装都画成独立「动作」节点，因此点「想法原文」就能直接看到它喂给了哪 6 个动作）。
 本文只回答三件事：**拆成哪些东西 → 每样东西有哪些参数、提示词长什么样 → 之后在哪里被引用**。
 所有提示词均为 `src/lib/promptRules.ts` / `src/services/scriptService.ts` 的现行原文（标注行号），示例值是为讲解虚构的，不代表真实模型输出。
 
