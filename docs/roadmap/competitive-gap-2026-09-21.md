@@ -48,15 +48,40 @@
 2. **把"景别"从运镜里独立出来。** 只动词表与拼装顺序，不动模型、不加依赖，但直接改善镜头语言是否像分镜。
 3. **成片加一条字幕轨与一首 BGM。** 完全不需要模型能力，只改拼接环节，就能把"能看"变成"能发"。
 
-## 四、开工前必须先确认的事
+## 四、官方文档已确认的事实（原"待确认"清单已被推翻，结论比跑样片更省事）
 
-- 所接视频模型是否支持：原生音频与对白、口型同步、尾帧/中间关键帧、单次最长时长、分辨率档位。这几项决定 P0-1、P1-3、P0-3 是"接能力"还是"绕路做"。
-- 是否允许并行多版本（同镜头多次生成）：决定 P1-4 的成本策略与默认值。
-- 镜头数与总时长的产品口径统一到哪一档（4-6 还是 4-8，目标时长是否可配）。
+查 Agnes 视频模型集成文档（`agnes-video-2.5-flash`，与 2.5 除 Flash 特例外参数一致）后，原先标为"要先问模型"的事项全部有确定答案：
+
+| 项目 | 官方结论 | 我们现在的做法 |
+|---|---|---|
+| 模式 | `mode` 支持 `text` / `keyframe` / **`reference`** 三种 | 只用了 `text` 与 `keyframe`（`videoService.ts:149`） |
+| 主体参考 | `reference` 模式支持 `images`（**最多 5 张**）与 `audios`（最多 3 条）；`videos` 不支持，传了直接 400 | **完全未使用** |
+| 首尾帧 | `keyframe` 支持 `first_frame` / `last_frame`，至少给一个 | 已用，但尾帧要用户手动勾选并手选图片 |
+| 分辨率 | Flash 锁定 `720P`（2.5 非 Flash 可到 1080P/2K） | 硬编码 `720P`，与 Flash 限制一致，不是缺陷 |
+| 时长 | `seconds` 为字符串 `"4"`–`"12"`，默认 `"5"` | 一致（4/5/8 是产品层规则，再 clamp 4..12） |
+| 画幅 | `21:9/16:9/4:3/1:1/3:4/9:16` | 白名单一致 |
+| 轮询 | `keyframe` 与 `reference` **必须带 `model_name`** | 已带（代码注释还提到 reference，说明当时已知有此模式但从未实现） |
+| 提示词锚定 | 提示词内可用 `<Picture N>` / `<Audio N>` 标记指代所给参考媒体 | 无此机制（P1-8 的官方落点就在这里） |
+| 音频 | 无独立对白/音效字段，但可送 `audios` 参考，或在提示词里描述声音 | 对白只存不用（P1-3 因此从"待确认"变成"可动手"） |
+
+**由此重排优先级：最大的缺口不是首尾帧，而是 `reference` 模式整条没接。**
+
+竞品的一致性核心是"主体参考图驱动"（Runway Gen-4 References、Veo ingredients、可灵多模态参考），而我们目前把一致性全押在"首帧=上一阶段生成的图片"上 —— 于是图片阶段的小偏差会被视频阶段放大，也正是"角色图不能进参考图"两难的来源：在生图里参考图会复制构图，但在生视频里 `reference` + `images` 表达的语义是"保持这个主体身份"，与锁构图并不冲突。**这两件事被混在同一个机制里处理了。**
+
+## 五、同场景首尾帧自动链的实测情况
+
+派生逻辑已落地（`src/lib/shotContinuity.ts` + 13 条单测）。关键工程约束：`useDualFrame` 与 `lastFrameUrl` 属于 MOTION_SHOT_FIELDS，**写回会清空已生成视频**，所以衔接必须在发请求时派生、不持久化。
+
+在一条 10 镜 / 4 场景的样例上实测：**只有 4 个相邻接缝可自动衔接**，其余断开原因分别是换场景（2 个）、同场景换人（1 个）、下一镜或本镜缺图（2 个）、末镜（1 个）。结论是直的：**这一招只治同场景内的跳，跨场景接缝它无能为力** —— 跨场景本就该切镜，靠拼接阶段的短转场更合适。
+
+验证有效性做过变异测试：把同场景判定反转后，4 条用例立即失败（不是空跑的绿）。
 
 ---
 
-## 五、本轮依据
+## 六、本轮依据
 
 竞品能力来自下列公开资料；本仓库现状来自 `docs/execution-flow.md`、`docs/execution-flow-diagrams.md`、`docs/idea-breakdown.md`、`docs/flow-map.html` 的 2026-09-21 源码快照（结论均可回源码定位）。既有代码级待办的现行权威清单是 `docs/execution-flow.md` §12（18 条，含证据行号）；
 `docs/history/2026-08-18-product-optimization.md` §三 另列了取消按钮、任务恢复、失败引导、模板、导入导出、模型选择六项增强建议（属 2026-08-18 基线），本文不重复，只补充提示词与流程结构层面的缺口。
+
+模型能力依据（第四节）：Agnes 官方集成文档 [Agnes Video 2.5](https://wiki.agnes-ai.com/zh-Hans/docs/agnes-video-25) 与 [Agnes Video 2.5 Flash](https://wiki.agnes-ai.com/en/docs/agnes-video-25-flash)。
+竞品能力依据：[Introducing Runway Gen-4](https://runway.com/research/introducing-runway-gen-4)、[Runway Changelog](https://runway.com/changelog)、[LTX-2 Prompting Guide](https://dev.to/gary_yan_86eb77d35e0070f5/ltx-2-prompting-guide-master-ai-video-generation-with-expert-techniques-2ejk)、[首帧与尾帧控制指南](https://seedance-2ai.org/zh/blog/ai-video-first-last-frame-guide)、[LTX Studio Review 2026](https://lumalabs.ai/news/ltx-studio-review)、[2026 AI 视频工具横评](https://post.smzdm.com/p/ak8m7m59/)。
