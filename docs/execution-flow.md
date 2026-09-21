@@ -1,0 +1,295 @@
+# 执行流程全拆解（源码快照 2026-09-21）
+
+> 用途：供主理人核对「程序实际怎么跑」是否与预期一致。
+> 全部结论来自当前源码，关键处标 `文件:行`。与 AGENTS.md/README 不一致的地方集中在第 11 节，代码可疑点在第 12 节。
+> 本文不描述界面外观，只描述：谁触发 → 调什么 → 发什么请求 → 写回什么 → 门禁如何放行。
+
+---
+
+## 1. 全局骨架
+
+三层，单向依赖，UI 不直连 API：
+
+- 步骤组件 `src/features/wizard/Step*.tsx` — 只负责交互、自动触发 effect、门禁展示
+- 编排层 `src/features/wizard/use{Script,Asset,Image,Video}Actions.ts` — 捕获 `targetProjectId`、幂等守卫、批量并发、状态写回
+- 服务层 `src/services/*` — 构造请求、解析响应、限流、重试；`src/lib/*` 为无副作用纯函数（提示词拼装、参数决策、引用解析）
+
+配置来源唯一：`useSettingsStore.getState().providerConfig`（apiKey / baseUrl / plan），由编排层在每次动作开始时读出后**显式传参**给服务层，服务层不 import store（`rateLimit.ts` 例外，它自己读 plan）。
+
+步骤容器：`CreationWizard.tsx:19` 固定 6 步；`:73-78` 按 `project.wizardStep` 路由组件；`:29-43` 是「下一步」的唯一门禁表。
+
+三种推进动力，必须分清：
+
+1. 用户点底部「下一步」→ 受 `canAdvance` 门禁表约束（`CreationWizard.tsx:29-43`）
+2. 步骤内专用按钮（如「提取并继续」「确认这批资产」「审核通过」）→ 直接 `setWizardStep`，绕过底部门禁
+3. `automationMode === "auto"` → 各步骤挂载的条件 effect 自动推进（半自动模式下这些 effect 全部不触发）
+
+状态枚举（`stores/projectTypes.ts`）：
+
+- `ProjectStatus` = `idle | scripting | imaging | videoing | rendering | done | failed`（:9-16）
+- `ShotStatus` = `idle | scripting | scripted | imaging | imaged | videoing | videoed | failed`（:18-26）
+- `AssetType` = `character | scene | product | prop | style`（:59）
+- `asset.source` = `extracted | manual`，缺省按 extracted 处理（:159）
+- `WizardStep` = 1..6，`AspectRatio` 只有 `9:16 | 16:9 | 1:1`（:28-30）
+
+---
+
+## 2. 步骤 0：前置配置（不进步骤条，但缺它整条链第一步就抛错）
+
+`settingsStore`（persist key `wxhb-settings`，**version 4**，`settingsStore.ts:142-143`）默认值：`baseUrl = https://api.agnes-ai.cn/v1`、`plan = default`、`language = zh`、`theme = light`、`apiKey = ""`、`autoRegeneratePortrait = true`、`autoRegenerateAssetImages = true`、`promptRules = []`（只存用户差异条目）。
+
+缺 Key 时的行为分两类，不一致：
+
+- 静默 return：`generateStoryboard` / `generateStyleReference` / `generateAssetImages` / 图片视频批量（`useScriptActions.ts:294`、`useAssetActions.ts:174`、`useImageActions.ts:199`、`useVideoActions.ts:192`）——按钮像没反应
+- 抛错上屏：步骤 1 的 `extractCharactersFromIdea`（`useScriptActions.ts:130-132` 抛 `API key is not configured.`）
+
+---
+
+## 3. 步骤 1：想法 → 提取
+
+入口 `StepIdea.tsx:83-115`。
+
+1. 输入框内容 500ms 防抖写回 `project.ideaPrompt`（`StepIdea.tsx:67-74`），画幅按钮立即写 `aspectRatio`（:169-172）
+2. 点「提取角色与资产并继续」/ Enter → 无项目则 `createProject(title=前 30 字)` 并补写 ideaPrompt + 画幅（:91-99）
+3. `await extractCharactersFromIdea(prompt)`，返回 `false` = 用户在确认弹窗取消，**留在步骤 1 不推进**（:101-102）
+4. 错误与 loading 态都带 `activeProjectId === targetId` 守卫，防止旧项目的失败污染切换后的新项目（:104-114）
+
+`extractCharactersFromIdea` 内部（`useScriptActions.ts:128-282`）：
+
+1. 已有 auto 资产 → `confirmDialog` 列出将被替换的名字，取消返回 false（:143-154）
+2. 发起即清空：只保留 `source === "manual"` 资产，清 `styleReferenceUrl` / `styleReferenceError`，`assetsReviewed = false`，`status = "scripting"`（:159-166）
+3. **两条链并行**（`Promise.allSettled`，:251）：
+   - 链 A 视觉方向：`extractVisualDirectionFromIdea` → `refineWithAudit`（配 `auditVisualDirection` 自检，最多 1 轮，`VISUAL_DIRECTION_MAX_ROUNDS = 1` :34）→ 写 `visualDirection`（`revision+1`、`status="draft"`）+ `status="idle"` + **`wizardStep: 2`**（:182-210）。即「切页时机 = 视觉方向完成」，早于资产提取
+   - 链 B 资产：`character / scene / product / prop` **4 个独立小请求并发**（:215,219），每类完成立刻追加写回 → 卡片逐类出现；单类失败不影响其他类，全部失败才算失败（:243-246）
+4. 任一链失败 → 项目 `status="failed"` + `error`，抛给 StepIdea 上屏（:255-264）
+5. 两链都成功后 fire-and-forget 后台链：`generateStyleReference(targetProjectId)` → `generateAssetImages(undefined, targetProjectId)`（:267-270，顺序不可颠倒，风格图先行）
+
+资产去重（`lib/extractAssets.ts`）：按 `name.trim().toLocaleLowerCase()` 去重，`dedupeAgainst` 只传 manual 资产；character 附带 `appearancePrompt` + `assetNamespace` + `fullPrompt`，`prompt = appearancePrompt`。
+
+---
+
+## 4. 步骤 2：资产工作台
+
+`StepAssets.tsx`。资产分组：角色 / 场景 / 核心主体(product) / 关键物件(prop) + 顶部「视觉方向」卡（style 资产 + 风格母版图）。
+
+### 4.1 风格母版链 `generateStyleReference`（`useAssetActions.ts:172-287`）
+
+1. 幂等：已有风格图且非 `force` → 直接返回；本项目已有资产任务在飞 → 直接返回（:183-184）
+2. 懒建 style 资产（`source:"extracted"`，`description = project.style`）（:194-208）
+3. 派生 + 自检（`force` 或 prompt 为空且未被 `derivation.locked` 时）：
+   - `deriveStylePrompt`：输入刻意**只有中文风格描述 + 视觉方向六维**，不含故事主体 → 英文 stylePrompt（:63-114，purpose `styleRef`）
+   - `auditStylePrompt`：禁止清单来自 `collectSubjectVocabulary(project)`（项目自身资产名，数据驱动），越界则由模型重写（purpose `stylePromptAudit`，Thinking 恒关）（:122-162）
+   - 轮数上限 1（`STYLE_PROMPT_MAX_ROUNDS` :165）；审计抛错只 warn 并保留原文，不阻塞
+4. `composeStyleReferencePrompt(stylePrompt)` → 生图 → 先写 style 资产 `imageUrl`，再写 `project.styleReferenceUrl`（:254-276），两次写回都带 `renderRevision` 校验
+5. 失败 → 写 `project.styleReferenceError`，**不抛出**（:277-282）
+
+### 4.2 资产图批量 `generateAssetImages`（`useAssetActions.ts:290-495`）
+
+1. 阶段 1：`generateStyle && 无风格图` → 先 `await generateStyleReference`（:315-317），风格失败不阻塞
+2. 阶段 2：`createBatchRunner`，**并发 3**（:489），任务筛选 = 该类型且 `!imageUrl`
+   - 角色 → `composePortraitPrompt({ appearancePrompt, stylePrompt })`（物种锁定，无 `photorealistic`、无人像语汇）
+   - 场景 / 产品 / 道具 → `composeTextToImagePrompt({ subject: assetImageBoundary(kind) + prompt, style: stylePrompt })`
+   - ⚠️ **风格母版不作为 i2i 参考图**（2026-09-15 事故决策，代码注释 :322-325 与 :239-240 双处说明）：参考图内容会被整体复制，风格一致性只由 stylePrompt 文本承载
+3. 每个任务写回前都用 `expectedRevision`，失败写 `asset.error`；`onBeforeRun/onFinally` 维护 `assetGenerationStarted`
+4. 单资产重生成走 `StepAssets.tsx:228-268`（`generateSingleAssetImage`）：同一套 prompt 拼装 + revision 写回，但**不登记到 activeAssetTasks**
+
+### 4.3 手动编辑入口（三条，全在步骤 2）
+
+- 角色：`CharacterEditor` + `useCharacterEditorActions.ts`。描述只由 AI 维护（指令 → `chatCompletion` purpose 无 / `SYSTEM_PROMPT_CHARACTER_DESCRIPTION_ZH`），改成功后**立刻**重派生英文 appearancePrompt（竞态守卫 `descriptionRef`，:71-75,229）；勾选「自动重生成定妆照」则链路尾部自动生图（:251-253）；定妆照用 `randomSeed()`（seed ∈ 0..999，:36-40）
+- 场景/产品/道具：`AssetEditor.tsx`，draft + 保存模型；指令 → `purpose:"fieldAssist"` + `SYSTEM_PROMPT_ASSET_EDIT_ZH`，返回 JSON 解析失败就地报错；勾选自动重生成则立刻生图（:117-119）
+- 视觉方向：`VisualDirectionEditor.tsx`，`purpose:"visualDirection"` + `SYSTEM_PROMPT_VISUAL_DIRECTION_EDIT_ZH`；**保存走 `updateVisualDirection`**
+
+⚠️ `updateVisualDirection` 是全屏级联失效（`projectStore.ts:97-120`）：`revision+1`、`status="stale"`、清 `styleReferenceUrl`、`assetsReviewed=false`、**所有资产 `imageUrl` 清空**、style 资产 prompt 清空且 `dirty:true`。即改一次视觉方向 → 步骤 2 所有图需重跑。
+
+### 4.4 推进与门禁
+
+- 半自动：底部「确认这批资产并生成分镜」→ `assetsReviewed = true` → `enterStoryboard()`（`StepAssets.tsx:131-136`）
+- `enterStoryboard` 关键行为（:101-128）：**已有分镜内容则直接切页不覆盖**；否则在**本页** `await generateStoryboard(idea, { onProgress })`，首个镜头写回（成功或失败都算）即 `setWizardStep(3)`，其余镜头继续在后台填充
+- auto：`allAssetsImaged` 由 false→true 时才自动进入分镜（:142-153），且要求**每个资产都有图**——任一资产失败会永久卡住自动推进（代码注释已承认，:141）
+- 底部「下一步」门禁：`case 2 = automationMode==="auto" || assetsReviewed===true`（`CreationWizard.tsx:34`）
+- 刷新恢复：`assetGenerationStarted === true` 且 `hasActiveAssetTask(project.id)` 为假 → 复位 false，避免按钮永久转圈（:88-93）
+
+---
+
+## 5. 步骤 3：分镜
+
+### 5.1 生成 `generateStoryboard`（`useScriptActions.ts:289-409`，两阶段）
+
+1. 幂等：`activeScriptTasks` 命中该项目 → **直接 return（不抛错）**（:304）
+2. `resetStuckShots` 复位上一轮残留 `scripting` 占位（:307），登记 AbortController，`project.status = "scripting"`
+3. 阶段 1 大纲：`generateStoryboardOutline`（`scriptService.ts:287`，purpose `storyboardOutline`）→ 校验 `Array.isArray(shots) && length>0`，否则 `error.shotsInvalid`；返回 `shots[{title,summary,characterNames,sceneName?}]` + `newCharacters` / `newScenes`
+4. 大纲发现的新资产先补建入库（`extractNewAssets`，:326-334）
+5. 阶段 1.5 占位：按大纲长度写入 N 个 `status:"scripting"` 空镜头 → 卡片全部立刻出现并显示生成中（:339-353）
+6. 阶段 2 逐镜头：`runWithConcurrency(tasks, SHOT_CONCURRENCY = 3)`（:37,394），每镜头一次 `generateStoryboardShot`（purpose `storyboard`，骨架 `storyboardShot`，≤3 次尝试 `MAX_SCRIPT_RETRIES=2` 无退避，`scriptService.ts:122,432`）
+   - 单镜头失败 → 只把该镜头置 `failed` + `error`，不影响其他镜头（:379-383）
+   - 写回前 `buildShotUpdate`（:58-88）统一解析引用：`resolveAssetId/Ids` 先按 ID 后按名称，对白生成 `dlg_*` 实体 ID，匹配不到置 `null`（归旁白）；引用未命中只降级为空，**绝不阻断内容写回**（:53-56 注释记录了 2026-09-16 事故）
+   - `normalizeRawShot`（`scriptService.ts:345`）：`duration` 只接受 `{4,5,8}` 否则回落 5；`visualPrompt` / `motionPrompt` 为空则该次尝试判失败并重试
+7. 全部返回 → `project.status = "idle"`；大纲阶段异常 → 复位占位 + `status="failed"` + 抛错（:397-405）
+
+### 5.2 触发时机（三处，都收敛到同一个幂等函数）
+
+- 从步骤 2 点确认（`StepAssets.enterStoryboard`）
+- 步骤 3 挂载 effect 自动补生成（`StepStoryboard.tsx:103-129`）：仅当「没有任何镜头带内容」+ `hasActiveScriptTask` 为假 + 有 ideaPrompt；依赖只放 `[shots.length, ideaPromptTrimmed]`，`autoStoryboardRef` 挡 StrictMode 双挂载
+- 顶部「重新生成」按钮：已有镜头时先 `confirmDialog`（覆盖会丢手改 + 白耗配额，:44-52）
+
+### 5.3 唯一的修改入口 = 详情页一句话指令
+
+步骤 3 内容**全只读**（列表卡 `ShotListSection` → 整卡点击进 `ShotDetail`）。改写走 `reviseShot`（`useScriptActions.ts:474-526`）→ `reviseShotWithInstruction`（`scriptService.ts:515`，purpose `shotEdit`，≤3 次尝试）→ 同一套 `buildShotUpdate` 写回，`status` 回 `scripted`。撤销栈在组件本地（`ShotDetail.tsx:95-113`，只含内容字段快照）。生成中（`scripting|imaging|videoing`）改写入口整体禁用（:64-66）。单镜头重摇 = `rerollShot`（:412-467，同阶段 2 单请求，带 `variationOf`）。
+
+### 5.4 推进与门禁
+
+- 半自动：底部审核卡点要求「所有镜头 scriptText 非空 且 visualPrompt 非空」（`StepStoryboard.tsx:249`）→ `storyboardReviewed=true` + 切步骤 4
+- auto：`generateStoryboard` 成功后立刻 `setWizardStep(4)`（:57-61 与 :117-121 两处）
+- 底部门禁：`case 3 = 有镜头 && 全部 scriptText 非空 && (auto || storyboardReviewed)`（`CreationWizard.tsx:35-36`）
+
+---
+
+## 6. 步骤 4：镜头图片
+
+`useImageActions.ts`，模块级 `runImageBatch`（:111-189，**并发 3**，:205）。
+
+1. `recoverStuck`：注册表空时把残留 `imaging` 复位成 `scripted`（:113-122）
+2. 筛选待生成：`!imageUrl && status !== "imaging" && visualPrompt.trim()`（:127-129）——缺 visualPrompt 的镜头**静默不参与**，UI 用 `missingPromptCount` 横幅提示（`StepImages.tsx:116-120`）
+3. 提示词组装 `buildImageGenerationInput`（:73-109）：
+   - 参考图 `pickShotReferences`：**只有角色定妆照 → 产品图 → 道具图**（显式引用，`promptComposer.ts:282` 起）；场景图与风格母版都不进参考图（各自注释都写明是 2026-09-15 事故决策）
+   - 有参考图 → `composeMultiReferencePrompt`；无参考图 → `composeTextToImagePrompt` 六段式 + `quality: "high quality, 8k"`
+   - 正向约束从注册表取 `composeShot` + `negativeStrategy` 生效文本注入（:57-63），**不新增 API negative 字段**
+4. 请求：`generateImage({apiKey,baseUrl,prompt,size,ratio,referenceImageUrls?})`；`aspectRatioToImageParams` 归一化（size 恒 `"1K"`，ratio 白名单外回落 `"1:1"`，`imageService.ts:72-78`）
+5. 写回 `imageUrl` + `status:"imaged"`，带 revision 校验；失败置 `failed` + error
+6. `onFinally`：全部有图 → `project.status="idle"`；否则 `failed` + **硬编码中文**「图片生成失败 N 个镜头，请重试失败项。」（:184-186）
+
+自动触发：`StepImages.tsx:37-45` 挂载/`shots.length` 变化时，只要有镜头缺图就 `generateImagesForStep()`（依赖刻意不含 `imageGenerationStarted`，符合铁律）。auto 模式在全图 false→true 时 `setWizardStep(5)`（:50-59）。半自动由 `ReviewCheckpoint` 确认 → `imagesReviewed=true` + 切 5（:157-169），且**存在失败镜头时确认按钮禁用**（`ReviewCheckpoint.tsx:85`）。
+
+单项 reroll `rerollImage`（:208-259）不登记注册表。
+
+---
+
+## 7. 步骤 5：镜头视频
+
+`useVideoActions.ts`，`runVideoBatch`（:29-182）。并发按套餐：`tokenplan → 3`，`rpm.video <= 1 → 1`，否则 `2`（:198-202）。
+
+1. `recoverStuck`：残留 `videoing` → 回 `imaged`，`videoProgress=0`（:31-41）
+2. 筛选：`!videoUrl && imageUrl && status !== "videoing" && (motionPrompt || actionDesc)`（:46-52）
+3. 提示词：`composeMotionPrompt(shot)`（恒直接返回 `shot.motionPrompt`，子字段不二次拼装，`lib/promptUtils.ts:21`）+ `appendRegistryRules(negativeStrategy)`
+4. 单镜头内部自带重试环：`MAX_TASK_RETRIES = 2`、退避 `8s * (attempt+1)`（:63-64,140-152），退避等待可被 abort 打断
+5. `generateVideo`（`videoService.ts`）：
+   - **先限流**：`rateLimiter.acquire("video", { cost: duration || 1, signal })`（:135），配额按秒计、在 HTTP 之前扣
+   - 创建体：`mode = 有首帧或尾帧 ? "keyframe" : "text"`（:149）、`size 恒 "720P"`（:71）、`aspect_ratio` 白名单、`seconds = clamp(round(duration), 4, 12)` 转字符串（:139-143）、`first_frame = shot.imageUrl` / `last_frame` 仅在提供时带（:156-161）
+   - ⚠️ 批量与单项重摇的筛选条件都要求 `shot.imageUrl` 非空，所以 `hasFirstFrame` 恒真 —— **当前 UI 实际永远走 `keyframe`，`text` 模式不可达**（`useVideoActions.ts:48-50,215`）
+   - 创建 POST `{baseUrl}/videos`，`maxRetries 3` + 10s base delay（针对 429）；`video_id ?? task_id ?? id`
+   - 轮询 `GET {origin}/agnesapi?video_id=...&model_name=agnes-video-2.5-flash`（:227），间隔 5s、超时 30 分钟、`task_not_exist` 最多容忍 24 轮（:25-27）
+   - 完成 URL 顺序：`url → metadata.url → video_url → output.url → output.video_url → remixed_from_video_id`
+   - **创建后失败的错误类型是 `VideoTaskCreatedError{videoId, stillRunning}`**（`videoService.ts:36-48`）；上层 `useVideoActions.ts:100-122` 对 `stillRunning=true` **只等待不再创建新任务**（避免双倍消耗），false 才判失败
+6. 写回 `videoUrl` + `status:"videoed"`（revision 校验）；`onFinally`：全有视频 → `idle`；全落定（有视频或失败）→ 复位 started + `failed`（`useVideoActions.ts:174-180`，硬编码中文文案）
+
+首尾帧：`DualFrameToggle`（步骤 5 卡内）可勾选双帧并从其他镜头图点选 `lastFrameUrl`，关闭时清尾帧。**注意这是本流程中唯一还保留手写 URL 输入框的地方**（`DualFrameToggle.tsx:82-90`）。
+
+推进：步骤 5 没有审核卡点，auto 模式全视频 false→true 时 `setWizardStep(6)`（`StepVideos.tsx:67-76`）；半自动靠底部「下一步」，门禁 `case 5 = 每个镜头都有 videoUrl`（`CreationWizard.tsx:39`）。
+
+---
+
+## 8. 步骤 6：成片拼接（零 AI 调用）
+
+`StepAssembly.tsx:68-110` → `renderService.concatenateVideos({videoUrls, onProgress, signal})`，顺序即 `shots` 数组顺序。
+
+1. `project.status = "rendering"`
+2. **只有 1 个视频时直接短路**：不走 FFmpeg，只下载并包成 `Blob(type:"video/mp4")` 的 objectURL，进度直接 100（`renderService.ts:191-198`）
+3. 多视频：FFmpeg.wasm 单例 load（CDN 三级兜底）→ DEV 下把 `cos-platform-outputs.agnes-ai.cn` 改写成 `/cdn-proxy<path?query>` 保留 COS 签名，代理失败回落直连 → 逐个 fetch（120s 超时并与外部 signal 合并）写虚拟文件，进度 0→50 → 写 `concat_list.txt` → `-c copy` 拼接（50→80），失败则删产物改重编码 `libx264 ultrafast crf23 + aac` 重跑 → 读回 Blob → objectURL（85→100），`finally` 删全部虚拟文件
+4. 取消：下载阶段 abort fetch，FFmpeg 阶段 `ffmpeg.terminate()` 并清实例（:204-212）；用户取消**不算失败**，状态复位 `idle`（`StepAssembly.tsx:98-101`）
+5. 错误信息尾部附最近 30 行 FFmpeg 日志，界面用 `<pre>` 展示
+6. 产物只存组件内 state（blob URL 不入 store），项目切换与组件卸载都 `revokeObjectURL`（:31-53）
+7. 完成 → `project.status = "done"`；下载走临时 `<a download="${project.title}.mp4">`
+
+auto 模式：`canRender && !isRendering && !renderedUrl` 且「从未就绪到就绪」时自动拼接一次，失败不自动重试（:58-66）。
+
+---
+
+## 9. 横切机制（跨步骤统一规则）
+
+**9.1 限流与配额（`services/rateLimit.ts`）**
+
+三类真实入口统一 `await rateLimiter.acquire(kind, opts)`：文本 `ai/openai.ts:72`（cost 恒 1）、图片 `:180`（按 `imageSizeToTier(size)` 分档）、视频 `videoService.ts:135`（cost = 秒数）。
+`guard` 顺序 = `throttleRpm → checkQuota → recordRpm + recordQuota`（:128-136）：**槽位与配额都在发请求之前扣掉**，请求失败不回滚。RPM 60s 滑窗（图片按档位 key），达上限则睡到最早一条滑出 +50ms。配额仅 `accessType === "tokenplan"` 生效，bucket 为 `5h/周（文本）、日（图片张数）、日（视频秒数）`，用尽抛 `RateLimitError{reason:"quota"}`；取消抛 `reason:"aborted"`。用量持久化 localStorage `wxhb-usage`。每种 kind 一条串行队列，保证等待按到达顺序。
+
+RPM 与配额表（`lib/plans.ts:73-134`，格式 文本 / 图片1K,2K,3K,4K / 视频；配额 文本5h,文本周,图片日,视频秒日）：
+
+- `default` 免费：20 / 20,10,1,1 / 1，无配额
+- `enterprise`：40 / 40,20,1,1 / 2，无配额
+- `starter`：1000 / 100,80,1,1 / 5；1500, 15000, 4000, 500
+- `plus`：同上 RPM；7500, 75000, 4000, 500
+- `pro`：同上 RPM；30000, 300000, 4000, 500
+
+**9.2 采样参数由模型自决（`lib/generationParams.ts`）**
+
+内容调用前 `resolveGenerationParams({purpose, context, cacheKey})` 会**先发一次元请求**让模型决定 `temperature/topP/enableThinking`（:129-166）。缓存 key = `${purpose}:${cacheKey ?? ""}`（:121-123）——`scriptService` 不传 cacheKey，所以每个 purpose 每会话只多付一次文本请求。决策失败退化为 `{temperature:0.7, enableThinking:false}`；`visualDirectionAudit` / `stylePromptAudit` 的 Thinking 被结构性钉死为 false。集中管理的只有这三个参数，`max_tokens`（恒 65536）、图片 size/ratio、视频 size/seconds/mode 都在别处固定。
+
+**9.3 批量幂等与恢复（`lib/batchRunner.ts` + 四张模块级注册表）**
+
+`activeScriptTasks` / `activeAssetTasks` / `activeImageTasks` / `activeVideoTasks`（各 `useXxxActions.ts` 顶部，Map<projectId, AbortController>）。`createBatchRunner` 执行序：注册表命中即返回 → `recoverStuck` → 新建独立 AbortController → `buildTasks`（空则 `onEmpty` 且**不登记**）→ 登记 → `onBeforeRun` → `runWithConcurrency`（N 个 worker 共享自增队列，`Promise.allSettled`，abort 后停止领取新任务）→ `finally` 注销 + `onFinally`。
+刷新恢复：注册表天然为空 → `recoverStuck` 把 `imaging→scripted`、`videoing→imaged`、`scripting→idle`；`assetGenerationStarted` 在步骤 2 挂载时按 `hasActiveAssetTask` 复位。
+
+**9.4 过期结果丢弃（`renderRevision`）**
+
+所有异步写回先捕获 `expectedRevision`，完成时用 `updateXxxByProjectIdIfRevision` / `setShotStatusByProjectIdIfRevision`；期间用户改过输入 → `projectOps.ts` 使 revision+1，旧结果被静默丢弃。失效规则：画面字段变 → 清图+清视频、status 回 `scripted|idle`；只写 `imageUrl` → 清视频；视觉字段变 → 连带清视频。
+
+**9.5 跨项目写回**：编排层一律先 `const targetProjectId = project.id`，回写只用 `updateProjectById` / `*ByProjectId` / `setProjectStatusById`。仍残留 active-project 版本的异步写回见第 12 节。
+
+**9.6 级联失效**：`updateVisualDirection`（清全部资产图，见 4.3）；`removeAsset` 会清理镜头引用并让相关镜头失效。
+
+**9.7 润色/撤销**：所有输入框内嵌「润色 / 撤销」（`components/ui/AiPolishField.tsx`），走 `chatService.polishText`（purpose `fieldAssist`），系统提示词经 `resolvePolishSystemPrompt` 取注册表生效版；撤销栈组件本地、`resetKey` 变化即清空。
+
+---
+
+## 10. 一次完整跑通要发多少请求（N = 镜头数，K = 资产数）
+
+- 文本：步骤 1 = 视觉方向 1 + 自检 1 + 4 类资产提取；步骤 2 = 风格派生 1 + 风格审计 1；步骤 3 = 大纲 1 + N（单镜头，每镜头最多 3 次）；每个新 purpose 首额外 +1 元请求
+- 图片：风格母版 1 + K + N
+- 视频：N（每个 = 1 次创建 + 若干次轮询，轮询不占 RPM/配额）
+- 步骤 6：0 次 AI 调用，纯本地 FFmpeg
+
+默认档（视频 RPM=1）下 N 个视频严格串行，这是「视频步骤特别慢」的唯一原因，与前端并发数无关（并发按套餐已降为 1）。
+
+---
+
+## 11. 与 AGENTS.md / README 现有描述的差异（文档已漂移，代码为准）
+
+1. `useWizardActions.ts` 已拆为 `useScriptActions / useAssetActions / useImageActions / useVideoActions` 四个域，前者只剩 35 行门面；AGENTS.md 仍写「向导操作编排（含模块级幂等守卫注册表）」并标注其为主要实现文件
+2. 步骤 2 资产已从 3 类扩为 **4 类 + 风格**：`character / scene / product / prop / style`；AGENTS.md 数据模型仍写 `character / scene / product`
+3. 视觉方向（`project.visualDirection` 六维结构化）是新增的一等公民，AGENTS.md 项目结构里完全没有该文件（`VisualDirectionEditor.tsx`）
+4. **风格母版已不再作为任何 i2i 参考图**（资产图与分镜图都是），AGENTS.md「阶段 2 的任务经 `referenceImageUrls` 参考风格图」「风格图恒占末位，总数 ≤3」已失效
+5. 分镜图参考现在只有 角色定妆照 → 产品 → 道具，**场景图明确不进参考**；AGENTS.md「场景→角色→产品合计 ≤2 张」口径已失效
+6. 「轻量资产提取接口 `extractAssetsFromIdea`」已被替换为 `extractVisualDirectionFromIdea` + `extractAssetsByType`（4 路并发）；「完整分镜生成仅在步骤 3 调用 `generateScript`」中的 `generateScript` 已不存在，现为 `generateStoryboardOutline` + `generateStoryboardShot` 两阶段
+7. `HistoryEntry` / 操作历史已从 store 删除（persist v15），AGENTS.md 数据模型仍列该实体
+8. `CharacterPanel.tsx`、`src/features/history/` 已不存在；AGENTS.md 项目结构仍列出
+9. `chatService.ts` 现只 re-export 7 个 `SYSTEM_PROMPT_*`（`SYSTEM_PROMPT_SCRIPT_TEXT / VISUAL_PROMPT / MAIN_PROMPT / MOTION_PROMPT / DESCRIPTION_ZH / CHARACTER / DIALOGUE`），「8 个常量已整体搬迁」的表述与实际不符；角色/资产/视觉方向的编辑提示词实际住在 `lib/promptRules.ts`（`SYSTEM_PROMPT_CHARACTER_DESCRIPTION_ZH` / `SYSTEM_PROMPT_ASSET_EDIT_ZH` / `SYSTEM_PROMPT_VISUAL_DIRECTION_EDIT_ZH`）
+10. 负向提示词已无 UI 也无字段（AGENTS.md「存在 UI/模型字段待核实」的 P1 悬案可结案）：负向策略只以 `negativeStrategy` 注册表文本注入正向 prompt
+11. `projectStore` persist 现为 **v16**，AGENTS.md 写「v1 → v11 持续存储迁移」
+12. `src/lib/logger.ts` + `logStorage.ts` + `components/LogConsoleDock.tsx`（trace/span、localStorage 持久化、底部停靠控制台）与 `lib/generationParams.ts`、`lib/refineContent.ts`、`lib/batchRunner.ts`、`lib/jsonResponse.ts`、`lib/devDump.ts`、`lib/assetDetails.ts`、`lib/shotFields.ts` 均未出现在 AGENTS.md 项目结构中
+13. 视频参数体系（`mode/size 720P/seconds/aspect_ratio/first_frame/last_frame`、轮询带 `model_name`）与 AGENTS.md 一致，未漂移
+
+---
+
+## 12. 核对流程时值得你裁决的可疑点（我发现，未改）
+
+按影响排序：
+
+1. **步骤 4/5 的子字段仍可手改**（`PromptSubFields.tsx:41-43` 用 active-project 的 `updateShot`，`onCommit` 再调 `rewritePromptFromFields` 重写整段英文）。这与「分镜内容全只读、唯一入口是详情页一句话」相冲：同一段提示词有两个编辑源（步骤 3 只读 + 步骤 4/5 可写），且跨了异步边界。
+2. **单项重生成不登记注册表**：`rerollImage`（`useImageActions.ts:208`）、`rerollVideo`（`useVideoActions.ts:205`）、场景/产品/道具单项生图（`StepAssets.tsx:228`）、定妆照生图（`useCharacterEditorActions.ts:134`）都绕过 `activeImageTasks` / `activeVideoTasks` / `activeAssetTasks`（`generateStyleReference` 是例外，它登记了）。批量任务看不见单项任务，两者可同时对同一镜头/资产发起 → 服务端任务重复创建、配额双倍消耗。步骤 2 用 `anyGenerating` 禁按钮做了规避（`StepAssets.tsx:65-66`），步骤 4/5 没有等价守卫。
+3. **定妆照写回跨异步边界用 active-project action**：`useCharacterEditorActions.ts:161` 的 `updateAsset(character.id, { imageUrl })` 与保存的 `updateAsset/addAsset` 都不带 projectId。等图片期间切换项目，结果会写进新项目的同名资产（AGENTS.md P1「多项目写回」尚未收口）。
+4. **配额在请求前扣、失败不回滚**（`rateLimit.ts:128-136`）。图片 403/内容过滤、视频创建后失败都会白扣一次配额；Token Plan 用户「用量看着没了但没出片」。
+5. **非幂等 POST 仍走通用重试**：图片创建（`ai/openai.ts:182,204`，默认 `maxRetries 3`）、视频创建（`videoService.ts:181`，429 退避重试）。服务端无幂等键，重试可能重复计费。AGENTS.md P1 已记录，代码未收。
+6. `generateStoryboard` 命中幂等守卫时 `return`（不抛错、不 await 在飞任务），`StepAssets.enterStoryboard` 的 `onProgress` 永不触发 → 极端时序下点「进入分镜」无反应也不报错（`useScriptActions.ts:304` + `StepAssets.tsx:113-128`）。
+7. `pickShotReferences` 注释写「总上限 3 张」，代码实为 `out.length < 4`（`promptComposer.ts:282` 起）。
+8. 步骤 4/5 的 `onFinally` 错误文案硬编码中文（`useImageActions.ts:185`、`useVideoActions.ts:178`），违反「用户可见文本必须进 i18n」的编码规范。
+9. 步骤 1 的 `IDEA_POLISH_PROMPT` / `IDEA_POLISH_PROMPT_EN` 长提示词写在组件里（`StepIdea.tsx:14-28`），未进 `promptRules` 注册表，用户不可编辑、也不在设置对话框显示。
+10. 视觉方向链完成即置 `project.status = "idle"`（`useScriptActions.ts:205`），此时资产提取链可能仍在跑 → 侧栏状态短暂显示空闲。
+11. auto 模式在资产/图片/视频任一环节出现失败镜头时**永久停住自动推进**（三处 `allXxx` 都要求 100% 成功，代码注释已承认是有意为之）。若期望「失败也继续收尾」，需要产品决策。
+12. 孤儿组件（无任何引用，属零调用死代码）：`src/features/script/ScriptPanel.tsx`、`src/features/preview/FinalPreview.tsx`、`src/features/preview/ShotPreview.tsx`、`src/features/wizard/ExpandableSection.tsx`。删除前建议再确认一次动态引用。
+
+---
+
+## 13. 数据生命周期（持久化）
+
+`projectStore`：key `wxhb-project`，**version 16**，`migrate: migratePersistedState`（`projectStore.ts:647-651`）。迁移链（`projectMigrations.ts`，纯函数幂等，逐版）：<2 单项目→多项目；<3 加 characters/dialogues/activeXxxIds；<4 加 wizardStep；<5 删 mode、映射旧步骤、`automationMode='semi-auto'`；<6 加 sceneReferences/styleReferenceUrl；<7 加三个 GenerationStarted；<8 characters+sceneReferences 合并为 assets（保留 ID）；<9 非空 prompt → `derivation.locked=true`；<10 修复被压成单行的角色描述；<11 规范化镜头引用数组；<12 视觉方向合法性兜底；<13 为非 style 资产物化 details；<14 视觉方向六平铺字段收进 details + style 资产物化 details；<15 删除 history；<16 `repairAssetDetails` 修污染值/补空。
+
+图片/视频产物只存远端 URL（模型返回），不存 base64；仅步骤 6 的成片是本地 blob，不持久化。
