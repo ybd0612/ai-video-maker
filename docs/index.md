@@ -108,11 +108,11 @@ CI 测试门禁           ⬜ .github/workflows/deploy.yml 仍只构建不跑测
 | 向导步骤与门禁 | `src/features/wizard/CreationWizard.tsx` | `TOTAL_STEPS` `:19`、`canAdvance` `:29-43` | 2026-09-21 |
 | 步骤显示名 | `src/i18n/index.ts` | `wizard.step1~6`（zh `:177-182`、en `:607-612`）——第 6 步 UI 作「后期 / Post-production」 | 2026-09-21 |
 | **对外名称（口径）** | 中文「AI 一键成片」/ 英文与仓库名 `AI Video Maker`；载体：`index.html` 标题、`i18n` 的 `pipeline.title`（zh `:76` / en `:506`） | 2026-09-21 已统一，旧变体全仓零残留 | 2026-09-21 |
-| 命令、端口、包版本、Node 要求 | `package.json`、`vite.config.ts`、`vitest.config.ts` | dev 5173 / preview 5180 | 2026-09-21 |
+| 命令、端口、包版本、Node 要求 | `package.json`、`vite.config.ts`、`vitest.config.ts` | dev **5188** / preview 5180（5173 被本机另一项目占用，已永久改端口） | 2026-09-21 |
 | CI 行为 | `.github/workflows/deploy.yml` | push `main` → 构建 + 部署 Pages，**不含 `npm run test`** | 2026-09-21 |
 | **验证方式（口径）** | 只做 Vitest 代码单元测试，**不用浏览器 / E2E / preview 验证界面**，界面由维护者本地确认 | 无工具载体，故在此写定 | 2026-09-21 |
 | **许可证（口径）** | **未定**：无 `LICENSE`，`package.json:3` 为 `private: true` → 默认保留所有权利，任何文档不得声称 MIT | 2026-09-21 决定暂不补 | 2026-09-21 |
-| 测试规模基线 | `npm run test` | 30 文件 / 393 用例通过（**仅当日快照**，不承诺恒定，现行以运行结果为准） | 2026-09-21 |
+| 测试规模基线 | `npm run test` | 31 文件 / 406 用例通过（**仅当日快照**，不承诺恒定，现行以运行结果为准） | 2026-09-21 |
 
 ---
 

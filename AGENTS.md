@@ -72,7 +72,7 @@ scripts/run-vitest.mjs              # Windows 盘符规范化后启动 Vitest
 
 ## 命令
 
-- `npm run dev` — 启动开发服务器（端口 5173）
+- `npm run dev` — 启动开发服务器（端口 **5188**；5173 已被本机另一项目占用，勿改回）
 - `npm run build` — TypeScript 检查 + Vite 生产构建
 - `npm run preview` — 预览生产版本（端口 5180）
 - `npm run test` — 运行单元测试（Vitest 单次执行）

@@ -17,7 +17,8 @@ export default defineConfig({
     },
   },
   server: {
-    port: 5173,
+    // 固定非默认端口 5188：5173 已被本机另一项目（MSCMS 后台）占用，勿改回。
+    port: 5188,
     host: "127.0.0.1",
     open: true,
     proxy: {

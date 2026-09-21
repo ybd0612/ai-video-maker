@@ -89,7 +89,7 @@ These are commonly assumed to exist but are not implemented in the code:
 
 ```bash
 npm install
-npm run dev      # http://127.0.0.1:5173
+npm run dev      # http://127.0.0.1:5188
 ```
 
 ### Configure API key and plan
@@ -105,7 +105,7 @@ Keys, settings and project data live in the current browser's `localStorage` and
 
 | Command | Purpose |
 | --- | --- |
-| `npm run dev` | Dev server (port 5173, bound to `127.0.0.1`, opens the browser) |
+| `npm run dev` | Dev server (port 5188, bound to `127.0.0.1`, opens the browser) |
 | `npm run build` | `tsc` type check + Vite production build (outputs `dist/`) |
 | `npm run preview` | Preview the production build (port 5180, `strictPort`) |
 | `npm run test` | Vitest unit tests, single run |

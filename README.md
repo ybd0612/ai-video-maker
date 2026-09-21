@@ -89,7 +89,7 @@
 
 ```bash
 npm install
-npm run dev      # http://127.0.0.1:5173
+npm run dev      # http://127.0.0.1:5188
 ```
 
 ### 配置 API Key 与套餐
@@ -105,7 +105,7 @@ Key、设置与项目数据都存在当前浏览器的 `localStorage`，只在�
 
 | 命令 | 作用 |
 | --- | --- |
-| `npm run dev` | 开发服务器（端口 5173，绑定 `127.0.0.1`，自动开浏览器） |
+| `npm run dev` | 开发服务器（端口 5188，绑定 `127.0.0.1`，自动开浏览器） |
 | `npm run build` | `tsc` 类型检查 + Vite 生产构建（产出 `dist/`） |
 | `npm run preview` | 预览生产构建（端口 5180，`strictPort`） |
 | `npm run test` | Vitest 单元测试单次执行 |
