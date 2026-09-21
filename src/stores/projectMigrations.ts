@@ -153,7 +153,7 @@ export function migratePersistedState(
 
   // Migrate from v8 to v9: 资产派生元数据（derivation）+ style 资产类型。
   // 不凭空创建 style 资产（无 style 资产的项目维持现状，运行期由
-  // useWizardActions 的 ensureStyleAsset 懒派生补齐）；仅做结构合法化：
+  // useAssetActions.generateStyleReference 懒建补齐）；仅做结构合法化：
   // 已有资产的非空英文派生物（prompt/appearancePrompt）补 derivation.locked=true，
   // 防止后续自动派生覆盖历史内容。重复执行幂等。
   if (version < 9) {

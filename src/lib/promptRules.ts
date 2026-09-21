@@ -196,7 +196,7 @@ Return JSON only:
 Return no other fields and no parameters outside the legal range.`,
   },
 
-  /* ── 步骤 1 轻量资产提取（scriptService.extractAssetsFromIdea） ── */
+  /* ── 步骤 1 按类资产提取（scriptService.extractAssetsByType，四类各一次请求） ── */
   extractAssets: {
     zh: `你是一位专业的视频资产提取助手。用户会给你一个视频主题或想法，请提取其中的资产信息，严格按以下 JSON 格式返回，不要包含任何其他文字：
 {
@@ -277,7 +277,7 @@ Examples:
   /* ── 步骤 3 分镜大纲（scriptService.generateStoryboardOutline） ── */
   storyboardOutline: {
     zh: `你是一位专业的视频分镜策划师。用户会给你一个主题或想法。你的任务是把想法规划为镜头大纲（先规划、后细化，不要写具体提示词）：
-1. 将其拆分为 4-8 个镜头，每个镜头时长只能从 4 秒、5 秒、8 秒中选择，保持叙事连贯、有情绪节奏
+1. 由你根据想法的叙事复杂度与节奏自行判断需要多少个镜头（宁可少而精，不做无意义切分）；每个镜头时长只能从 4 秒、5 秒、8 秒中选择，保持叙事连贯、有情绪节奏
 2. 每个镜头给出一句话内容概括（发生了什么、关键画面、情绪节拍）
 3. 指出该镜头涉及的角色名与场景名（必须使用"已有资产清单"中的原名；涉及才列，不涉及为空）
 4. 仅当想法明确需要清单中没有的新角色/新场景时，在 newCharacters/newScenes 中给出完整资产（结构同资产提取），否则给空数组
@@ -304,7 +304,7 @@ Examples:
   "newScenes": []
 }`,
     en: `You are a professional video storyboard planner. The user gives you a topic or idea. Plan the shot breakdown (plan first, details come later — do NOT write image prompts):
-1. Break it into 4-8 shots; each shot duration must be exactly 4s, 5s, or 8s, with coherent narrative and emotional pacing
+1. Decide the shot count yourself from the idea's narrative complexity and pacing (prefer fewer, meaningful shots over filler); each shot duration must be exactly 4s, 5s, or 8s, with coherent narrative and emotional pacing
 2. For each shot give a one-sentence summary (what happens, the key visual, the emotional beat)
 3. Name the characters and scene involved in each shot (use EXACT names from the "existing assets" list; leave empty when not involved)
 4. Only when the idea clearly requires characters/scenes missing from the list, provide full assets in newCharacters/newScenes (same schema as asset extraction); otherwise use empty arrays
@@ -852,8 +852,8 @@ export const BUILTIN_RULES: PromptRule[] = [
     task: "storyboardOutline",
     section: "rules",
     content: {
-      zh: "- 总镜头数 4-8 个，节奏有起承转合",
-      en: "- 4-8 shots total, with narrative pacing",
+      zh: "- 总镜头数不预设固定区间，由你按想法的信息量与时长自行判断，宁可少而精；节奏必须有起承转合",
+      en: "- Do not assume a fixed shot range; judge the total count yourself from the idea's information load and intended length, preferring fewer meaningful shots; the pacing must still have a setup-development-payoff arc",
     },
     enabled: true,
     source: "builtin",

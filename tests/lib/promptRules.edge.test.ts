@@ -103,7 +103,7 @@ describe("buildSystemPrompt 边界", () => {
 
     const zh = buildSystemPrompt("storyboardShot", "zh", allRulesDisabled);
     expect(zh).not.toContain("重要规则：");
-    expect(zh).not.toContain("总镜头数 4-8 个");
+    expect(zh).not.toContain("每个镜头聚焦一个核心动作");
     // safety section 条目仍启用 → header 与内容保留
     expect(zh).toContain("⚠️ 内容安全要求：");
     expect(zh).toContain("服饰描述得体");

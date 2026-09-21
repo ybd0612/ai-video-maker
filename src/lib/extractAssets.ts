@@ -37,7 +37,7 @@ export interface RawAsset {
  * 调用方需据此回填引用，保证对白归属与角色一致性。
  * 角色/产品/场景/风格共用此函数（type 区分）。
  * style 分支不走 appearancePrompt/namespace/fullPrompt：
- * prompt（英文 stylePrompt）为 L2 派生物，运行期由 ensureStyleAsset 懒派生。
+ * prompt（英文 stylePrompt）为 L2 派生物，运行期由 useAssetActions.generateStyleReference 懒派生。
  *
  * @param dedupeAgainst 去重基准：追加式传全部旧资产（默认）；
  *                      替换式只传 manual 资产（见顶部语义说明）。

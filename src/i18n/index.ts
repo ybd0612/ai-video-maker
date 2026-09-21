@@ -503,7 +503,7 @@ const en = {
 
   // Pipeline
 
-  "pipeline.title": "AI Video Creator",
+  "pipeline.title": "AI Video Maker",
   "pipeline.apiKeyRequired": "API Key not configured. Please set your key to use AI features.",
   "pipeline.openSettings": "Open Settings",
   "pipeline.scriptPanelTitle": "Enter your idea",
