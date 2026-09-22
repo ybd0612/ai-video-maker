@@ -814,6 +814,9 @@ export async function extractAssetsByType(
     purpose: "assetExtraction",
     apiKey: opts.apiKey,
     baseUrl: opts.baseUrl,
+    // 四类资产并发提取且决策上下文各不相同（见下方 "This call extracts ONLY"）；
+    // 不按类型分键会让四路决策互相覆盖同一缓存槽，下一轮整体命中最后写入者。
+    cacheKey: type,
     context: [
       "Task: extract typed assets (characters, products, props, scenes, style) with structured details and English appearance prompts, as strict JSON.",
       `This call extracts ONLY: ${type}`,

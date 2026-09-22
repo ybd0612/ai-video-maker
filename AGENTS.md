@@ -235,6 +235,7 @@ scripts/run-vitest.mjs              # Windows 盘符规范化后启动 Vitest
 - 分镜生成后必须**回填角色 ID 引用**：模型返回的 `activeCharacterIds` / `dialogues.characterId` 可能是自编 ID，需按「角色名 → store 角色 ID」映射统一回填（新资产由 `extractNewAssets` 建映射），匹配不到的对白置 `null`（归旁白），否则角色一致性（图片注入/定妆照参考）与对白归属会失效。
 - 单镜头重roll（`rerollShot`）同样必须**回填对白/角色引用**（映射 + 无效清理），并把 `dialogues` / `activeCharacterIds` 一并写回，否则重roll后对白与脚本脱节。
 - 步骤 1 资产提取走**按类轻量接口** `extractAssetsByType`（每类一次请求，只返回该类 JSON，代码再做越界兜底过滤）；完整分镜仅在步骤 3 走 `generateStoryboardOutline` + `generateStoryboardShot`，禁止用完整分镜生成做资产提取（无谓的重复请求）。
+- **主体忠实（2026-09-22 事故沉淀）**：想法原文已给出的物种/品种/颜色等事实必须被照抄，禁止模型「合理化更正」。此前 `extractAssets` 无任何主体约束，同一份 192 字想法两次提取分别产出「贵宾犬 Poodle」与「金毛犬 Labrador」，且中文 `description` 与英文 `appearancePrompt` 同轮各写各的，而生图只喂英文那份 → 品种随机漂移。现行口径：① 约束由内置条目 `extract.subject-fidelity` 承载（排在提取规则首位，用户可覆盖）；② 角色 `details.species` 必须写全「物种 + 品种」，只写「狗」会让品种在下游丢失；③ 参数决策按资产类型分 `cacheKey` 且同键并发单飞（旧实现四类共用 `"assetExtraction:"` 一个槽，互相覆盖 → topP 逐轮漂移）。**禁止引入品种词表 / 枚举白名单**这类写死限制——判断权归模型，代码只保证品种只有一个来源。
 - **镜头数量不写死**（2026-09-21 产品决定）：由模型按想法的叙事复杂度与节奏自行判断，载体是 `promptRules.ts` 的 `storyboardOutline` 骨架第 1 条与内置条目 `storyboard.shot-count`（用户可在设置里覆盖）。**代码与文档一律不得再出现「4-6 个 / 4-8 个」这类固定区间**；镜头时长仍受结构约束（`duration` 只允许 4 / 5 / 8 秒）。
 - **文本模型输出预算统一为 `MAX_OUTPUT_TOKENS`（65536，见 lib/models.ts）——效果优先，禁止为各任务单独设小预算**（预算过小会导致输出截断、JSON 断裂）。
 

@@ -110,7 +110,7 @@ export interface ResolveGenerationParamsOptions {
   baseUrl: string;
   /** 该用途的运行上下文（语言、画幅、资产规模等），供模型判断 */
   context?: string;
-  /** 缓存隔离键（通常为项目 id）；同用途同键复用上次决策 */
+  /** 决策隔离键：按会让决策上下文真正不同的维度传入（如资产类型）；省略则同用途共用一个槽 */
   cacheKey?: string;
   /** 跳读缓存，强制重新决策 */
   force?: boolean;
@@ -119,12 +119,19 @@ export interface ResolveGenerationParamsOptions {
 /** 用途 + 缓存键 → 已决策参数 */
 const paramCache = new Map<string, GenerationParams>();
 
+/**
+ * 同键在飞的决策（单飞）。
+ * 没有它时，N 路同键并发会全部 cache miss、各发一次决策请求并互相写同一个 key，
+ * 最终生效值取决于谁最后返回 —— 同一任务的采样参数因此逐轮无谓漂移。
+ */
+const paramInflight = new Map<string, Promise<GenerationParams>>();
+
 function cacheKeyOf(opts: ResolveGenerationParamsOptions): string {
   return `${opts.purpose}:${opts.cacheKey ?? ""}`;
 }
 
 /**
- * 让模型为该用途决定采样参数（结果按用途缓存）。
+ * 让模型为该用途决定采样参数（结果按用途 + 缓存键复用，同键并发只问一次）。
  * 决策失败不抛错：退化为 NEUTRAL_GENERATION_PARAMS，保证生成链路继续。
  */
 export async function resolveGenerationParams(
@@ -134,8 +141,23 @@ export async function resolveGenerationParams(
   if (!opts.force) {
     const cached = paramCache.get(key);
     if (cached) return cached;
+    const pending = paramInflight.get(key);
+    if (pending) return pending;
   }
 
+  const decision = decideGenerationParams(opts, key);
+  paramInflight.set(key, decision);
+  try {
+    return await decision;
+  } finally {
+    if (paramInflight.get(key) === decision) paramInflight.delete(key);
+  }
+}
+
+async function decideGenerationParams(
+  opts: ResolveGenerationParamsOptions,
+  key: string,
+): Promise<GenerationParams> {
   try {
     const service = createAIService({
       provider: "openai",
@@ -184,4 +206,5 @@ export async function resolveGenerationParams(
 /** 清空参数决策缓存（测试用；切换项目时可选择性调用）。 */
 export function clearGenerationParamCache(): void {
   paramCache.clear();
+  paramInflight.clear();
 }

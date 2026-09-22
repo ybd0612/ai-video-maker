@@ -563,7 +563,8 @@ Promise.allSettled([链A, 链B])                                      :269
   localStorage["wxhb-usage"] 持久化计数   |  取消 -> RateLimitError{reason:"aborted 已取消"}
                                              ⚠ 该错误的 kind 字段恒为 "text"（:86,95）
 文本元调用也各占一槽：resolveGenerationParams(参数决策) 内部又走一次 chatCompletion
-（缓存键 = purpose 用途:cacheKey，scriptService 不传 cacheKey -> 每个用途每会话只多 1 次）
+（缓存键 = purpose 用途:cacheKey；assetExtraction 按资产类型分键，2026-09-22；
+ 同键并发单飞只问一次 -> 每个用途每个键每会话只多 1 次）
 ```
 
 ---

@@ -216,6 +216,23 @@ describe("buildSystemPrompt", () => {
     const rendered = buildSystemPrompt("storyboardShot", "zh", BUILTIN_RULES);
     expect(rendered).not.toContain("视频文案优化专家");
   });
+
+  it("extractAssets 生效提示词含主体忠实条目，且排在其它提取规则之前", () => {
+    // 历史缺陷：提取阶段无任何主体约束 → 同一份想法两次提取分别得到
+    // 「贵宾犬 Poodle」与「金毛犬 Labrador」，模型擅自换品种不算违规。
+    const zh = buildSystemPrompt("extractAssets", "zh", BUILTIN_RULES);
+    expect(zh).toContain("主体忠实（最高优先）");
+    expect(zh).toContain("物种 + 品种");
+    expect(zh.indexOf("主体忠实（最高优先）")).toBeLessThan(zh.indexOf("- characters："));
+
+    const en = buildSystemPrompt("extractAssets", "en", BUILTIN_RULES);
+    expect(en).toContain("Subject fidelity (highest priority)");
+    expect(en.indexOf("Subject fidelity (highest priority)")).toBeLessThan(
+      en.indexOf("- characters:"),
+    );
+    // 英文条目不得夹带未翻译的中文词（en 版会喂给 language=en 的项目）
+    expect(en).not.toMatch(/[一-鿿]/);
+  });
 });
 
 /* ── getActiveRuleText（供提示词拼装链注入正向约束） ──────────────────────── */

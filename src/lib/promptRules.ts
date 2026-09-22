@@ -692,6 +692,17 @@ function monolingual(text: string): { zh: string; en: string } {
 export const BUILTIN_RULES: PromptRule[] = [
   /* ── extractAssets（步骤 1 轻量资产提取） ── */
   {
+    id: "extract.subject-fidelity",
+    task: "extractAssets",
+    section: "rules",
+    content: {
+      zh: "- **主体忠实（最高优先）**：想法原文已经给出的主体事实——物种、品种、颜色、材质、体型、年龄阶段、职业、数量、专有名词——必须**原样照抄**，禁止替换为同类的其它品种或类型，禁止按常识「合理化更正」（想法写「泰迪」就只能是泰迪/贵宾犬，不得改成金毛、拉布拉多或任何其它犬种）。\n- 想法没有给出的细节可以自由补全，但补全结果必须与已有事实指向**同一个主体**，不得自相矛盾；description、details 与 appearancePrompt 三者描述的物种/品种必须完全一致。\n- characters 的 `details.species` 必须写全「物种 + 品种」（例：`狗（金毛寻回犬）`、`贵宾犬（泰迪）`、`猫（橘色家猫）`）；只写「狗」「猫」这类笼统物种会让品种事实在下游丢失。\n- 下方「已有资产」清单里出现过的同名主体，必须沿用它的物种与品种，禁止改名换种。",
+      en: "- **Subject fidelity (highest priority)**: any subject fact already stated in the idea — species, breed, colour, material, build, age stage, role, count, proper nouns — must be copied **verbatim**. Never swap it for another breed or type of the same kind, and never \"correct it toward what usually looks right\" (if the idea says a Teddy/poodle, it stays a Teddy/poodle — not a Golden, not a Labrador, not any other breed).\n- Facts the idea does not state may be invented freely, but every invention must point at the **same subject** as the stated facts: description, details and appearancePrompt must all agree on one species/breed.\n- For characters, `details.species` must carry **species + breed** (e.g. `dog (Golden Retriever)`, `poodle (Teddy)`, `cat (orange tabby)`); a bare `dog` / `cat` loses the breed fact for every downstream step.\n- When a name already appears in the \"existing assets\" list below, reuse its species and breed; never rename or re-breed it.",
+    },
+    enabled: true,
+    source: "builtin",
+  },
+  {
     id: "extract.assets-animals",
     task: "extractAssets",
     section: "rules",

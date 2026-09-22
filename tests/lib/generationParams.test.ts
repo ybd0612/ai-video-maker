@@ -173,4 +173,51 @@ describe("resolveGenerationParams", () => {
     });
     expect(params.temperature).toBe(0.5);
   });
+
+  it("同键并发只问模型一次（单飞）", async () => {
+    chatMock.mockResolvedValue({ content: JSON.stringify({ temperature: 0.42 }) });
+
+    const results = await Promise.all(
+      Array.from({ length: 4 }, () =>
+        resolveGenerationParams({
+          purpose: "storyboard",
+          apiKey: "k",
+          baseUrl: "b",
+          cacheKey: "p1",
+        }),
+      ),
+    );
+
+    expect(chatMock).toHaveBeenCalledTimes(1);
+    expect(results).toEqual(Array(4).fill({ temperature: 0.42, enableThinking: false }));
+  });
+
+  it("不同缓存键并发决策互不覆盖（各拿各的值）", async () => {
+    // 历史缺陷：四类资产并发提取共用 "assetExtraction:" 一个槽，四路决策互相写入，
+    // 下一轮整体命中"最后返回的那个值" → 同一任务的 topP 逐轮无谓漂移（实测 0.8 → 0.7）。
+    let n = 0;
+    chatMock.mockImplementation(async () => {
+      n += 1;
+      return { content: JSON.stringify({ temperature: 0.1 * n, topP: 0.5 + 0.1 * n }) };
+    });
+
+    const types = ["character", "scene", "product", "prop"] as const;
+    const first = await Promise.all(
+      types.map((type) =>
+        resolveGenerationParams({ purpose: "assetExtraction", apiKey: "k", baseUrl: "b", cacheKey: type }),
+      ),
+    );
+    expect(chatMock).toHaveBeenCalledTimes(4);
+
+    // 第二轮：每类都必须命中自己那一槽，而不是全体命中最后写入者
+    const second = await Promise.all(
+      types.map((type) =>
+        resolveGenerationParams({ purpose: "assetExtraction", apiKey: "k", baseUrl: "b", cacheKey: type }),
+      ),
+    );
+
+    expect(chatMock).toHaveBeenCalledTimes(4);
+    expect(second).toEqual(first);
+    expect(new Set(first.map((p) => p.temperature)).size).toBe(4);
+  });
 });
