@@ -43,9 +43,9 @@ export function appendRegistryRules(prompt: string, rules?: RegistryRuleText): s
   if (!rules) return prompt;
   const blocks: string[] = [];
   const compose = rules.composeShot?.trim();
-  if (compose) blocks.push(`Composition rules: ${compose}`);
+  if (compose) blocks.push(`构图规则：${compose}`);
   const negative = rules.negativeStrategy?.trim();
-  if (negative) blocks.push(`Quality requirements: ${negative}`);
+  if (negative) blocks.push(`质量要求：${negative}`);
   if (blocks.length === 0) return prompt;
   const base = prompt.trim();
   return base ? `${base}, ${blocks.join(", ")}` : blocks.join(", ");
@@ -171,23 +171,23 @@ export function composeMultiReferencePrompt(i: {
   const scene = i.scene.trim();
 
   // 镜头差异必须前置，避免被共同的参考图说明淹没。
-  if (scene) parts.push(`Target shot: ${scene}`);
+  if (scene) parts.push(`目标镜头：${scene}`);
 
   // 参考图只锚定显式引用资产的身份/外观，不提供场景构图。
   for (const r of i.references) {
     const note = r.note.trim();
-    if (note) parts.push(`Image ${r.index} is the ${r.role} reference: ${note}`);
+    if (note) parts.push(`图 ${r.index} 是${r.role === "scene" ? "场景" : r.role === "character" ? "角色" : r.role === "product" ? "产品" : r.role === "prop" ? "道具" : "风格"}参考：${note}`);
   }
 
   const style = i.style?.trim();
-  if (style) parts.push(`Reusable visual style: ${style}`);
+  if (style) parts.push(`可复用视觉风格：${style}`);
   const lighting = i.lighting?.trim();
-  if (lighting) parts.push(`Shot lighting: ${lighting}`);
+  if (lighting) parts.push(`本镜头光线：${lighting}`);
   const composition = i.composition?.trim();
-  if (composition) parts.push(`Shot composition: ${composition}`);
+  if (composition) parts.push(`本镜头构图：${composition}`);
 
   parts.push(
-    "Use the target shot as the source of composition, action and environment. Use each reference only to preserve the identity and appearance of its explicitly named asset; do not copy any reference layout, camera angle, background or lighting.",
+    "以目标镜头决定构图、动作与环境；每张参考图只用于保持其点名资产的身份与外观，不得复制任何参考图的构图、机位、背景或光线。",
   );
 
   return appendRegistryRules(parts.join(", "), i.rules);

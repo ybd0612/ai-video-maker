@@ -194,7 +194,7 @@ describe("buildSystemPrompt", () => {
     const rendered = buildSystemPrompt("storyboardShot", "zh", disabled);
     expect(rendered).not.toContain("每镜头 duration 为 4、5 或 8 秒");
     // 其他条目仍在
-    expect(rendered).toContain("必须用英文");
+    expect(rendered).toContain("必须用中文");
   });
 
   it("渲染顺序：rules → examples → safety", () => {

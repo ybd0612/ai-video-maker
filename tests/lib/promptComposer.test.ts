@@ -141,17 +141,17 @@ describe("composeMultiReferencePrompt", () => {
       ],
       scene: "the fox walks in the forest",
     });
-    expect(out).toContain("Image 1 is the scene reference: 森林: misty forest");
-    expect(out).toContain("Image 2 is the character reference: 小狐狸: a small fox");
-    expect(out).toContain("Image 3 is the style reference: 整体风格: anime");
-    expect(out).toContain("Target shot: the fox walks in the forest");
+    expect(out).toContain("图 1 是场景参考：森林: misty forest");
+    expect(out).toContain("图 2 是角色参考：小狐狸: a small fox");
+    expect(out).toContain("图 3 是风格参考：整体风格: anime");
+    expect(out).toContain("目标镜头：the fox walks in the forest");
     expect(out).toContain(
-      "Use the target shot as the source of composition, action and environment.",
+      "以目标镜头决定构图、动作与环境",
     );
     // 顺序：镜头差异 → 参考图说明 → 图像关系
-    const idx1 = out.indexOf("Image 1");
-    const idxScene = out.indexOf("Target shot");
-    const idxAnchor = out.indexOf("Use the target shot");
+    const idx1 = out.indexOf("图 1 是场景参考");
+    const idxScene = out.indexOf("目标镜头");
+    const idxAnchor = out.indexOf("以目标镜头决定构图");
     expect(idxScene).toBeLessThan(idx1);
     expect(idx1).toBeLessThan(idxAnchor);
   });
@@ -179,21 +179,21 @@ describe("appendRegistryRules", () => {
     expect(appendRegistryRules("a fox", undefined)).toBe("a fox");
   });
 
-  it("composeShot 规则作为正向「Composition rules」约束追加", () => {
+  it("composeShot 规则作为正向「构图规则」约束追加", () => {
     const out = appendRegistryRules("the fox walks", {
       composeShot: "declare each reference image role, never copy composition",
     });
     expect(out).toBe(
-      "the fox walks, Composition rules: declare each reference image role, never copy composition",
+      "the fox walks, 构图规则：declare each reference image role, never copy composition",
     );
   });
 
-  it("negativeStrategy 规则作为正向「Quality requirements」约束追加（不新增 negative 字段）", () => {
+  it("negativeStrategy 规则作为正向「质量要求」约束追加（不新增 negative 字段）", () => {
     const out = appendRegistryRules("the fox walks", {
       negativeStrategy: "keep negatives to generic defects; phrase avoid-items as positive",
     });
     expect(out).toBe(
-      "the fox walks, Quality requirements: keep negatives to generic defects; phrase avoid-items as positive",
+      "the fox walks, 质量要求：keep negatives to generic defects; phrase avoid-items as positive",
     );
   });
 
@@ -202,8 +202,8 @@ describe("appendRegistryRules", () => {
       composeShot: "multi-reference role declaration",
       negativeStrategy: "quality defects only",
     });
-    const iComp = out.indexOf("Composition rules");
-    const iQual = out.indexOf("Quality requirements");
+    const iComp = out.indexOf("构图规则");
+    const iQual = out.indexOf("质量要求");
     expect(iComp).toBeGreaterThan(-1);
     expect(iQual).toBeGreaterThan(iComp);
   });
@@ -225,17 +225,17 @@ describe("composeMultiReferencePrompt 注入注册表规则", () => {
 
   it("rules 进入分镜图提示词，且位于参考图关系指令之后", () => {
     const out = composeMultiReferencePrompt({ references: refs, scene: "the fox walks", rules });
-    expect(out).toContain("Composition rules: declare each reference role, never copy composition");
-    expect(out).toContain("Quality requirements: keep negatives to generic defects only");
+    expect(out).toContain("构图规则：declare each reference role, never copy composition");
+    expect(out).toContain("质量要求：keep negatives to generic defects only");
     const iAnchor = out.indexOf("Use the target shot as the source of composition");
-    const iComp = out.indexOf("Composition rules");
+    const iComp = out.indexOf("构图规则");
     expect(iComp).toBeGreaterThan(iAnchor);
   });
 
   it("无 rules 时输出与旧行为一致（向后兼容，默认空 block 不污染）", () => {
     const withRules = composeMultiReferencePrompt({ references: refs, scene: "the fox walks" });
-    expect(withRules).not.toContain("Composition rules");
-    expect(withRules).not.toContain("Quality requirements");
+    expect(withRules).not.toContain("构图规则");
+    expect(withRules).not.toContain("质量要求");
   });
 
   it("规则文本不含风格母版载体词（抽象样张等）—— 保持风格母版隔离铁律", () => {
@@ -254,7 +254,7 @@ describe("composeTextToImagePrompt 注入注册表规则", () => {
       rules: { composeShot: "reuse appearancePrompt verbatim", negativeStrategy: "no extra limbs" },
     });
     expect(out).toBe(
-      "a small fox, anime style, 8k, Composition rules: reuse appearancePrompt verbatim, Quality requirements: no extra limbs",
+      "a small fox, anime style, 8k, 构图规则：reuse appearancePrompt verbatim, 质量要求：no extra limbs",
     );
   });
 

@@ -383,8 +383,8 @@ Return strict JSON in exactly this format, no other text:
   storyboardShot: {
     zh: `你是一位专业的视频分镜设计师。你会拿到分镜大纲与其中一个镜头的计划，你的任务是把这一个镜头写完整：
 1. scriptText：该镜头的叙事脚本（含动作与情绪，语言随用户输入）
-2. visualPrompt：完整英文画面提示词——主体外观（直接沿用所给资产的英文外观描述）、动作、环境、构图与镜头；只描述该镜头
-3. motionPrompt：完整英文运动提示词——主体动作、镜头运动、环境变化
+2. visualPrompt：完整中文画面提示词——主体外观（直接沿用所给资产的外观描述原文）、动作、环境、构图与镜头；只描述该镜头
+3. motionPrompt：完整中文运动提示词——主体动作、镜头运动、环境变化
 4. 其余描述字段（sceneDesc/detailDesc/lightingDesc/styleDesc/actionDesc/cameraDesc/envChangeDesc/motionSpeedDesc）逐项填写；主体信息只写入 visualPrompt，不再单独生成 subjectDesc
 5. dialogues 按需给对白（characterId 用角色名），activeCharacterIds/activeSceneId/activeProductIds/activePropIds 用已有资产的 ID；visualPrompt 或 scriptText 中出现的可识别道具/产品必须同步写入对应 active ID，duration 从 4/5/8 中选
 {{assets}}
@@ -403,8 +403,8 @@ Return strict JSON in exactly this format, no other text:
 只输出这一个镜头的 JSON 对象（不是数组），不要包含任何其他文字。所有返回字段都必须非空。`,
     en: `You are a professional video storyboard designer. You get the storyboard outline and the plan of ONE shot. Write that single shot completely:
 1. scriptText: the narrative script for this shot (action and emotion, follow the user's language)
-2. visualPrompt: a complete ENGLISH image prompt — subject appearance (reuse the provided asset appearance descriptions verbatim), action, environment, composition and camera; describe only this shot
-3. motionPrompt: a complete ENGLISH motion prompt — subject motion, camera movement, environmental changes
+2. visualPrompt: a complete Chinese image prompt — subject appearance (reuse the provided asset appearance descriptions verbatim), action, environment, composition and camera; describe only this shot
+3. motionPrompt: a complete Chinese motion prompt — subject motion, camera movement, environmental changes
 4. Fill every other description field (sceneDesc/detailDesc/lightingDesc/styleDesc/actionDesc/cameraDesc/envChangeDesc/motionSpeedDesc); put subject information only in visualPrompt, with no separate subjectDesc
 5. dialogues when needed (characterId = character name); activeCharacterIds/activeSceneId/activeProductIds/activePropIds use existing asset IDs; any identifiable prop or product mentioned in visualPrompt or scriptText must also be included in the matching active ID list; duration from 4/5/8
 {{assets}}
@@ -649,17 +649,17 @@ export const SYSTEM_PROMPT_SHOT_EDIT_ZH = `你正在修改一个已有的分镜�
 
 硬性要求：
 - 用户没提到的字段必须原样保留：时长、资产引用、对白、结构化子字段都不得顺手改动
-- 若修改涉及画面或运动，同步更新对应的结构化子字段与英文提示词，保证子字段与整段提示词一致
+- 若修改涉及画面或运动，同步更新对应的结构化子字段与画面/运动提示词，保证子字段与整段提示词一致
 - 资产引用继续使用给定资产的名字或 ID，不得发明不存在的资产
-- 输出单个镜头 JSON 对象（不是数组），字段齐全，英文提示词保持英文`;
+- 输出单个镜头 JSON 对象（不是数组），字段齐全，visualPrompt / motionPrompt 保持中文`;
 
 export const SYSTEM_PROMPT_SHOT_EDIT_EN = `You are revising an existing storyboard shot. The user gives you the shot's complete JSON plus a revision request. Follow the field spec that comes after this instruction, apply ONLY the changes the user asked for, keep every other field as-is, and return the complete updated shot JSON. No explanations, no Markdown code fences.
 
 Hard requirements:
 - Fields the user did not mention must stay identical: duration, asset references, dialogues and structured sub-fields are not to be touched
-- If the change affects visuals or motion, update the matching structured sub-fields AND the English prompt so both stay consistent
+- If the change affects visuals or motion, update the matching structured sub-fields AND the visualPrompt/motionPrompt so all stay consistent
 - Keep asset references using the given asset names or IDs; never invent assets
-- Return a single shot JSON object (not an array) with all fields present; English prompts stay in English`;
+- Return a single shot JSON object (not an array) with all fields present; visualPrompt and motionPrompt stay in Chinese`;
 
 export const SYSTEM_PROMPT_VISUAL_DIRECTION_EDIT_ZH = `你是一位短视频项目的视觉指导。用户会给你一个项目级视觉方向和修改要求，请只返回修改后的完整 JSON，不要解释、不要 Markdown 代码块。
 JSON 必须严格包含以下字段：name、description（一句话简介）、details（含 mediumMaterial、colorPalette、lightingMood、cameraTexture、composition、emotion 六个视觉维度）。
@@ -833,8 +833,8 @@ export const BUILTIN_RULES: PromptRule[] = [
     task: "storyboardShot",
     section: "rules",
     content: {
-      zh: "- visualPrompt 和 motionPrompt 必须用英文（直接用于 AI API）",
-      en: "- visualPrompt and motionPrompt MUST be in English (sent directly to AI APIs)",
+      zh: "- visualPrompt 和 motionPrompt 必须用中文（生图与生视频模型已实测同样理解中文，且中文可直接从资产设定复用，不需要二次翻译）",
+      en: "- visualPrompt and motionPrompt MUST be in Chinese (both the image and video models were verified to follow Chinese prompts as well as English, and Chinese lets them reuse the asset details verbatim without a second translation)",
     },
     enabled: true,
     source: "builtin",
@@ -866,8 +866,8 @@ export const BUILTIN_RULES: PromptRule[] = [
     task: "storyboardShot",
     section: "rules",
     content: {
-      zh: "- 画面与动态子字段给用户在界面上看，用中文填写；完整英文提示词仍是 API 的唯一来源",
-      en: "- Visual and motion sub-fields are shown to users in their language; the complete English prompts remain the API source of truth",
+      zh: "- 画面与动态子字段给用户在界面上看，用中文填写；完整中文提示词仍是 API 的唯一来源",
+      en: "- Visual and motion sub-fields are shown to users in their language; the complete Chinese prompts remain the API source of truth",
     },
     enabled: true,
     source: "builtin",
