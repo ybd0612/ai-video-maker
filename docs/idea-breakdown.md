@@ -146,7 +146,7 @@ this call, and every other array MUST be an empty array.
 
 四类各发一次请求、并行跑，靠最后这句「只提取 X 类」区分；代码还会做兜底过滤（`scriptService.ts:924-930`）——**即使模型越界输出了别的类数组，也只保留本次目标类**，其余置空。
 
-⚠️ 一个要注意的事实：那句 `Design assets according to the confirmed visual direction`（按已确认的视觉方向设计资产）在现行链路里**没有附带视觉方向数据**。`extractAssetsByType` 的第 3 个参数 `visualDirection` 从未被调用方传入（唯一调用点 `useScriptActions.ts:221`），而且链 A 与链 B 是并行发出的，资产提取时视觉方向还没产出。**结论：资产提取阶段看不到画风，画风是在后面生图时才注入的。**
+⚠️ 一个要注意的事实：那句 `Design assets according to the confirmed visual direction`（按已确认的视觉方向设计资产）在现行链路里**没有附带视觉方向数据**。`extractAssetsByType` 的第 3 个参数 `visualDirection` 从未被调用方传入（唯一调用点 `useScriptActions.ts:239`），而且链 A 与链 B 是并行发出的，资产提取时视觉方向还没产出。**结论：资产提取阶段看不到画风，画风是在后面生图时才注入的。**
 
 另外还有 4 条按类追加的内置规则条目（可在设置里改）：`extract.assets-animals` 角色/动物类、`extract.assets-scenes` 场景类、`extract.assets-products` 产品类、`extract.assets-props` 道具类，外加 `safety.extract-scope` 内容安全边界（`promptRules.ts:695-751`）。
 

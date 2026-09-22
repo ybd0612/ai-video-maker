@@ -34,8 +34,8 @@
 
 | 文档 | 管什么 | 读者什么时候看 | 一致性 | 权威度 |
 | --- | --- | --- | --- | --- |
-| `docs/execution-flow.md` | 6 步链路「谁触发 → 发什么请求 → 写回什么 → 门禁如何放行」，§11 文档漂移清单、§12 代码可疑点、§13 持久化迁移 | 改任何生成链路之前 | 🟢 2026-09-21 快照 | **流程、门禁与代码级待办的权威**；§12 是待裁决清单，不是缺陷定论 |
-| `docs/execution-flow-diagrams.md` | 全参数进出与请求体的 ASCII 图集 + 图 A 术语对照总表 | 想知道某个字段叫什么、喂给谁 | 🟢 2026-09-21 快照 | **字段命名与术语的权威**（与上者分工：那边管流程，这边管参数） |
+| `docs/execution-flow.md` | 6 步链路「谁触发 → 发什么请求 → 写回什么 → 门禁如何放行」，§11 文档漂移清单、§12 代码可疑点、§13 持久化迁移 | 改任何生成链路之前 | 🟢 2026-09-21 快照；2026-09-22 步骤 1 门禁修复后重排行号 + §12 第 15 条结案 | **流程、门禁与代码级待办的权威**；§12 是待裁决清单，不是缺陷定论 |
+| `docs/execution-flow-diagrams.md` | 全参数进出与请求体的 ASCII 图集 + 图 A 术语对照总表 | 想知道某个字段叫什么、喂给谁 | 🟢 2026-09-21 快照；2026-09-22 图 1 补守卫/收尾节点、图 4 行号 | **字段命名与术语的权威**（与上者分工：那边管流程，这边管参数） |
 | `docs/idea-breakdown.md` | 一句想法被拆成哪些字段 + 提示词原文 + 引用去向表 | 调提示词 / 看拆解形态 | 🟢 2026-09-21 已同步「镜头数由模型判断」的新提示词原文 | 提示词原文的**快照**；生效版 = 骨架 + 用户条目，以设置里「导出」为准 |
 | `docs/flow-map.html` | 交互式引用图（57 节点 / 129 条边，含 20 个动作节点与视频一致性策略），点方块按跳数高亮下游 | 追一个字段的全部消费者 | 🟢 2026-09-21 同步镜头数口径与 reference 模式 | 与 `execution-flow.md` 同源、**手工同步**，改链路须一并更新 |
 | `docs/all-assets-structured-plan.md` | 「代码管结构与流程、效果判断归大模型」的落地方案与两阶段取舍 | 想改提示词职责边界 / 加参数前 | 🟢 状态「已实施 2026-09-15」与代码一致 | 该原则的决策依据（下一步建议提炼为 ADR） |
@@ -96,7 +96,7 @@ CI 测试门禁           ⬜ .github/workflows/deploy.yml 仍只构建不跑测
 | 限流与配额扣减时机 | `src/services/rateLimit.ts` | `guard` `:128-136`（请求前扣，失败不回滚） | 2026-09-21 |
 | 批量并发度 | `useAssetActions.ts:489`、`useImageActions.ts:205`、`useScriptActions.ts:37`、`useVideoActions.ts:198-202` | 固定 3 / 3 / 3 / 按套餐 1·2·3 | 2026-09-21 |
 | 幂等注册表与批次框架 | `src/lib/batchRunner.ts` + 四个 `use*Actions.ts` 顶部 | `active{Script,Asset,Image,Video}Tasks` | 2026-09-21 |
-| 取消能力现状 | 全仓 `controller.abort()` 共 5 处（`StepAssembly.tsx:114`、`fetchWithRetry.ts:106,115`、`renderService.ts:109,112`） | **只有第 6 步拼接可取消**；批量生成无取消入口 | 2026-09-21 |
+| 取消能力现状 | 全仓 `controller.abort()` 调用点共 5 处（`StepAssembly.tsx:114`、`fetchWithRetry.ts:106,115`、`renderService.ts:109,112`） | **只有第 6 步拼接可取消**；批量生成无取消入口 | 2026-09-21 |
 | 提示词任务与骨架 | `src/lib/promptRules.ts` | `PromptTask` `:21-33`（12 个任务）、`SKELETONS`、`BUILTIN_RULES` | 2026-09-21 |
 | 生效提示词 = 骨架 + 用户条目 | `settingsStore.promptRules`（persist v4）覆盖内置 | 界面「导出」为准 | 2026-09-21 |
 | 采样参数决策与缓存 | `src/lib/generationParams.ts` | `resolveGenerationParams`、缓存 key `${purpose}:${cacheKey}` | 2026-09-21 |
@@ -173,3 +173,4 @@ CI 测试门禁           ⬜ .github/workflows/deploy.yml 仍只构建不跑测
 | --- | --- | --- |
 | 2026-09-21 | 新建本索引；按源码取证重写 `README.md` / `README_EN.md`（删幽灵功能「AI 对话」、撤回 MIT 声明、新增「明确不支持」清单、目录与命令按实际文件对齐、限额表改为引用 `plans.ts`）；登记 C1–C17 | Qoder（文档审计） |
 | 2026-09-21 | **口径落地 + 第 1、2 批搬迁**：镜头数量改由模型判断（`promptRules.ts` 骨架 zh/en + `storyboard.shot-count` 条目，失效断言同步更新，`idea-breakdown.md` / `flow-map.html` 原文引用同步）；对外名统一（`index.html` 标题、`i18n.pipeline.title` en）；`AGENTS.md` 18 处事实订正 + 时点审计整节迁出为 `docs/history/2026-09-13-agents-audit.md`；6 份快照 `git mv` 进 `docs/history/` 并逐份加顶部修订；全仓入站链接重写（含 `vite.config.ts`、`settingsStore.ts` 注释、`docs/roadmap` 引用）；C1–C12、C14–C16 结案，新增 C18 | Qoder（文档治理） |
+| 2026-09-22 | **步骤 1 想法提取重复触发修复**：新增 `activeIdeaTasks` 单飞守卫（模块级注册表四张 → 五张）；`project.status = "scripting"` 改为覆盖两条链全程（链 A 不再提前置 `idle`）并成为步骤 1 唯一跨组件门禁 —— StepIdea 输入框/按钮/Enter 与底部「下一步」在提取期间一律禁用；`CreationWizard` 挂载时按注册表实况复位残留 `scripting`。同步 `AGENTS.md`（铁律 + 结构注释 + 注册表数量 + 测试数 34 文件/435 用例）、两份 README 贡献须知、`docs/execution-flow.md`（§1/§2/§3/§9.3 事实与行号重排，§12 第 11 条行号、**第 15 条结案**）、`docs/execution-flow-diagrams.md`（图 1 守卫与收尾节点、图 4 行号）、`docs/idea-breakdown.md` 行号。`docs/flow-map.html` 只编码数据/字段引用、不含门禁，无需同步 | Qoder（Bug 修复） |

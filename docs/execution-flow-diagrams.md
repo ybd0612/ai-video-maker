@@ -179,25 +179,31 @@ in:      吃进的参数        out:   吐出的结果            req:   真正�
 > 导读：本图是**执行时序版**（守卫、重试、槽位、写回顺序）。想知道"一句想法被拆成什么、每样东西有哪些字段、提示词原文长什么样、之后在哪里被引用"，看 `docs/idea-breakdown.md`。
 
 ```
-[UI] StepIdea.tsx:83 handleGenerate()
+[UI] StepIdea.tsx:87 handleGenerate()
   in : prompt(想法原文, str)（textarea 本地态，500ms 防抖写回 ideaPrompt）
        selectedAspectRatio(所选画幅): "16:9" 横 | "9:16" 竖 | "1:1" 方
+  门禁: 输入框/按钮/Enter 都看 generating = 本地 isGenerating || project.status=="scripting" (:45)
+       底部「下一步」同样被 status=="scripting" 挡住（CreationWizard.tsx:47）
   act: 无项目 -> createProject(title 项目名 = prompt 前 30 字)
                      updateProject({ideaPrompt, aspectRatio})
   |
   v
-[编排] useScriptActions.extractCharactersFromIdea(prompt)          :128
+[编排] useScriptActions.extractCharactersFromIdea(prompt)          :142
   in : prompt(想法原文, str)
   !! : apiKey(密钥)/baseUrl(接口地址) 缺失 -> throw "API key is not configured."
   out: Promise<boolean>   false = 用户在替换确认弹窗点了取消 -> 界面留在步骤 1
-       （切页不由 onGenerated 负责，CreationWizard.tsx:73 传的是无 props 的 <StepIdea/>）
+       （切页不由 onGenerated 负责，CreationWizard.tsx:89 传的是无 props 的 <StepIdea/>）
   |
-  |-- [store] :159  assets = 只留 source(来源)=="manual"(手动)
+  |-- 守卫 :172  activeIdeaTasks(想法提取注册表) 命中该 projectId -> return true（不抛错）
+  |              紧接同步 set 登记 AbortController；守卫与登记之间不得有 await
+  |              （2026-09-22 前无任何守卫：提取中切页再返回重点提取 -> 并发两轮、资产重复）
+  |
+  |-- [store] :178  assets = 只留 source(来源)=="manual"(手动)
   |                 styleReferenceUrl / styleReferenceError = undefined
   |                 assetsReviewed(资产已审核)=false   status="scripting 出脚本中"
   |
   |-- baseOpts = {apiKey 密钥, baseUrl 接口地址, prompt 想法原文,
-  |               language 界面语言, aspectRatio 画幅, assets 资产表}       :171
+  |               language 界面语言, aspectRatio 画幅, assets 资产表}       :190
   |
   +== 链A 视觉方向 =========================================================+
   !  [srv] scriptService.extractVisualDirectionFromIdea(baseOpts)   :759
@@ -208,15 +214,16 @@ in:      吃进的参数        out:   吐出的结果            req:   真正�
   !             chat_template_kwargs:{enable_thinking 思考开关}}
   !        out: RawVisualDirection(模型原始视觉方向)
   !             {name 名称, description 简介, details 六维设定}
-  !  [lib] refineWithAudit(produce 产出, audit 审计, maxRounds 轮数=1)  :183
+  !  [lib] refineWithAudit(produce 产出, audit 审计, maxRounds 轮数=1)  :202
   !        in : current 当前版:RawVisualDirection
   !            forbiddenSubjects(禁止清单) = collectSubjectVocabulary(project)
   !                                          <- 本项目自身的资产名列表
   !        [srv] auditVisualDirection(...)              槽位: purpose=visualDirectionAudit
   !             out: AuditOutcome{clean 是否干净:bool, value 采用版:RawVisualDirection}
   !             审计自身抛错 -> 保留原文并结束（不阻塞主链）
-  !  [store] :203  visualDirection{revision 版本号 +1, status:"draft 草稿"}
-  !                 status="idle 空闲"   wizardStep=2   <== 切页就发生在这里
+  !  [store] :222  visualDirection{revision 版本号 +1, status:"draft 草稿"}
+  !                wizardStep=2   <== 切页就发生在这里
+  !                注意：**不再复位 project.status**（提取全程保持 "scripting"，见下方收尾）
   +==========================================================================+
   +== 链B 资产（4 路并发 Promise.all）=======================================+
   !  for type(类型) in [character 角色, scene 场景, product 主体, prop 道具]:
@@ -234,14 +241,17 @@ in:      吃进的参数        out:   吐出的结果            req:   真正�
   !          角色额外生成 appearancePrompt(英文外貌提示词)/assetNamespace(命名空间)
   !                  /fullPrompt(完整提示词)
   !          out: {assets:Asset[], idByName 名称->ID 映射}
-  !    [store] :234  assets = [...旧, ...新增]   <== 每类完成立刻写回（卡片逐类出现）
-  !  单类失败只记录进 failures；added==0 且全部失败才 throw            :243
+  !    [store] :252  assets = [...旧, ...新增]   <== 每类完成立刻写回（卡片逐类出现）
+  !          写回基准 = 函数入口捕获的 project.assets 快照（两轮并发会各自基于旧快照追加 -> 重复入库）
+  !  单类失败只记录进 failures；added==0 且全部失败才 throw            :261
   +==========================================================================+
   |
   v
-Promise.allSettled([链A, 链B])                                      :251
+Promise.allSettled([链A, 链B])                                      :269
   任一 rejected -> [store] status="failed 失败" + error -> throw 给 [UI] 上屏
-  全部 fulfilled -> 后台异步（不等、不阻塞界面）：
+  全部 fulfilled -> [store] :285 status="idle 空闲"   <== 步骤 1 门禁到此才放开
+        finally :302  activeIdeaTasks.delete(pid)  (注销单飞守卫)
+        后台异步（不等、不阻塞界面）：
         await generateStyleReference(pid 项目ID)          -> 见 图2
         await generateAssetImages(undefined, pid)         -> 见 图3
 ```
@@ -325,10 +335,10 @@ Promise.allSettled([链A, 链B])                                      :251
 ## 图 4　步骤 3：分镜（大纲 → 占位 → 逐镜头）
 
 ```
-[编排] generateStoryboard(prompt 想法原文, {onProgress 进度回调})      :289
+[编排] generateStoryboard(prompt 想法原文, {onProgress 进度回调})      :312
   in : prompt = project.ideaPrompt.trim()
   守卫: hasActiveTask(activeScriptTasks, pid) -> **静默 return（不抛错、也不等）**
-  [store] resetStuckShots(pid) 把残留 status="scripting" 复位为 idle      :307
+  [store] resetStuckShots(pid) 把残留 status="scripting" 复位为 idle      :330
   |
   1) [srv] generateStoryboardOutline(大纲请求)
       in : {apiKey, baseUrl, prompt 想法原文, language 界面语言,
@@ -343,7 +353,7 @@ Promise.allSettled([链A, 链B])                                      :251
   3) [store] setShotsByProjectId(pid, N x Shot{status:"scripting",
                      scriptText:"", visualPrompt:"", motionPrompt:"",
                      duration 时长:5, dialogues:[], active*Ids:[]})   <== 卡片全部亮起
-  4) runWithConcurrency(N 个任务, SHOT_CONCURRENCY 并发=3)             :394
+  4) runWithConcurrency(N 个任务, SHOT_CONCURRENCY 并发=3)             :417
        |
        +-- [srv] generateStoryboardShot(单镜头)
        |      in : {apiKey, baseUrl, prompt 想法原文, language, aspectRatio, assets,
@@ -354,7 +364,7 @@ Promise.allSettled([链A, 链B])                                      :251
        |           -> normalizeRawShot 规范化：duration 只接受 {4,5,8} 否则回落 5
        |      内部重试 attempt<=2（最多 3 次尝试，无退避等待）
        |      !! visualPrompt 或 motionPrompt 为空 = 该次尝试判失败并重试
-       +-- [lib] buildShotUpdate(raw, latestAssets 最新资产表)          :58
+       +-- [lib] buildShotUpdate(raw, latestAssets 最新资产表)          :72
                  in : RawShot + Asset[]
                  引用解析: resolveAssetId/resolveAssetIds —— 先按 ID，再按名称匹配
                  out: Partial<Shot>{
@@ -373,7 +383,7 @@ Promise.allSettled([链A, 链B])                                      :251
        +-- finally: completed 完成数++ -> onProgress(completed, total)
                      <== StepAssets 收到首个回调就 setWizardStep(3) 切页
   5) [store] setProjectStatusById(pid, "idle 空闲")
-     大纲阶段异常 -> resetStuckShots + status="failed" + throw              :397
+     大纲阶段异常 -> resetStuckShots + status="failed" + throw              :420
 ```
 
 单镜头改写走同一套出参：`reviseShot` -> `reviseShotWithInstruction({shot 当前镜头, instruction 用户一句话要求, assets, language, aspectRatio})`（purpose=shotEdit，<=3 次）-> 同一个 `buildShotUpdate` 写回。`rerollShot` 复用阶段 2 的单请求并额外带 `variationOf{scriptText, visualPrompt}`（要求出不同版本）。

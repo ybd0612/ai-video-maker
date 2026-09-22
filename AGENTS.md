@@ -23,7 +23,7 @@ src/
 │   │   ├── CreationWizard.tsx      # 步骤路由 + 「下一步」唯一门禁表 canAdvance
 │   │   ├── StepIdea / StepAssets / StepStoryboard / StepImages / StepVideos / StepAssembly
 │   │   ├── StepIndicator / AutomationModeSwitch / ReviewCheckpoint
-│   │   ├── useScriptActions.ts     # 分镜域：想法提取、大纲+逐镜头、改写、重roll（activeScriptTasks）
+│   │   ├── useScriptActions.ts     # 分镜域：想法提取、大纲+逐镜头、改写、重roll（activeScriptTasks + activeIdeaTasks）
 │   │   ├── useAssetActions.ts      # 资产域：风格母版链、资产图批量（activeAssetTasks）
 │   │   ├── useImageActions.ts      # 镜头图片域（activeImageTasks）
 │   │   ├── useVideoActions.ts      # 镜头视频域（activeVideoTasks）
@@ -199,7 +199,7 @@ scripts/run-vitest.mjs              # Windows 盘符规范化后启动 Vitest
 - **P1 非幂等重试**：图片创建与视频创建在没有幂等键 / 任务恢复协议前，不得继续扩大创建请求的自动重试。
 - **P1 多项目写回**：跨 `await` 一律按 `targetProjectId` 写回，禁止 active-project action 参与异步链路。
 - **P1 取消链路**：新增生成入口必须贯通 `AbortSignal`；补齐前不得宣称「所有 AI 请求可取消」（现状见上方铁律注）。
-- **P1 质量门禁**：`npm run test` 现为 30 文件 / 393 用例通过（2026-09-21 实测）；**CI 仍不跑测试**，把它加成部署前门禁是待办。
+- **P1 质量门禁**：`npm run test` 现为 34 文件 / 435 用例通过（2026-09-22 实测）；**CI 仍不跑测试**，把它加成部署前门禁是待办。
 - **P1 数据契约**：镜头时长与数量口径已收敛（时长 `{4,5,8}` 白名单 + 数量交模型判断）；`scriptService` 之外仍缺统一的`unknown → 解析 → 运行时校验 → 重试/报错` 链路（按类资产提取已具备）。
 
 ## Pipeline 架构（现行链路的权威描述在 docs/execution-flow.md）
@@ -215,20 +215,21 @@ scripts/run-vitest.mjs              # Windows 盘符规范化后启动 Vitest
 - 视频参数体系：`mode` 三选一 —— `keyframe`（`first_frame` / `last_frame`）、`reference`（`images` ≤5，可含 `audios` ≤3，不支持 `videos`）、`text`；⚠ **`reference` 与首尾帧服务端互斥**，同时传返回 400「首尾帧素材与参考素材不能同时使用」。`size` 固定 `"720P"`，画幅 `aspect_ratio`，时长 `seconds`（4–12 秒字符串）；轮询必须带 `model_name`。
 - 视频一致性策略：设置项 `videoConsistency`（`off` / `chain` / `identity`，默认 `chain`），素材统一由 `src/lib/videoPlan.ts:planShotVideoMedia` 决定（批量与单项重摇共用）；同场景尾帧由 `src/lib/shotContinuity.ts` 派生，**只在发请求时计算、绝不写回 store**（`useDualFrame` / `lastFrameUrl` 属 MOTION 字段，写回会清空已生成视频）。
 - 成片地址解析链以**实测**为准：`url`（顶层）→ `metadata.url` → `video_url` → `output.url` → `output.video_url` → `remixed_from_video_id`。
-- 批量用 `createBatchRunner` + 四张模块级注册表；`Promise.allSettled` 收集全部结果，需要失败即停时才用 `all`。
+- 批量用 `createBatchRunner` + 四张批量注册表；另有第五张 `activeIdeaTasks`（步骤 1 想法提取的单飞守卫，不走 `createBatchRunner`，但同一套 `hasActiveTask` + `finally` 注销）；`Promise.allSettled` 收集全部结果，需要失败即停时才用 `all`。
 - 单镜头重roll 必须回填对白与资产引用（名称→store ID 映射，匹配不到的对白置 `null` 归旁白）。
 
 ## 向导可靠性铁律（踩坑沉淀，改动时必须遵守）
 
 - 批量生成（视频/图片/资产）必须用**模块级注册表**（`activeVideoTasks` / `activeImageTasks` / `activeAssetTasks`）做幂等守卫：同项目任务在跑时不重复启动，避免服务端任务重复创建（token 双倍消耗）。
 - 每个批量任务用**独立 AbortController**，禁止共享 abortRef 互杀。
+- **步骤 1 想法提取必须单飞 + 状态门禁**（2026-09-22 事故沉淀）：`extractCharactersFromIdea` 入口用 `activeIdeaTasks` 做项目级守卫（命中即 `return true`，`finally` 注销；守卫与登记之间禁止 await）。「提取中」的唯一跨组件信号是 `project.status === "scripting"`，**StepIdea 的本地 `isGenerating` 会随切页卸载丢失，禁止只靠它做门禁**：`canAdvance` 步骤 1 与 StepIdea 的输入框/按钮/Enter 都要吃这个状态。历史成因：提取中点「下一步」→ 返回上一步 → 再点「提取」，两轮提取并发、各按自己入口的 `assets` 快照追加写回 → 同类资产重复入库且资产图翻倍（实测 13 资产 / 12 次生图）。
 - 向导步骤的自动触发 effect 只依赖 `[shots.length]`，**禁止依赖 `*GenerationStarted` 标志**（批量生成内部会把它置 true，导致 effect 重入误杀进行中任务）。
-- 刷新恢复：注册表为空时，残留 `videoing`→`imaged`、`imaging`→`scripted`；挂载时重置卡 true 的 `*GenerationStarted`，避免永久转圈。
+- 刷新恢复：注册表为空时，残留 `videoing`→`imaged`、`imaging`→`scripted`；挂载时重置卡 true 的 `*GenerationStarted`，避免永久转圈；残留的项目级 `scripting` 由 `CreationWizard` 挂载时按 `hasActiveIdeaTask` / `hasActiveScriptTask` 一次性复位（放容器是因为中断时用户可能停在任意步骤）。
 - 异步结果一律按项目 ID 写回（`updateXxxByProjectId`），禁止用 active-project 版本，防串写。
 - “重试失败 / 全部重新生成”按钮必须走批量生成函数（幂等 + 并发受控），禁止 forEach 并发 reroll。
 - 视频完成响应解析链：`url`（顶层）→ `metadata.url` → `video_url` → `output.url` → `output.video_url` → `remixed_from_video_id`。
 - **风格母版必须先于资产图生成，但不作为 i2i 参考图**（2026-09-12 建立，2026-09-15 修订）：`generateAssetImages` 分两阶段——阶段 1 串行生成风格图（`generateStyleReference`，幂等 + `activeAssetTasks` 互斥；风格提示词由 AI 从中文风格描述 + 视觉方向六维**零角色派生**，再经 `stylePromptAudit` 越界自检），阶段 2 的角色 / 场景 / 主体 / 道具任务**只以英文 `stylePrompt` 文本注入**生图 prompt，不传风格图作参考（参考图内容会被整体复制，2026-09-15 实锤）；风格图失败不阻塞资产生成。生图请求走 `extra_body.image[]` 多参考，`size` 恒 `1K` + `ratio`（`imageService.aspectRatioToImageParams`；2K/3K/4K 仅在 `plans.ts` 预留，全仓无调用点产生）。定妆照用 `promptComposer.composePortraitPrompt`（物种锁定句 + 全身设定，已移除 `photorealistic` 与 `Portrait of / head and shoulders / looking at camera` 人像语汇）。
-- 步骤 1 两条链**并行**（`Promise.allSettled`）：链 A 视觉方向（提取 + `visualDirectionAudit` 自检，完成即写 `wizardStep: 2`），链 B 按类资产提取（character/scene/product/prop 各一次请求）；两链都成功后 fire-and-forget 依次跑 `generateStyleReference(targetProjectId)` → `generateAssetImages(undefined, targetProjectId)`（顺序不可颠倒）。风格资产（`Asset.type="style"`）由 `generateStyleReference` 内部**懒建**（`ensureStyleAsset` 函数已不存在，2026-09-21 已清掉残留注释）。分镜图经 `pickShotReferences` 取多参考：**只有 角色定妆照 → 主体 → 道具**，场景图与风格母版都不进参考（代码上限 4 张，旧口径「≤2 张 / 风格图恒占末位 / 总数 ≤3」全部作废）。StepAssets 手动「重新生成风格图」传 `force=true` 覆盖已有图。
+- 步骤 1 两条链**并行**（`Promise.allSettled`）：链 A 视觉方向（提取 + `visualDirectionAudit` 自检，完成即写 `wizardStep: 2`，**但不复位 `project.status`**），链 B 按类资产提取（character/scene/product/prop 各一次请求）；**两链都完成才 `status = "idle"`**（此状态即步骤 1 的门禁），随后 fire-and-forget 依次跑 `generateStyleReference(targetProjectId)` → `generateAssetImages(undefined, targetProjectId)`（顺序不可颠倒）。风格资产（`Asset.type="style"`）由 `generateStyleReference` 内部**懒建**（`ensureStyleAsset` 函数已不存在，2026-09-21 已清掉残留注释）。分镜图经 `pickShotReferences` 取多参考：**只有 角色定妆照 → 主体 → 道具**，场景图与风格母版都不进参考（代码上限 4 张，旧口径「≤2 张 / 风格图恒占末位 / 总数 ≤3」全部作废）。StepAssets 手动「重新生成风格图」传 `force=true` 覆盖已有图。
 - **资产防重复（2026-09-12）**：`Asset.source` 标记来源（`extracted`=AI 提取 / `manual`=手动添加，缺省视为 extracted 兼容旧数据；`addAsset` 默认 manual）。重新提取是**替换式**：旧的 extracted 资产整体被新结果取代、manual 保留且与新结果重名时以手动版为准；有 extracted 资产时先弹 `confirmDialog`（列出将替换的名字）确认，取消则返回 `false` 不推进向导。模型对同一故事命名不稳定（「小兔子」/「小白兔」），**禁止改回纯追加式**。
 - 分镜阶段（`generateStoryboardOutline` + 逐镜头 `generateStoryboardShot`）已产出完整英文双提示词，**禁止二次翻译覆盖**（translateToMotion 已移除）。
 - 分镜生成后必须**回填角色 ID 引用**：模型返回的 `activeCharacterIds` / `dialogues.characterId` 可能是自编 ID，需按「角色名 → store 角色 ID」映射统一回填（新资产由 `extractNewAssets` 建映射），匹配不到的对白置 `null`（归旁白），否则角色一致性（图片注入/定妆照参考）与对白归属会失效。

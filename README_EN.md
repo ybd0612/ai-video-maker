@@ -174,7 +174,7 @@ When reporting a generation bug, include: wizard step, project status, failing s
 
 There is no `CONTRIBUTING.md` yet. Before changing code, read [AGENTS.md](./AGENTS.md) (layering and single-source-of-truth rules, wizard reliability rules, test conventions). The three most commonly broken:
 
-- Batch generation must use the module-level registry as an idempotency guard, with one `AbortController` per task.
+- Batch generation must use the module-level registry as an idempotency guard, with one `AbortController` per task. Idea extraction in step 1 is a single-flight task too (`activeIdeaTasks`): while `project.status === "scripting"`, both the extract button and the bottom “Next” are disabled.
 - Async results are written back by `projectId`; never use active-project actions across an `await`.
 - User-facing text goes into `src/i18n/index.ts` (zh and en together), long prompts into `src/lib/promptRules.ts` entries, and mutable parameters into `lib/models.ts` / `lib/plans.ts`.
 

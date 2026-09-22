@@ -4,8 +4,10 @@
 // 想法 → 资产(参考图) → 分镜 → 图片 → 视频 → 后期拼接
 // ────────────────────────────────────────────────────────────────────────────
 
+import { useEffect } from "react";
 import { useProjectStore, selectActiveProject, type WizardStep } from "@/stores/projectStore";
 import { useT } from "@/i18n";
+import { hasActiveIdeaTask, hasActiveScriptTask } from "./useWizardActions";
 import { StepIndicator } from "./StepIndicator";
 import { StepIdea } from "./StepIdea";
 import { StepStoryboard } from "./StepStoryboard";
@@ -26,9 +28,23 @@ export function CreationWizard() {
   const currentStep = project?.wizardStep ?? 1;
   const shots = project?.shots ?? [];
 
+  // 刷新恢复：模块级注册表随页面销毁清空，上一轮遗留的 scripting 永远等不到写回复位，
+  // 会同时卡死步骤 1 的「AI 提取 / 下一步」门禁和侧栏转圈。放在容器做（而非某个步骤组件），
+  // 因为中断时用户可能停在任意步骤；只在挂载时跑一次 —— 此刻注册表为空即代表"没有真实任务"。
+  useEffect(() => {
+    const stuck = useProjectStore.getState().projects.filter(
+      (p) => p.status === "scripting" && !hasActiveIdeaTask(p.id) && !hasActiveScriptTask(p.id),
+    );
+    for (const p of stuck) {
+      useProjectStore.getState().setProjectStatusById(p.id, "idle");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const canAdvance = (() => {
     switch (currentStep) {
-      case 1: return !!project?.ideaPrompt?.trim();
+      // 提取期间（scripting）禁止前进：否则可在两链未收尾时切页、返回后重复触发提取
+      case 1: return !!project?.ideaPrompt?.trim() && project?.status !== "scripting";
       // 半自动流程必须通过 StepAssets 自己的审核卡点进入分镜；
       // 这里也保留门禁，防止外部导航或恢复旧状态绕过审核。
       case 2: return project?.automationMode === "auto" || project?.assetsReviewed === true;

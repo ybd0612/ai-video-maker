@@ -50,6 +50,20 @@ export function hasActiveScriptTask(projectId: string): boolean {
 }
 
 /**
+ * 想法提取任务注册表（模块级共享，跨组件实例幂等守卫）。
+ * StepIdea 的加载态是组件本地 state，切到步骤 2 即卸载；返回步骤 1 重新挂载后
+ * 「AI 提取」按钮又可点，同一项目会并发跑两轮提取：两轮各自清空旧资产，并按**各自启动时
+ * 的 assets 快照**追加写回，模型对同一故事命名不稳定 → 同类资产重复入库，
+ * 并连带把资产图请求也翻倍（实测一次误操作产生 13 个资产 / 12 次生图）。
+ */
+const activeIdeaTasks = new Map<string, AbortController>();
+
+/** 查询某项目是否仍有存活的想法提取任务（供步骤 1 门禁与刷新恢复判断） */
+export function hasActiveIdeaTask(projectId: string): boolean {
+  return hasActiveTask(activeIdeaTasks, projectId);
+}
+
+/**
  * 模型返回的镜头 → store 写回载荷。
  * 引用解析（名称/ID → 真实资产 ID）与对白实体 ID 生成集中在此，唯一权威实现：
  * 首次生成 / 单镜头重摇 / 指令改写三处共用。引用未命中只降级为空，绝不抛错
@@ -153,6 +167,11 @@ export function useScriptActions(
       if (!ok) return false;
     }
 
+    // 幂等守卫：同一项目已有提取在飞时不再启动第二轮（守卫与注册之间不得有 await）。
+    // 在飞期间重复触发的语义是"结果稍后会写回"，故返回 true 而非 false（false 专指用户取消）。
+    if (hasActiveTask(activeIdeaTasks, targetProjectId)) return true;
+    activeIdeaTasks.set(targetProjectId, new AbortController());
+
     // 发起即清空旧 auto 资产与其派生（仅保留手动添加的）：
     // 并行模式下视觉方向先完成就会切到步骤 2，不清空的话页面会显示上一次的
     // 旧资产卡片，被误当成新结果。提取失败时旧资产不恢复，重试即可。
@@ -203,7 +222,6 @@ export function useScriptActions(
         useProjectStore.getState().updateProjectById(targetProjectId, (p) => ({
           ...p,
           visualDirection,
-          status: "idle",
           wizardStep: 2,
         }));
         return visualDirection;
@@ -263,6 +281,9 @@ export function useScriptActions(
         throw failure;
       }
 
+      // 两链都完成才复位：scripting 覆盖整个提取期，同时是步骤 1 「AI 提取」与「下一步」的门禁信号
+      useProjectStore.getState().setProjectStatusById(targetProjectId, "idle");
+
       // 后台生成链路仍按原顺序执行：先风格参考图，再生成角色/场景/产品图。
       void (async () => {
         await generateStyleReference(targetProjectId);
@@ -278,6 +299,8 @@ export function useScriptActions(
         error: err instanceof Error ? err.message : String(err),
       }));
       throw err;
+    } finally {
+      activeIdeaTasks.delete(targetProjectId);
     }
   }, [generateAssetImages, generateStyleReference, t]);
 

@@ -174,7 +174,7 @@ scripts/run-vitest.mjs           # Windows 下规范化盘符后启动 Vitest
 
 本项目尚无 `CONTRIBUTING.md`。改代码前请先读 [AGENTS.md](./AGENTS.md)（分层与单一事实源铁律、向导可靠性铁律、测试约定），其中最容易被踩的三条：
 
-- 批量生成必须走模块级注册表做幂等守卫，每个任务独立 `AbortController`。
+- 批量生成必须走模块级注册表做幂等守卫，每个任务独立 `AbortController`。步骤 1 的想法提取同样是单飞任务（`activeIdeaTasks`），提取期间「AI 提取」与底部「下一步」都以 `project.status === "scripting"` 禁用。
 - 异步结果一律按 `projectId` 写回，禁止使用只作用于活动项目的 action。
 - 用户可见文案进 `src/i18n/index.ts`（zh + en 同步），长提示词进 `src/lib/promptRules.ts` 条目，会变化的参数进 `lib/models.ts` / `lib/plans.ts`。
 

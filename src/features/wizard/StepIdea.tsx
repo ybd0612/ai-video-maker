@@ -40,6 +40,10 @@ export function StepIdea({ onGenerated }: StepIdeaProps) {
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // 提取进行中的权威信号在 store（scripting 覆盖视觉方向链 + 资产链全程）：
+  // 本地 isGenerating 会随切页卸载丢失，返回本页时若只看本地态，按钮又可点击 → 并发跑第二轮提取。
+  const generating = isGenerating || project?.status === "scripting";
+
   // Initialize from project store, fallback to empty
   const [prompt, setPrompt] = useState(project?.ideaPrompt ?? "");
   const [selectedAspectRatio, setSelectedAspectRatio] = useState<AspectRatio>(
@@ -115,7 +119,7 @@ export function StepIdea({ onGenerated }: StepIdeaProps) {
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter" && !e.shiftKey && !isGenerating && prompt.trim()) {
+    if (e.key === "Enter" && !e.shiftKey && !generating && prompt.trim()) {
       e.preventDefault();
       handleGenerate();
     }
@@ -142,12 +146,12 @@ export function StepIdea({ onGenerated }: StepIdeaProps) {
           onKeyDown={handleKeyDown}
           placeholder={t("wizard.ideaPlaceholder")}
           rows={7}
-          disabled={isGenerating}
+          disabled={generating}
           appearanceClass="rounded-xl border border-line bg-raised text-sm text-ink placeholder:text-ink-5"
         />
 
         {/* Generating overlay */}
-        {isGenerating && (
+        {generating && (
           <div className="absolute inset-0 flex items-center justify-center rounded-xl bg-surface/80 backdrop-blur-sm">
             <div className="flex flex-col items-center gap-2">
               <Loader2 size={24} className="animate-spin text-success" />
@@ -185,10 +189,10 @@ export function StepIdea({ onGenerated }: StepIdeaProps) {
       {/* Generate button */}
       <button
         onClick={handleGenerate}
-        disabled={!prompt.trim() || isGenerating}
+        disabled={!prompt.trim() || generating}
         className="mx-auto flex items-center gap-2 rounded-xl bg-success-solid px-8 py-3 text-sm font-semibold text-white transition hover:bg-success-solid disabled:opacity-50 disabled:cursor-not-allowed"
       >
-        {isGenerating ? (
+        {generating ? (
           <Loader2 size={16} className="animate-spin" />
         ) : (
           <Sparkles size={16} />

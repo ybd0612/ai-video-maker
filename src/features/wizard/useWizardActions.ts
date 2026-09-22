@@ -31,5 +31,5 @@ export function useWizardActions() {
 }
 
 export { hasActiveAssetTask } from "./useAssetActions";
-export { hasActiveScriptTask } from "./useScriptActions";
+export { hasActiveScriptTask, hasActiveIdeaTask } from "./useScriptActions";
 export { extractNewAssets } from "@/lib/extractAssets";
