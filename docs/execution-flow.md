@@ -164,7 +164,7 @@
 5. 写回 `imageUrl` + `status:"imaged"`，带 revision 校验；失败置 `failed` + error
 6. `onFinally`：全部有图 → `project.status="idle"`；否则 `failed` + **硬编码中文**「图片生成失败 N 个镜头，请重试失败项。」（:184-186）
 
-自动触发：`StepImages.tsx:37-45` 挂载/`shots.length` 变化时，只要有镜头缺图就 `generateImagesForStep()`（依赖刻意不含 `imageGenerationStarted`，符合铁律）。auto 模式在全图 false→true 时 `setWizardStep(5)`（:50-59）。半自动由 `ReviewCheckpoint` 确认 → `imagesReviewed=true` + 切 5（:157-169），且**存在失败镜头时确认按钮禁用**（`ReviewCheckpoint.tsx:85`）。
+自动触发与计数口径：唯一的待生成定义在 `src/lib/shotQueue.ts:pendingImageShots`（无 `imageUrl` && `status !== "imaging"` && `visualPrompt` 非空，**含 `failed`**）—— 批量 `buildTasks`、挂载 effect（只依赖 `[shots.length]`，刻意不含 `imageGenerationStarted`）、界面计数三处共用同一函数。顶部按钮不再只在有失败时出现：只要 `pendingCount > 0` 就常驻「补做缺失 (N)」（含失败时文案为「重试失败」），非生成中时另有横幅提示这些镜头可能因失效规则被清空、可只补这些。auto 模式在全图 false→true 时 `setWizardStep(5)`；半自动由 `ReviewCheckpoint` 确认 → `imagesReviewed=true` + 切 5，且**存在失败镜头时确认按钮禁用**（`ReviewCheckpoint.tsx:85`）。
 
 单项 reroll `rerollImage`（:208-259）不登记注册表。
 
@@ -175,7 +175,7 @@
 `useVideoActions.ts`，`runVideoBatch`（:29-182）。并发按套餐：`tokenplan → 3`，`rpm.video <= 1 → 1`，否则 `2`（:198-202）。
 
 1. `recoverStuck`：残留 `videoing` → 回 `imaged`，`videoProgress=0`（:31-41）
-2. 筛选：`!videoUrl && imageUrl && status !== "videoing" && (motionPrompt || actionDesc)`（:46-52）
+2. 筛选：`src/lib/shotQueue.ts:pendingVideoShots` = `!videoUrl && imageUrl && status !== "videoing" && (motionPrompt || actionDesc)`；排队数、待消耗秒数与顶部「补做缺失 (N)」按钮全部基于同一函数（含 `failed`）
 3. 提示词：`composeMotionPrompt(shot)`（恒直接返回 `shot.motionPrompt`，子字段不二次拼装，`lib/promptUtils.ts:21`）+ `appendRegistryRules(negativeStrategy)`
 4. 单镜头内部自带重试环：`MAX_TASK_RETRIES = 2`、退避 `8s * (attempt+1)`（:63-64,140-152），退避等待监听 abort 事件；但**当前没有任何入口会触发这个 abort**（见 9.3）
 5. `generateVideo`（`videoService.ts`）—— 素材由 `src/lib/videoPlan.ts:planShotVideoMedia` 按设置项 `videoConsistency` 决策，批量与单项重摇共用同一函数（`useVideoActions.ts` 不再自己拼素材）：
@@ -323,7 +323,7 @@ RPM 与配额表（`lib/plans.ts:73-134`，格式 文本 / 图片1K,2K,3K,4K / �
 
 按影响排序：
 
-1. **镜头图片被失效后，步骤 4 没有对应的补生成入口**（最影响实际使用）。触发路径有两条：改子字段（9.4 VISUAL 规则）或回步骤 2 重生成/补全资产图（9.6 级联）。失效后该镜头 `status = scripted`、`imageUrl = undefined`：自动触发 effect 只依赖 `[shots.length]`（`StepImages.tsx:37-45`）不会重跑；「重试失败」按钮只在 `failedCount > 0` 时出现（:74-83）而它不是 failed；`allSettled` 要求 `imageUrl || failed`（:31）→ 审核卡点也不出现。用户唯一能点的是「全部重新生成」，代价是把已有图片全部重做（先弹确认）。同理适用于步骤 5 的视频。
+1. ~~**镜头图片被失效后，步骤 4 没有对应的补生成入口**~~ **已修复（2026-09-21）**。现在：待补做集合的唯一口径是 `src/lib/shotQueue.ts`（`pendingImageShots` / `pendingVideoShots`，**含 `failed`**），批量生成、挂载自动触发、界面计数与顶部按钮四处共用；按钮只要有待补做就常驻显示「补做缺失 (N)」（走同一个幂等批量函数），非生成中时另有横幅解释成因；只想补单个镜头仍可展开该镜头卡片用「重新生成」。因此改子字段或重生成资产图导致产物被清空后，不再只能整套重做。
 2. **步骤 4/5 的子字段仍可手改**（`PromptSubFields.tsx:41-43` 用 active-project 的 `updateShot`，`onCommit` 再调 `rewritePromptFromFields` 重写整段英文）。与「分镜内容全只读、唯一入口是详情页一句话」相冲：同一段提示词有两个编辑源，且它正是第 1 条的主要触发器。
 3. **单项重生成不登记注册表**：`rerollImage`（`useImageActions.ts:208`）、`rerollVideo`（`useVideoActions.ts:205`）、场景/产品/道具单项生图（`StepAssets.tsx:228`）、定妆照生图（`useCharacterEditorActions.ts:134`）都绕过 `activeImageTasks` / `activeVideoTasks` / `activeAssetTasks`（`generateStyleReference` 是例外，它登记了）。批量任务看不见单项任务，两者可同时对同一镜头/资产发起 → 服务端任务重复创建、配额双倍消耗。步骤 2 用 `anyGenerating` 禁按钮做了规避（`StepAssets.tsx:65-66`），步骤 4/5 没有等价守卫。
 4. **定妆照写回跨异步边界用 active-project action**：`useCharacterEditorActions.ts:161` 的 `updateAsset(character.id, { imageUrl: url })` 与保存路径的 `updateAsset/addAsset` 都不带 projectId。等图片期间切换项目，结果会写进新项目的同名资产（AGENTS.md P1「多项目写回」尚未收口）。

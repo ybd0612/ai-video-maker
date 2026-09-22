@@ -113,7 +113,8 @@ CI 测试门禁           ⬜ .github/workflows/deploy.yml 仍只构建不跑测
 | CI 行为 | `.github/workflows/deploy.yml` | push `main` → 构建 + 部署 Pages，**不含 `npm run test`** | 2026-09-21 |
 | **验证方式（口径）** | 只做 Vitest 代码单元测试，**不用浏览器 / E2E / preview 验证界面**，界面由维护者本地确认 | 无工具载体，故在此写定 | 2026-09-21 |
 | **许可证（口径）** | **未定**：无 `LICENSE`，`package.json:3` 为 `private: true` → 默认保留所有权利，任何文档不得声称 MIT | 2026-09-21 决定暂不补 | 2026-09-21 |
-| 测试规模基线 | `npm run test` | 33 文件 / 426 用例通过（**仅当日快照**，不承诺恒定，现行以运行结果为准） | 2026-09-21 |
+| **待补做镜头口径** | `src/lib/shotQueue.ts`（`pendingImageShots` / `pendingVideoShots` / `shotsWithoutVisualPrompt` / `shotsWithoutMotion`） | 批量生成、挂载自动触发、界面计数、顶部「补做缺失」按钮**四处共用同一函数**；待补做集合含 `failed` | 2026-09-21 |
+| 测试规模基线 | `npm run test` | 34 文件 / 435 用例通过（**仅当日快照**，不承诺恒定，现行以运行结果为准） | 2026-09-21 |
 
 ---
 

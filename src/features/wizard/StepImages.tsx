@@ -10,6 +10,7 @@ import { ShotCard } from "./ShotCard";
 import { PromptSubFields } from "./PromptSubFields";
 import { Lightbox } from "@/components/ui/Lightbox";
 import { useWizardActions } from "./useWizardActions";
+import { pendingImageShots, shotsWithoutVisualPrompt } from "@/lib/shotQueue";
 import { ReviewCheckpoint } from "./ReviewCheckpoint";
 import { confirmDialog } from "@/components/ui/ConfirmDialog";
 import { RefreshCw } from "lucide-react";
@@ -25,8 +26,10 @@ export function StepImages() {
   const imagedCount = shots.filter((s) => !!s.imageUrl).length;
   const allImaged = shots.length > 0 && shots.every((s) => !!s.imageUrl);
   const failedCount = shots.filter((s) => s.status === "failed").length;
-  // 缺少画面描述的镜头：不会参与图片生成（静默跳过会让用户困惑）
-  const missingPromptCount = shots.filter((s) => !s.visualPrompt.trim()).length;
+  // 与批量生成同一口径：待补做 = 无图 + 非生成中 + 有画面提示词（含失败镜头）
+  const pendingCount = pendingImageShots(shots).length;
+  // 缺画面提示词的镜头永远不会被生成，必须单独提示而不是静默跳过
+  const noPromptCount = shotsWithoutVisualPrompt(shots).length;
   // 所有 shot 均已落定（成功或失败）时才显示审核卡点，避免失败时用户卡住
   const allSettled = shots.length > 0 && shots.every((s) => !!s.imageUrl || s.status === "failed");
   const generatingCount = shots.filter((s) => s.status === "imaging").length;
@@ -35,11 +38,8 @@ export function StepImages() {
   // 注意：不依赖 imageGenerationStarted —— 批量生成内部会把它置 true，
   // 若加入依赖会导致 effect 重入，误杀进行中的图片请求。
   useEffect(() => {
-    if (shots.length > 0) {
-      const needsImages = shots.some((s) => !s.imageUrl);
-      if (needsImages) {
-        generateImagesForStep();
-      }
+    if (pendingImageShots(shots).length > 0) {
+      generateImagesForStep();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [shots.length]);
@@ -71,14 +71,17 @@ export function StepImages() {
               {generatingCount} {t("wizard.generating")}
             </span>
           )}
-          {failedCount > 0 && (
+          {pendingCount > 0 && (
             <button
               onClick={() => generateImagesForStep()}
               disabled={generatingCount > 0}
-              className="flex items-center gap-1 rounded px-2 py-1 text-[0.6875rem] text-danger hover:bg-danger-deep/30 transition disabled:opacity-50"
+              className={`flex items-center gap-1 rounded px-2 py-1 text-[0.6875rem] transition disabled:opacity-50 ${
+                failedCount > 0 ? "text-danger hover:bg-danger-deep/30" : "text-warn hover:bg-warn-deep/30"
+              }`}
+              title={t("wizard.retryPendingHint")}
             >
               <RefreshCw size={11} />
-              {t("wizard.retryFailed")} ({failedCount})
+              {t(failedCount > 0 ? "wizard.retryFailed" : "wizard.retryPending")} ({pendingCount})
             </button>
           )}
           <button
@@ -112,10 +115,17 @@ export function StepImages() {
         </div>
       </div>
 
+      {/* 待补做镜头（可能被失效规则清空过）：给出定点补做入口，避免整套重做 */}
+      {pendingCount > 0 && generatingCount === 0 && (
+        <div className="rounded-lg border border-warn/60 bg-warn-deep/20 px-3 py-2 text-xs text-warn">
+          {t("wizard.pendingImagesHint", { count: pendingCount })}
+        </div>
+      )}
+
       {/* 缺少画面描述的镜头提示（不会参与生成） */}
-      {missingPromptCount > 0 && (
+      {noPromptCount > 0 && (
         <div className="rounded-lg border border-warn bg-warn-deep/30 px-3 py-2 text-xs text-warn">
-          {t("wizard.missingVisualPrompt", { count: missingPromptCount })}
+          {t("wizard.missingVisualPrompt", { count: noPromptCount })}
         </div>
       )}
 

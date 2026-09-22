@@ -7,6 +7,7 @@ import { useSettingsStore } from "@/stores/settingsStore";
 import { resolvePlan, type PlanId } from "@/lib/plans";
 import { generateVideo, aspectRatioToVideoAspect, VideoTaskCreatedError } from "@/services/videoService";
 import { planShotVideoMedia } from "@/lib/videoPlan";
+import { pendingVideoShots } from "@/lib/shotQueue";
 import { composeMotionPrompt } from "@/lib/promptUtils";
 import { createBatchRunner } from "@/lib/batchRunner";
 import { appendRegistryRules, type RegistryRuleText } from "@/lib/promptComposer";
@@ -44,13 +45,7 @@ const runVideoBatch = createBatchRunner({
     const { providerConfig, videoConsistency } = useSettingsStore.getState();
     const latestProject = useProjectStore.getState().projects.find((p) => p.id === pid);
     if (!latestProject) return [];
-    const shotsNeedingVideos = latestProject.shots.filter(
-      (shot) =>
-        !shot.videoUrl &&
-        shot.imageUrl &&
-        shot.status !== "videoing" &&
-        (shot.motionPrompt.trim() || shot.actionDesc?.trim()),
-    );
+    const shotsNeedingVideos = pendingVideoShots(latestProject.shots);
     const videoAspect = aspectRatioToVideoAspect(latestProject.aspectRatio);
     const rules = extractVideoRules();
 

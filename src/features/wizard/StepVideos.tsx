@@ -12,6 +12,7 @@ import { PromptSubFields } from "./PromptSubFields";
 import { DualFrameToggle } from "./DualFrameToggle";
 import { Lightbox } from "@/components/ui/Lightbox";
 import { useWizardActions } from "./useWizardActions";
+import { pendingVideoShots } from "@/lib/shotQueue";
 import { confirmDialog } from "@/components/ui/ConfirmDialog";
 import { RefreshCw } from "lucide-react";
 
@@ -27,13 +28,14 @@ export function StepVideos() {
   const allVideoed = shots.length > 0 && shots.every((s) => !!s.videoUrl);
   const failedCount = shots.filter((s) => s.status === "failed").length;
   const generatingCount = shots.filter((s) => s.status === "videoing").length;
-  // 排队中的镜头：已准备好（有图片）但尚未开始生成
-  const queueCount = shots.filter((s) => !s.videoUrl && s.status === "imaged" && s.imageUrl).length;
+  // 与批量生成同一口径：待补做 = 有图 + 有动态描述 + 无视频 + 非生成中（含失败镜头）
+  const pending = pendingVideoShots(shots);
+  const pendingCount = pending.length;
+  // 排队中的镜头：已准备好但尚未开始生成
+  const queueCount = pending.filter((s) => s.status === "imaged").length;
   // 成本预估：成片总时长 + 待生成视频的配额消耗（时长秒数）
   const totalDuration = shots.reduce((sum, s) => sum + (s.duration || 0), 0);
-  const pendingSeconds = shots
-    .filter((s) => !s.videoUrl && s.imageUrl && s.status !== "videoing")
-    .reduce((sum, s) => sum + (s.duration || 0), 0);
+  const pendingSeconds = pending.reduce((sum, s) => sum + (s.duration || 0), 0);
 
   // 生成完成 toast：allVideoed 从 false→true 时短暂提示
   const [showDoneToast, setShowDoneToast] = useState(false);
@@ -52,11 +54,8 @@ export function StepVideos() {
   // 注意：不依赖 videoGenerationStarted —— 批量生成内部会把它置 true，
   // 若加入依赖会导致 effect 重入，generateVideosForStep 的幂等守卫会跳过，但更稳妥的做法是只触发一次。
   useEffect(() => {
-    if (shots.length > 0) {
-      const needsVideos = shots.some((s) => !s.videoUrl && s.imageUrl);
-      if (needsVideos) {
-        generateVideosForStep();
-      }
+    if (pendingVideoShots(shots).length > 0) {
+      generateVideosForStep();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [shots.length]);
@@ -94,14 +93,17 @@ export function StepVideos() {
               {t(plan === "default" ? "wizard.queueHintDefault" : "wizard.queueHintFaster")}
             </span>
           )}
-          {failedCount > 0 && (
+          {pendingCount > 0 && (
             <button
               onClick={() => generateVideosForStep()}
               disabled={generatingCount > 0}
-              className="flex items-center gap-1 rounded px-2 py-1 text-[0.6875rem] text-danger hover:bg-danger-deep/30 transition disabled:opacity-50"
+              className={`flex items-center gap-1 rounded px-2 py-1 text-[0.6875rem] transition disabled:opacity-50 ${
+                failedCount > 0 ? "text-danger hover:bg-danger-deep/30" : "text-warn hover:bg-warn-deep/30"
+              }`}
+              title={t("wizard.retryPendingHint")}
             >
               <RefreshCw size={11} />
-              {t("wizard.retryFailed")} ({failedCount})
+              {t(failedCount > 0 ? "wizard.retryFailed" : "wizard.retryPending")} ({pendingCount})
             </button>
           )}
           <button

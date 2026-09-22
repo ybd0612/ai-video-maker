@@ -59,6 +59,7 @@ src/
 │   ├── assetDetails.ts / extractAssets.ts / assetNamespace.ts / characterUtils.ts
 │   ├── shotFields.ts / shotReferences.ts / generationParams.ts / refineContent.ts
 │   ├── shotContinuity.ts           # 同场景首尾帧衔接派生（纯函数，不写 store）
+│   ├── shotQueue.ts                # 待补做镜头集合的唯一口径（批量生成 + 界面计数共用）
 │   ├── videoPlan.ts                # 视频一致性策略：mode 选择 + 素材互斥（keyframe/reference/text）
 │   ├── batchRunner.ts              # createBatchRunner：注册表 + recoverStuck + 受控并发 + finally 清理
 │   ├── jsonResponse.ts             # 模型 JSON 响应解析与容错

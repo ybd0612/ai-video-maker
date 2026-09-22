@@ -17,6 +17,7 @@ import {
   type RegistryRuleText,
 } from "@/lib/promptComposer";
 import { getActiveRules, getActiveRuleText } from "@/lib/promptRules";
+import { pendingImageShots } from "@/lib/shotQueue";
 import { restoreProjectStatusIfReady } from "./wizardActionUtils";
 
 const activeImageTasks = new Map<string, AbortController>();
@@ -124,9 +125,7 @@ const runImageBatch = createBatchRunner({
     const { providerConfig } = useSettingsStore.getState();
     const latestProject = useProjectStore.getState().projects.find((p) => p.id === pid);
     if (!latestProject) return [];
-    const shotsNeedingImages = latestProject.shots.filter(
-      (shot) => !shot.imageUrl && shot.status !== "imaging" && shot.visualPrompt.trim(),
-    );
+    const shotsNeedingImages = pendingImageShots(latestProject.shots);
     const { size: imageSize, ratio: imageRatio } = aspectRatioToImageParams(latestProject.aspectRatio);
     const rules = extractShotImageRules();
 
