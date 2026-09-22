@@ -365,7 +365,9 @@ export const APPEARANCE_FIELDS: Record<AssetDetails["kind"], string[]> = {
 export function composeAssetAppearance(
   asset: Pick<Asset, "type" | "description" | "details">,
 ): string {
-  const summary = (asset.description ?? "").split(/\r?\n/)[0]?.trim() ?? "";
+  // 摘要行常自带句末句号，与拼接用的中文逗号相连会留下「。，」残迹 → 剥掉行末标点
+  const summaryRaw = (asset.description ?? "").split(/\r?\n/)[0]?.trim() ?? "";
+  const summary = summaryRaw.replace(/[。.]+$/, "");
   const fields = APPEARANCE_FIELDS[asset.type] ?? [];
   const details = asset.details as Record<string, string> | undefined;
   const parts: string[] = [];

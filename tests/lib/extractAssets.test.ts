@@ -78,7 +78,7 @@ describe("extractNewAssets 去重语义", () => {
     const raw: RawAsset = {
       name: "泰迪",
       description:
-        "一只经过修剪的棕色泰迪犬\n物种：贵宾犬（泰迪）\n身份：主角\n年龄：成年\n性格：温柔\n外貌：卷曲浓密的毛发，吻部略尖\n服饰：无\n记忆点：头顶一撮长卷发\n背景：家养宠物",
+        "一只经过修剪的棕色泰迪犬。\n物种：贵宾犬（泰迪）\n身份：主角\n年龄：成年\n性格：温柔\n外貌：卷曲浓密的毛发，吻部略尖\n服饰：无\n记忆点：头顶一撮长卷发\n背景：家养宠物",
       appearancePrompt: "a small brown poodle with curly fur",
     };
     const { assets, idByName } = extractNewAssets([], [raw], "character");
@@ -87,6 +87,8 @@ describe("extractNewAssets 去重语义", () => {
     expect(appearance).toContain("一只经过修剪的棕色泰迪犬");
     expect(appearance).toContain("物种：贵宾犬（泰迪）");
     expect(appearance).toContain("识别特征：头顶一撮长卷发");
+    // 摘要行自带句号时不得拼出「。，」残迹
+    expect(appearance).not.toContain("。，");
     // 品种只有一处载体：模型同轮写的英文不再进入生图链路
     expect(appearance).not.toContain("poodle");
     // 叙事字段不得混进外观
