@@ -199,7 +199,7 @@ scripts/run-vitest.mjs              # Windows 盘符规范化后启动 Vitest
 - **P1 非幂等重试**：图片创建与视频创建在没有幂等键 / 任务恢复协议前，不得继续扩大创建请求的自动重试。
 - **P1 多项目写回**：跨 `await` 一律按 `targetProjectId` 写回，禁止 active-project action 参与异步链路。
 - **P1 取消链路**：新增生成入口必须贯通 `AbortSignal`；补齐前不得宣称「所有 AI 请求可取消」（现状见上方铁律注）。
-- **P1 质量门禁**：`npm run test` 现为 34 文件 / 435 用例通过（2026-09-22 实测）；**CI 仍不跑测试**，把它加成部署前门禁是待办。
+- **P1 质量门禁**：`npm run test` 现为 35 文件 / 453 用例通过（2026-09-22 实测）；**CI 仍不跑测试**，把它加成部署前门禁是待办。
 - **P1 数据契约**：镜头时长与数量口径已收敛（时长 `{4,5,8}` 白名单 + 数量交模型判断）；`scriptService` 之外仍缺统一的`unknown → 解析 → 运行时校验 → 重试/报错` 链路（按类资产提取已具备）。
 
 ## Pipeline 架构（现行链路的权威描述在 docs/execution-flow.md）
@@ -231,7 +231,7 @@ scripts/run-vitest.mjs              # Windows 盘符规范化后启动 Vitest
 - **风格母版必须先于资产图生成，但不作为 i2i 参考图**（2026-09-12 建立，2026-09-15 修订）：`generateAssetImages` 分两阶段——阶段 1 串行生成风格图（`generateStyleReference`，幂等 + `activeAssetTasks` 互斥；风格提示词由 AI 从中文风格描述 + 视觉方向六维**零角色派生**，再经 `stylePromptAudit` 越界自检），阶段 2 的角色 / 场景 / 主体 / 道具任务**只以英文 `stylePrompt` 文本注入**生图 prompt，不传风格图作参考（参考图内容会被整体复制，2026-09-15 实锤）；风格图失败不阻塞资产生成。生图请求走 `extra_body.image[]` 多参考，`size` 恒 `1K` + `ratio`（`imageService.aspectRatioToImageParams`；2K/3K/4K 仅在 `plans.ts` 预留，全仓无调用点产生）。定妆照用 `promptComposer.composePortraitPrompt`（物种锁定句 + 全身设定，已移除 `photorealistic` 与 `Portrait of / head and shoulders / looking at camera` 人像语汇）。
 - 步骤 1 两条链**并行**（`Promise.allSettled`）：链 A 视觉方向（提取 + `visualDirectionAudit` 自检，完成即写 `wizardStep: 2`，**但不复位 `project.status`**），链 B 按类资产提取（character/scene/product/prop 各一次请求）；**两链都完成才 `status = "idle"`**（此状态即步骤 1 的门禁），随后 fire-and-forget 依次跑 `generateStyleReference(targetProjectId)` → `generateAssetImages(undefined, targetProjectId)`（顺序不可颠倒）。风格资产（`Asset.type="style"`）由 `generateStyleReference` 内部**懒建**（`ensureStyleAsset` 函数已不存在，2026-09-21 已清掉残留注释）。分镜图经 `pickShotReferences` 取多参考：**只有 角色定妆照 → 主体 → 道具**，场景图与风格母版都不进参考（代码上限 4 张，旧口径「≤2 张 / 风格图恒占末位 / 总数 ≤3」全部作废）。StepAssets 手动「重新生成风格图」传 `force=true` 覆盖已有图。
 - **资产防重复（2026-09-12）**：`Asset.source` 标记来源（`extracted`=AI 提取 / `manual`=手动添加，缺省视为 extracted 兼容旧数据；`addAsset` 默认 manual）。重新提取是**替换式**：旧的 extracted 资产整体被新结果取代、manual 保留且与新结果重名时以手动版为准；有 extracted 资产时先弹 `confirmDialog`（列出将替换的名字）确认，取消则返回 `false` 不推进向导。模型对同一故事命名不稳定（「小兔子」/「小白兔」），**禁止改回纯追加式**。
-- 分镜阶段（`generateStoryboardOutline` + 逐镜头 `generateStoryboardShot`）已产出完整英文双提示词，**禁止二次翻译覆盖**（translateToMotion 已移除）。
+- 分镜阶段（`generateStoryboardOutline` + 逐镜头 `generateStoryboardShot`）已产出完整双提示词（**当前仍为英文，批 3 待中文化**），**禁止二次翻译覆盖**（translateToMotion 已移除）。
 - 分镜生成后必须**回填角色 ID 引用**：模型返回的 `activeCharacterIds` / `dialogues.characterId` 可能是自编 ID，需按「角色名 → store 角色 ID」映射统一回填（新资产由 `extractNewAssets` 建映射），匹配不到的对白置 `null`（归旁白），否则角色一致性（图片注入/定妆照参考）与对白归属会失效。
 - 单镜头重roll（`rerollShot`）同样必须**回填对白/角色引用**（映射 + 无效清理），并把 `dialogues` / `activeCharacterIds` 一并写回，否则重roll后对白与脚本脱节。
 - 步骤 1 资产提取走**按类轻量接口** `extractAssetsByType`（每类一次请求，只返回该类 JSON，代码再做越界兜底过滤）；完整分镜仅在步骤 3 走 `generateStoryboardOutline` + `generateStoryboardShot`，禁止用完整分镜生成做资产提取（无谓的重复请求）。
