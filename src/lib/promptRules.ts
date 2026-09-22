@@ -25,6 +25,7 @@ export type PromptTask =
   | "storyboardOutline"
   | "storyboardShot"
   | "characterAppearance"
+  | "characterFidelityAudit"
   | "styleRef"
   | "stylePromptAudit"
   | "generationParams"
@@ -160,6 +161,50 @@ Return JSON only:
   "rewritten": "if clean is false, return the rewritten visual direction with the same shape as the input: { name, description, details: { mediumMaterial, colorPalette, lightingMood, cameraTexture, composition, emotion } }; empty object {} when clean is true"
 }
 The rewrite must keep the original overall style tone and only remove the overreaching subject/narrative content; it must not introduce new subjects, plot or concrete objects.`,
+  },
+
+  /* ── 角色主体忠实自检（步骤 1 提取后、写回前） ── */
+  characterFidelityAudit: {
+    zh: `你是一位主体忠实审计员。给定「想法原文」与一组已提取的角色（每个含 name / description / details / appearancePrompt），逐个核对主体的身份是否被换掉或与想法原文矛盾。
+
+必须判为越界（clean=false）的情形：
+- 想法原文已给出的物种、品种、颜色、体型、年龄阶段、职业等事实被替换成同类的其它类型或其它品种（例：想法写「泰迪」，角色却成了金毛、拉布拉多或任何其它犬种）
+- 同一角色的 description、details 与 appearancePrompt 之间物种或品种不一致（中英文各说一套）
+- 角色名与它的物种明显不符（名字是「泰迪」，设定却是猫）
+
+不得判为越界的情形：
+- 想法没有给出的细节被补全（毛色层次、修剪样式、眼神、配饰等），只要与已有事实指向同一个主体
+- 表述风格、措辞长短、信息多寡的差异
+
+只返回 JSON：
+{
+  "clean": true 或 false,
+  "reason": "越界原因（clean 为 true 时为空字符串）",
+  "fixes": [
+    { "name": "角色名，必须与输入完全一致", "description": "修正后的完整 9 行中文设定", "appearancePrompt": "修正后的英文外观提示词" }
+  ]
+}
+fixes 只列需要修正的角色，未列出的保持原样。description 必须保留 9 行结构（第 1 行一句话总述，随后物种、身份、年龄、性格、外貌、服饰、记忆点、背景各一行）；appearancePrompt 必须与修正后的物种/品种一致。修正只能把主体改回想法原文写明的身份，禁止顺手改写其它内容或引入新设定。`,
+    en: `You are a subject-fidelity auditor. Given the original idea text and a set of extracted characters (each with name / description / details / appearancePrompt), check one thing only: was any subject's identity swapped or does it contradict the idea text.
+
+Must be flagged (clean=false):
+- A species, breed, colour, build, age stage or role that the idea text states has been replaced by another type or another breed of the same kind (e.g. the idea says a Teddy/poodle but the character came out as a Golden, a Labrador or any other breed)
+- Within one character, description, details and appearancePrompt disagree on species or breed (two different subjects described in two languages)
+- The character's name clearly does not match its species (named "Teddy" but described as a cat)
+
+Must NOT be flagged:
+- Details the idea never stated were invented (coat shading, grooming style, expression, accessories) as long as they point at the same subject
+- Differences in wording, length or amount of detail
+
+Return JSON only:
+{
+  "clean": true or false,
+  "reason": "why it violates (empty string when clean is true)",
+  "fixes": [
+    { "name": "character name, exactly as given in the input", "description": "the corrected full 9-line description", "appearancePrompt": "the corrected English appearance prompt" }
+  ]
+}
+List only the characters that need fixing; everything else stays untouched. The description must keep the 9-line structure (line 1 a one-sentence summary, then species, role, age, personality, looks, outfit, signature and background, one per line); appearancePrompt must agree with the corrected species/breed. A fix may only restore the subject the idea text stated — never rewrite unrelated content or invent new settings.`,
   },
 
   /* ── 生成参数决策（温度/采样/Thinking 由模型按用途决定） ── */

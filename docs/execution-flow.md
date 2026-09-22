@@ -62,12 +62,12 @@
 
 `extractCharactersFromIdea` 内部（`useScriptActions.ts:142-305`）：
 
-1. 已有 auto 资产 → `confirmDialog` 列出将被替换的名字，取消返回 false（:158-168）
+1. 已有 auto 资产 → `confirmDialog` 列出将被替换的名字（角色附带现有物种/品种，让"主体会被重新判断"在确认前就可见），取消返回 false（:159-171）
 2. 幂等守卫：`activeIdeaTasks` 命中该项目 → 直接 `return true`（在飞那轮稍后会写回；`false` 专指用户取消），紧接同步登记，**守卫与登记之间不得有 await**（:170-173）
 3. 发起即清空：只保留 `source === "manual"` 资产，清 `styleReferenceUrl` / `styleReferenceError`，`assetsReviewed = false`，`status = "scripting"`（:175-185）
 4. **两条链并行**（`Promise.allSettled`，:269）：
    - 链 A 视觉方向：`extractVisualDirectionFromIdea` → `refineWithAudit`（配 `auditVisualDirection` 自检，最多 1 轮，`VISUAL_DIRECTION_MAX_ROUNDS = 1` :34）→ 写 `visualDirection`（`revision+1`、`status="draft"`）+ **`wizardStep: 2`**（:201-228）。即「切页时机 = 视觉方向完成」，早于资产提取；**不复位 `project.status`**
-   - 链 B 资产：`character / scene / product / prop` **4 个独立小请求并发**（:233,237），每类完成立刻追加写回 → 卡片逐类出现；单类失败不影响其他类，全部失败才算失败（:261-264）
+   - 链 B 资产：`character / scene / product / prop` **4 个独立小请求并发**（:237,241），每类完成立刻追加写回 → 卡片逐类出现；**角色类写回前先过一次主体忠实自检**（`auditCharacterFidelity`，把想法原文与角色身份交给模型核对，越界则按名字改回 description / appearancePrompt，审计失败一律保留原提取结果）；单类失败不影响其他类，全部失败才算失败（:283-286）
 5. 任一链失败 → 项目 `status="failed"` + `error`，抛给 StepIdea 上屏（:273-282）
 6. 两链都完成才 `status="idle"`（:285），`finally` 注销注册表（:302-304）。即 **`scripting` 精确覆盖"提取未收尾"**：步骤 1 的「AI 提取」与底部「下一步」、侧栏转圈都以它为准
 7. 两链都成功后 fire-and-forget 后台链：`generateStyleReference(targetProjectId)` → `generateAssetImages(undefined, targetProjectId)`（:288-291，顺序不可颠倒，风格图先行）
@@ -238,7 +238,7 @@ RPM 与配额表（`lib/plans.ts:73-134`，格式 文本 / 图片1K,2K,3K,4K / �
 
 **9.2 采样参数由模型自决（`lib/generationParams.ts`）**
 
-内容调用前 `resolveGenerationParams({purpose, context, cacheKey})` 会**先发一次元请求**让模型决定 `temperature/topP/enableThinking`（:130-181）。缓存 key = `${purpose}:${cacheKey ?? ""}`（:121-123）——`scriptService` 不传 cacheKey，所以每个 purpose 每会话只多付一次文本请求。决策失败退化为 `{temperature:0.7, enableThinking:false}`；`visualDirectionAudit` / `stylePromptAudit` 的 Thinking 被结构性钉死为 false。集中管理的只有这三个参数，`max_tokens`（恒 65536）、图片 size/ratio、视频 size/seconds/mode 都在别处固定。
+内容调用前 `resolveGenerationParams({purpose, context, cacheKey})` 会**先发一次元请求**让模型决定 `temperature/topP/enableThinking`。缓存 key = `${purpose}:${cacheKey ?? ""}`（`generationParams.ts:131`）——`assetExtraction` 按资产类型分键（四类并发共用一个槽会让彼此决策互相覆盖，实测 topP 逐轮从 0.8 漂到 0.7），其余 purpose 不传即每会话每槽只多付一次文本请求。**同键并发走单飞**（`paramInflight` :129）：N 路同时 miss 只发一次元请求，避免"最后返回者胜出"。决策失败退化为 `{temperature:0.7, enableThinking:false}`；`visualDirectionAudit` / `stylePromptAudit` / `characterFidelityAudit` 的 Thinking 被结构性钉死为 false（:65）。集中管理的只有这三个参数，`max_tokens`（恒 65536）、图片 size/ratio、视频 size/seconds/mode 都在别处固定。
 
 **9.3 批量幂等与恢复（`lib/batchRunner.ts` + 五张模块级注册表）**
 
@@ -288,10 +288,10 @@ RPM 与配额表（`lib/plans.ts:73-134`，格式 文本 / 图片1K,2K,3K,4K / �
 文本（`acquire("text")`，每次 cost 1）：
 
 - 步骤 1 链 A：视觉方向提取 1 + 自检审计 1
-- 步骤 1 链 B：`character / scene / product / prop` 提取 4
+- 步骤 1 链 B：`character / scene / product / prop` 提取 4 + 角色主体忠实自检 1（仅角色类，写回前发；即使返回 `clean=true` 也要占这 1 次）
 - 风格链（**由步骤 1 尾部的后台链触发**，界面已在步骤 2）：派生 stylePrompt 1 + 越界审计 1（`style` 资产已有非空 prompt 且未 `locked`/未 `force` 时这两次都跳过）
 - 步骤 3：大纲 1 + N（每个镜头 1 次，JSON 无效时同一镜头最多 3 次尝试）
-- 元请求：每个 `purpose` 首次出现时 +1（`generationParams`，之后按 purpose 缓存）
+- 元请求：每个「purpose + cacheKey」槽首次出现时 +1（`generationParams`，之后按该槽缓存）——`assetExtraction` 按资产类型分键，故占 4 个槽
 - 按需：步骤 2 三类编辑器指令改写、步骤 3 一句话改写、任意输入框润色，各 1 次（+ 该 purpose 未缓存时的元请求）
 
 图片（`acquire("image")`，档位恒 1K）：风格母版 1 + A + N

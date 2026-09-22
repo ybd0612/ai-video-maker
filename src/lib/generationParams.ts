@@ -34,6 +34,7 @@ export type GenerationPurpose =
   | "styleRef"
   | "stylePromptAudit"
   | "characterAppearance"
+  | "characterFidelityAudit"
   | "fieldAssist";
 
 export interface GenerationParams {
@@ -64,6 +65,7 @@ export const TOP_P_RANGE = [0.01, 1] as const;
 const THINKING_FIXED_FALSE_PURPOSES: ReadonlySet<GenerationPurpose> = new Set([
   "visualDirectionAudit",
   "stylePromptAudit",
+  "characterFidelityAudit",
 ]);
 
 function inRange(

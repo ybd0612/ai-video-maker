@@ -50,7 +50,7 @@ export interface RawShot {
   useDualFrame?: boolean;
 }
 
-interface RawCharacter {
+export interface RawCharacter {
   name: string;
   description: string;
   details?: Extract<AssetDetails, { kind: "character" }>;
@@ -748,6 +748,116 @@ export async function auditVisualDirection(opts: {
     return { clean: false, value: applyVisualDirectionRewrite(opts.direction, rewritten) };
   } catch (err) {
     console.warn("Visual direction audit failed, keeping extracted direction:", err);
+    return keep;
+  }
+}
+
+/** 主体忠实自检的修正条目（字段一律按 unknown 接收后再校验，不信任模型输出形状） */
+export interface CharacterFidelityFix {
+  name?: unknown;
+  description?: unknown;
+  appearancePrompt?: unknown;
+}
+
+/**
+ * 按角色名回填忠实修正：只覆盖非空字符串的 description / appearancePrompt。
+ * 名字对不上、字段缺失或内容没变化都原样返回 —— 宁可保留提取结果，
+ * 也不引入半截设定（description 是 9 行结构的唯一载体，被清空会连带丢物种）。
+ */
+export function applyCharacterFidelityFixes(
+  characters: RawCharacter[],
+  fixes: Map<string, CharacterFidelityFix>,
+): RawCharacter[] {
+  return characters.map((c) => {
+    const fix = fixes.get(String(c.name ?? "").trim().toLocaleLowerCase());
+    if (!fix) return c;
+    const description =
+      typeof fix.description === "string" && fix.description.trim() ? fix.description : c.description;
+    const appearancePrompt =
+      typeof fix.appearancePrompt === "string" && fix.appearancePrompt.trim()
+        ? fix.appearancePrompt
+        : c.appearancePrompt;
+    if (description === c.description && appearancePrompt === c.appearancePrompt) return c;
+    return { ...c, description, appearancePrompt };
+  });
+}
+
+/**
+ * 角色主体忠实自检：把想法原文与已提取角色交给模型，只审「主体身份是否被换掉」
+ * 与「同一角色中英文物种是否打架」，越界时按角色名回填修正后的设定。
+ *
+ * 提取阶段已有 extract.subject-fidelity 条目约束，但条目只是"要求"；
+ * 这里是事后核对，两者共用同一判据（想法原文写明的身份不可替换）。
+ * 审计或解析失败一律保留原提取结果，绝不阻塞提取主链路。
+ */
+export async function auditCharacterFidelity(opts: {
+  apiKey: string;
+  baseUrl: string;
+  language: "zh" | "en";
+  idea: string;
+  characters: RawCharacter[];
+}): Promise<AuditOutcome<RawCharacter[]>> {
+  const keep = { clean: true as const, value: opts.characters };
+  if (opts.characters.length === 0) return keep;
+  try {
+    const params = await resolveGenerationParams({
+      purpose: "characterFidelityAudit",
+      apiKey: opts.apiKey,
+      baseUrl: opts.baseUrl,
+      context: [
+        "Task: audit extracted characters against the original idea text and fix only swapped subject identities.",
+        `Characters: ${opts.characters.length}`,
+        `Language: ${opts.language}`,
+      ].join("\n"),
+    });
+    const service = createAIService({
+      provider: "openai",
+      apiKey: opts.apiKey,
+      baseUrl: opts.baseUrl,
+    });
+    const result = await service.chatCompletion({
+      messages: [
+        {
+          role: "system",
+          content: buildTaskSystemPrompt("characterFidelityAudit", opts.language, getActiveRules()),
+        },
+        {
+          role: "user",
+          content: [
+            `Idea text:\n${opts.idea}`,
+            `Extracted characters:\n${JSON.stringify(
+              opts.characters.map((c) => ({
+                name: c.name,
+                description: c.description,
+                species: c.details?.species,
+                appearancePrompt: c.appearancePrompt,
+              })),
+              null,
+              2,
+            )}`,
+          ].join("\n\n"),
+        },
+      ],
+      temperature: params.temperature,
+      ...(params.topP === undefined ? {} : { topP: params.topP }),
+      enableThinking: params.enableThinking,
+    });
+
+    const parsed = parseJsonFromResponse<{ clean?: boolean; fixes?: CharacterFidelityFix[] }>(
+      result.content,
+    );
+    if (!parsed || parsed.clean !== false || !Array.isArray(parsed.fixes)) return keep;
+
+    const fixesByName = new Map<string, CharacterFidelityFix>();
+    for (const fix of parsed.fixes) {
+      if (fix && typeof fix.name === "string" && fix.name.trim()) {
+        fixesByName.set(fix.name.trim().toLocaleLowerCase(), fix);
+      }
+    }
+    if (fixesByName.size === 0) return keep;
+    return { clean: false, value: applyCharacterFidelityFixes(opts.characters, fixesByName) };
+  } catch (err) {
+    console.warn("Character fidelity audit failed, keeping extracted characters:", err);
     return keep;
   }
 }

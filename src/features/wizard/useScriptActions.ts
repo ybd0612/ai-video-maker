@@ -11,6 +11,7 @@ import {
 import { useSettingsStore } from "@/stores/settingsStore";
 import { useT } from "@/i18n";
 import {
+  auditCharacterFidelity,
   auditVisualDirection,
   extractAssetsByType,
   extractVisualDirectionFromIdea,
@@ -24,7 +25,7 @@ import {
 import { extractNewAssets } from "@/lib/extractAssets";
 import { collectSubjectVocabulary } from "@/lib/promptComposer";
 import { refineWithAudit } from "@/lib/refineContent";
-import { beginTrace } from "@/lib/logger";
+import { beginTrace, logger } from "@/lib/logger";
 import { hasActiveTask, runWithConcurrency } from "@/lib/batchRunner";
 import { pickShotFields } from "@/lib/shotFields";
 import { resolveAssetId, resolveAssetIds } from "@/lib/shotReferences";
@@ -156,12 +157,15 @@ export function useScriptActions(
     const manualAssets = project.assets.filter((a) => a.source === "manual");
     const autoAssets = project.assets.filter((a) => a.source !== "manual");
     if (autoAssets.length > 0) {
+      // 角色带上现有物种/品种：让"主体会被重新判断"在按下确认前就看得见
+      const describeAsset = (a: Asset) =>
+        a.details?.kind === "character" && a.details.species ? `${a.name}（${a.details.species}）` : a.name;
       const ok = await confirmDialog({
         title: t("wizard.reextractTitle"),
         message: t("wizard.reextractMessage", {
           auto: autoAssets.length,
           manual: manualAssets.length,
-          names: autoAssets.map((a) => a.name).join("、"),
+          names: autoAssets.map(describeAsset).join("、"),
         }),
       });
       if (!ok) return false;
@@ -237,11 +241,29 @@ export function useScriptActions(
         await Promise.all(types.map(async (type) => {
           try {
             const result = await extractAssetsByType(baseOpts, type);
-            const list =
+            let list =
               type === "character" ? result.characters
               : type === "scene" ? result.scenes
               : type === "product" ? result.products
               : result.props;
+            // 角色主体忠实自检（写回前）：想法原文写明的品种被换成同类其它品种时按名字改回。
+            // 只审角色 —— 主体身份只存在于角色设定，场景/产品/道具不存在"换品种"。
+            if (type === "character") {
+              const audited = await auditCharacterFidelity({
+                apiKey: providerConfig.apiKey,
+                baseUrl: providerConfig.baseUrl,
+                language: project.language,
+                idea: prompt,
+                characters: result.characters,
+              });
+              if (!audited.clean) {
+                const fixed = result.characters
+                  .filter((c, i) => audited.value[i] !== c)
+                  .map((c) => c.name);
+                logger.info("llm", "logmsg.characterFidelityFixed", { fixed: fixed.join("、") });
+              }
+              list = audited.value;
+            }
             const built = extractNewAssets(project.assets, list as never, type, manualAssets).assets;
             const manualNames = new Set(manualAssets.map((a) => a.name.trim().toLocaleLowerCase()));
             const deduped = built.filter(

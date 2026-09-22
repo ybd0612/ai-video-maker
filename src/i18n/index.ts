@@ -221,7 +221,7 @@ const zh = {
   "wizard.propReferencesHint": "会在特定镜头中反复出现、需要保持一致的物件，如钥匙、项链、武器或信件",
   "wizard.addProp": "添加关键物件",
   "wizard.reextractTitle": "重新提取资产？",
-  "wizard.reextractMessage": "项目已有 {auto} 个自动提取的资产（{names}）。重新提取将【替换】它们，{manual} 个手动添加的资产会保留，并按最新想法生成新的资产。是否继续？",
+  "wizard.reextractMessage": "项目已有 {auto} 个自动提取的资产（{names}）。重新提取将【替换】它们，且每个主体的物种/品种都会被重新判断，结果可能与现在不同；{manual} 个手动添加的资产会保留。是否继续？",
   "wizard.queueCount": "{count} 个排队中",
   "wizard.queueHintDefault": "约 1 分钟/条",
   "wizard.queueHintFaster": "较高并发，通常更快",
@@ -431,6 +431,7 @@ const zh = {
   // 渲染、导出与落盘时按当前语言翻译，保证界面与 runtime.log 一致可读。
   "logmsg.sessionStart": "页面会话开始",
   "logmsg.extractRawResponse": "资产提取原始响应留痕（JSON 解析异常取证）",
+  "logmsg.characterFidelityFixed": "角色主体忠实自检：已按想法原文改回 {fixed}",
   "logmsg.trace.generateStyleReference": "生成视觉方向图",
   "logmsg.trace.generateAssetImages": "生成资产图",
   "logmsg.trace.extractFromIdea": "从想法提取视觉方向与资产",
@@ -659,7 +660,7 @@ const en = {
   "wizard.propReferencesHint": "Objects that recur in specific shots and need visual consistency, such as keys, necklaces, weapons, or letters",
   "wizard.addProp": "Add key object",
   "wizard.reextractTitle": "Re-extract assets?",
-  "wizard.reextractMessage": "This project already has {auto} auto-extracted assets ({names}). Re-extracting will REPLACE them; {manual} manually added assets are kept. New assets will be generated from the latest idea. Continue?",
+  "wizard.reextractMessage": "This project already has {auto} auto-extracted assets ({names}). Re-extracting will REPLACE them, and every subject's species/breed gets re-decided — the result may differ from what you see now; {manual} manually added assets are kept. Continue?",
   "wizard.queueCount": "{count} queued",
   "wizard.queueHintDefault": "~1 min per video",
   "wizard.queueHintFaster": "Higher concurrency, usually faster",
@@ -869,6 +870,7 @@ const en = {
   // translated on render / export / disk flush so the UI and runtime.log stay readable.
   "logmsg.sessionStart": "Page session started",
   "logmsg.extractRawResponse": "Raw asset-extraction response captured (for JSON parse failure forensics)",
+  "logmsg.characterFidelityFixed": "Character fidelity audit: restored to the idea text for {fixed}",
   "logmsg.trace.generateStyleReference": "Generate visual direction image",
   "logmsg.trace.generateAssetImages": "Generate asset images",
   "logmsg.trace.extractFromIdea": "Extract visual direction and assets from idea",

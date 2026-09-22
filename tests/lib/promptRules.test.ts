@@ -131,6 +131,14 @@ describe("SKELETONS", () => {
       expect(s).toContain("{{#safety}}");
     }
   });
+
+  it("characterFidelityAudit 骨架中英齐备，且划清「补全」与「换主体」的边界", () => {
+    // 不给"不得判为越界"的豁免，审计会把正常的细节补全误判成换主体 → 每次提取都被重写
+    expect(SKELETONS.characterFidelityAudit.zh).toContain("不得判为越界");
+    expect(SKELETONS.characterFidelityAudit.zh).toContain("fixes");
+    expect(SKELETONS.characterFidelityAudit.en).toContain("Must NOT be flagged");
+    expect(SKELETONS.characterFidelityAudit.en).toContain("fixes");
+  });
 });
 
 /* ── mergeRules ───────────────────────────────────────────────────────────── */
