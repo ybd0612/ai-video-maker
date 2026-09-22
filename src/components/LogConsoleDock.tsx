@@ -2,7 +2,7 @@
 // src/components/LogConsoleDock.tsx
 // 主界面底部停靠的日志控制台（Chrome DevTools 风格）。
 // - 顶边可拖拽调整高度（持久化到 settingsStore.logPanelHeight）
-// - 头部：级别/来源筛选、关键字搜索、展开/收起全部、复制/导出/清空、关闭
+// - 头部：级别/来源筛选、关键字搜索、展开/收起全部、复制/导出/暂停采集/清空、关闭
 // - 条目：点击展开完整请求/响应 JSON；点 #traceId 只看该链路
 // 数据源为 lib/logger 的内存环形缓冲，经 useSyncExternalStore 实时刷新。
 // ────────────────────────────────────────────────────────────────────────────
@@ -15,6 +15,8 @@ import {
   ChevronsUpDown,
   Copy,
   Download,
+  Pause,
+  Play,
   Save,
   Trash2,
   X,
@@ -92,6 +94,8 @@ export function LogConsoleDock() {
   const height = useSettingsStore((s) => s.logPanelHeight);
   const setHeight = useSettingsStore((s) => s.setLogPanelHeight);
   const setShowLogPanel = useSettingsStore((s) => s.setShowLogPanel);
+  const loggingEnabled = useSettingsStore((s) => s.loggingEnabled);
+  const setLoggingEnabled = useSettingsStore((s) => s.setLoggingEnabled);
 
   const [level, setLevel] = useState<LogLevel | "all">("all");
   const [scope, setScope] = useState<(typeof SCOPES)[number]>("all");
@@ -271,6 +275,14 @@ export function LogConsoleDock() {
           className="rounded p-1 text-ink-4 hover:bg-raised"
         >
           <Download size={11} />
+        </button>
+        <button
+          type="button"
+          onClick={() => setLoggingEnabled(!loggingEnabled)}
+          title={loggingEnabled ? t("log.pauseCollection") : t("log.resumeCollection")}
+          className={`rounded p-1 hover:bg-raised ${loggingEnabled ? "text-ink-4" : "text-warn"}`}
+        >
+          {loggingEnabled ? <Pause size={11} /> : <Play size={11} />}
         </button>
         <button
           type="button"

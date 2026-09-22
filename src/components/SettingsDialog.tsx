@@ -337,10 +337,6 @@ export function SettingsDialog() {
   const open = useSettingsStore((s) => s.settingsDialogOpen);
   const language = useSettingsStore((s) => s.language);
   const setLanguage = useSettingsStore((s) => s.setLanguage);
-  const loggingEnabled = useSettingsStore((s) => s.loggingEnabled);
-  const setLoggingEnabled = useSettingsStore((s) => s.setLoggingEnabled);
-  const showLogPanel = useSettingsStore((s) => s.showLogPanel);
-  const setShowLogPanel = useSettingsStore((s) => s.setShowLogPanel);
   const videoConsistency = useSettingsStore((s) => s.videoConsistency);
   const setVideoConsistency = useSettingsStore((s) => s.setVideoConsistency);
   const t = useT();
@@ -622,31 +618,8 @@ export function SettingsDialog() {
                   </p>
                 </div>
 
-                {/* 运行日志：面板显示开关 + 采集开关 */}
-                <div className="rounded-lg border border-line/50 bg-raised/40 p-3">
-                  <label className="mb-1 block text-[0.6875rem] font-medium text-ink-3">
-                    {t("log.title")}
-                  </label>
-                  <label className="flex select-none items-center gap-2 py-1 text-xs text-ink-2">
-                    <input
-                      type="checkbox"
-                      checked={showLogPanel}
-                      onChange={(e) => setShowLogPanel(e.target.checked)}
-                      className="h-3.5 w-3.5 accent-accent"
-                    />
-                    {t("log.showPanel")}
-                  </label>
-                  <label className="flex select-none items-center gap-2 py-1 text-xs text-ink-2">
-                    <input
-                      type="checkbox"
-                      checked={loggingEnabled}
-                      onChange={(e) => setLoggingEnabled(e.target.checked)}
-                      className="h-3.5 w-3.5 accent-accent"
-                    />
-                    {t("log.record")}
-                  </label>
-                  <p className="mt-1 text-[0.625rem] leading-relaxed text-ink-5">{t("log.hint")}</p>
-                </div>
+                {/* 运行日志相关开关不在此处：面板显示用顶栏右上角快捷开关，
+                    采集暂停/恢复在日志面板工具条（LogConsoleDock） */}
 
                 <p className="text-[0.625rem] text-ink-5">
 {t("settings.storageNote")}

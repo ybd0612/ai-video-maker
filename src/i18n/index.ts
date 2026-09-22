@@ -394,9 +394,8 @@ const zh = {
   // 拼接（成片）步骤
   "assembly.failedPrefix": "拼接失败",
 
-  // 运行日志与链路追踪（设置 → 日志）
+  // 运行日志与链路追踪（顶栏快捷开关 + 日志面板工具条）
   "log.title": "运行日志",
-  "log.hint": "记录每次模型调用的参数、结果与耗时，用于排查问题。开启后日志面板停靠在主界面底部，可拖拽调整高度；日志同时另存到本机浏览器（内存保留 1000 条、落盘 300 条，超长提示词自动截断），刷新或重开标签页后仍在，不会上报网络。",
   "log.search": "搜索提示词、错误或任意字段…",
   "log.clear": "清空",
   "log.export": "导出 JSON",
@@ -423,7 +422,8 @@ const zh = {
   "log.collapseAll": "收起全部",
   "log.showPanel": "显示日志面板",
   "log.hidePanel": "隐藏日志面板",
-  "log.record": "记录运行日志（内存最多 1000 条）",
+  "log.pauseCollection": "暂停采集日志（点击恢复）",
+  "log.resumeCollection": "日志采集已暂停，点击恢复",
   "log.localHint": "开发模式：日志同时以 NDJSON 追加写入 debug-dump/runtime.log（可直接交给 AI 分析）",
   "log.persistedMark": "日志已存入本机浏览器",
 
@@ -832,9 +832,8 @@ const en = {
   // Assembly step
   "assembly.failedPrefix": "Assembly failed",
 
-  // Runtime log & tracing (Settings → Logs)
+  // Runtime log & tracing (top-bar toggle + log dock toolbar)
   "log.title": "Runtime log",
-  "log.hint": "Records the parameters, results and duration of every model call for troubleshooting. When enabled, the log panel docks at the bottom of the main view and can be resized by dragging. Logs are also stored in this browser (1000 entries in memory, 300 on disk, long prompts truncated), so they survive a reload or reopening the tab. Nothing is sent over the network.",
   "log.search": "Search prompts, errors or any field…",
   "log.clear": "Clear",
   "log.export": "Export JSON",
@@ -861,7 +860,8 @@ const en = {
   "log.collapseAll": "Collapse all",
   "log.showPanel": "Show log panel",
   "log.hidePanel": "Hide log panel",
-  "log.record": "Record runtime log (max 1000 entries in memory)",
+  "log.pauseCollection": "Pause log collection (click to resume)",
+  "log.resumeCollection": "Log collection paused — click to resume",
   "log.localHint": "Dev mode: entries are also appended as NDJSON to debug-dump/runtime.log (ready for AI analysis)",
   "log.persistedMark": "Logs are stored in this browser",
 
