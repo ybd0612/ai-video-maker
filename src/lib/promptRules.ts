@@ -754,7 +754,7 @@ export const BUILTIN_RULES: PromptRule[] = [
     task: "extractAssets",
     section: "rules",
     content: {
-      zh: "- characters：涵盖故事中的**一切角色主体**——人物、动物（如小兔子、小猫）、拟人化角色、机器人等，只要是故事的主角/配角就必须全部填入；仅纯风景内容才 []\n- 每个角色 description 必须严格保留 9 行：第 1 行一句话总述，后面按顺序逐行输出物种、身份、年龄、性格、外貌、服饰、记忆点、背景；禁止用句号/分号压成一行",
+      zh: "- **description 第 1 行（一句话总述）只能写该资产自身的身份与外观**，禁止出现剧情动作、场景、时间天气或其他角色（例：写「一只左眼失明的年长橘猫」，不要写「在天台与边牧幼犬对峙、争水、最终相依的橘猫」）——生图提示词会直接取用这一行\n- characters：涵盖故事中的**一切角色主体**——人物、动物（如小兔子、小猫）、拟人化角色、机器人等，只要是故事的主角/配角就必须全部填入；仅纯风景内容才 []\n- 每个角色 description 必须严格保留 9 行：第 1 行一句话总述，后面按顺序逐行输出物种、身份、年龄、性格、外貌、服饰、记忆点、背景；禁止用句号/分号压成一行",
       en: "- characters: ONLY fill if content has characters, otherwise []\n- Each character description MUST preserve exactly 9 lines: one summary line followed by species, role, age, personality, looks, outfit, signature and background; never compress the elements into one sentence",
     },
     enabled: true,

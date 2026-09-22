@@ -365,9 +365,11 @@ export const APPEARANCE_FIELDS: Record<AssetDetails["kind"], string[]> = {
 export function composeAssetAppearance(
   asset: Pick<Asset, "type" | "description" | "details">,
 ): string {
-  // 摘要行常自带句末句号，与拼接用的中文逗号相连会留下「。，」残迹 → 剥掉行末标点
+  // 摘要行常自带句末句号，与拼接用的中文逗号相连会留下「。，」残迹 → 剥掉行末标点；
+  // 且只取第一个分句：实测模型常把剧情写进摘要（「一只贵宾犬，从铁门后冲出，与橘猫对峙…」），
+  // 整段照抄会让定妆照画出第二只狗和一只猫。品种事实另有 details.species 兜底，截断不丢身份。
   const summaryRaw = (asset.description ?? "").split(/\r?\n/)[0]?.trim() ?? "";
-  const summary = summaryRaw.replace(/[。.]+$/, "");
+  const summary = summaryRaw.replace(/[。.]+$/, "").split("，")[0].trim();
   const fields = APPEARANCE_FIELDS[asset.type] ?? [];
   const details = asset.details as Record<string, string> | undefined;
   const parts: string[] = [];
@@ -403,7 +405,10 @@ export const BRIEF_APPEARANCE_FIELDS: Record<AssetDetails["kind"], string[]> = {
 export function composeAssetBriefAppearance(
   asset: Pick<Asset, "type" | "description" | "details">,
 ): string {
-  const summary = splitAssetDescription(asset.description ?? "").summary.replace(/[。.]+$/, "");
+  // 摘要行只取第一个分句：实测模型常把剧情写进摘要（「一只忠诚温和的贵宾犬，从铁门后冲出，与橘猫对峙、随后踩水驱赶…」），整段照抄会让定妆照画出第二只狗和一只猫。
+  // 品种事实另有 details.species 兜底，截断不会丢身份。
+  const summaryFull = splitAssetDescription(asset.description ?? "").summary.replace(/[。.]+$/, "");
+  const summary = summaryFull.split("，")[0].trim();
   const details = asset.details as Record<string, string> | undefined;
   const parts: string[] = [];
   if (summary) parts.push(summary);
