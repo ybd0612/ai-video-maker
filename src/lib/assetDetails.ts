@@ -280,6 +280,104 @@ export function ensureAssetDetails(asset: Asset): Asset {
 }
 
 /**
+ * 生图描述里各可视化字段的中文标签。
+ * 提示词恒中文（不随界面语言变化），因此标签写死中文，不走 i18n；
+ * 标签的作用是消歧 —— 服饰为「无，但披挂窗帘作披风」这类值，
+ * 不带标签拼进描述会让模型读成一句无主语的话。
+ */
+const APPEARANCE_FIELD_LABELS: Record<string, string> = {
+  species: "物种",
+  appearance: "外貌",
+  outfit: "服饰",
+  signature: "识别特征",
+  settingType: "空间类型",
+  environment: "环境",
+  time: "时间",
+  weather: "天气",
+  elements: "主要元素",
+  spatialLayers: "空间层次",
+  lighting: "光线",
+  paletteMood: "色彩与氛围",
+  category: "品类",
+  silhouette: "轮廓",
+  dimensions: "尺寸",
+  color: "颜色",
+  material: "材质",
+  structure: "结构",
+  surfaceDetails: "表面细节",
+  branding: "品牌标识",
+  objectType: "物件类型",
+  shape: "形状",
+  wear: "磨损痕迹",
+};
+
+/**
+ * 各资产类型进入生图描述的**可视化字段**（顺序即拼接顺序）。
+ * 刻意剔除叙事类字段（性格 / 身份 / 背景 / 剧情用途 / 使用方式 / 故事作用）：
+ * 它们会让图像模型画出故事场景而不是资产本体。
+ */
+export const APPEARANCE_FIELDS: Record<AssetDetails["kind"], string[]> = {
+  character: ["species", "appearance", "outfit", "signature"],
+  scene: [
+    "settingType",
+    "environment",
+    "time",
+    "weather",
+    "elements",
+    "spatialLayers",
+    "lighting",
+    "paletteMood",
+  ],
+  product: [
+    "category",
+    "silhouette",
+    "dimensions",
+    "color",
+    "material",
+    "structure",
+    "surfaceDetails",
+    "branding",
+    "signature",
+  ],
+  prop: [
+    "objectType",
+    "shape",
+    "dimensions",
+    "material",
+    "color",
+    "structure",
+    "wear",
+    "signature",
+  ],
+  style: [],
+};
+
+/**
+ * 生图用的中文外观描述：一句话摘要 + 可视化字段（带字段名）。
+ *
+ * 2026-09-22 中文化改造的核心：**不再让模型同轮另写一份英文提示词**。
+ * 一份事实只留一处载体，中英文各说一套（中文写金毛、英文写 Labrador）从结构上消失。
+ *
+ * ⚠️ 摘要行必须保留：实测模型常把品种只写进摘要行（「…金毛犬伙伴」），
+ * 而 `details.species` 仅写「狗」—— 丢掉摘要行等于丢掉品种事实。
+ * 无任何可视化字段与摘要时返回空串，由调用方决定回落策略。
+ */
+export function composeAssetAppearance(
+  asset: Pick<Asset, "type" | "description" | "details">,
+): string {
+  const summary = (asset.description ?? "").split(/\r?\n/)[0]?.trim() ?? "";
+  const fields = APPEARANCE_FIELDS[asset.type] ?? [];
+  const details = asset.details as Record<string, string> | undefined;
+  const parts: string[] = [];
+  if (summary) parts.push(summary);
+  for (const key of fields) {
+    const value = details?.[key]?.trim();
+    if (value && !parts.includes(value)) parts.push(`${APPEARANCE_FIELD_LABELS[key] ?? key}：${value}`);
+  }
+  return parts.join("，");
+}
+
+/**
  * 结构化设定的字段行（剔除内部判别字段 `kind`），顺序即 details 的键顺序。
  * 展示层（资产编辑器「完整设定」）与下游文本链路共用，避免各处各写一遍。
  */

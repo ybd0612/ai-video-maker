@@ -7,10 +7,7 @@ import {
 import { useSettingsStore } from "@/stores/settingsStore";
 import { useT } from "@/i18n";
 import { chatCompletion } from "@/services/chatService";
-import {
-  SYSTEM_PROMPT_CHARACTER_DESCRIPTION_ZH,
-  buildCharacterAppearancePrompt,
-} from "@/lib/promptRules";
+import { SYSTEM_PROMPT_CHARACTER_DESCRIPTION_ZH } from "@/lib/promptRules";
 import { generateImage, aspectRatioToImageParams } from "@/services/imageService";
 import { generateAssetNamespace, generateFullPrompt } from "@/lib/assetNamespace";
 import {
@@ -20,6 +17,7 @@ import {
   parseCharacterDescription,
 } from "@/lib/promptComposer";
 import {
+  composeAssetAppearance,
   composeDetailsText,
   extractAssetSummary,
   mergeDetailsPreferDerived,
@@ -81,49 +79,26 @@ export function useCharacterEditorActions({
   const [notice, setNotice] = useState<string | null>(null);
 
   /**
-   * 从中文描述派生英文外貌提示词（文本调用，不耗图片配额）。
+   * 外观提示词派生：由代码从中文设定拼装（零模型调用）。
    * AI 修改描述后的即时联动、保存兜底、定妆照生成前刷新共用同一派生链路。
-   * 返回 null 表示派生失败（网络/内容过滤/空输出），由调用方决定兜底策略。
+   *
+   * 2026-09-22 中文化改造：不再让模型另写一份英文 —— 品种等主体事实只保留在设定一处，
+   * 派生只是翻译它的可视化子集，因此结构上不可能与设定自相矛盾。
+   * desc 未带结构化字段（如刚打开编辑器）时并上已持久化 details，避免信息衰减。
    */
   const deriveAppearance = useCallback(
-    async (desc: string, charName: string): Promise<string | null> => {
-      if (!desc.trim() || !providerConfig.apiKey || !providerConfig.baseUrl) return null;
-      // description 只存一句话简介：desc 本身没有结构化字段时（如刚打开编辑器），
-      // 派生输入必须并上结构化设定，否则信息严重衰减；desc 已带字段（AI 刚改写）则不并旧值
-      const parsedDesc = parseCharacterDescription(desc);
-      const detailsText =
-        parsedDesc.fields.length > 0 ? "" : composeDetailsText(character?.details);
-      try {
-        const result = await chatCompletion({
-          apiKey: providerConfig.apiKey,
-          baseUrl: providerConfig.baseUrl,
-          // 采样参数由模型按用途决定（外貌提示词是角色一致性锚点，不再是代码硬编码温度）
-          purpose: "characterAppearance",
-          paramContext: [
-            "Task: derive an English appearance prompt for a character, used as the identity anchor across all shots.",
-            "Consistency across repeated derivations matters.",
-          ].join("\n"),
-          messages: [
-            { role: "system", content: buildCharacterAppearancePrompt() },
-            {
-              role: "user",
-              content: [
-                `Name: ${charName}`,
-                `Description: ${desc.trim()}`,
-                ...(detailsText ? [`Structured details:\n${detailsText}`] : []),
-                "",
-                "Write the appearance description for THIS subject. Keep its species/type exactly as given above.",
-              ].join("\n"),
-            },
-          ],
-        });
-        return result.content.trim() || null;
-      } catch (err) {
-        console.error("Failed to derive appearance prompt:", err);
-        return null;
-      }
+    (desc: string): string => {
+      const normalized = normalizeCharacterDescription(desc);
+      return composeAssetAppearance({
+        type: "character",
+        description: normalized,
+        details: mergeDetailsPreferDerived(
+          { type: "character", description: normalized },
+          character?.details,
+        ),
+      });
     },
-    [providerConfig, character],
+    [character],
   );
 
   /**
@@ -143,6 +118,7 @@ export function useCharacterEditorActions({
         const stylePrompt = project ? getStylePrompt(project) : undefined;
         const prompt = composePortraitPrompt({
           appearancePrompt: effectiveAppearance,
+          species: character?.details?.kind === "character" ? character.details.species : undefined,
           stylePrompt,
         });
         // 画幅与批量链路一致（项目画幅），避免手动重生成把定妆照规格改掉；
@@ -221,10 +197,10 @@ export function useCharacterEditorActions({
         setDescHistory((h) => [...h, { description, appearance: appearancePrompt }]);
         setDescription(next);
         setInstruction("");
-        // 即时联动：描述一变立刻重派生英文，界面同步刷新
+        // 即时联动：描述一变立刻按新设定重拼外观提示词（纯函数，不发请求）
         setIsDerivingAppearance(true);
         setAppearanceStale(true);
-        const derived = await deriveAppearance(next, name.trim() || "（未命名）");
+        const derived = deriveAppearance(next);
         // 竞态守卫：派生期间描述又被改动（撤销/再次 AI 修改）→ 丢弃过期结果
         if (descriptionRef.current === next) {
           if (derived) {
@@ -281,7 +257,7 @@ export function useCharacterEditorActions({
       // AI 修改成功后 appearancePrompt 已经是当前描述的最新派生物，不能再拿持久化角色的旧 description 比较，
       // 否则用户刚看到的新英文提示词会在点击“重新生成”时被无意义地二次改写。
       if ((appearanceStale || !effectiveAppearance) && trimmedDescription) {
-        const derived = await deriveAppearance(trimmedDescription, name.trim() || "（未命名）");
+        const derived = deriveAppearance(trimmedDescription);
         if (!derived) throw new Error(t("characters.portraitDeriveFailed"));
         effectiveAppearance = derived;
         setAppearancePrompt(derived);
@@ -319,7 +295,7 @@ export function useCharacterEditorActions({
         providerConfig.apiKey &&
         providerConfig.baseUrl
       ) {
-        const derived = await deriveAppearance(trimmedDescription, trimmedName);
+        const derived = deriveAppearance(trimmedDescription);
         if (derived) {
           trimmedAppearance = derived;
           setAppearancePrompt(derived);

@@ -98,7 +98,7 @@
 1. 阶段 1：`generateStyle && 无风格图` → 先 `await generateStyleReference`（:315-317），风格失败不阻塞
 2. 阶段 2：`createBatchRunner`，**并发 3**（:489），任务筛选 = 该类型且 `!imageUrl`
    - ⚠️ 批量**只按 `!imageUrl` 过滤，不检查 `prompt` 是否为空**；只有手动「补全缺失资产」在算 options 时额外要求 `prompt.trim()`（`StepAssets.tsx:204-208`）。所以步骤 1 尾部的自动批量会对空提示词资产（如用户早先手动加的场景）发一次只有边界句的无效生图请求，白扣一档图片配额
-   - 角色 → `composePortraitPrompt({ appearancePrompt, stylePrompt })`（物种锁定，无 `photorealistic`、无人像语汇）
+   - 角色 → `composePortraitPrompt({ appearancePrompt, species, stylePrompt })`（中文控制语；`appearancePrompt` 由 `composeAssetAppearance` 从中文 `details` + 摘要行拼装、非模型产出；物种锁定吃 `details.species`，无 `photorealistic`、无人像语汇）
    - 场景 / 产品 / 道具 → `composeTextToImagePrompt({ subject: assetImageBoundary(kind) + prompt, style: stylePrompt })`
    - ⚠️ **风格母版不作为 i2i 参考图**（2026-09-15 事故决策，代码注释 :322-325 与 :239-240 双处说明）：参考图内容会被整体复制，风格一致性只由 stylePrompt 文本承载
 3. 每个任务写回前都用 `expectedRevision`，失败写 `asset.error`；`onBeforeRun/onFinally` 维护 `assetGenerationStarted`

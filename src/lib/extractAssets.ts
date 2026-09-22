@@ -14,7 +14,7 @@
 import { newId, type Asset, type AssetDetails, type AssetType } from "@/stores/projectStore";
 import { generateAssetNamespace, generateFullPrompt } from "@/lib/assetNamespace";
 import { normalizeCharacterDescription } from "@/lib/promptComposer";
-import { normalizeAssetDetails } from "@/lib/assetDetails";
+import { composeAssetAppearance, normalizeAssetDetails } from "@/lib/assetDetails";
 
 /** 模型输出的资产条目（提取/分镜共用的原始形态；style 提供 details 或平铺 6 字段） */
 export interface RawAsset {
@@ -53,37 +53,46 @@ export function extractNewAssets(
   const idByName = new Map<string, string>();
   for (const item of incoming) {
     const name = typeof item.name === "string" ? item.name : "";
-    const description = typeof item.description === "string" ? item.description : "";
-    const appearancePrompt =
-      typeof item.appearancePrompt === "string" ? item.appearancePrompt : "";
+    const rawDescription = typeof item.description === "string" ? item.description : "";
     const normalizedName = name.trim().toLocaleLowerCase();
     if (!normalizedName || names.has(normalizedName)) continue;
     names.add(normalizedName);
+
+    const description = type === "character"
+      ? normalizeCharacterDescription(rawDescription)
+      : rawDescription;
+    // style 兼容：模型偶尔把六个视觉维度平铺返回而不嵌 details，先组成 incoming 再归一化
+    const incomingDetails: AssetDetails | undefined =
+      item.details ??
+      (type === "style"
+        ? {
+            kind: "style",
+            mediumMaterial: item.mediumMaterial ?? "",
+            colorPalette: item.colorPalette ?? "",
+            lightingMood: item.lightingMood ?? "",
+            cameraTexture: item.cameraTexture ?? "",
+            composition: item.composition ?? "",
+            emotion: item.emotion ?? "",
+          }
+        : undefined);
+    const details = normalizeAssetDetails({ type, description }, incomingDetails);
+
+    // 角色：外观提示词由代码从中文设定拼装，品种只有一处载体（模型不再同轮写英文）。
+    // 模型没给结构化设定却给了英文提示词时回落英文，避免拼出空描述。
+    const modelAppearance = typeof item.appearancePrompt === "string" ? item.appearancePrompt : "";
+    const appearancePrompt =
+      type === "character"
+        ? composeAssetAppearance({ type, description, details }) || modelAppearance
+        : modelAppearance;
+
     const record: Asset = {
       id: newId("asset"),
       type,
       source: "extracted",
       name,
-      description: type === "character"
-        ? normalizeCharacterDescription(description)
-        : description,
+      description,
       prompt: type === "style" ? "" : appearancePrompt,
-      ...(type === "style"
-        ? {
-            details: normalizeAssetDetails(
-              { type, description },
-              item.details ?? {
-                kind: "style",
-                mediumMaterial: item.mediumMaterial ?? "",
-                colorPalette: item.colorPalette ?? "",
-                lightingMood: item.lightingMood ?? "",
-                cameraTexture: item.cameraTexture ?? "",
-                composition: item.composition ?? "",
-                emotion: item.emotion ?? "",
-              },
-            ),
-          }
-        : { details: normalizeAssetDetails({ type, description }, item.details) }),
+      ...(details ? { details } : {}),
       ...(type === "character"
         ? {
             appearancePrompt,

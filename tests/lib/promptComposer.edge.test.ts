@@ -136,44 +136,45 @@ describe("pickShotReferences 边界", () => {
 /* ── composePortraitPrompt 物种探测边界 ──────────────────────────────────── */
 
 describe("composePortraitPrompt 物种探测边界", () => {
-  it("动物探测按首句判定：第二句含动物词不影响人物判定路径", () => {
-    // 首句无动物词 → humanoid 通用锁定；第二句的 rabbit 不触发物种句
+  it("动物探测按首句兜底：第二句含动物词不影响人物判定路径", () => {
+    // 首句无动物词 → 通用锁定；第二句的 rabbit 不触发物种句
     const out = composePortraitPrompt({
       appearancePrompt: "A young woman with a warm smile. She owns a rabbit.",
     });
-    expect(out).toContain("SUBJECT LOCK");
-    expect(out).not.toContain("SUBJECT SPECIES LOCK");
+    expect(out).toContain("主体锁定：严格保留");
+    expect(out).not.toContain("这个主体是");
   });
 
-  it("猪角色命中 piglet 关键词 → 使用非人类物种锁定", () => {
+  it("猪角色 → 动物物种锁定 + 猪专属解剖约束（历史事故沉淀）", () => {
     const out = composePortraitPrompt({
       appearancePrompt: "A cute chubby pink piglet with short legs and small ears",
     });
-    expect(out).toContain("SUBJECT SPECIES LOCK");
-    expect(out).toContain("Never render it as a human");
-    expect(out).toContain("Normal pig anatomy");
-    expect(out).toContain("four legs");
-    expect(out).not.toContain("SUBJECT LOCK:");
+    expect(out).toContain("这个主体是");
+    expect(out).toContain("绝不画成人物");
+    expect(out).toContain("猪的正常解剖结构");
+    expect(out).toContain("四条腿");
+    expect(out).not.toContain("所描述动物的正常解剖结构");
   });
 
-  it("产品首句命中产品关键词 → 通用锁定（非动物句）", () => {
+  it("产品首句 → 通用锁定（非动物句），且不含人像语汇", () => {
     const out = composePortraitPrompt({
       appearancePrompt: "A sleek product shot of a matte black water bottle",
     });
-    expect(out).toContain("SUBJECT LOCK");
-    expect(out).not.toContain("SUBJECT SPECIES LOCK");
-    // 三个违禁短语均不出现
+    expect(out).toContain("主体锁定：严格保留");
+    expect(out).not.toContain("这个主体是");
     expect(out).not.toContain("Portrait of");
     expect(out).not.toContain("head and shoulders");
     expect(out).not.toContain("looking at camera");
   });
 
-  it("中文首句含物种词（如 小兔子 → rabbit 不匹配中文）走通用锁定，不抛错", () => {
+  it("中文物种词现在生效：「小白兔」拿到动物物种锁定", () => {
+    // 旧实现词表只有英文，中文设定一律走通用锁定（原用例锁的是这个缺陷）；
+    // 中文化改造后中文物种线索纳入判定，必须走动物物种锁定句。
     const out = composePortraitPrompt({
       appearancePrompt: "一只可爱的小白兔，长耳朵，红眼睛。小兔子很活泼。",
     });
-    // 中文关键词不在英文 ANIMAL_KEYWORDS 内 → humanoid 路径，但输出结构完整
-    expect(out).toContain("SUBJECT LOCK");
-    expect(out).toContain("Full-body character design sheet");
+    expect(out).toContain("主体锁定：这个主体是一只可爱的小白兔");
+    expect(out).toContain("绝不画成人物");
+    expect(out).toContain("全身角色设定图，身份一致，画面干净");
   });
 });

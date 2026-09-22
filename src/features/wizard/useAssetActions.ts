@@ -336,6 +336,7 @@ export function useAssetActions(): AssetActions {
               try {
                 const portraitPrompt = composePortraitPrompt({
                   appearancePrompt: char.appearancePrompt?.trim() || char.prompt.trim(),
+                  species: char.details?.kind === "character" ? char.details.species : undefined,
                   stylePrompt,
                 });
                 const url = await generateImage({

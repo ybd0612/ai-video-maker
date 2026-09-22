@@ -194,77 +194,80 @@ export function composeMultiReferencePrompt(i: {
 
 /* ── 定妆照（物种锁定） ──────────────────────────────────────────────────── */
 
-/** 动物物种关键词（按 appearancePrompt 首句小写匹配） */
-const ANIMAL_KEYWORDS = [
+/**
+ * 动物物种线索（中英双语，兼容只存英文外观描述的历史资产）。
+ * 只用于判定"是不是非人类动物"以选择锁定句，**不涉及品种**，不是品种白名单。
+ */
+const ANIMAL_SPECIES_HINTS = [
+  "动物", "宠物", "兔", "猫", "狗", "犬", "狐", "鸟", "鹰", "猫头鹰", "狼", "虎",
+  "狮", "熊", "熊猫", "鹿", "马", "猴", "鼠", "松鼠", "龙", "龟", "企鹅", "象",
+  "生物", "鱼", "猪", "牛", "羊", "鸡", "鸭", "驴", "驼", "貂", "獾", "狸",
   "animal", "rabbit", "bunny", "hare", "cat", "kitten", "dog", "puppy",
   "fox", "bird", "owl", "wolf", "tiger", "lion", "bear", "panda", "deer",
   "horse", "pony", "monkey", "mouse", "squirrel", "dragon", "turtle",
   "penguin", "elephant", "creature", "fish", "pig", "piglet", "boar",
 ] as const;
 
-/** 产品/实物关键词（同样按首句匹配） */
-const PRODUCT_KEYWORDS = [
-  "product", "bottle", "box", "package", "packaging", "device", "phone",
-  "laptop", "watch", "headphones", "sneaker", "shoe", "bag", "cup", "mug",
-  "toy", "camera", "gadget", "keyboard", "jar", "can", "perfume",
-] as const;
-
-/** 取英文/中文首句（句号/问叹号切分），用于物种探测 */
+/** 取英文/中文首句（句号/问叹号切分），用于物种兜底探测 */
 function firstSentence(text: string): string {
   return text.split(/[.!?。！？]/)[0]?.trim() ?? "";
 }
 
-/** 按 appearancePrompt 首句探测物种类型 */
-function detectSpecies(text: string): "animal" | "product" | "humanoid" {
-  const s = firstSentence(text).toLowerCase();
-  if (ANIMAL_KEYWORDS.some((k) => s.includes(k))) return "animal";
-  if (PRODUCT_KEYWORDS.some((k) => s.includes(k))) return "product";
-  return "humanoid";
+/**
+ * 该主体是否应按"非人类动物"上物种锁定。
+ * 优先看结构化 `species`（含品种，如「贵宾犬（泰迪）」「dog (Golden Retriever)」），
+ * 缺失时才回落到外观描述首句探测 —— 兼容只存英文提示词的历史资产。
+ */
+export function isAnimalSubject(species: string | undefined, appearance: string): boolean {
+  const fromSpecies = species?.trim().toLowerCase() ?? "";
+  if (fromSpecies) return ANIMAL_SPECIES_HINTS.some((k) => fromSpecies.includes(k.toLowerCase()));
+  return ANIMAL_SPECIES_HINTS.some((k) => firstSentence(appearance).toLowerCase().includes(k.toLowerCase()));
 }
 
 /** 通用定妆照尾部（全身设定，禁止半身像/看镜头） */
-const PORTRAIT_TAIL =
-  "Full-body character design sheet, consistent identity, clean presentation";
+const PORTRAIT_TAIL = "全身角色设定图，身份一致，画面干净";
 
 /** 按主体补充正向解剖约束；猪单独写明物种典型结构，避免模型把“正确肢体数量”理解得过于宽泛。 */
-function anatomyConstraint(text: string): string {
-  const sentence = firstSentence(text).toLowerCase();
-  if (/\b(?:pig|piglet|boar)\b/.test(sentence)) {
-    return "Normal pig anatomy: one head, one body, four legs, two ears and one snout; no extra or duplicated limbs, no duplicated or fused body parts";
+function anatomyConstraint(species: string | undefined, appearance: string): string {
+  const probe = `${species ?? ""} ${firstSentence(appearance)}`.toLowerCase();
+  if (/猪|pig|piglet|boar/.test(probe)) {
+    return "猪的正常解剖结构：一个头、一个身体、四条腿、两只耳朵和一个鼻子；无多余或重复的肢体，无重复或融合的身体部位";
   }
-  if (ANIMAL_KEYWORDS.some((keyword) => sentence.includes(keyword))) {
-    return "Normal anatomy for the described animal: one head, one body, correct species-typical limb count and placement; no extra or duplicated limbs, no duplicated or fused body parts";
+  if (isAnimalSubject(species, appearance)) {
+    return "所描述动物的正常解剖结构：一个头、一个身体、符合该物种的正常肢体数量与位置；无多余或重复的肢体，无重复或融合的身体部位";
   }
-  return "Normal anatomy for the described subject: one head, one body, correct limb count and placement; no duplicated or fused body parts";
+  return "所描述主体的正常解剖结构：一个头、一个身体、正确的肢体数量与位置；无重复或融合的身体部位";
 }
 
 /**
- * 定妆照专用提示词：物种词前置 + 物种锁定语汇 + 全身角色设定。
- * - animal：物种锁定句（非人类动物，禁止人化）
- * - humanoid / product：通用主体锁定句
- * - 空 appearancePrompt 不产生空锁定句（直接返回风格+尾部）
- * - 严禁 "Portrait of / head and shoulders / looking at camera"（推手之一）
+ * 定妆照专用提示词：物种锁定语汇 + 中文外观描述 + 全身角色设定。
+ * - 动物：物种锁定句（把 `species` 原样写进锁定句，品种因此只有一个来源）
+ * - 其它：通用主体锁定句
+ * - 空描述不产生空锁定句（直接返回风格 + 尾部）
+ * - 严禁 "Portrait of / head and shoulders / looking at camera" 这类人像语汇
  */
 export function composePortraitPrompt(i: {
   appearancePrompt: string;
+  /** 结构化物种（含品种）；决定锁定句与解剖约束，缺失时按外观描述兜底探测 */
+  species?: string;
   stylePrompt?: string;
 }): string {
   const appearance = i.appearancePrompt.trim();
   const style = i.stylePrompt?.trim();
-  const stylePart = style ? `, ${style}` : "";
+  const stylePart = style ? `，${style}` : "";
 
   if (!appearance) {
     // 空描述不产生空锁定句
-    return `${stylePart ? stylePart.replace(/^, /, "") + ". " : ""}${PORTRAIT_TAIL}`;
+    return `${style ? `${style}. ` : ""}${PORTRAIT_TAIL}`;
   }
 
-  const species = detectSpecies(appearance);
-  const lock =
-    species === "animal"
-      ? `SUBJECT SPECIES LOCK: this subject is a non-human animal (${firstSentence(appearance).toLowerCase()}). Never render it as a human, never add human faces or hands. `
-      : "SUBJECT LOCK: strictly preserve the subject type and identity described below; never swap the subject. ";
+  const species = i.species?.trim();
+  const lock = isAnimalSubject(species, appearance)
+    ? `主体锁定：这个主体是${(species || firstSentence(appearance)).replace(/[。.]$/, "")}，` +
+      "严格保留它的物种与品种，绝不替换成其它物种或其它品种，绝不画成人物，绝不添加人脸或人手。"
+    : "主体锁定：严格保留以下描述的主体类型与身份，绝不替换主体。";
 
-  return `${lock}${appearance}${stylePart}. ${anatomyConstraint(appearance)}. ${PORTRAIT_TAIL}`;
+  return `${lock}${appearance}${stylePart}。${anatomyConstraint(species, appearance)}。${PORTRAIT_TAIL}`;
 }
 
 /* ── 分镜图多参考选取 ────────────────────────────────────────────────────── */

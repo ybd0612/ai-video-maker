@@ -42,35 +42,29 @@ beforeEach(() => {
 describe("applyCharacterFidelityFixes", () => {
   const chars = [TEDDY, CAT];
 
-  it("按角色名回填 description 与 appearancePrompt", () => {
+  it("按角色名回填 description", () => {
     const fixes = new Map<string, CharacterFidelityFix>([
-      [
-        "泰迪",
-        {
-          name: "泰迪",
-          description: "一只棕色贵宾犬（泰迪）\n物种: 贵宾犬（泰迪）",
-          appearancePrompt: "a brown toy poodle, teddy cut",
-        },
-      ],
+      ["泰迪", { name: "泰迪", description: "一只棕色贵宾犬（泰迪）\n物种: 贵宾犬（泰迪）" }],
     ]);
     const out = applyCharacterFidelityFixes(chars, fixes);
     expect(out[0].description).toContain("贵宾犬（泰迪）");
-    expect(out[0].appearancePrompt).toBe("a brown toy poodle, teddy cut");
+    // 外观提示词由代码从设定拼装，自检不再改它
+    expect(out[0].appearancePrompt).toBe(TEDDY.appearancePrompt);
     // 未列出的角色保持原对象引用
     expect(out[1]).toBe(CAT);
   });
 
   it("名字大小写与首尾空白不影响匹配", () => {
     const fixes = new Map<string, CharacterFidelityFix>([
-      ["poodle", { name: " Poodle ", appearancePrompt: "x" }],
+      ["poodle", { name: " Poodle ", description: "fixed" }],
     ]);
     const out = applyCharacterFidelityFixes([{ ...TEDDY, name: "  POODLE  " }], fixes);
-    expect(out[0].appearancePrompt).toBe("x");
+    expect(out[0].description).toBe("fixed");
   });
 
   it("空字符串 / 非字符串 / 缺字段的修正被丢弃，保留原值", () => {
     const fixes = new Map<string, CharacterFidelityFix>([
-      ["泰迪", { name: "泰迪", description: "   ", appearancePrompt: 123 }],
+      ["泰迪", { name: "泰迪", description: "   " }],
     ]);
     const out = applyCharacterFidelityFixes(chars, fixes);
     expect(out[0]).toBe(TEDDY);
@@ -78,7 +72,7 @@ describe("applyCharacterFidelityFixes", () => {
 
   it("模型编出的陌生名字不会误伤已有角色", () => {
     const fixes = new Map<string, CharacterFidelityFix>([
-      ["金毛", { name: "金毛", description: "golden", appearancePrompt: "golden" }],
+      ["金毛", { name: "金毛", description: "golden" }],
     ]);
     const out = applyCharacterFidelityFixes(chars, fixes);
     expect(out[0]).toBe(TEDDY);
@@ -139,7 +133,9 @@ describe("auditCharacterFidelity", () => {
     const userMsg = auditCall.messages[1].content as string;
     expect(userMsg).toContain(opts.idea);
     expect(userMsg).toContain("泰迪");
-    expect(userMsg).toContain("a small brown poodle with curly fur");
+    expect(userMsg).toContain("一只经过修剪的棕色泰迪犬");
+    // 外观提示词由代码拼装，不再送进审计
+    expect(userMsg).not.toContain("a small brown poodle with curly fur");
     // 审计自身必须关 Thinking（与另两个审计用途同属格式化改写）
     expect(auditCall.enableThinking).toBe(false);
   });

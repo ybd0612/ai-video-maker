@@ -756,13 +756,13 @@ export async function auditVisualDirection(opts: {
 export interface CharacterFidelityFix {
   name?: unknown;
   description?: unknown;
-  appearancePrompt?: unknown;
 }
 
 /**
- * 按角色名回填忠实修正：只覆盖非空字符串的 description / appearancePrompt。
+ * 按角色名回填忠实修正：只覆盖非空字符串的 description。
  * 名字对不上、字段缺失或内容没变化都原样返回 —— 宁可保留提取结果，
- * 也不引入半截设定（description 是 9 行结构的唯一载体，被清空会连带丢物种）。
+ * 也不引入半截设定（description 是 9 行结构的唯一载体，被清空会连带丢物种；
+ * 外观提示词由代码从它拼装，因此修 description 就等于修了生图输入）。
  */
 export function applyCharacterFidelityFixes(
   characters: RawCharacter[],
@@ -773,12 +773,7 @@ export function applyCharacterFidelityFixes(
     if (!fix) return c;
     const description =
       typeof fix.description === "string" && fix.description.trim() ? fix.description : c.description;
-    const appearancePrompt =
-      typeof fix.appearancePrompt === "string" && fix.appearancePrompt.trim()
-        ? fix.appearancePrompt
-        : c.appearancePrompt;
-    if (description === c.description && appearancePrompt === c.appearancePrompt) return c;
-    return { ...c, description, appearancePrompt };
+    return description === c.description ? c : { ...c, description };
   });
 }
 
@@ -830,7 +825,6 @@ export async function auditCharacterFidelity(opts: {
                 name: c.name,
                 description: c.description,
                 species: c.details?.species,
-                appearancePrompt: c.appearancePrompt,
               })),
               null,
               2,
@@ -928,7 +922,7 @@ export async function extractAssetsByType(
     // 不按类型分键会让四路决策互相覆盖同一缓存槽，下一轮整体命中最后写入者。
     cacheKey: type,
     context: [
-      "Task: extract typed assets (characters, products, props, scenes, style) with structured details and English appearance prompts, as strict JSON.",
+      "Task: extract typed assets (characters, products, props, scenes, style) with structured details as strict JSON. Characters carry structured details only (their image prompt is composed in code); products/props/scenes also carry an English appearance prompt.",
       `This call extracts ONLY: ${type}`,
       `Language: ${opts.language}`,
       `Aspect ratio: ${opts.aspectRatio}`,

@@ -262,53 +262,62 @@ describe("composeTextToImagePrompt 注入注册表规则", () => {
 });
 
 describe("composePortraitPrompt", () => {
-  it("动物角色：含物种锁定句（禁止人化），且不含 Portrait of / head and shoulders", () => {
+  it("动物角色：中文物种锁定句（禁止人化），且不含人像语汇", () => {
     const out = composePortraitPrompt({
       appearancePrompt: "a small white rabbit with long ears",
     });
-    expect(out).toContain("SUBJECT SPECIES LOCK");
-    expect(out).toContain("Never render it as a human");
-    expect(out).toContain("Normal anatomy for the described animal");
-    expect(out).toContain("correct species-typical limb count and placement");
+    expect(out).toContain("主体锁定：这个主体是");
+    expect(out).toContain("绝不画成人物");
+    expect(out).toContain("所描述动物的正常解剖结构");
+    expect(out).toContain("符合该物种的正常肢体数量与位置");
     expect(out).not.toContain("Portrait of");
     expect(out).not.toContain("head and shoulders");
     expect(out).not.toContain("looking at camera");
   });
 
-  it("人物角色：含通用主体锁定句与全身设定尾部", () => {
+  it("物种判定优先吃结构化 species：英文描述无动物词也不再让狗退化", () => {
+    // 历史缺陷：词表只认英文，"Realistic young Labrador Retriever" 被判成 humanoid，
+    // 狗拿的是弱版通用锁定句（橘猫反而拿到强版物种锁定）。
+    const out = composePortraitPrompt({
+      appearancePrompt: "Realistic young Labrador Retriever, medium to large muscular build",
+      species: "贵宾犬（泰迪）",
+    });
+    expect(out).toContain("这个主体是贵宾犬（泰迪）");
+    expect(out).toContain("严格保留它的物种与品种");
+    expect(out).toContain("所描述动物的正常解剖结构");
+  });
+
+  it("人物角色：通用主体锁定句与全身设定尾部", () => {
     const out = composePortraitPrompt({
       appearancePrompt: "a young woman with long dark hair",
     });
-    expect(out).toContain("SUBJECT LOCK");
-    expect(out).toContain("Full-body character design sheet, consistent identity, clean presentation");
-    expect(out).toContain("Normal anatomy for the described subject");
-    expect(out).toContain("correct limb count and placement");
-    expect(out).not.toContain("no extra or duplicated limbs");
-    expect(out).toContain("no duplicated or fused body parts");
-    expect(out).not.toContain("head and shoulders");
+    expect(out).toContain("主体锁定：严格保留以下描述的主体类型与身份，绝不替换主体。");
+    expect(out).toContain("全身角色设定图，身份一致，画面干净");
+    expect(out).toContain("所描述主体的正常解剖结构");
+    expect(out).not.toContain("绝不画成人物");
   });
 
-  it("stylePrompt 追加在 appearancePrompt 之后、尾部之前", () => {
+  it("stylePrompt 追加在外观描述之后、尾部之前", () => {
     const out = composePortraitPrompt({
       appearancePrompt: "a small white rabbit.",
       stylePrompt: "watercolor illustration style",
     });
-    expect(out).toContain("a small white rabbit., watercolor illustration style");
-    expect(out.indexOf("watercolor")).toBeLessThan(out.indexOf("Full-body character design sheet"));
+    expect(out).toContain("a small white rabbit.，watercolor illustration style。");
+    expect(out.indexOf("watercolor")).toBeLessThan(out.indexOf("全身角色设定图"));
   });
 
-  it("空 appearancePrompt 不产生空锁定句（无 SUBJECT 字样）", () => {
+  it("空 appearancePrompt 不产生空锁定句", () => {
     const out = composePortraitPrompt({ appearancePrompt: "", stylePrompt: "anime" });
-    expect(out).not.toContain("SUBJECT");
-    expect(out).toContain("Full-body character design sheet");
+    expect(out).not.toContain("主体锁定");
+    expect(out).toContain("全身角色设定图");
   });
 
   it("产品主体走通用锁定句（非动物物种句）", () => {
     const out = composePortraitPrompt({
       appearancePrompt: "a product shot of a glass bottle",
     });
-    expect(out).toContain("SUBJECT LOCK");
-    expect(out).not.toContain("SUBJECT SPECIES LOCK");
+    expect(out).toContain("主体锁定：严格保留");
+    expect(out).not.toContain("这个主体是");
   });
 });
 
