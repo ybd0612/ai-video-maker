@@ -185,18 +185,6 @@ export const useProjectStore = create<ProjectState>()(
           ),
         })),
 
-      clearProject: () => {
-        const { activeProjectId } = get();
-        if (!activeProjectId) return;
-        set((s) => ({
-          projects: s.projects.filter((p) => p.id !== activeProjectId),
-          activeProjectId:
-            s.projects.length > 1
-              ? s.projects.find((p) => p.id !== activeProjectId)?.id ?? null
-              : null,
-        }));
-      },
-
       /* ── Shot actions ───────────────────────────────────────────────── */
 
       setShots: (shots) =>

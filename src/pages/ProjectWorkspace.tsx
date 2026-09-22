@@ -8,38 +8,24 @@
 // 避免同一份镜头数据存在两处可编辑入口而产生数据不一致。
 // ────────────────────────────────────────────────────────────────────────────
 
-import { useCallback } from "react";
 import { useProjectStore, selectActiveProject } from "@/stores/projectStore";
 import { useSettingsStore } from "@/stores/settingsStore";
 import { useT } from "@/i18n";
 import { ProjectSidebar } from "@/features/projects/ProjectSidebar";
-import { Settings, Trash2, Moon, Sun, TerminalSquare } from "lucide-react";
+import { Settings, Moon, Sun, TerminalSquare } from "lucide-react";
 import { LogConsoleDock } from "@/components/LogConsoleDock";
 import { ApiKeyBanner } from "@/components/ApiKeyBanner";
-import { confirmDialog } from "@/components/ui/ConfirmDialog";
 import { CreationWizard } from "@/features/wizard/CreationWizard";
 
 export function ProjectWorkspace() {
   const t = useT();
   const project = useProjectStore(selectActiveProject);
   const projects = useProjectStore((s) => s.projects);
-  const clearProject = useProjectStore((s) => s.clearProject);
   const openSettings = useSettingsStore((s) => s.setSettingsDialogOpen);
   const theme = useSettingsStore((s) => s.theme);
   const setTheme = useSettingsStore((s) => s.setTheme);
   const showLogPanel = useSettingsStore((s) => s.showLogPanel);
   const setShowLogPanel = useSettingsStore((s) => s.setShowLogPanel);
-
-  // Clear project
-  const handleClear = useCallback(async () => {
-    const ok = await confirmDialog({
-      title: t("pipeline.deleteProject"),
-      message: t("pipeline.deleteProjectConfirm").replace("{title}", project?.title ?? ""),
-      confirmLabel: t("dialog.confirm"),
-      variant: "danger",
-    });
-    if (ok) clearProject();
-  }, [clearProject, project?.title, t]);
 
   return (
     <div className="flex h-screen w-screen flex-col overflow-hidden bg-app">
@@ -90,17 +76,6 @@ export function ProjectWorkspace() {
           >
             <Settings size={14} />
           </button>
-
-          {/* Clear */}
-          {project && (
-            <button
-              onClick={handleClear}
-              className="rounded-md p-1.5 text-ink-4 hover:bg-danger-deep hover:text-danger"
-              title={t("pipeline.deleteProject")}
-            >
-              <Trash2 size={14} />
-            </button>
-          )}
         </div>
       </header>
 

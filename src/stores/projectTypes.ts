@@ -267,7 +267,6 @@ export interface ProjectState {
   duplicateProject: (id: string) => Project | null;
   setProjectStatus: (status: ProjectStatus, error?: string) => void;
   setProjectStatusById: (projectId: string, status: ProjectStatus, error?: string) => void;
-  clearProject: () => void;
 
   /* Shot actions */
   setShots: (shots: Shot[]) => void;
