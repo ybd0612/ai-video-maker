@@ -383,6 +383,37 @@ export function composeAssetAppearance(
  * 结构化设定的字段行（剔除内部判别字段 `kind`），顺序即 details 的键顺序。
  * 展示层（资产编辑器「完整设定」）与下游文本链路共用，避免各处各写一遍。
  */
+/**
+ * 分镜用**短外观锚点**：只给一句身份描述（摘要 + 物种/类型），不复制完整设定。
+ *
+ * 2026-09-22 回归修复：分镜骨架与规则都要求「沿用资产外观描述原文」，而完整档外观
+ * 是带标签的整份设定（物种：…，外貌：…，服饰：…，识别特征：…），于是 visualPrompt
+ * 膨胀到 1100-1400 字、开头被某一个角色的完整身份垄断，模型把整句读成
+ * 「主体=开头那只动物」→ 多角色镜头画出两只猫、镜头间主体漂移。
+ * 完整设定交给参考图锚定，镜头提示词只需要一个短身份锚点。
+ */
+export const BRIEF_APPEARANCE_FIELDS: Record<AssetDetails["kind"], string[]> = {
+  character: ["species"],
+  scene: ["settingType"],
+  product: ["category"],
+  prop: ["objectType"],
+  style: [],
+};
+
+export function composeAssetBriefAppearance(
+  asset: Pick<Asset, "type" | "description" | "details">,
+): string {
+  const summary = splitAssetDescription(asset.description ?? "").summary.replace(/[。.]+$/, "");
+  const details = asset.details as Record<string, string> | undefined;
+  const parts: string[] = [];
+  if (summary) parts.push(summary);
+  for (const key of BRIEF_APPEARANCE_FIELDS[asset.type] ?? []) {
+    const value = details?.[key]?.trim().replace(/[。.]+$/, "");
+    if (value && !parts.some((x) => x.includes(value) || value.includes(x))) parts.push(value);
+  }
+  return parts.join("，");
+}
+
 export function detailEntries(
   details: AssetDetails | undefined,
 ): Array<[string, string]> {

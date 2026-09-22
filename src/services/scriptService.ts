@@ -15,7 +15,7 @@ import {
 import { extractJsonFromResponse, parseJsonFromResponse } from "@/lib/jsonResponse";
 import { getTranslation } from "@/i18n";
 import { resolveGenerationParams } from "@/lib/generationParams";
-import { composeAssetDescription } from "@/lib/assetDetails";
+import { composeAssetBriefAppearance, composeAssetDescription } from "@/lib/assetDetails";
 import { toIdRef, toIdRefList } from "@/lib/shotReferences";
 import type { AuditOutcome } from "@/lib/refineContent";
 
@@ -129,24 +129,20 @@ function buildAssetsContext(language: "zh" | "en", assets?: Asset[]): string {
   const products = (assets ?? []).filter((a) => a.type === "product");
   const props = (assets ?? []).filter((a) => a.type === "prop");
 
-  // 取资产的英文外观提示词（appearancePrompt）：角色存于专属字段 appearancePrompt，
-  // 场景/产品/道具存于 prompt（extractAssets 提取时同源拷贝），这里兼容两种落库位置。
-  const firstNonEmpty = (...values: unknown[]): string =>
-    values.find((value): value is string => typeof value === "string" && value.trim() !== "")?.trim() ?? "";
-  const assetAppearancePrompt = (a: Asset): string =>
-    firstNonEmpty(a.appearancePrompt, a.prompt);
+  // 分镜只给一句短外观锚点，完整设定交给参考图锚定：
+  // 逐字复用完整设定会让 visualPrompt 膨胀到上千字，并让开头那个主体垄断整张画面（2026-09-22 实测回归）。
+  const assetAppearancePrompt = (a: Asset): string => composeAssetBriefAppearance(a);
 
-  // 每个资产条目显式注入英文外观提示词（appearancePrompt），同时保留 composeAssetDescription
-  // 的 details；storyboardShot 骨架明确要求「主体外观直接沿用所给资产的英文外观描述」，
-  // 缺了这段，模型就只能凭空捏造外观，破坏跨镜头一致性。
+  // 每个资产条目注入一句短外观锚点，同时保留 composeAssetDescription 的完整设定供模型理解语境；
+  // 缺了锚点，模型只能凭空捏造外观，破坏跨镜头一致性。
   const withAppearance = (line: string, ap: string): string =>
-    ap ? `${line}\n  appearancePrompt: ${ap}` : line;
+    ap ? `${line}\n  外观锚点: ${ap}` : line;
 
   if (language === "en") {
     let charSection = "";
     if (characters.length > 0) {
       charSection =
-        "\nExisting characters (use corresponding IDs if content involves them). Reuse the character's English appearancePrompt verbatim in visualPrompt:\n" +
+        "\nExisting characters (use corresponding IDs if content involves them). In visualPrompt use ONLY the one-line appearance anchor given below; never copy the full asset details:\n" +
         characters
           .map((c) =>
             withAppearance(
@@ -161,7 +157,7 @@ function buildAssetsContext(language: "zh" | "en", assets?: Asset[]): string {
     let sceneSection = "";
     if (scenes.length > 0) {
       sceneSection =
-        "\nAvailable scene references (use these scenes, keep sceneDesc consistent with scene names). Reuse the scene's English appearancePrompt verbatim in visualPrompt:\n" +
+        "\nAvailable scene references (use these scenes, keep sceneDesc consistent with scene names). In visualPrompt use ONLY the one-line appearance anchor given below; never copy the full scene details:\n" +
         scenes
           .map((s) =>
             withAppearance(`- ${s.name} (ID: ${s.id}): ${composeAssetDescription(s)}`, assetAppearancePrompt(s)),
@@ -173,7 +169,7 @@ function buildAssetsContext(language: "zh" | "en", assets?: Asset[]): string {
     let productSection = "";
     if (products.length > 0) {
       productSection =
-        "\nExisting product subjects (if content involves these products, keep the subject consistent across shots). Reuse the product's English appearancePrompt verbatim in visualPrompt:\n" +
+        "\nExisting product subjects (if content involves these products, keep the subject consistent across shots). In visualPrompt use ONLY the one-line appearance anchor given below; never copy the full product details:\n" +
         products
           .map((p) =>
             withAppearance(`- ${p.name} (ID: ${p.id}): ${composeAssetDescription(p)}`, assetAppearancePrompt(p)),
@@ -185,7 +181,7 @@ function buildAssetsContext(language: "zh" | "en", assets?: Asset[]): string {
     let propSection = "";
     if (props.length > 0) {
       propSection =
-        "\nExisting props / key objects (use IDs when they appear in a shot). Reuse the prop's English appearancePrompt verbatim in visualPrompt:\n" +
+        "\nExisting props / key objects (use IDs when they appear in a shot). In visualPrompt use ONLY the one-line appearance anchor given below; never copy the full prop details:\n" +
         props
           .map((p) =>
             withAppearance(
@@ -203,7 +199,7 @@ function buildAssetsContext(language: "zh" | "en", assets?: Asset[]): string {
   let charSection = "";
   if (characters.length > 0) {
     charSection =
-      "\n已有角色（如内容涉及这些角色，请使用对应 ID）。visualPrompt 中的主体外观请直接沿用该角色的英文 appearancePrompt：\n" +
+      "\n已有角色（如内容涉及这些角色，请使用对应 ID）。visualPrompt 只使用下面给出的**一句短外观锚点**，禁止复制完整设定：\n" +
       characters
         .map((c) =>
           withAppearance(

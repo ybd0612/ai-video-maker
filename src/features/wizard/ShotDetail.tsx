@@ -6,7 +6,7 @@
 // 撤销依赖本次会话的快照栈（与资产详情一致）。
 // ────────────────────────────────────────────────────────────────────────────
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { Asset, Shot } from "@/stores/projectStore";
 import { useProjectStore } from "@/stores/projectStore";
 import { useT, type TranslationKey } from "@/i18n";
@@ -60,6 +60,15 @@ export function ShotDetail({ shot, assets, onClose, onRevise, onReroll, hasApiKe
   const [instruction, setInstruction] = useState("");
   const [history, setHistory] = useState<Array<Partial<Shot>>>([]);
   const [busy, setBusy] = useState(false);
+
+  // 与资产 / 角色 / 视觉方向编辑器一致：ESC 退回列表；在飞任务期间不关闭
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape" && !busy) onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [busy, onClose]);
 
   // 生成中（本步改写 / 后续步骤产图产视频）一律关闭改写入口：避免覆盖在飞结果
   const generating =

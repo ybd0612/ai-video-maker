@@ -383,7 +383,7 @@ Return strict JSON in exactly this format, no other text:
   storyboardShot: {
     zh: `你是一位专业的视频分镜设计师。你会拿到分镜大纲与其中一个镜头的计划，你的任务是把这一个镜头写完整：
 1. scriptText：该镜头的叙事脚本（含动作与情绪，语言随用户输入）
-2. visualPrompt：完整中文画面提示词——主体外观（直接沿用所给资产的外观描述原文）、动作、环境、构图与镜头；只描述该镜头
+2. visualPrompt：完整中文画面提示词——主体外观（**只用所给的一句短外观锚点**，不要把物种/外貌/服饰/识别特征逐条展开）、动作、环境、构图与镜头；只描述该镜头
 3. motionPrompt：完整中文运动提示词——主体动作、镜头运动、环境变化
 4. 其余描述字段（sceneDesc/detailDesc/lightingDesc/styleDesc/actionDesc/cameraDesc/envChangeDesc/motionSpeedDesc）逐项填写；主体信息只写入 visualPrompt，不再单独生成 subjectDesc
 5. dialogues 按需给对白（characterId 用角色名），activeCharacterIds/activeSceneId/activeProductIds/activePropIds 用已有资产的 ID；visualPrompt 或 scriptText 中出现的可识别道具/产品必须同步写入对应 active ID，duration 从 4/5/8 中选
@@ -476,7 +476,7 @@ Return ONLY the appearance description, with no explanations and no bullet point
 
   /* ── 风格提示词派生（useWizardActions.deriveStylePrompt） ── */
   styleRef: {
-    zh: `You are a visual style director. Based only on the desired visual direction fields, produce ONE English reusable image-style prompt. It will be reused for asset images and storyboard shot images; a separate assembly layer adds the abstract style sample-sheet carrier.
+    zh: `You are a visual style director. Based only on the desired visual direction fields, produce ONE reusable image-style prompt written in Chinese. It will be reused for asset images and storyboard shot images; a separate assembly layer adds the abstract style sample-sheet carrier.
 
 The prompt MUST describe ONLY reusable visual language:
 - medium / art form
@@ -500,7 +500,7 @@ Examples:
 {{/examples}}
 
 Output ONLY the prompt text itself, one to three sentences, no quotes, no explanation.`,
-    en: `You are a visual style director. Based only on the desired visual direction fields, produce ONE English reusable image-style prompt. It will be reused for asset images and storyboard shot images; a separate assembly layer adds the abstract style sample-sheet carrier.
+    en: `You are a visual style director. Based only on the desired visual direction fields, produce ONE reusable image-style prompt written in Chinese. It will be reused for asset images and storyboard shot images; a separate assembly layer adds the abstract style sample-sheet carrier.
 
 The prompt MUST describe ONLY reusable visual language:
 - medium / art form
@@ -844,8 +844,8 @@ export const BUILTIN_RULES: PromptRule[] = [
     task: "storyboardShot",
     section: "rules",
     content: {
-      zh: "- 如有角色出场，visualPrompt 必须包含角色完整外貌描述",
-      en: "- If characters appear, visualPrompt MUST include their full appearance",
+      zh: "- 如有角色出场，visualPrompt 只使用所给的一句短外观锚点；禁止把资产的完整设定（物种/外貌/服饰/识别特征）逐条复制进镜头提示词——那会让提示词膨胀到上千字，并让开头那个主体垄断整张画面",
+      en: "- If characters appear, visualPrompt uses ONLY the one-line appearance anchor provided; never copy the asset's full details (species / looks / outfit / signature) — that bloats the prompt past a thousand characters and lets whichever subject appears first dominate the whole frame",
     },
     enabled: true,
     source: "builtin",
