@@ -249,7 +249,7 @@ describe("getActiveRuleText", () => {
   it("默认（无显式 rules）从内置条目提取某 task 的生效规则文本，按语言拼接", () => {
     const compose = getActiveRuleText("composeShot", "en");
     expect(compose).toContain("In multi-reference composition, declare each reference image's role");
-    expect(compose).toContain("reuse the asset's appearancePrompt from the registry");
+    expect(compose).toContain("reuse the asset's appearancePrompt (Chinese) from the registry");
     const negative = getActiveRuleText("negativeStrategy", "en");
     expect(negative).toContain("Keep negative prompts to generic quality defects");
   });

@@ -249,13 +249,13 @@ Return no other fields and no parameters outside the legal range.`,
     { "name": "角色名", "description": "一句话总述", "details": { "species": "物种 + 品种（如 贵宾犬（泰迪）、猫（橘色家猫））", "role": "身份", "age": "年龄阶段", "personality": "性格与行为倾向", "appearance": "体型、比例、五官、颜色、材质", "outfit": "服饰与配饰", "signature": "跨镜头识别特征", "background": "来历与角色关系" } }
   ],
   "products": [
-    { "name": "产品名", "description": "一句话定位", "details": { "category": "产品类型", "purpose": "核心用途", "silhouette": "整体轮廓与比例", "dimensions": "尺寸与比例", "color": "颜色", "material": "材质", "structure": "结构组成", "surfaceDetails": "表面细节", "branding": "品牌或 Logo", "signature": "不可改变的识别特征", "usageState": "使用状态" }, "appearancePrompt": "完整英文产品外观提示词" }
+    { "name": "产品名", "description": "一句话定位", "details": { "category": "产品类型", "purpose": "核心用途", "silhouette": "整体轮廓与比例", "dimensions": "尺寸与比例", "color": "颜色", "material": "材质", "structure": "结构组成", "surfaceDetails": "表面细节", "branding": "品牌或 Logo", "signature": "不可改变的识别特征", "usageState": "使用状态" } }
   ],
   "props": [
-    { "name": "道具名", "description": "一句话定位", "details": { "purpose": "道具用途", "storyRole": "故事作用", "objectType": "物件类型", "shape": "整体形状", "dimensions": "尺寸与比例", "material": "材质", "color": "颜色", "structure": "结构细节", "wear": "磨损与使用痕迹", "signature": "特殊标记或识别特征", "usage": "在镜头中的使用方式" }, "appearancePrompt": "完整英文道具外观提示词" }
+    { "name": "道具名", "description": "一句话定位", "details": { "purpose": "道具用途", "storyRole": "故事作用", "objectType": "物件类型", "shape": "整体形状", "dimensions": "尺寸与比例", "material": "材质", "color": "颜色", "structure": "结构细节", "wear": "磨损与使用痕迹", "signature": "特殊标记或识别特征", "usage": "在镜头中的使用方式" } }
   ],
   "scenes": [
-    { "name": "场景名", "description": "一句话定位", "details": { "settingType": "空间类型", "environment": "地理与环境", "time": "时间", "weather": "天气", "elements": "主要元素", "spatialLayers": "前景、中景、背景与空间层次", "lighting": "光线方向与质量", "paletteMood": "色彩与氛围", "storyUse": "可用于哪些剧情" }, "appearancePrompt": "完整英文场景外观提示词" }
+    { "name": "场景名", "description": "一句话定位", "details": { "settingType": "空间类型", "environment": "地理与环境", "time": "时间", "weather": "天气", "elements": "主要元素", "spatialLayers": "前景、中景、背景与空间层次", "lighting": "光线方向与质量", "paletteMood": "色彩与氛围", "storyUse": "可用于哪些剧情" } }
   ],
   "styles": [
     {
@@ -277,8 +277,9 @@ Return no other fields and no parameters outside the legal range.`,
 {{#safety}}
 {{safety}}
 {{/safety}}
-- appearancePrompt 必须只描述对应资产本身的可视化外观，不写故事动作、角色关系或其他资产；视觉方向只提供画风参考，不把故事主体写入视觉方向描述
-- 场景 appearancePrompt 只描述环境、空间、时间、天气、光线、材质与氛围；产品和道具 appearancePrompt 只描述物件本体
+- 不要写 appearancePrompt：生图用的外观描述由代码从你返回的结构化设定拼装，因此**可视化字段必须填全**（缺字段的资产会拼出残缺提示词）
+- 每个资产的设定必须只描述它本身的可视化外观，不写故事动作、角色关系或其他资产；视觉方向只提供画风参考，不把故事主体写入视觉方向描述
+- 场景设定只描述环境、空间、时间、天气、光线、材质与氛围；产品和道具设定只描述物件本体
 - 不要生成分镜，只返回上述 JSON`,
     en: `You are a professional video asset extraction assistant. The user will give you a video topic or idea. Extract asset info and return strictly in this JSON format, no other text:
 {
@@ -286,13 +287,13 @@ Return no other fields and no parameters outside the legal range.`,
     { "name": "Character name", "description": "One-sentence summary + 8 elements (species → role → age → personality → looks → outfit → signature → background), each element on its own line prefixed with its name + colon", "details": { "species": "Species + breed (e.g. poodle (Teddy), cat (orange tabby))", "role": "Role", "age": "Age stage", "personality": "Personality and behavior", "appearance": "Body shape, proportions, features, color, material", "outfit": "Clothing and accessories", "signature": "Cross-shot identifying trait", "background": "Origin and character relationships" } }
   ],
   "products": [
-    { "name": "Product name", "description": "Brief positioning", "details": { "category": "Product type", "purpose": "Core purpose", "silhouette": "Overall silhouette and proportions", "dimensions": "Size and proportions", "color": "Color", "material": "Material", "structure": "Structure", "surfaceDetails": "Surface details", "branding": "Brand or logo", "signature": "Unchangeable identifying feature", "usageState": "Usage state" }, "appearancePrompt": "Appearance description in English (style, color, material, logo, etc.)" }
+    { "name": "Product name", "description": "Brief positioning", "details": { "category": "Product type", "purpose": "Core purpose", "silhouette": "Overall silhouette and proportions", "dimensions": "Size and proportions", "color": "Color", "material": "Material", "structure": "Structure", "surfaceDetails": "Surface details", "branding": "Brand or logo", "signature": "Unchangeable identifying feature", "usageState": "Usage state" } }
   ],
   "props": [
-    { "name": "Prop name", "description": "Brief positioning", "details": { "purpose": "Prop purpose", "storyRole": "Story role", "objectType": "Object type", "shape": "Overall shape", "dimensions": "Size and proportions", "material": "Material", "color": "Color", "structure": "Structure details", "wear": "Wear and usage traces", "signature": "Special marking or identifying feature", "usage": "How it is used in shot" }, "appearancePrompt": "Appearance description in English (material, color, shape and distinctive details)" }
+    { "name": "Prop name", "description": "Brief positioning", "details": { "purpose": "Prop purpose", "storyRole": "Story role", "objectType": "Object type", "shape": "Overall shape", "dimensions": "Size and proportions", "material": "Material", "color": "Color", "structure": "Structure details", "wear": "Wear and usage traces", "signature": "Special marking or identifying feature", "usage": "How it is used in shot" } }
   ],
   "scenes": [
-    { "name": "Scene name", "description": "Brief positioning", "details": { "settingType": "Space type", "environment": "Geography and environment", "time": "Time", "weather": "Weather", "elements": "Key elements", "spatialLayers": "Foreground, midground, background and spatial layers", "lighting": "Light direction and quality", "paletteMood": "Color and mood", "storyUse": "Which scenes it can serve" }, "appearancePrompt": "English scene description (environment, lighting, atmosphere)" }
+    { "name": "Scene name", "description": "Brief positioning", "details": { "settingType": "Space type", "environment": "Geography and environment", "time": "Time", "weather": "Weather", "elements": "Key elements", "spatialLayers": "Foreground, midground, background and spatial layers", "lighting": "Light direction and quality", "paletteMood": "Color and mood", "storyUse": "Which scenes it can serve" } }
   ],
   "styles": [
     {
@@ -314,8 +315,9 @@ Examples:
 {{#safety}}
 {{safety}}
 {{/safety}}
-- appearancePrompt must describe only the visual appearance of its own asset, not story action, character relationships or other assets; the visual direction must contain style language, not story subjects
-- Scene appearancePrompt describes only environment, space, time, weather, lighting, material and atmosphere; product and prop appearancePrompt describe only the object itself
+- Do NOT write appearancePrompt: the image prompt is composed in code from the structured details you return, so **every visual field must be filled** (a missing field yields a truncated image prompt)
+- Each asset's details must describe only its own visual appearance, not story action, character relationships or other assets; the visual direction must contain style language, not story subjects
+- Scene details describe only environment, space, time, weather, lighting, material and atmosphere; product and prop details describe only the object itself
 - Do NOT generate storyboard shots; return only the JSON above`,
   },
 
@@ -1015,8 +1017,8 @@ export const BUILTIN_RULES: PromptRule[] = [
     task: "composeShot",
     section: "rules",
     content: {
-      zh: "- 拼装画面提示词时，主体英文外观直接复用注册表中该资产的 appearancePrompt（来自 extractAssets 骨架的资产本体），保持跨镜头一致；风格母版只叠加纯视觉语言（复用 styleRef/visualDirection 骨架），不重写主体",
-      en: "- When composing the image prompt, reuse the asset's appearancePrompt from the registry (the asset body from the extractAssets skeleton) verbatim for cross-shot consistency; the style master only layers pure visual language (reuse the styleRef/visualDirection skeletons) and never rewrites the subject",
+      zh: "- 拼装画面提示词时，主体外观直接复用注册表中该资产的 appearancePrompt（来自 extractAssets 骨架的资产本体），保持跨镜头一致；风格母版只叠加纯视觉语言（复用 styleRef/visualDirection 骨架），不重写主体",
+      en: "- When composing the image prompt, reuse the asset's appearancePrompt (Chinese) from the registry (the asset body from the extractAssets skeleton) verbatim for cross-shot consistency; the style master only layers pure visual language (reuse the styleRef/visualDirection skeletons) and never rewrites the subject",
     },
     enabled: true,
     source: "builtin",

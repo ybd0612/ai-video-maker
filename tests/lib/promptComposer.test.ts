@@ -78,10 +78,12 @@ describe("composeTextToImagePrompt", () => {
 /* ── 资产图拼装（composeTextToImagePrompt + assetImageBoundary） ──────────── */
 
 describe("资产主体边界与视觉方向", () => {
-  it("按资产类型生成最小主体边界，同时保留让模型生成具体提示词的空间", () => {
-    expect(assetImageBoundary("scene")).toContain("Environment-only");
-    expect(assetImageBoundary("product")).toContain("Product-only");
-    expect(assetImageBoundary("prop")).toContain("Prop-only");
+  it("按资产类型生成中文最小主体边界（只声明边界，不重写资产内容）", () => {
+    expect(assetImageBoundary("scene")).toContain("场景图：只画这个空间本身");
+    expect(assetImageBoundary("scene")).toContain("不要出现角色或剧情动作");
+    expect(assetImageBoundary("product")).toContain("产品图：只画这个产品本体");
+    expect(assetImageBoundary("product")).toContain("不要出现人物或使用场景");
+    expect(assetImageBoundary("prop")).toContain("道具图：只画这个物件本体");
     expect(assetImageBoundary("scene")).not.toContain("rabbit");
   });
 

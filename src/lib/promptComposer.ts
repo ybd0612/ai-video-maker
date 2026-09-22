@@ -121,12 +121,13 @@ export function composeTextToImagePrompt(i: {
 
 /**
  * 资产生图的最小主体边界：要求模型只呈现当前资产。
- * 具体外观提示词仍由资产提取/编辑模型生成，避免在代码中重写资产内容。
+ * 具体外观描述由 `assetDetails.composeAssetAppearance` 从结构化设定拼装，
+ * 代码只声明边界，不重写资产内容。
  */
 export function assetImageBoundary(type: "scene" | "product" | "prop"): string {
-  if (type === "scene") return "Environment-only image; show the environment itself, not a story scene or characters.";
-  if (type === "product") return "Product-only image; show only the product itself, not people or a usage scene.";
-  return "Prop-only image; show only the named object itself, not characters or story action.";
+  if (type === "scene") return "场景图：只画这个空间本身的环境与构图，不要出现角色或剧情动作。";
+  if (type === "product") return "产品图：只画这个产品本体，不要出现人物或使用场景。";
+  return "道具图：只画这个物件本体，不要出现角色或剧情动作。";
 }
 
 /**

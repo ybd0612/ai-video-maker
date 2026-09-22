@@ -77,13 +77,14 @@ export function extractNewAssets(
         : undefined);
     const details = normalizeAssetDetails({ type, description }, incomingDetails);
 
-    // 角色：外观提示词由代码从中文设定拼装，品种只有一处载体（模型不再同轮写英文）。
-    // 模型没给结构化设定却给了英文提示词时回落英文，避免拼出空描述。
+    // 外观提示词由代码从中文设定拼装（四类通用，style 除外）：品种/材质等事实只有一处载体，
+    // 模型同轮再写一份英文必然出现两份表述各说一套。
+    // 设定全缺时回落模型给的提示词，避免拼出空描述。
     const modelAppearance = typeof item.appearancePrompt === "string" ? item.appearancePrompt : "";
     const appearancePrompt =
-      type === "character"
-        ? composeAssetAppearance({ type, description, details }) || modelAppearance
-        : modelAppearance;
+      type === "style"
+        ? modelAppearance
+        : composeAssetAppearance({ type, description, details }) || modelAppearance;
 
     const record: Asset = {
       id: newId("asset"),
