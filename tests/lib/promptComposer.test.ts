@@ -302,8 +302,10 @@ describe("composePortraitPrompt", () => {
       appearancePrompt: "a small white rabbit.",
       stylePrompt: "watercolor illustration style",
     });
-    expect(out).toContain("a small white rabbit.，watercolor illustration style。");
+    expect(out).toContain("watercolor illustration style");
     expect(out.indexOf("watercolor")).toBeLessThan(out.indexOf("全身角色设定图"));
+    // 风格段自带句末标点时不得叠出双句号
+    expect(out).not.toContain("。。");
   });
 
   it("空 appearancePrompt 不产生空锁定句", () => {
@@ -318,6 +320,27 @@ describe("composePortraitPrompt", () => {
     });
     expect(out).toContain("主体锁定：严格保留");
     expect(out).not.toContain("这个主体是");
+  });
+
+  it("stylePrompt 自带句号时不叠出双句号", () => {
+    // 英文链路同样有此瑕疵（生产日志里 "feeling.. Normal anatomy"）
+    const out = composePortraitPrompt({
+      appearancePrompt: "一只棕色泰迪犬。",
+      species: "贵宾犬（泰迪）",
+      stylePrompt: "电影感写实，暖色调。",
+    });
+    expect(out).not.toContain("。。");
+    expect(out).not.toContain("..");
+  });
+
+  it("取景约束前置于外观描述（实测末尾放法会画成半身胸像）", () => {
+    const out = composePortraitPrompt({
+      appearancePrompt: "一只棕色泰迪犬，卷曲浓密的毛发",
+      species: "贵宾犬（泰迪）",
+      stylePrompt: "电影感写实",
+    });
+    expect(out).toContain("取景：完整全身入画，含四肢、尾巴与脚掌");
+    expect(out.indexOf("取景")).toBeLessThan(out.indexOf("一只棕色泰迪犬"));
   });
 });
 

@@ -266,8 +266,12 @@ export function composePortraitPrompt(i: {
     ? `主体锁定：这个主体是${(species || firstSentence(appearance)).replace(/[。.]$/, "")}，` +
       "严格保留它的物种与品种，绝不替换成其它物种或其它品种，绝不画成人物，绝不添加人脸或人手。"
     : "主体锁定：严格保留以下描述的主体类型与身份，绝不替换主体。";
+  // 取景约束前置：实测只把它放在末尾时，模型会画成半身胸像（物种锁定句权重压过尾部）
+  const framing = "取景：完整全身入画，含四肢、尾巴与脚掌，角色设定图视角。";
 
-  return `${lock}${appearance}${stylePart}。${anatomyConstraint(species, appearance)}。${PORTRAIT_TAIL}`;
+  // stylePrompt 常自带句末标点，避免与模板补的句号叠成「。。」
+  const body = `${lock}${framing}${appearance}${stylePart}`.replace(/[。.]+\s*$/, "");
+  return `${body}。${anatomyConstraint(species, appearance)}。${PORTRAIT_TAIL}`;
 }
 
 /* ── 分镜图多参考选取 ────────────────────────────────────────────────────── */
