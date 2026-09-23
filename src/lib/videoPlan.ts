@@ -11,10 +11,10 @@
 // - Flash 的 images 上限 5 张。
 // ────────────────────────────────────────────────────────────────────────────
 
-import { buildContinuityMap, planShotContinuity } from "@/lib/shotContinuity";
+import { buildHandoffMap, planShotContinuity } from "@/lib/shotContinuity";
 import type { Asset, Shot } from "@/stores/projectStore";
 
-/** 视频一致性策略：off 只锁首帧；chain 追加同场景首尾帧链；identity 再让跨场景镜头改走参考图 */
+/** 视频一致性策略：off 只锁本镜首帧；chain 让后镜首帧取前镜末帧；identity 再让无衔接的镜头改走参考图 */
 export type VideoConsistency = "off" | "chain" | "identity";
 
 export const VIDEO_CONSISTENCY_VALUES: readonly VideoConsistency[] = ["off", "chain", "identity"];
@@ -28,13 +28,13 @@ export interface VideoPlan {
   lastFrameUrl?: string;
   referenceImageUrls: string[];
   /** 选择该模式的依据，供日志与界面解释 */
-  reason: "manual-tail" | "auto-chain" | "identity-reference" | "first-frame-only" | "text-only";
+  reason: "manual-tail" | "auto-handoff" | "identity-reference" | "first-frame-only" | "text-only";
 }
 
 export interface VideoPlanInput {
   shot: Pick<Shot, "imageUrl" | "useDualFrame" | "lastFrameUrl">;
-  /** 由 planShotContinuity 派生出的同场景下一镜画面图；无则 undefined */
-  autoLastFrameUrl?: string;
+  /** 由 tailFrameStore 提供的前镜末帧；仅当 planShotContinuity 判定衔接时非空 */
+  autoFirstFrameUrl?: string;
   consistency: VideoConsistency;
   /** 身份参考素材（定妆照 + 风格母版），仅 identity 分支使用 */
   identityReferences?: string[];
@@ -46,7 +46,7 @@ export interface VideoPlanInput {
  * 任何情况下都不会同时给出首/尾帧与参考图。
  */
 export function planShotVideo(input: VideoPlanInput): VideoPlan {
-  const { shot, autoLastFrameUrl, consistency, identityReferences = [] } = input;
+  const { shot, autoFirstFrameUrl, consistency, identityReferences = [] } = input;
   const manualTail = shot.useDualFrame ? shot.lastFrameUrl : undefined;
 
   if (shot.imageUrl && manualTail) {
@@ -55,10 +55,11 @@ export function planShotVideo(input: VideoPlanInput): VideoPlan {
       referenceImageUrls: [], reason: "manual-tail",
     };
   }
-  if (shot.imageUrl && consistency !== "off" && autoLastFrameUrl) {
+  if (shot.imageUrl && consistency !== "off" && autoFirstFrameUrl) {
+    // 前镜末帧与本镜画面图同时存在时，用前镜末帧作首帧：拼接处连续优先于本镜静帧还原。
     return {
-      mode: "keyframe", firstFrameUrl: shot.imageUrl, lastFrameUrl: autoLastFrameUrl,
-      referenceImageUrls: [], reason: "auto-chain",
+      mode: "keyframe", firstFrameUrl: autoFirstFrameUrl,
+      referenceImageUrls: [], reason: "auto-handoff",
     };
   }
   if (shot.imageUrl && consistency === "identity" && identityReferences.length > 0) {
@@ -121,6 +122,8 @@ export interface ShotVideoMediaInput {
   assets: readonly Asset[];
   styleReferenceUrl?: string;
   consistency: VideoConsistency;
+  /** 前镜末帧地址表（shotId → URL），由调用方从 lib/tailFrameStore 取；缺失即不衔接 */
+  tailFrames?: Record<string, string>;
 }
 
 /**
@@ -131,14 +134,15 @@ export function planShotVideoMedia(input: ShotVideoMediaInput): {
   plan: VideoPlan;
   media: VideoMediaFields;
 } {
-  const autoLastFrameUrl = buildContinuityMap(planShotContinuity(input.shots)).get(input.shot.id);
+  const handoff = buildHandoffMap(planShotContinuity(input.shots)).get(input.shot.id);
+  const autoFirstFrameUrl = handoff ? input.tailFrames?.[handoff] : undefined;
   const identityReferences =
-    input.consistency === "identity" && !autoLastFrameUrl
+    input.consistency === "identity" && !autoFirstFrameUrl
       ? pickIdentityReferences(input.shot, input.assets, input.styleReferenceUrl)
       : [];
   const plan = planShotVideo({
     shot: input.shot,
-    autoLastFrameUrl,
+    autoFirstFrameUrl,
     consistency: input.consistency,
     identityReferences,
   });

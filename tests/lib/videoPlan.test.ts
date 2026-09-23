@@ -2,7 +2,8 @@
 // tests/lib/videoPlan.test.ts
 // 视频一致性策略单测。断言来自 src/lib/videoPlan.ts 真实实现。
 // 关键不变量：reference 与 first_frame / last_frame 永不同时给出
-// （服务端实测 400「首尾帧素材与参考素材不能同时使用」）。
+// （服务端实测 400「首尾帧素材与参考素材不能同时使用」）；
+// chain 的方向是「后镜首帧取前镜末帧」，自动路径不产生任何尾帧。
 // ────────────────────────────────────────────────────────────────────────────
 
 import { describe, expect, it } from "vitest";
@@ -16,6 +17,7 @@ import {
 import type { Asset, Shot } from "@/stores/projectStore";
 
 const IMG = (n: number) => `https://cdn.test/shot${n}.png`;
+const TAIL = (id: string) => `https://cdn.test/tail_${id}.png`;
 
 /** 构造 planShotVideoMedia 需要的最小镜头对象 */
 function mkShot(
@@ -27,6 +29,7 @@ function mkShot(
   return {
     id, index, imageUrl: IMG(index), activeSceneId: scene,
     activeCharacterIds: scene === undefined ? [] : ["char_1"],
+    shotSize: "medium",
     useDualFrame: false, lastFrameUrl: undefined,
     ...over,
   } as unknown as Shot;
@@ -55,7 +58,7 @@ describe("planShotVideo", () => {
   it("用户手动尾帧优先，忽略自动衔接", () => {
     const plan = planShotVideo({
       shot: shot({ useDualFrame: true, lastFrameUrl: "https://cdn.test/manual.png" }),
-      autoLastFrameUrl: IMG(2),
+      autoFirstFrameUrl: IMG(2),
       consistency: "chain",
     });
     expect(plan).toMatchObject({
@@ -65,29 +68,22 @@ describe("planShotVideo", () => {
     expectExclusive(plan);
   });
 
-  it("chain 策略下用同场景下一镜画面图作尾帧", () => {
-    const plan = planShotVideo({ shot: shot(), autoLastFrameUrl: IMG(2), consistency: "chain" });
-    expect(plan).toMatchObject({
-      mode: "keyframe", firstFrameUrl: IMG(1), lastFrameUrl: IMG(2), reason: "auto-chain",
-    });
-    expectExclusive(plan);
-  });
-
-  it("off 策略完全不引入自动尾帧", () => {
-    const plan = planShotVideo({ shot: shot(), autoLastFrameUrl: IMG(2), consistency: "off" });
+  it("off 策略完全不引入前镜末帧", () => {
+    const plan = planShotVideo({ shot: shot(), autoFirstFrameUrl: IMG(2), consistency: "off" });
     expect(plan).toMatchObject({ mode: "keyframe", reason: "first-frame-only" });
+    expect(plan.firstFrameUrl).toBe(IMG(1));
     expect(plan.lastFrameUrl).toBeUndefined();
   });
 
-  it("identity 只在拿不到衔接尾帧时生效，且不带任何帧素材", () => {
+  it("identity 只在拿不到衔接首帧时生效，且不带任何帧素材", () => {
     const refs = [IMG(9), IMG(8)];
-    const withChain = planShotVideo({
-      shot: shot(), autoLastFrameUrl: IMG(2), consistency: "identity", identityReferences: refs,
+    const withHandoff = planShotVideo({
+      shot: shot(), autoFirstFrameUrl: IMG(2), consistency: "identity", identityReferences: refs,
     });
-    expect(withChain.reason).toBe("auto-chain");
+    expect(withHandoff.reason).toBe("auto-handoff");
 
     const crossScene = planShotVideo({
-      shot: shot(), autoLastFrameUrl: undefined, consistency: "identity", identityReferences: refs,
+      shot: shot(), autoFirstFrameUrl: undefined, consistency: "identity", identityReferences: refs,
     });
     expect(crossScene).toMatchObject({ mode: "reference", reason: "identity-reference" });
     expect(crossScene.firstFrameUrl).toBeUndefined();
@@ -113,6 +109,57 @@ describe("planShotVideo", () => {
     const plan = planShotVideo({ shot: shot(), consistency: "identity", identityReferences: many });
     expect(plan.referenceImageUrls).toHaveLength(MAX_VIDEO_REFERENCE_IMAGES);
     expect(plan.referenceImageUrls).toEqual(many.slice(0, 5));
+  });
+});
+
+describe("planShotVideo：前镜末帧衔接", () => {
+  it("有前镜末帧且 consistency 非 off → keyframe 首帧用前镜末帧，不带尾帧", () => {
+    const plan = planShotVideo({
+      shot: { imageUrl: "https://cdn.test/self.png", useDualFrame: false, lastFrameUrl: undefined },
+      autoFirstFrameUrl: "https://cdn.test/prev_tail.png",
+      consistency: "chain",
+    });
+    expect(plan).toEqual({
+      mode: "keyframe",
+      firstFrameUrl: "https://cdn.test/prev_tail.png",
+      referenceImageUrls: [],
+      reason: "auto-handoff",
+    });
+  });
+
+  it("consistency=off 时忽略前镜末帧，退回仅锁本镜首帧", () => {
+    const plan = planShotVideo({
+      shot: { imageUrl: "https://cdn.test/self.png", useDualFrame: false, lastFrameUrl: undefined },
+      autoFirstFrameUrl: "https://cdn.test/prev_tail.png",
+      consistency: "off",
+    });
+    expect(plan.reason).toBe("first-frame-only");
+    expect(plan.firstFrameUrl).toBe("https://cdn.test/self.png");
+  });
+
+  it("用户手动尾帧永远优先于自动衔接", () => {
+    const plan = planShotVideo({
+      shot: {
+        imageUrl: "https://cdn.test/self.png",
+        useDualFrame: true,
+        lastFrameUrl: "https://cdn.test/manual.png",
+      },
+      autoFirstFrameUrl: "https://cdn.test/prev_tail.png",
+      consistency: "chain",
+    });
+    expect(plan.reason).toBe("manual-tail");
+    expect(plan.lastFrameUrl).toBe("https://cdn.test/manual.png");
+  });
+
+  it("衔接与身份参考互斥：有末帧时不走 reference", () => {
+    const plan = planShotVideo({
+      shot: { imageUrl: "https://cdn.test/self.png", useDualFrame: false, lastFrameUrl: undefined },
+      autoFirstFrameUrl: "https://cdn.test/prev_tail.png",
+      consistency: "identity",
+      identityReferences: ["https://cdn.test/portrait.png"],
+    });
+    expect(plan.mode).toBe("keyframe");
+    expect(plan.referenceImageUrls).toEqual([]);
   });
 });
 
@@ -155,12 +202,48 @@ describe("planShotVideoMedia（编排层唯一入口）", () => {
   const sameScene = [mkShot("s0", 0, "scene_a"), mkShot("s1", 1, "scene_a")];
   const crossScene = [mkShot("s0", 0, "scene_a"), mkShot("s1", 1, "scene_b")];
 
-  it("同场景相邻镜头 → 首帧 + 下一镜画面图作尾帧，不带参考图", () => {
-    const { media } = planShotVideoMedia({
-      shot: sameScene[0], shots: sameScene, assets: ASSETS,
+  it("同场景相邻镜头 + 有前镜末帧 → 首帧换成前镜末帧，不带尾帧也不带参考图", () => {
+    const { plan, media } = planShotVideoMedia({
+      shot: sameScene[1], shots: sameScene, assets: ASSETS,
       styleReferenceUrl: IMG(9), consistency: "chain",
+      tailFrames: { s0: TAIL("s0") },
     });
-    expect(media).toEqual({ imageUrl: IMG(0), lastFrameUrl: IMG(1) });
+    expect(plan.reason).toBe("auto-handoff");
+    expect(media).toEqual({ imageUrl: TAIL("s0") });
+  });
+
+  it("衔接判定通过但末帧还没抽出来 → 自动降级为仅锁本镜首帧", () => {
+    const { plan, media } = planShotVideoMedia({
+      shot: sameScene[1], shots: sameScene, assets: ASSETS,
+      styleReferenceUrl: IMG(9), consistency: "chain",
+      tailFrames: {},
+    });
+    expect(plan.reason).toBe("first-frame-only");
+    expect(media).toEqual({ imageUrl: IMG(1) });
+  });
+
+  it("自动路径永不产生尾帧：同场景两镜带末帧请求都不含 lastFrameUrl", () => {
+    const tailFrames = { s0: TAIL("s0") };
+    for (const shotItem of sameScene) {
+      const { media } = planShotVideoMedia({
+        shot: shotItem, shots: sameScene, assets: ASSETS,
+        styleReferenceUrl: IMG(9), consistency: "chain", tailFrames,
+      });
+      expect(media.lastFrameUrl).toBeUndefined();
+    }
+  });
+
+  it("景别跨两档时不衔接（即使末帧已就绪）", () => {
+    const gapScene = [
+      mkShot("s0", 0, "scene_a", { shotSize: "wide" }),
+      mkShot("s1", 1, "scene_a", { shotSize: "close-up" }),
+    ];
+    const { plan } = planShotVideoMedia({
+      shot: gapScene[1], shots: gapScene, assets: ASSETS,
+      styleReferenceUrl: IMG(9), consistency: "chain",
+      tailFrames: { s0: TAIL("s0") },
+    });
+    expect(plan.reason).toBe("first-frame-only");
   });
 
   it("跨场景 + identity → 只给参考图（定妆照 + 风格母版），不给首尾帧", () => {
@@ -182,22 +265,25 @@ describe("planShotVideoMedia（编排层唯一入口）", () => {
     expect(media).toEqual({ imageUrl: IMG(0) });
   });
 
-  it("用户手动双帧优先，忽略同场景自动尾帧", () => {
+  it("用户手动双帧优先，忽略前镜末帧衔接", () => {
     const manual = [
-      mkShot("s0", 0, "scene_a", { useDualFrame: true, lastFrameUrl: "https://cdn.test/manual.png" }),
-      mkShot("s1", 1, "scene_a"),
+      mkShot("s0", 0, "scene_a"),
+      mkShot("s1", 1, "scene_a", {
+        useDualFrame: true, lastFrameUrl: "https://cdn.test/manual.png",
+      }),
     ];
     const { plan, media } = planShotVideoMedia({
-      shot: manual[0], shots: manual, assets: ASSETS,
+      shot: manual[1], shots: manual, assets: ASSETS,
       styleReferenceUrl: IMG(9), consistency: "identity",
+      tailFrames: { s0: TAIL("s0") },
     });
     expect(plan.reason).toBe("manual-tail");
-    expect(media).toEqual({ imageUrl: IMG(0), lastFrameUrl: "https://cdn.test/manual.png" });
+    expect(media).toEqual({ imageUrl: IMG(1), lastFrameUrl: "https://cdn.test/manual.png" });
   });
 
-  it("末镜没有下一镜：identity 策略下改走参考图", () => {
+  it("首镜没有上一镜：identity 策略下改走参考图", () => {
     const { media } = planShotVideoMedia({
-      shot: sameScene[1], shots: sameScene, assets: ASSETS,
+      shot: sameScene[0], shots: sameScene, assets: ASSETS,
       styleReferenceUrl: IMG(9), consistency: "identity",
     });
     expect(media.imageUrl).toBeUndefined();

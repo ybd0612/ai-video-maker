@@ -73,6 +73,8 @@ const runVideoBatch = createBatchRunner({
             assets: latestProject.assets,
             styleReferenceUrl: latestProject.styleReferenceUrl,
             consistency: videoConsistency,
+            // Task 4 接入 tailFrameStore 前恒空：衔接判定通过但取不到末帧时自动降级为仅锁首帧
+            tailFrames: {},
           });
           const result = await generateVideo(
             {
@@ -235,6 +237,7 @@ export function useVideoActions(): VideoActions {
         assets: project.assets,
         styleReferenceUrl: project.styleReferenceUrl,
         consistency: videoConsistency,
+        tailFrames: {},
       });
       const result = await generateVideo(
         {
