@@ -385,10 +385,11 @@ Return strict JSON in exactly this format, no other text:
   storyboardShot: {
     zh: `你是一位专业的视频分镜设计师。你会拿到分镜大纲与其中一个镜头的计划，你的任务是把这一个镜头写完整：
 1. scriptText：该镜头的叙事脚本（含动作与情绪，语言随用户输入）
-2. visualPrompt：完整中文画面提示词——主体外观（**只用所给的一句短外观锚点**，不要把物种/外貌/服饰/识别特征逐条展开）、动作、环境、构图与镜头；只描述该镜头
-3. motionPrompt：完整中文运动提示词——主体动作、镜头运动、环境变化
+2. visualPrompt：完整中文画面提示词——主体外观（**只用所给的一句短外观锚点**，不要把物种/外貌/服饰/识别特征逐条展开）、动作、环境、构图与镜头；**只写这一个机位、这一个瞬间、这一个景别**
+3. motionPrompt：完整中文运动提示词——起幅＝visualPrompt 的那一帧，随后主体动作、一种镜头运动、环境变化
 4. 其余描述字段（sceneDesc/detailDesc/lightingDesc/styleDesc/actionDesc/cameraDesc/envChangeDesc/motionSpeedDesc）逐项填写；主体信息只写入 visualPrompt，不再单独生成 subjectDesc
 5. dialogues 按需给对白（characterId 用角色名），activeCharacterIds/activeSceneId/activeProductIds/activePropIds 用已有资产的 ID；visualPrompt 或 scriptText 中出现的可识别道具/产品必须同步写入对应 active ID，duration 从 4/5/8 中选
+6. shotSize：本镜的机读景别，只能取 extreme-wide / wide / medium / close / close-up 五个值之一，必须与 visualPrompt 里写的景别一致
 {{assets}}
 {{#rules}}
 重要规则：
@@ -405,10 +406,11 @@ Return strict JSON in exactly this format, no other text:
 只输出这一个镜头的 JSON 对象（不是数组），不要包含任何其他文字。所有返回字段都必须非空。`,
     en: `You are a professional video storyboard designer. You get the storyboard outline and the plan of ONE shot. Write that single shot completely:
 1. scriptText: the narrative script for this shot (action and emotion, follow the user's language)
-2. visualPrompt: a complete Chinese image prompt — subject appearance (**use only the one-line brief appearance anchor provided**; do NOT expand species / appearance / outfit / signature into it), action, environment, composition and camera; describe only this shot
-3. motionPrompt: a complete Chinese motion prompt — subject motion, camera movement, environmental changes
+2. visualPrompt: a complete Chinese image prompt — subject appearance (**use only the one-line brief appearance anchor provided**; do NOT expand species / appearance / outfit / signature into it), action, environment, composition and camera; **write only this one camera setup, this one instant, this one shot size**
+3. motionPrompt: a complete Chinese motion prompt — it must open on the exact frame visualPrompt draws, then subject motion, ONE camera movement, environmental changes
 4. Fill every other description field (sceneDesc/detailDesc/lightingDesc/styleDesc/actionDesc/cameraDesc/envChangeDesc/motionSpeedDesc); put subject information only in visualPrompt, with no separate subjectDesc
 5. dialogues when needed (characterId = character name); activeCharacterIds/activeSceneId/activeProductIds/activePropIds use existing asset IDs; any identifiable prop or product mentioned in visualPrompt or scriptText must also be included in the matching active ID list; duration from 4/5/8
+6. shotSize: this shot's machine-readable shot size, one of extreme-wide / wide / medium / close / close-up, and it must match the shot size stated in visualPrompt
 {{assets}}
 {{#rules}}
 Important rules:
@@ -903,6 +905,28 @@ export const BUILTIN_RULES: PromptRule[] = [
     content: {
       zh: "- 每镜头 duration 为 4、5 或 8 秒（视频模型支持 4-12 秒）",
       en: "- Each shot duration: 4, 5, or 8 seconds (the video model supports 4-12s)",
+    },
+    enabled: true,
+    source: "builtin",
+  },
+  {
+    id: "storyboard.single-setup",
+    task: "storyboardShot",
+    section: "rules",
+    content: {
+      zh: "- 一镜一机位：visualPrompt 只描述**这一个机位下的这一个瞬间**。禁止写剪辑语汇——切换、反打、快速交替、先切…再切…、左侧画面/右侧画面/下方画面、分屏、叠化、蒙太奇、多画面并列。一张静帧装不下三个画面，模型只会把它们糊成一团\n- 一个镜头只承载一个核心动作与一种景别；若想法确实需要多个机位或多个动作节拍，**拆成两个镜头**分别输出，不要塞进本镜",
+      en: "- ONE camera setup per shot: visualPrompt describes ONLY this single framing at a single instant. Never write editing language — cuts, shot-reverse-shot, rapid intercutting, 'first ... then ...', left panel / right panel / bottom panel, split screen, dissolve, montage, side-by-side frames. A still cannot hold three frames; the model just smears them together\n- One core action and one shot size per shot; if the idea genuinely needs another setup or beat, SPLIT IT INTO TWO SHOTS instead of cramming it into this one",
+    },
+    enabled: true,
+    source: "builtin",
+  },
+  {
+    id: "storyboard.motion-matches-frame",
+    task: "storyboardShot",
+    section: "rules",
+    content: {
+      zh: "- motionPrompt 的**起幅必须正好是本镜 visualPrompt 画出的那一帧**：静帧中已经发生的事不得重复，动态里不能把它从头再做一遍（静帧是猫站在塔顶，动态就不能再写「跃向塔顶」）；静帧中没有的物体，动态里不得凭空出现\n- 一段视频不会剪辑：motionPrompt 只允许一种连续的镜头运动（或明确写「固定机位」），禁止中途换机位、换景别、跳切",
+      en: "- motionPrompt MUST start exactly on the frame visualPrompt draws: whatever already happened in the still must not be replayed (if the still shows the cat on top of the tank, the motion must not say 'leaps onto the top'); objects absent from the still must not appear out of nowhere\n- A clip cannot cut: motionPrompt allows ONE continuous camera move (or an explicit 'locked-off camera') — never a mid-clip change of setup or shot size, never a jump cut",
     },
     enabled: true,
     source: "builtin",
