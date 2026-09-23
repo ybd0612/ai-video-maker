@@ -396,7 +396,9 @@ export function composeAssetAppearance(
  */
 export const BRIEF_APPEARANCE_FIELDS: Record<AssetDetails["kind"], string[]> = {
   character: ["species"],
-  scene: ["settingType"],
+  // 天气与时间必须进镜头：它们是"这一幕和下一幕看起来不一样"的唯一依据。
+  // 只给 settingType 会让"暴雨前"和"暴雨中"画出同一个正在下雨的天台（2026-09-23 实测）。
+  scene: ["settingType", "weather", "time"],
   product: ["category"],
   prop: ["objectType"],
   style: [],

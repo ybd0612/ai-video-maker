@@ -6,7 +6,11 @@
 // ────────────────────────────────────────────────────────────────────────────
 
 import { describe, expect, it } from "vitest";
-import { composeAssetAppearance, composeAssetBriefAppearance } from "@/lib/assetDetails";
+import {
+  BRIEF_APPEARANCE_FIELDS,
+  composeAssetAppearance,
+  composeAssetBriefAppearance,
+} from "@/lib/assetDetails";
 import { getActiveRuleText } from "@/lib/promptRules";
 import type { AssetDetails } from "@/stores/projectStore";
 
@@ -22,6 +26,43 @@ const DOG: AssetDetails = {
   background: "家庭宠物",
 };
 const DOG_DESC = "一只忠诚温和的贵宾犬。\n物种：狗（贵宾犬/泰迪）\n外貌：卷毛蓬松";
+
+describe("场景短锚点必须携带天气与时间", () => {
+  it("scene 锚点含 settingType / weather / time 三项", () => {
+    expect(BRIEF_APPEARANCE_FIELDS.scene).toEqual(["settingType", "weather", "time"]);
+  });
+
+  it("「暴雨前」场景的锚点带上「大雨未落」——镜头提示词才有干湿依据", () => {
+    const anchor = composeAssetBriefAppearance({
+      type: "scene",
+      description: "暴雨将至的旧楼天台，生锈水塔与铁门在远处闪电下呈现冷硬轮廓。",
+      details: {
+        kind: "scene",
+        settingType: "室外城市楼顶平台",
+        weather: "乌云密布，狂风卷起尘土，大雨未落，远处天空伴有强烈闪电",
+        time: "黄昏至暴雨来临前的临界时刻",
+      },
+    } as Parameters<typeof composeAssetBriefAppearance>[0]);
+    expect(anchor).toContain("室外城市楼顶平台");
+    expect(anchor).toContain("大雨未落");
+    expect(anchor).toContain("黄昏");
+  });
+
+  it("锚点里相邻片段互为子串时去重（既有去重口径扩展到新增字段）", () => {
+    const anchor = composeAssetBriefAppearance({
+      type: "scene",
+      description: "雨夜天台",
+      details: {
+        kind: "scene",
+        settingType: "天台",
+        weather: "深夜暴雨",
+        time: "深夜",
+      },
+    } as Parameters<typeof composeAssetBriefAppearance>[0]);
+    // "深夜" 已被 "深夜暴雨" 包含，不应重复出现两次
+    expect(anchor.match(/深夜/g)?.length).toBe(1);
+  });
+});
 
 describe("composeAssetBriefAppearance", () => {
   it("只给一句身份锚点，不含字段标签", () => {
