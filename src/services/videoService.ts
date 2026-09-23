@@ -81,6 +81,8 @@ interface CreateVideoOptions {
   aspectRatio: string;
   /** 视频时长（秒），发送前会收敛到官方支持的 4~12 秒 */
   duration: number;
+  /** 任务创建成功后、开始轮询前立刻回调。用于把 videoId 落盘，刷新后可恢复而不重建 */
+  onTaskCreated?: (videoId: string, modelName: string) => void;
 }
 
 interface VideoResult {
@@ -282,11 +284,31 @@ export async function generateVideo(
     throw new Error(getTranslation("error.videoCreateNoVideoId"));
   }
 
+  // 任务已在服务端创建：先落盘再轮询。轮询期间的任何失败都不能让任务 ID 一起丢掉
+  // （视频按秒计费，丢了 ID 就只能重建任务）。
+  opts.onTaskCreated?.(videoId, MODELS.video);
+
+  return pollVideoTaskById({ apiKey: opts.apiKey, baseUrl }, videoId, MODELS.video, onProgress, signal);
+}
+
+/**
+ * 继续轮询一个**已存在**的服务端任务：只发 GET，绝不发 POST /videos。
+ * 供刷新后恢复在飞任务使用（见 Shot.videoTaskId），也被 generateVideo 内部复用。
+ */
+export async function pollVideoTaskById(
+  opts: { apiKey: string; baseUrl: string },
+  videoId: string,
+  modelName: string,
+  onProgress?: (progress: number) => void,
+  signal?: AbortSignal,
+): Promise<VideoResult> {
+  const baseUrl = opts.baseUrl.replace(/\/+$/, "");
+
   // ── Poll for result ────────────────────────────────────────────────────
   // 轮询端点：GET {origin}/agnesapi?video_id={videoId}&model_name={model}
   // model_name 必带：2.5 Flash 的 keyframe / reference 模式不带会查不到任务。
   const origin = new URL(baseUrl).origin;
-  const pollUrl = `${origin}/agnesapi?video_id=${encodeURIComponent(videoId)}&model_name=${encodeURIComponent(MODELS.video)}`;
+  const pollUrl = `${origin}/agnesapi?video_id=${encodeURIComponent(videoId)}&model_name=${encodeURIComponent(modelName)}`;
   const pollStartedAt = Date.now();
   let pollRounds = 0;
   const deadline = Date.now() + VIDEO_POLL_TIMEOUT_MS;

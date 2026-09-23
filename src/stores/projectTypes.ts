@@ -193,6 +193,10 @@ export interface Shot {
   videoUrl?: string;
   videoProgress?: number;
   videoRetryCount?: number;
+  /** 服务端任务 ID；创建成功即落盘，刷新后据此继续轮询同一任务而不重建 */
+  videoTaskId?: string;
+  /** 轮询必须带 model_name，与创建时的模型一起存 */
+  videoTaskModel?: string;
   error?: string;
   // Structured visual sub-fields for review and editing; visualPrompt is the API SSOT
   sceneDesc?: string;        // Scene/background: "sitting in a sunlit cafe"

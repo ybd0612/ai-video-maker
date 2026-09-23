@@ -383,5 +383,12 @@ export function migratePersistedState(
     // no-op：见上方说明
   }
 
+  // Migrate from v17 to v18: 新增 Shot.videoTaskId / videoTaskModel（任务恢复用）。
+  // 旧数据没有这两个字段：刷新恢复逻辑遇到缺省即按现状走「无在飞任务」路径，
+  // 不做任何猜测式补值（模型名与任务 ID 都无法从既有数据推出）。
+  if (version < 18) {
+    // no-op：见上方说明
+  }
+
   return state;
 }

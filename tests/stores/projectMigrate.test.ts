@@ -447,3 +447,14 @@ describe("v16 → v17：shotSize 字段引入", () => {
     expect(twice).toBe(JSON.stringify(JSON.parse(once)));
   });
 });
+
+describe("v17 → v18：视频任务字段引入", () => {
+  it("不为旧镜头凭空补 videoTaskId / videoTaskModel", () => {
+    const state = { projects: [{ id: "p1", shots: [{ id: "s1", index: 0, status: "videoing" }] }] };
+    const out = migratePersistedState(structuredClone(state), 17) as {
+      projects: Array<{ shots: Array<Record<string, unknown>> }>;
+    };
+    expect("videoTaskId" in out.projects[0].shots[0]).toBe(false);
+    expect("videoTaskModel" in out.projects[0].shots[0]).toBe(false);
+  });
+});
