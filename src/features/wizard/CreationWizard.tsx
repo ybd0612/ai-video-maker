@@ -8,6 +8,7 @@ import { useEffect } from "react";
 import { useProjectStore, selectActiveProject, type WizardStep } from "@/stores/projectStore";
 import { useT } from "@/i18n";
 import { hasActiveIdeaTask, hasActiveScriptTask } from "./useWizardActions";
+import { resumePendingVideoTasks } from "./useVideoActions";
 import { StepIndicator } from "./StepIndicator";
 import { StepIdea } from "./StepIdea";
 import { StepStoryboard } from "./StepStoryboard";
@@ -38,6 +39,9 @@ export function CreationWizard() {
     for (const p of stuck) {
       useProjectStore.getState().setProjectStatusById(p.id, "idle");
     }
+    // 视频域同理：注册表已清空，但带 videoTaskId 的镜头说明服务端任务还在跑，
+    // 必须续轮询同一个任务（按秒计费），无 ID 的才复位为 imaged。
+    void resumePendingVideoTasks();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

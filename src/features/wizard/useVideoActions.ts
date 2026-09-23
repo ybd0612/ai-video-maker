@@ -5,13 +5,14 @@ import {
 } from "@/stores/projectStore";
 import { useSettingsStore } from "@/stores/settingsStore";
 import { resolvePlan, type PlanId } from "@/lib/plans";
-import { generateVideo, aspectRatioToVideoAspect, VideoTaskCreatedError } from "@/services/videoService";
+import { generateVideo, aspectRatioToVideoAspect, pollVideoTaskById, VideoTaskCreatedError } from "@/services/videoService";
 import { planShotVideoMedia } from "@/lib/videoPlan";
 import { extractTailFrameUrl } from "@/services/renderService";
 import { releaseTailFrames, setTailFrame, snapshotTailFrames } from "@/lib/tailFrameStore";
 import { pendingVideoShots } from "@/lib/shotQueue";
+import { getTranslation } from "@/i18n";
 import { composeMotionPrompt } from "@/lib/promptUtils";
-import { createBatchRunner } from "@/lib/batchRunner";
+import { createBatchRunner, hasActiveTask } from "@/lib/batchRunner";
 import { appendRegistryRules, type RegistryRuleText } from "@/lib/promptComposer";
 import { getActiveRenderRules } from "@/lib/promptRules";
 import { restoreProjectStatusIfReady } from "./wizardActionUtils";
@@ -60,11 +61,11 @@ const runVideoBatch = createBatchRunner({
       useProjectStore.getState().setShotStatusByProjectId(pid, shot.id, "videoing");
       useProjectStore.getState().updateShotByProjectId(pid, shot.id, { videoProgress: 0 });
 
-      // 任务已创建但轮询超时/异常时，不再创建重复任务；继续等待同一个任务。
-      const MAX_TASK_RETRIES = 2;
-      const RETRY_DELAY_MS = 8_000;
-
-      for (let attempt = 0; attempt <= MAX_TASK_RETRIES; attempt++) {
+      // 创建请求非幂等：POST /videos 按秒计费，超时/5xx 时服务端可能已经建了任务，
+      // 自动重发就是重复扣秒数。因此这里不重试创建；任务已建的场景由
+      // VideoTaskCreatedError + shot.videoTaskId 承接（见 pollVideoTaskById 恢复），
+      // 其余失败一律就地终态，交用户手动重试。
+      {
         if (signal.aborted) return;
 
         try {
@@ -89,6 +90,12 @@ const runVideoBatch = createBatchRunner({
               ...media,
               aspectRatio: videoAspect,
               duration: shot.duration,
+              onTaskCreated: (videoId, modelName) => {
+                useProjectStore.getState().updateShotByProjectId(pid, shot.id, {
+                  videoTaskId: videoId,
+                  videoTaskModel: modelName,
+                });
+              },
             },
             (progress) => {
               useProjectStore.getState().updateShotByProjectId(pid, shot.id, { videoProgress: progress });
@@ -100,7 +107,7 @@ const runVideoBatch = createBatchRunner({
             pid,
             shot.id,
             expectedRevision,
-            { videoUrl: result.videoUrl, status: "videoed" },
+            { videoUrl: result.videoUrl, status: "videoed", videoTaskId: undefined, videoTaskModel: undefined },
           );
           if (!applied) return;
           // 末帧只服务后续镜头的首帧衔接：抽取失败静默降级，绝不影响本镜结果
@@ -128,7 +135,6 @@ const runVideoBatch = createBatchRunner({
                 expectedRevision,
                 {
                   videoProgress: 0,
-                  videoRetryCount: attempt + 1,
                   error: `${err.message} 已保留服务端任务，不重复创建。`,
                 },
               );
@@ -136,36 +142,13 @@ const runVideoBatch = createBatchRunner({
             return;
           }
 
-          const isLastAttempt = attempt >= MAX_TASK_RETRIES;
-          if (isLastAttempt) {
-            useProjectStore.getState().setShotStatusByProjectIdIfRevision(
-              pid,
-              shot.id,
-              expectedRevision,
-              "failed",
-              err instanceof Error ? err.message : String(err),
-            );
-          } else {
-            useProjectStore.getState().updateShotByProjectIdIfRevision(
-              pid,
-              shot.id,
-              expectedRevision,
-              { videoProgress: 0, videoRetryCount: attempt + 1 },
-            );
-            await new Promise<void>((resolve, reject) => {
-              const delay = RETRY_DELAY_MS * (attempt + 1);
-              const timer = window.setTimeout(() => {
-                signal.removeEventListener("abort", onAbort);
-                resolve();
-              }, delay);
-              const onAbort = () => {
-                window.clearTimeout(timer);
-                reject(new DOMException("Video generation aborted", "AbortError"));
-              };
-              if (signal.aborted) onAbort();
-              else signal.addEventListener("abort", onAbort, { once: true });
-            });
-          }
+          useProjectStore.getState().setShotStatusByProjectIdIfRevision(
+            pid,
+            shot.id,
+            expectedRevision,
+            "failed",
+            `${err instanceof Error ? err.message : String(err)} ${getTranslation("error.videoCreateManualRetry")}`,
+          );
         }
       }
     });
@@ -195,6 +178,73 @@ const runVideoBatch = createBatchRunner({
     }
   },
 });
+
+/**
+ * 刷新恢复：模块级注册表随页面销毁清空，但服务端任务还在跑。
+ * 有 videoTaskId 说明任务确实存在（按秒计费）→ 继续轮询同一个任务，绝不重建；
+ * 没有 ID 才按旧口径复位为 imaged，交用户手动重做。
+ * 必须在 hasActiveTask 守卫之后执行，避免与正在跑的批量任务重复轮询。
+ */
+export async function resumePendingVideoTasks(): Promise<void> {
+  const { providerConfig } = useSettingsStore.getState();
+  if (!providerConfig.apiKey || !providerConfig.baseUrl) return;
+
+  for (const project of useProjectStore.getState().projects) {
+    if (hasActiveTask(activeVideoTasks, project.id)) continue;
+    const targetProjectId = project.id;
+
+    for (const shot of project.shots) {
+      if (shot.status !== "videoing") continue;
+
+      if (!shot.videoTaskId || !shot.videoTaskModel) {
+        useProjectStore.getState().updateShotByProjectId(targetProjectId, shot.id, {
+          status: "imaged",
+          videoProgress: 0,
+          error: undefined,
+        });
+        continue;
+      }
+
+      const expectedRevision = shot.renderRevision ?? 0;
+      const videoId = shot.videoTaskId;
+      const modelName = shot.videoTaskModel;
+      try {
+        const result = await pollVideoTaskById(
+          { apiKey: providerConfig.apiKey, baseUrl: providerConfig.baseUrl },
+          videoId,
+          modelName,
+          (progress) => {
+            useProjectStore.getState().updateShotByProjectId(targetProjectId, shot.id, { videoProgress: progress });
+          },
+        );
+        const applied = useProjectStore.getState().updateShotByProjectIdIfRevision(
+          targetProjectId,
+          shot.id,
+          expectedRevision,
+          { videoUrl: result.videoUrl, status: "videoed", videoTaskId: undefined, videoTaskModel: undefined },
+        );
+        if (applied) {
+          // 恢复路径同样补末帧；失败只降级，不影响本镜结果
+          void extractTailFrameUrl(result.videoUrl)
+            .then((url) => setTailFrame(shot.id, url))
+            .catch(() => {});
+        }
+      } catch (err) {
+        useProjectStore.getState().setShotStatusByProjectIdIfRevision(
+          targetProjectId,
+          shot.id,
+          expectedRevision,
+          "failed",
+          err instanceof Error ? err.message : String(err),
+        );
+      }
+    }
+
+    restoreProjectStatusIfReady(targetProjectId, (currentProject) =>
+      currentProject.shots.every((item) => !!item.videoUrl),
+    );
+  }
+}
 
 export interface VideoActions {
   generateVideosForStep: () => Promise<void>;
@@ -260,6 +310,12 @@ export function useVideoActions(): VideoActions {
           ...media,
           aspectRatio: aspectRatioToVideoAspect(project.aspectRatio),
           duration: shot.duration,
+          onTaskCreated: (videoId, modelName) => {
+            useProjectStore.getState().updateShotByProjectId(targetProjectId, shotId, {
+              videoTaskId: videoId,
+              videoTaskModel: modelName,
+            });
+          },
         },
         (progress) => {
           useProjectStore.getState().updateShotByProjectId(targetProjectId, shotId, {
@@ -273,7 +329,7 @@ export function useVideoActions(): VideoActions {
         targetProjectId,
         shotId,
         expectedRevision,
-        { videoUrl: result.videoUrl, status: "videoed" },
+        { videoUrl: result.videoUrl, status: "videoed", videoTaskId: undefined, videoTaskModel: undefined },
       );
       if (!applied) return;
       try {
