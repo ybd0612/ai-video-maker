@@ -337,7 +337,7 @@ RPM 与配额表（`lib/plans.ts:73-134`，格式 文本 / 图片1K,2K,3K,4K / �
 6. **回步骤 2 重新生成任一资产图会连带清空镜头已完成产物**：`applyAssetUpdate` 把生成器自己的 `imageUrl` 写回也算「渲染字段变化」（9.6），并重置三个审核标记；改 style 资产则全部分镜作废。行为有单测锁定，但「补一个缺失资产 = 重做整套镜头图片」是否是你要的代价，值得确认。
 7. **批量任务没有取消入口**（9.3）：注册表里的 controller 从未被 abort，切项目、离开步骤、组件卸载都拦不住在飞请求与 30 分钟视频轮询，钱照扣、结果照写回。
 8. **配额在请求前扣、失败不回滚**（`rateLimit.ts:128-136`）。图片 403/内容过滤、视频创建后失败都会白扣一次配额；Token Plan 用户会看到「用量没了但没出片」。
-9. **非幂等 POST 仍走通用重试**：图片创建（`ai/openai.ts:182,204`，默认 `maxRetries 3`）、视频创建（`videoService.ts:173-181`，429 退避重试）。服务端无幂等键，重试可能重复计费。AGENTS.md P1 已记录，代码未收。
+9. **非幂等 POST 的重试收口状态**：图片创建**已收口**（`ai/openai.ts:219-227`，`maxRetries: 0` + 单次超时 180s；2026-09-23 实测 1K 单张 29-59s 贴着旧默认 60s 线，超时重发会在服务端重复建任务并重复按张计配额，失败改为交用户手动重试）。**视频创建仍未收口**（`videoService.ts:196-206`，`maxRetries: 3` 且未传 `timeoutMs` → 默认 60s/次）：429 退避是有意的，但超时/5xx 同样会触发重发，视频按秒计费代价更高，是下一个要收的口。
 10. **资产图批量不过滤空提示词**：`generateAssetImages` 的任务只按 `!imageUrl` 筛选，不看 `prompt` 是否为空（`useAssetActions.ts:330-473`）；步骤 1 尾部的自动批量因此会对空 prompt 的资产（例如用户早先手动添加、尚未填设定的场景）发一次只含边界句的生图请求，白扣一档图片配额。手动入口有 `prompt.trim()` 守卫（`StepAssets.tsx:234`），批量没有。
 11. `generateStoryboard` 命中幂等守卫时 `return`（不抛错、不 await 在飞任务），`StepAssets.enterStoryboard` 的 `onProgress` 永不触发 → 极端时序下点「进入分镜」无反应也不报错（`useScriptActions.ts:327` + `StepAssets.tsx:113-128`）。
 12. `pickShotReferences` 注释写「总上限 3 张」，代码实为 `out.length < 4`（`promptComposer.ts:282` 起，push 上限 4）。

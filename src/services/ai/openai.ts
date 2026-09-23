@@ -50,6 +50,21 @@ interface OpenAIConfig {
  */
 const TEXT_TIMEOUT_MS = 180_000;
 
+/**
+ * 生图创建请求的单次尝试超时（毫秒）。
+ * 2026-09-23 实测：1K 档单张要 29-59s，紧贴 fetchWithRetry 默认的 60s 线；
+ * 叠并发时直接超时，表现为「重试后终于成功」但服务端已建了多个任务。
+ */
+const IMAGE_TIMEOUT_MS = 180_000;
+
+/**
+ * 生图创建请求的重试次数 —— 恒为 0。
+ * POST /images/generations 非幂等：客户端超时/5xx 后重发，服务端会各自再建一个
+ * 生成任务并按张数计配额，而界面只保留最后一个 URL（AGENTS.md 的 P1 红线）。
+ * 失败一律交给用户手动重试（各生成入口本就是幂等守卫 + 显式重摇）。
+ */
+const IMAGE_CREATE_MAX_RETRIES = 0;
+
 export class OpenAIService implements AIService {
   private config: OpenAIConfig;
 
@@ -208,6 +223,8 @@ export class OpenAIService implements AIService {
         Authorization: `Bearer ${this.config.apiKey}`,
       },
       body: JSON.stringify(body),
+      timeoutMs: IMAGE_TIMEOUT_MS,
+      maxRetries: IMAGE_CREATE_MAX_RETRIES,
     });
 
     if (!resp.ok) {

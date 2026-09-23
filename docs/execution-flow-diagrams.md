@@ -422,7 +422,7 @@ Promise.allSettled([链A, 链B])                                      :269
   |
   +-- [srv] OpenAIService.generateImage                     openai.ts:169
              槽位: acquire("image", {sizeTier 尺寸档位: imageSizeToTier("1K")})
-             url  : POST {baseUrl}/images/generations   (fetchWithRetry 最多 4 次 x 60s)
+             url  : POST {baseUrl}/images/generations   (fetchWithRetry 单次尝试 x 180s，非幂等 POST 不自动重试)
              body : {model:"agnes-image-2.5-flash",
                      prompt(画面描述),
                      size:"1K",                     // 档位串，不是像素值
@@ -663,4 +663,4 @@ automationMode 自动化模式      顶栏「全自动/半自动」开关       
 1. `assets[].imageUrl`(资产参考图) 一次写回 => 三个审核门禁 + 引用它的镜头图视频一起没（图9 中段）。
 2. `referenceImageUrls`(参考图列表) 只在**分镜图**链路出现；资产图与风格图全是文生图（图2 / 图3 / 图5）。
 3. `duration`(时长) 被规范化两次：`normalizeRawShot` 只允许 {4,5,8}，`videoService` 再 clamp 到 4..12（图4 / 图6）。
-4. 视频槽位在创建前就按秒扣，且非幂等 POST 仍会自动重试（图6 / 图8）。
+4. 视频槽位在创建前就按秒扣，且**视频**创建 POST 仍会自动重试（图6 / 图8）；图片创建已改为不自动重试（2026-09-23）。

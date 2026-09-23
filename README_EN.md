@@ -162,7 +162,7 @@ The build uses a relative `base` of `./`, so it works both on a custom domain an
 
 - Output depends on external models: structured JSON, prompt quality and image/video consistency remain unstable.
 - Quota is consumed before the HTTP call and **is not rolled back** on failure; image 403 / content filtering and post-creation video failures still burn quota.
-- Non-idempotent image/video creation POSTs still go through the generic retry helper with no server-side idempotency key, so retries risk double billing (tracked as an open item).
+- The video creation POST still goes through the generic retry helper with no server-side idempotency key, so a timeout or 5xx can double-bill; **image creation no longer retries automatically** (2026-09-23) — a failed shot stays failed until you reroll it, so quota is never silently burned more than once.
 - After a shot image is invalidated by the cascade, step 4 has no "fill only the missing items" entry, which pushes users into "regenerate everything".
 - Auto mode stops permanently when any stage has a failed item; it never continues with failures.
 - FFmpeg.wasm is bounded by browser memory and cross-origin resources; long or remote videos may fail to assemble.
