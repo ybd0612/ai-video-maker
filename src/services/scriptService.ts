@@ -18,6 +18,7 @@ import { resolveGenerationParams } from "@/lib/generationParams";
 import { composeAssetBriefAppearance, composeAssetDescription } from "@/lib/assetDetails";
 import { toIdRef, toIdRefList } from "@/lib/shotReferences";
 import { normalizeShotSize } from "@/lib/shotSize";
+import type { ShotSize } from "@/lib/shotSize";
 import type { AuditOutcome } from "@/lib/refineContent";
 
 interface GenerateScriptOptions {
@@ -390,6 +391,12 @@ export async function generateStoryboardShot(
     total: number;
     /** 重摇场景：给出该镜头上一版内容，要求变化出新一版 */
     variationOf?: { scriptText: string; visualPrompt: string };
+    /** 紧邻的上一镜实际产出；首镜不传。用于让本镜真正承接上一镜 */
+    previousShot?: {
+      scriptText: string;
+      visualPrompt: string;
+      shotSize?: ShotSize;
+    };
   },
 ): Promise<RawShot> {
   const systemPrompt = buildTaskSystemPrompt("storyboardShot", opts.language, getActiveRules())
@@ -418,6 +425,14 @@ export async function generateStoryboardShot(
     `Now write ONLY shot ${opts.index + 1}/${opts.total}:`,
     `Title: ${opts.item.title}`,
     `Plan: ${opts.item.summary}`,
+    opts.previousShot
+      ? [
+          "Previous shot (already generated — do NOT repeat its frame; this shot must hand off from it):",
+          `  script: ${opts.previousShot.scriptText}`,
+          `  visual: ${opts.previousShot.visualPrompt}`,
+          `  shotSize: ${opts.previousShot.shotSize ?? "unknown"}`,
+        ].join("\n")
+      : "",
     opts.item.characterNames.length > 0
       ? `Characters appearing in this shot (use these names): ${opts.item.characterNames.join(", ")}`
       : "",

@@ -26,7 +26,7 @@ import { extractNewAssets } from "@/lib/extractAssets";
 import { collectSubjectVocabulary } from "@/lib/promptComposer";
 import { refineWithAudit } from "@/lib/refineContent";
 import { beginTrace, logger } from "@/lib/logger";
-import { hasActiveTask, runWithConcurrency } from "@/lib/batchRunner";
+import { hasActiveTask } from "@/lib/batchRunner";
 import { pickShotFields } from "@/lib/shotFields";
 import { normalizeShotSize } from "@/lib/shotSize";
 import { resolveAssetId, resolveAssetIds } from "@/lib/shotReferences";
@@ -34,9 +34,6 @@ import { restoreProjectStatusIfReady, resetStuckShots } from "./wizardActionUtil
 
 /** 视觉方向自检轮数上限（2026-09-15 由 2 → 1：审计+重写已合一，第 2 轮边际收益低于 ~40s 耗时）。 */
 const VISUAL_DIRECTION_MAX_ROUNDS = 1;
-
-/** 逐镜头生成的并发上限（文本 RPM 由 rateLimiter 统一节流） */
-const SHOT_CONCURRENCY = 3;
 
 /**
  * 分镜批量任务注册表（模块级共享，跨组件实例幂等守卫）。
@@ -400,10 +397,16 @@ export function useScriptActions(
       }));
       useProjectStore.getState().setShotsByProjectId(targetProjectId, placeholderShots);
 
-      // 阶段 2：并发逐镜头生成，单个完成即写回；单镜头失败只标记该镜头
+      // 阶段 2：按序逐镜头生成。相邻镜头必须看到上一镜的实际产出，
+      // 因此这里刻意不并发（storyboard.shot-craft 的「承接上一镜」在并发下无法执行）。
+      // 单个镜头失败只标记该镜头并继续，不中断整批。
       let completed = 0;
-      const tasks = outline.shots.map((item, i) => async () => {
+      for (let i = 0; i < outline.shots.length; i++) {
+        const item = outline.shots[i];
         const shot = placeholderShots[i];
+        // 每次重新读 store：上一镜刚写回的内容必须在本次请求里可见
+        const latestProject = useProjectStore.getState().projects.find((p) => p.id === targetProjectId);
+        const prev = i > 0 ? latestProject?.shots[i - 1] : undefined;
         try {
           const raw = await generateStoryboardShot({
             apiKey: providerConfig.apiKey,
@@ -416,6 +419,13 @@ export function useScriptActions(
             item,
             index: i,
             total: placeholderShots.length,
+            previousShot: prev
+              ? {
+                  scriptText: prev.scriptText,
+                  visualPrompt: prev.visualPrompt,
+                  shotSize: prev.shotSize,
+                }
+              : undefined,
           });
           // 名字/引用 → 资产 ID 解析（用最新 assets，含大纲补建的新资产）。
           // 引用未命中只降级为空，不得阻断已成功生成的镜头内容写回。
@@ -438,8 +448,7 @@ export function useScriptActions(
             // 进度回调仅用于界面提示，忽略其异常
           }
         }
-      });
-      await runWithConcurrency(tasks, SHOT_CONCURRENCY);
+      }
 
       useProjectStore.getState().setProjectStatusById(targetProjectId, "idle");
     } catch (err) {
