@@ -13,7 +13,12 @@ vi.mock("@/lib/fetchWithRetry", () => ({
   fetchWithRetry: vi.fn(),
 }));
 vi.mock("@/services/rateLimit", () => ({
-  rateLimiter: { acquire: vi.fn().mockResolvedValue(undefined) },
+  rateLimiter: {
+    acquire: vi.fn().mockResolvedValue(undefined),
+    notifyRateLimited: vi.fn().mockResolvedValue(undefined),
+  },
+  // 真实值见 services/rateLimit.ts；此处仅桩化（缺失命名导出会让文本入口直接报错）
+  RATE_LIMIT_RETRY_BUDGET: 2,
   imageSizeToTier: vi.fn().mockReturnValue("1K"),
 }));
 

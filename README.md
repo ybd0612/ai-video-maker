@@ -57,7 +57,7 @@
 ## 主要能力
 
 - 6 步向导 + 多项目管理（创建 / 切换 / 复制 / 删除 / 搜索 / 排序），数据持久化在 `localStorage`
-- 文本 / 图片 / 视频三类调用的**集中式限流**：RPM 滑动窗口 + Token Plan 配额计数，配置单一事实源在 `src/lib/plans.ts`
+- 文本 / 图片 / 视频三类调用的**集中式限流**：RPM 滑动窗口 + Token Plan 配额计数，配置单一事实源在 `src/lib/plans.ts`；被服务端限流（429）时自动登记冷却、等到窗口解除后继续，不必手动重摇
 - **提示词规则注册表**（`src/lib/promptRules.ts`）：骨架在代码、规则条目可编辑；设置对话框「提示词规则」Tab 可查看 / 编辑 / 开关 / 新增 / 导入导出，**改完即时生效、零构建**
 - **采样参数由模型自决**（`src/lib/generationParams.ts`）：按用途先发一次元请求决定 `temperature` / `top_p` / Thinking，代码只做区间校验与缓存
 - 内联 AI 润色：所有 AI 可辅助的输入框右下角嵌「润色 / 逐步撤销」（`components/ui/AiPolishField.tsx`）

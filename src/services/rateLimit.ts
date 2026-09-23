@@ -1,15 +1,26 @@
 // ────────────────────────────────────────────────────────────────────────────
 // src/services/rateLimit.ts
-// 集中式用量限制器：RPM 节流 + Token Plan 订阅配额追踪。
+// 集中式用量限制器：RPM 节流 + 429 闭环冷却 + Token Plan 订阅配额追踪。
 //
 // 在真实 API 调用前调用 rateLimiter.acquire(kind, opts)：
-//   - 文本（chatCompletion）、图片（generateImage）、视频（生成任务创建）三类入口统一经过此处。
+//   - 文本（chatCompletion）、图片（generateImage）、视频（生成任务创建）三类入口统一在此处。
 //   - RPM：按模型种类（图片再按 1K/2K/3K/4K 档位）做 60s 滑动窗口节流；
-//          达到上限则等待到最早的请求滑出窗口（天然把并发串行化，避免触发 429）。
+//          达到上限则等待到最早的请求滑出窗口（天然把并发串行化）。
 //   - 配额：仅 Token Plan（Starter/Plus/Pro）生效，对文本(每5h/每周)、图片(每日张数)、
 //          视频(每日秒数) 计数并持久化到 localStorage；用尽则抛出 RateLimitError（不可重试）。
 //
-// 设计取舍：以「实际 RPM」作安全上限；用量在 acquire 时即记账（保守，与服务器计数一致）。
+// ⚠️ RPM 阈值表按官方文档取值，**防不住 429，只能当粗过滤**（2026-09-23 实测）：
+// 免费档文档值 text RPM=20，而服务端在 12 请求/38s（步骤 1 资产提取）与
+// 7 请求/37s（步骤 3 逐镜头分镜）就返回 429「您已达到免费用户的 API 速率限制」，
+// 即 acquire 的等待分支一次都没触发；同期还存在 20 请求/60s 全部成功的窗口，
+// 说明服务端限额不是单纯按请求条数计（疑似含 token 口径），客户端无法开环算准。
+//
+// 因此真正的防线是闭环：入口收到 429 后调用 notifyRateLimited(kind)，把该模型种类
+// 登记进分钟级冷却，同 kind 的后续 acquire 一律等到窗口解除后才放行 ——
+// 不再依赖猜出来的阈值。实测封锁窗口在 16-20s 内自愈（429 之后的下一个请求即成功），
+// 而 fetchWithRetry 旧的 2/4/8s 秒级退避总跨度 ~17s 全部落在窗口内，故必然失败三次。
+//
+// 设计取舍：以「实际 RPM」作粗过滤上限；用量在 acquire 时即记账（保守，与服务器计数一致）。
 // ────────────────────────────────────────────────────────────────────────────
 
 import { getTranslation } from "@/i18n";
@@ -28,6 +39,21 @@ import {
 export type { SizeTier } from "@/lib/plans";
 
 const STORAGE_KEY = "wxhb-usage";
+
+/* ── 429 冷却参数（闭环防线的单一事实源） ─────────────────────────────────── */
+
+/**
+ * 服务端未给出 Retry-After 时的兜底冷却时长。
+ * 实测封锁窗口在 16-20s 内自愈（429 后紧邻的下一个请求即成功），此处留裕量取 30s；
+ * 秒级指数退避（2/4/8s）已被证明必然整段落在窗口内，不得回退到那个量级。
+ */
+export const RATE_LIMIT_COOLDOWN_MS = 30_000;
+/** Retry-After 过小时的钳制下限 */
+const COOLDOWN_FLOOR_MS = 15_000;
+/** 无上限信任服务端：Retry-After 过大时截断，避免请求无限挂起 */
+const COOLDOWN_CEIL_MS = 120_000;
+/** 单个请求允许因 429 等待并重发的次数（各生成入口共用同一预算口径） */
+export const RATE_LIMIT_RETRY_BUDGET = 2;
 
 /* ── 错误类型 ─────────────────────────────────────────────────────────────── */
 
@@ -107,6 +133,8 @@ class RateLimiter {
   private rpmLog: Map<string, number[]> = new Map();
   /** 持久化配额用量：bucketKey -> 计数项数组 */
   private usage: Record<string, UsageEntry[]> = {};
+  /** 429 闭环冷却：模型种类 -> 冷却截止时间戳（内存，按会话） */
+  private cooldownUntil: Map<ModelKind, number> = new Map();
 
   constructor() {
     this.load();
@@ -123,9 +151,30 @@ class RateLimiter {
     await run; // 等待本请求自身的节流 + 配额检查完成（throw 会上抛）
   }
 
+  /**
+   * 入口收到 429 时登记冷却并等待到窗口解除。
+   *
+   * 供 fetchWithRetry 的 onRateLimited 钩子调用：429 表示服务端在创建任务前就拒绝，
+   * 未建任务也未扣费，重发安全；等待时长优先取 Retry-After，否则用兜底冷却。
+   * 冷却按模型种类共享，因此同 kind 排队的其他请求也会在 acquire 里一并等到窗口解除。
+   */
+  async notifyRateLimited(
+    kind: ModelKind,
+    opts: { retryAfterMs?: number; signal?: AbortSignal } = {},
+  ): Promise<void> {
+    const requested = opts.retryAfterMs ?? RATE_LIMIT_COOLDOWN_MS;
+    const waitMs = Math.min(Math.max(requested, COOLDOWN_FLOOR_MS), COOLDOWN_CEIL_MS);
+    // 已有更晚的截止时间时不缩短（否则并发 429 会互相把窗口提前打开）
+    const until = Math.max(this.cooldownUntil.get(kind) ?? 0, Date.now() + waitMs);
+    this.cooldownUntil.set(kind, until);
+    await this.waitForCooldown(kind, opts.signal);
+  }
+
   /* ── 核心流程 ────────────────────────────────────────────────────────── */
 
   private async guard(kind: ModelKind, plan: PlanConfig, opts: AcquireOptions): Promise<void> {
+    // 0) 429 冷却未解除前一律不放行（闭环反馈优先于开环阈值）
+    await this.waitForCooldown(kind, opts.signal);
     // 1) RPM 节流（可能等待）
     await this.throttleRpm(kind, plan, opts.sizeTier, opts.signal);
     // 2) 配额检查（超限直接抛错）
@@ -133,6 +182,17 @@ class RateLimiter {
     // 3) 记账
     this.recordRpm(kind, opts.sizeTier);
     this.recordQuota(kind, plan, opts.cost ?? 1);
+  }
+
+  /* ── 429 冷却窗口 ───────────────────────────────────────────────────── */
+
+  private async waitForCooldown(kind: ModelKind, signal: AbortSignal | undefined): Promise<void> {
+    // 冷却可能被并发的 429 继续往后推，因此睡完再复查，而不是只睡一次
+    for (;;) {
+      const remaining = (this.cooldownUntil.get(kind) ?? 0) - Date.now();
+      if (remaining <= 0) return;
+      await sleep(remaining, signal);
+    }
   }
 
   /* ── RPM 滑动窗口 ───────────────────────────────────────────────────── */

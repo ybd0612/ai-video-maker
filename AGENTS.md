@@ -196,10 +196,10 @@ scripts/run-vitest.mjs              # Windows 盘符规范化后启动 Vitest
 仍然有效的红线（不与上述三份重复，改代码必须遵守）：
 
 - **P0 安全**：发现疑似密钥泄露时停止提交与传播，先轮换再脱敏，并评估 Git 历史清理范围。
-- **P1 非幂等重试**：图片创建与视频创建在没有幂等键 / 任务恢复协议前，不得继续扩大创建请求的自动重试。**两处服务层均已收口**（2026-09-23）：图片 `ai/openai.ts` 与视频 `videoService.ts` 都改为 `maxRetries = 0` + 单次 180s 超时，失败一律交用户手动重试。实测依据 —— 图片 1K 单张 29-59s 贴着 `fetchWithRetry` 默认 60s 线；视频 `createMs`（包着整次调用）30 次真实创建里 p50 仅 3.6s 但有 3 次越过 60s（62.8s / 140.8s / 142.8s），说明超时重发在生产里确实发生过，而 `POST /videos` 按秒计费，重发一次就是再建一个任务、再扣一次秒数；429 已由 `rateLimiter` 在发请求前按 RPM 节流，不需要靠重试兜底。**最后一处非幂等重发点**是编排层的创建重试环（`useVideoActions.ts:59-126`，`MAX_TASK_RETRIES = 2`：创建抛错时最多再发 3 次），要收它必须先决定「批量跑中一次网络抖动是否还自动救回」——那是产品可见行为，不擅自改。
+- **P1 非幂等重试**：图片创建与视频创建在没有幂等键 / 任务恢复协议前，不得继续扩大创建请求的自动重试。**两处服务层均已收口**（2026-09-23）：图片 `ai/openai.ts` 与视频 `videoService.ts` 都改为 `maxRetries = 0` + 单次 180s 超时，超时 / 5xx 失败一律交用户手动重试。实测依据 —— 图片 1K 单张 29-59s 贴着 `fetchWithRetry` 默认 60s 线；视频 `createMs`（包着整次调用）30 次真实创建里 p50 仅 3.6s 但有 3 次越过 60s（62.8s / 140.8s / 142.8s），说明超时重发在生产里确实发生过，而 `POST /videos` 按秒计费，重发一次就是再建一个任务、再扣一次秒数。**429 不属于这条红线范围**（2026-09-23 实测推翻旧结论「429 已由 `rateLimiter` 按 RPM 节流兜住」—— 免费档文档 20 RPM，服务端 12 请求/38s 即拒，节流等待分支从未触发）：429 是服务端在建任务前的拒绝，未建任务也未计费，重发安全，因此三个生成入口（文本 / 图片 / 视频创建）统一走 `fetchWithRetry` 的独立通道 —— 回报 `rateLimiter.notifyRateLimited(kind)` 登记分钟级冷却、睡到窗口解除后重发（预算 `RATE_LIMIT_RETRY_BUDGET = 2`，不占 `maxRetries`）。**同批修掉一处真实计费缺陷**：视频轮询的请求级失败（含 429 重试耗尽抛出的 `HttpError`）此前以普通 Error 逃出 `generateVideo`，被 `useVideoActions` 判成「创建失败」而再发一次 `POST /videos`；现由 `pollVideoTask` 统一包成带 `videoId` 的 `VideoTaskCreatedError`，新增轮询/请求级失败一律按「任务已创建」处理。**最后一处非幂等重发点**仍是编排层的创建重试环（`useVideoActions.ts:59-126`，`MAX_TASK_RETRIES = 2`：创建抛错时最多再发 3 次，超时/5xx 与 429 通道预算用尽后的 `HttpError` 都会落到这里），要收它必须先决定「批量跑中一次网络抖动是否还自动救回」——那是产品可见行为，不擅自改。
 - **P1 多项目写回**：跨 `await` 一律按 `targetProjectId` 写回，禁止 active-project action 参与异步链路。
 - **P1 取消链路**：新增生成入口必须贯通 `AbortSignal`；补齐前不得宣称「所有 AI 请求可取消」（现状见上方铁律注）。
-- **P1 质量门禁**：`npm run test` 现为 37 文件 / 470 用例通过（2026-09-23 实测）；**CI 仍不跑测试**，把它加成部署前门禁是待办。
+- **P1 质量门禁**：`npm run test` 现为 37 文件 / 487 用例通过（2026-09-23 实测）；**CI 仍不跑测试**，把它加成部署前门禁是待办。
 - **P1 数据契约**：镜头时长与数量口径已收敛（时长 `{4,5,8}` 白名单 + 数量交模型判断）；`scriptService` 之外仍缺统一的`unknown → 解析 → 运行时校验 → 重试/报错` 链路（按类资产提取已具备）。
 
 ## Pipeline 架构（现行链路的权威描述在 docs/execution-flow.md）
@@ -283,7 +283,7 @@ scripts/run-vitest.mjs              # Windows 盘符规范化后启动 Vitest
 
 ## 用量限制与套餐（Rate Limit / Plan）
 
-服务面向免费用户（默认 `default` 套餐），官方对各访问类型有 RPM 与订阅配额限制。这些限制已写入程序，在真实 API 调用前统一拦截，避免触发 429 / 配额超限。数据来源：`https://agnes-ai.cn/zh-Hans/docs/tokenplan`。
+服务面向免费用户（默认 `default` 套餐），官方对各访问类型有 RPM 与订阅配额限制。这些限制已写入程序，在真实 API 调用前统一拦截配额超限；但 **RPM 阈值只是开环粗过滤，实测防不住 429**（见下方「429 闭环冷却」）。数据来源：`https://agnes-ai.cn/zh-Hans/docs/tokenplan`。
 
 - **套餐（plan）**：用户在设置对话框选择，存入 `providerConfig.plan`，默认 `default`。共 5 档：`default`（免费）、`enterprise`（企业认证）、`starter` / `plus` / `pro`（Token Plan 订阅）。
 - **配置单一事实源**：`src/lib/plans.ts` 的 `PLANS` 常量，集中定义各档 RPM 与订阅配额（文本/图片/视频）。替换或调整限制只改此处。
@@ -292,6 +292,7 @@ scripts/run-vitest.mjs              # Windows 盘符规范化后启动 Vitest
   - 图片 — `openai.ts` 的 `generateImage`（按 `imageSizeToTier(size)` 区分 1K/2K/3K/4K 档位）
   - 视频 — `src/services/videoService.ts` 的 `generateVideo`（cost = 请求时长秒数）
 - **RPM 节流**：按模型种类（图片再按尺寸档位）做 60s 滑动窗口；达到上限即等待到最早一条滑出窗口。以官方「实际 RPM」作安全上限（更保守）。默认档视频 RPM=1，向导已按套餐同步并发（免费档 1、企业 2、Token Plan 3），不会同时显示多个“生成中”。
+- **429 闭环冷却（新增生成入口必须挂上）**：入口收到 429 后调用 `rateLimiter.notifyRateLimited(kind, { retryAfterMs, signal })` 按模型种类登记分钟级冷却（无 `Retry-After` 时兜底 30s，夹在 15s~120s），同 kind 的后续 `acquire` 一律等到窗口解除 —— 实测封锁窗口 16-20s 自愈，而旧的 2/4/8s 秒级退避总跨度 ~17s 整段落在窗口内，必然三次全败。重发走 `fetchWithRetry` 的独立通道（`rateLimitRetries = RATE_LIMIT_RETRY_BUDGET` + `onRateLimited`），**不占 `maxRetries` 预算**：429 是服务端建任务前的拒绝，重发不重复计费；超时 / 5xx 仍按上一条红线关闭。文本 / 图片 / 视频创建三个入口均已接入，细节与实测见 `docs/execution-flow.md` §9.1。
 - **订阅配额（仅 Token Plan）**：文本（每 5h / 每周）、图片（每日张数）、视频（每日秒数）计数并持久化到 localStorage（key `wxhb-usage`），刷新不丢失。用尽抛出 `RateLimitError`（reason=`quota`，定义于 `services/rateLimit.ts`），按终态错误处理（不进入视频自动重试）。
 - **取消**：`acquire` 支持 `AbortSignal`，取消时抛 `RateLimitError`（reason=`aborted`）。
 - **套餐升级即生效**：用户切换套餐后，限流器实时读取 `providerConfig.plan`，无需刷新页面。

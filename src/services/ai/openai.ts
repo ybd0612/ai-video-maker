@@ -7,7 +7,7 @@
 import { MODELS, MAX_OUTPUT_TOKENS } from "@/lib/models";
 import { resolveBaseUrl } from "@/lib/resolveBaseUrl";
 import { fetchWithRetry } from "@/lib/fetchWithRetry";
-import { rateLimiter, imageSizeToTier } from "@/services/rateLimit";
+import { rateLimiter, imageSizeToTier, RATE_LIMIT_RETRY_BUDGET } from "@/services/rateLimit";
 import { generateVideo as rawGenerateVideo } from "@/services/videoService";
 import { getTranslation } from "@/i18n";
 
@@ -58,10 +58,11 @@ const TEXT_TIMEOUT_MS = 180_000;
 const IMAGE_TIMEOUT_MS = 180_000;
 
 /**
- * 生图创建请求的重试次数 —— 恒为 0。
+ * 生图创建请求的**通用**重试次数 —— 恒为 0。
  * POST /images/generations 非幂等：客户端超时/5xx 后重发，服务端会各自再建一个
  * 生成任务并按张数计配额，而界面只保留最后一个 URL（AGENTS.md 的 P1 红线）。
  * 失败一律交给用户手动重试（各生成入口本就是幂等守卫 + 显式重摇）。
+ * ⚠ 本常量不管 429：429 是服务端在建任务前的拒绝，重发安全，走下面的独立通道。
  */
 const IMAGE_CREATE_MAX_RETRIES = 0;
 
@@ -95,6 +96,11 @@ export class OpenAIService implements AIService {
         Authorization: `Bearer ${this.config.apiKey}`,
       },
       timeoutMs: TEXT_TIMEOUT_MS,
+      // 429 走独立通道：登记文本冷却 + 等到窗口解除后自动重发，不再交用户手动重摇。
+      // （文本请求尚未贯通 AbortSignal，故此处的等待不可取消 —— 属已知缺口，非本条策略问题）
+      rateLimitRetries: RATE_LIMIT_RETRY_BUDGET,
+      onRateLimited: ({ retryAfterMs }) =>
+        rateLimiter.notifyRateLimited("text", { retryAfterMs }),
       body: JSON.stringify({
         model: MODELS.text,
         messages: params.messages,
@@ -192,7 +198,8 @@ export class OpenAIService implements AIService {
     });
     try {
     // 用量控制：图片 RPM（按尺寸档位 1K/2K/3K/4K 区分限制）
-    await rateLimiter.acquire("image", { sizeTier: imageSizeToTier(params.size) });
+    const sizeTier = imageSizeToTier(params.size);
+    await rateLimiter.acquire("image", { sizeTier });
 
     const url = `${this.config.baseUrl.replace(/\/+$/, "")}/images/generations`;
 
@@ -225,6 +232,11 @@ export class OpenAIService implements AIService {
       body: JSON.stringify(body),
       timeoutMs: IMAGE_TIMEOUT_MS,
       maxRetries: IMAGE_CREATE_MAX_RETRIES,
+      // 429 = 服务端建任务前的拒绝（未建任务、未计张数），重发安全，走独立冷却通道；
+      // 超时 / 5xx 仍由 maxRetries=0 关闭，不重复建任务。
+      rateLimitRetries: RATE_LIMIT_RETRY_BUDGET,
+      onRateLimited: ({ retryAfterMs }) =>
+        rateLimiter.notifyRateLimited("image", { retryAfterMs }),
     });
 
     if (!resp.ok) {

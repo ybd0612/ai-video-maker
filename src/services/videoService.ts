@@ -23,19 +23,22 @@ import { MODELS } from "@/lib/models";
 import { fetchWithRetry } from "@/lib/fetchWithRetry";
 import { clampNumber } from "@/lib/validation";
 import { MAX_VIDEO_REFERENCE_IMAGES } from "@/lib/videoPlan";
-import { rateLimiter } from "@/services/rateLimit";
+import { rateLimiter, RATE_LIMIT_RETRY_BUDGET } from "@/services/rateLimit";
 
 const VIDEO_POLL_INTERVAL_MS = 5_000;
 const VIDEO_POLL_TIMEOUT_MS = 30 * 60 * 1000; // 视频模型较慢，单个任务最多等待 30 分钟
 const VIDEO_POLL_MAX_NOT_EXIST_RETRIES = 24; // 最多等待 2 分钟让任务注册
 /**
- * 视频创建 POST 的重试次数 —— 恒为 0。
+ * 视频创建 POST 的**通用**重试次数 —— 恒为 0。
  * 原注释写「为 429 退避」，但 fetchWithRetry 的 isRetriable 同样覆盖超时与 5xx，
  * 而实测（2026-09-23，debug-dump/runtime.log 30 次真实创建）createMs 包着整次调用，
  * p50 只有 3.6s 却有 3 次越过默认 60s 线（62.8s / 140.8s / 142.8s）→ 超时重发在
  * 生产里真的发生过。POST /videos 非幂等且按秒计费，重发一次就是再建一个任务、
- * 再扣一次秒数。429 已由 rateLimiter 在发请求前按套餐 RPM 节流（视频 RPM=1），
- * 不需要靠重试兜底；失败一律交用户手动重摇。
+ * 再扣一次秒数，所以超时 / 5xx 一律不重发，失败交用户手动重摇。
+ * ⚠ 429 例外：它是服务端在建任务前的拒绝（未建任务、未扣秒数），重发安全，
+ * 走下面的独立冷却通道。原先「429 已由 rateLimiter 按 RPM 节流兜住」的前提
+ * 已被 2026-09-23 实测否定（免费档文档 RPM=20，服务端 12 请求/38s 即拒），
+ * 故 RPM 阈值只作粗过滤，429 的兜底改由闭环冷却承担。
  */
 const VIDEO_CREATE_MAX_RETRIES = 0;
 /** 单次尝试超时：给足创建时间，避免慢响应被掐断（与文本/图片创建同量级） */
@@ -84,6 +87,27 @@ interface VideoResult {
   videoUrl: string;
   coverImageUrl?: string;
   duration?: number;
+}
+
+/**
+ * 轮询一次任务状态。
+ *
+ * ⚠️ 请求级失败必须转成带 `videoId` 的 {@link VideoTaskCreatedError} 再上抛：
+ * `fetchWithRetry` 在重试耗尽时是**抛错**（HttpError / 网络错误 / 超时）而不是返回响应，
+ * 未包装的普通 Error 会被调用方（`useVideoActions`）判成「创建阶段失败」而走自动重发分支，
+ * 于是对同一个镜头再发一次 `POST /videos` —— 服务端多出一个个已计费的重复任务。
+ * 一次 GET 轮询被 429 卡住正是最容易踩中这条路径的情形（2026-09-23 排查 429 时发现）。
+ */
+async function pollVideoTask(pollUrl: string, apiKey: string, videoId: string): Promise<Response> {
+  try {
+    return await fetchWithRetry(pollUrl, { headers: { Authorization: `Bearer ${apiKey}` } });
+  } catch (err) {
+    const detail = err instanceof Error ? err.message : String(err);
+    throw new VideoTaskCreatedError(
+      `视频任务 ${videoId} 轮询请求失败：${detail}。已保留服务端任务，不重复创建。`,
+      videoId,
+    );
+  }
 }
 
 /** Agnes Video 2.5 Flash 固定输出 720P，画幅由 aspect_ratio 决定。 */
@@ -213,6 +237,11 @@ export async function generateVideo(
       signal,
       maxRetries: VIDEO_CREATE_MAX_RETRIES,
       timeoutMs: VIDEO_CREATE_TIMEOUT_MS,
+      // 429 = 服务端建任务前的拒绝（未建任务、未扣秒数），等窗口解除后重发安全。
+      // 重发不再走 acquire()：那会把被拒绝的请求也记进每日秒数配额，虚增用量。
+      rateLimitRetries: RATE_LIMIT_RETRY_BUDGET,
+      onRateLimited: ({ retryAfterMs }) =>
+        rateLimiter.notifyRateLimited("video", { retryAfterMs, signal }),
     });
 
     if (!createResp.ok) {
@@ -272,9 +301,7 @@ export async function generateVideo(
     await new Promise<void>((r) => setTimeout(r, VIDEO_POLL_INTERVAL_MS));
     if (signal?.aborted) throw new Error(getTranslation("error.videoPollCancelled"));
 
-    const pollResp = await fetchWithRetry(pollUrl, {
-      headers: { Authorization: `Bearer ${opts.apiKey}` },
-    });
+    const pollResp = await pollVideoTask(pollUrl, opts.apiKey, videoId);
 
     if (!pollResp.ok) {
       const text = await pollResp.text().catch(() => "");

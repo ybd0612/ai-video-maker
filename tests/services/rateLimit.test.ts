@@ -208,3 +208,132 @@ describe("取消", () => {
     expect((err as Error).message).toBe("请求已取消。");
   });
 });
+
+/* ── 429 闭环冷却 ──────────────────────────────────────────────────────────
+   成因（2026-09-23 实测 debug-dump/runtime.log）：RPM 阈值表按官方文档取值，
+   免费档 text RPM=20 时服务端在 12 请求/38s 就返回 429，acquire 的等待分支
+   一次都没触发；而封锁窗口 16-20s 后自愈。因此 429 必须由入口回报给限流器，
+   按分钟级登记冷却并让同 kind 的请求一律等窗口解除 —— 阈值表只作粗过滤。 */
+describe("429 闭环冷却", () => {
+  it("登记冷却后，同 kind 的 acquire 必须等到窗口解除才放行", async () => {
+    const { rateLimiter, setPlan } = await freshRateLimit();
+    setPlan("default");
+    vi.useFakeTimers();
+
+    // 不 await：notify 内部会睡到窗口解除
+    void rateLimiter.notifyRateLimited("text");
+    await vi.advanceTimersByTimeAsync(0);
+
+    let released = false;
+    const pending = rateLimiter.acquire("text").then(() => {
+      released = true;
+    });
+
+    await vi.advanceTimersByTimeAsync(29_900);
+    expect(released).toBe(false);
+
+    await vi.advanceTimersByTimeAsync(200);
+    await pending;
+    expect(released).toBe(true);
+  });
+
+  it("Retry-After 过小会被抬到下限，避免退避回到秒级", async () => {
+    const { rateLimiter } = await freshRateLimit();
+    vi.useFakeTimers();
+
+    let done = false;
+    const pending = rateLimiter
+      .notifyRateLimited("text", { retryAfterMs: 1_000 })
+      .then(() => {
+        done = true;
+      });
+
+    await vi.advanceTimersByTimeAsync(14_999);
+    expect(done).toBe(false);
+
+    await vi.advanceTimersByTimeAsync(2);
+    await pending;
+    expect(done).toBe(true);
+  });
+
+  it("Retry-After 过大时截断到上限，不无限挂起请求", async () => {
+    const { rateLimiter } = await freshRateLimit();
+    vi.useFakeTimers();
+
+    let done = false;
+    const pending = rateLimiter
+      .notifyRateLimited("text", { retryAfterMs: 10 * 60_000 })
+      .then(() => {
+        done = true;
+      });
+
+    await vi.advanceTimersByTimeAsync(119_900);
+    expect(done).toBe(false);
+
+    await vi.advanceTimersByTimeAsync(200);
+    await pending;
+    expect(done).toBe(true);
+  });
+
+  it("并发 429 只延长冷却，第二次更早的窗口不得把放行时间提前", async () => {
+    const { rateLimiter, setPlan } = await freshRateLimit();
+    setPlan("default");
+    vi.useFakeTimers();
+
+    void rateLimiter.notifyRateLimited("text", { retryAfterMs: 60_000 });
+    await vi.advanceTimersByTimeAsync(0);
+    void rateLimiter.notifyRateLimited("text", { retryAfterMs: 20_000 });
+
+    let released = false;
+    const pending = rateLimiter.acquire("text").then(() => {
+      released = true;
+    });
+
+    await vi.advanceTimersByTimeAsync(40_000);
+    expect(released).toBe(false);
+
+    await vi.advanceTimersByTimeAsync(20_100);
+    await pending;
+    expect(released).toBe(true);
+  });
+
+  it("冷却按模型种类隔离，图片被限流不阻塞文本", async () => {
+    const { rateLimiter, setPlan } = await freshRateLimit();
+    setPlan("pro");
+    vi.useFakeTimers();
+
+    void rateLimiter.notifyRateLimited("image");
+    await vi.advanceTimersByTimeAsync(0);
+
+    let textReleased = false;
+    const textPending = rateLimiter.acquire("text").then(() => {
+      textReleased = true;
+    });
+    let imageReleased = false;
+    const imagePending = rateLimiter.acquire("image", { sizeTier: "1K" }).then(() => {
+      imageReleased = true;
+    });
+
+    await vi.advanceTimersByTimeAsync(10);
+    await textPending;
+    expect(textReleased).toBe(true);
+    expect(imageReleased).toBe(false);
+
+    await vi.advanceTimersByTimeAsync(30_000);
+    await imagePending;
+    expect(imageReleased).toBe(true);
+  });
+
+  it("冷却等待可被 AbortSignal 取消", async () => {
+    const { rateLimiter, RateLimitError } = await freshRateLimit();
+    const controller = new AbortController();
+    controller.abort();
+
+    const err = await rateLimiter
+      .notifyRateLimited("text", { signal: controller.signal })
+      .catch((e: unknown) => e);
+
+    expect(err).toBeInstanceOf(RateLimitError);
+    expect((err as { reason?: string }).reason).toBe("aborted");
+  });
+});

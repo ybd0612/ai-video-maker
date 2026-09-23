@@ -57,7 +57,7 @@ Step labels match the UI (`wizard.step1~6` in `src/i18n/index.ts`):
 ## Capabilities
 
 - Six-step wizard + multi-project management (create / switch / duplicate / delete / search / sort), persisted in `localStorage`
-- **Centralized rate limiting** for text / image / video: RPM sliding window plus Token Plan quota accounting; the single source of truth is `src/lib/plans.ts`
+- **Centralized rate limiting** for text / image / video: RPM sliding window plus Token Plan quota accounting; the single source of truth is `src/lib/plans.ts`. On a server-side 429 the matching model kind enters a cooldown and the request resumes automatically once the window clears — no manual re-roll needed
 - **Prompt rule registry** (`src/lib/promptRules.ts`): skeletons in code, rule entries editable in Settings → "Prompt rules" (view / edit / toggle / add / import / export), **effective immediately, zero rebuild**
 - **Sampling parameters decided by the model** (`src/lib/generationParams.ts`): a meta request decides `temperature` / `top_p` / Thinking per purpose; code only range-validates and caches
 - Inline AI polish: every AI-assisted input embeds "polish / stepwise undo" (`components/ui/AiPolishField.tsx`)

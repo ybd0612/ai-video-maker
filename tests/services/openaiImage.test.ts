@@ -14,7 +14,12 @@ vi.mock("@/lib/fetchWithRetry", () => ({
   fetchWithRetry: vi.fn(),
 }));
 vi.mock("@/services/rateLimit", () => ({
-  rateLimiter: { acquire: vi.fn().mockResolvedValue(undefined) },
+  rateLimiter: {
+    acquire: vi.fn().mockResolvedValue(undefined),
+    notifyRateLimited: vi.fn().mockResolvedValue(undefined),
+  },
+  // 真实值见 services/rateLimit.ts；此处仅桩化
+  RATE_LIMIT_RETRY_BUDGET: 2,
   imageSizeToTier: vi.fn().mockReturnValue("1K"),
 }));
 vi.mock("@/services/videoService", () => ({
@@ -141,5 +146,16 @@ describe("生图创建请求的重试与超时（非幂等 POST）", () => {
     const timeoutMs = lastFetchOptions().timeoutMs;
     expect(typeof timeoutMs).toBe("number");
     expect(timeoutMs as number).toBeGreaterThanOrEqual(180_000);
+  });
+
+  // 429 是服务端在建任务前的拒绝（未建任务、未计张数），重发安全；
+  // 上面关掉的只是超时 / 5xx 那条无法证明安全的通道。
+  it("429 走独立等待通道，通用重试仍为 0", async () => {
+    await svc.generateImage({ prompt: "x", size: "1K" });
+
+    const opts = lastFetchOptions();
+    expect(opts.maxRetries).toBe(0);
+    expect(opts.rateLimitRetries).toBeGreaterThan(0);
+    expect(typeof opts.onRateLimited).toBe("function");
   });
 });

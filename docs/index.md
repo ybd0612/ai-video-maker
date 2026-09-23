@@ -85,8 +85,9 @@ CI 测试门禁           ⬜ .github/workflows/deploy.yml 仍只构建不跑测
 | --- | --- | --- | --- |
 | 模型标识符（文本 / 图像 / 视频） | `src/lib/models.ts` | `MODELS` `:6-10` | 2026-09-21 |
 | 文本输出预算 | `src/lib/models.ts` | `MAX_OUTPUT_TOKENS` `:18` | 2026-09-21 |
-| 套餐 RPM 与订阅配额 | `src/lib/plans.ts` | `PLANS` `:73-134` | 2026-09-21 |
-| 图片尺寸档位识别 | `src/lib/plans.ts` | `imageSizeToTier` `:159-169` | 2026-09-21 |
+| 套餐 RPM 与订阅配额（开环粗过滤，防不住 429） | `src/lib/plans.ts` | `PLANS` `:78` | 2026-09-23 |
+| 429 闭环冷却时长与重发预算 | `src/services/rateLimit.ts` | `RATE_LIMIT_COOLDOWN_MS` `:50`、`RATE_LIMIT_RETRY_BUDGET` `:56`、`notifyRateLimited` `:161` | 2026-09-23 |
+| 图片尺寸档位识别 | `src/lib/plans.ts` | `imageSizeToTier` `:164` | 2026-09-23 |
 | 出图实际用的 `size` | `src/services/imageService.ts` | `aspectRatioToImageParams` `:72-78`（恒 `1K`，2K/3K/4K 仅预留） | 2026-09-21 |
 | 视频 `size` / `seconds` / `mode` | `src/services/videoService.ts` | `VIDEO_SIZE` `:71`、`seconds` 夹取 `:139-143`、`mode` `:149` | 2026-09-21 |
 | 视频轮询端点与必带参数 | `src/services/videoService.ts` | `:227`（`{origin}/agnesapi?video_id=…&model_name=…`） | 2026-09-21 |
