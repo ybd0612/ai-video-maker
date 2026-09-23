@@ -28,8 +28,18 @@ import { rateLimiter } from "@/services/rateLimit";
 const VIDEO_POLL_INTERVAL_MS = 5_000;
 const VIDEO_POLL_TIMEOUT_MS = 30 * 60 * 1000; // 视频模型较慢，单个任务最多等待 30 分钟
 const VIDEO_POLL_MAX_NOT_EXIST_RETRIES = 24; // 最多等待 2 分钟让任务注册
-const VIDEO_CREATE_MAX_RETRIES = 3; // 429 rate-limit retry
-const VIDEO_CREATE_BASE_DELAY_MS = 10_000; // 10s base delay for 429 retry
+/**
+ * 视频创建 POST 的重试次数 —— 恒为 0。
+ * 原注释写「为 429 退避」，但 fetchWithRetry 的 isRetriable 同样覆盖超时与 5xx，
+ * 而实测（2026-09-23，debug-dump/runtime.log 30 次真实创建）createMs 包着整次调用，
+ * p50 只有 3.6s 却有 3 次越过默认 60s 线（62.8s / 140.8s / 142.8s）→ 超时重发在
+ * 生产里真的发生过。POST /videos 非幂等且按秒计费，重发一次就是再建一个任务、
+ * 再扣一次秒数。429 已由 rateLimiter 在发请求前按套餐 RPM 节流（视频 RPM=1），
+ * 不需要靠重试兜底；失败一律交用户手动重摇。
+ */
+const VIDEO_CREATE_MAX_RETRIES = 0;
+/** 单次尝试超时：给足创建时间，避免慢响应被掐断（与文本/图片创建同量级） */
+const VIDEO_CREATE_TIMEOUT_MS = 180_000;
 
 /**
  * Error thrown when the video task was already created on the server
@@ -202,7 +212,7 @@ export async function generateVideo(
       body: JSON.stringify(body),
       signal,
       maxRetries: VIDEO_CREATE_MAX_RETRIES,
-      baseDelayMs: VIDEO_CREATE_BASE_DELAY_MS,
+      timeoutMs: VIDEO_CREATE_TIMEOUT_MS,
     });
 
     if (!createResp.ok) {

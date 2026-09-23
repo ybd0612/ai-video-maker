@@ -463,7 +463,7 @@ Promise.allSettled([链A, 链B])                                      :269
   +-- [srv] generateVideo(opts, onProgress 进度回调, signal 取消信号)  videoService.ts:125
   |      in : {apiKey, baseUrl, prompt 动态描述, ...media, aspectRatio 画幅, duration 时长(秒)}
   |      槽位: acquire("video", {cost 计费量: duration||1, signal})  <-- HTTP 之前就扣秒数
-  |      req1: POST {baseUrl}/videos   (maxRetries 3, baseDelay 退避基数 10s)
+  |      req1: POST {baseUrl}/videos   (maxRetries 0 不自动重试, timeoutMs 单次超时 180s)
   |            {model:"agnes-video-2.5-flash",
   |             prompt: sanitizePrompt(清洗后的动态描述),
   |             mode: "reference" 有参考图 | "keyframe" 有首/尾帧 | "text" 无素材,
@@ -663,4 +663,4 @@ automationMode 自动化模式      顶栏「全自动/半自动」开关       
 1. `assets[].imageUrl`(资产参考图) 一次写回 => 三个审核门禁 + 引用它的镜头图视频一起没（图9 中段）。
 2. `referenceImageUrls`(参考图列表) 只在**分镜图**链路出现；资产图与风格图全是文生图（图2 / 图3 / 图5）。
 3. `duration`(时长) 被规范化两次：`normalizeRawShot` 只允许 {4,5,8}，`videoService` 再 clamp 到 4..12（图4 / 图6）。
-4. 视频槽位在创建前就按秒扣，且**视频**创建 POST 仍会自动重试（图6 / 图8）；图片创建已改为不自动重试（2026-09-23）。
+4. 视频槽位在创建前就按秒扣；**服务层的创建重试已全部关闭**（图片 2026-09-23、视频同日），但编排层仍有一圈 `MAX_TASK_RETRIES = 2` 会在创建抛错时重发创建请求（图6 / 图8）—— 这是最后一处非幂等重发点。

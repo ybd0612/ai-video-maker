@@ -117,3 +117,32 @@ describe("generateVideo 请求体", () => {
     expect(createBody().seconds).toBe("12");
   });
 });
+
+/* ── 创建请求的重试与超时（非幂等 POST，按秒计费） ───────────────────────── */
+
+describe("generateVideo 创建请求的重试与超时", () => {
+  function createFetchOptions(): Record<string, unknown> {
+    return mockedFetch.mock.calls[0][1] as unknown as Record<string, unknown>;
+  }
+
+  // 实测成因（2026-09-23，debug-dump/runtime.log 里 30 次真实创建）：createMs 包着
+  // 整次 fetchWithRetry，p50 只有 3.6s，但有 3 次超过 60s（62.8s / 140.8s / 142.8s）
+  // → 说明超时重发在生产里真的发生过，而 POST /videos 非幂等且按秒计费，
+  //   每次重发都会在服务端再建一个任务、再扣一次秒数。
+  it("创建 POST 不自动重试：maxRetries 为 0", async () => {
+    stubHappyPath();
+    await run(base);
+
+    // fetchWithRetry 在 maxRetries=0 时只发一次请求（见 tests/lib/fetchWithRetry.test.ts:77）
+    expect(createFetchOptions().maxRetries).toBe(0);
+  });
+
+  it("创建 POST 单次超时 ≥ 180s，避免慢响应被掐断后重发建任务", async () => {
+    stubHappyPath();
+    await run(base);
+
+    const timeoutMs = createFetchOptions().timeoutMs;
+    expect(typeof timeoutMs).toBe("number");
+    expect(timeoutMs as number).toBeGreaterThanOrEqual(180_000);
+  });
+});

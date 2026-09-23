@@ -191,7 +191,7 @@
      - `reference` + `images`（≤5）：`videoConsistency === "identity"` 且同场景衔接取不到尾帧时（换场景、末镜），改送 `[出场角色定妆照…, 风格母版]` 锚身份与画风；
      - `text`：无素材（当前筛选要求有 `imageUrl`，实际不可达）。
    - ⚠️ 实测依据见 `docs/roadmap/competitive-gap-2026-09-21.md` §6：`reference` 与 `first_frame`/`last_frame` 同时传，服务端 400「首尾帧素材与参考素材不能同时使用」。
-   - 创建 POST `{baseUrl}/videos`（`videoService.ts:173-181`），`maxRetries 3` + 10s base delay（针对 429）；`video_id ?? task_id ?? id`
+   - 创建 POST `{baseUrl}/videos`（`videoService.ts:206-216`），`maxRetries 0`（非幂等，2026-09-23 起不自动重试）+ 单次超时 180s；`video_id ?? task_id ?? id`
    - 轮询 `GET {origin}/agnesapi?video_id=...&model_name=agnes-video-2.5-flash`（:227），间隔 5s、超时 30 分钟、`task_not_exist` 最多容忍 24 轮（:25-27）
    - 完成 URL 顺序（:288-294）：`url → metadata.url → video_url → output.url → output.video_url → remixed_from_video_id`；函数返回 `{ videoUrl, coverImageUrl, duration }`（:64-68,342），但**两个调用点只取 `result.videoUrl`**，cover 与实际时长被丢弃
    - **创建后失败的错误类型是 `VideoTaskCreatedError{videoId, stillRunning}`**（`videoService.ts:35-48`）；上层 `useVideoActions.ts:100-122` 对 `stillRunning=true` **只等待不再创建新任务**（避免双倍消耗），false 才判失败
@@ -337,7 +337,7 @@ RPM 与配额表（`lib/plans.ts:73-134`，格式 文本 / 图片1K,2K,3K,4K / �
 6. **回步骤 2 重新生成任一资产图会连带清空镜头已完成产物**：`applyAssetUpdate` 把生成器自己的 `imageUrl` 写回也算「渲染字段变化」（9.6），并重置三个审核标记；改 style 资产则全部分镜作废。行为有单测锁定，但「补一个缺失资产 = 重做整套镜头图片」是否是你要的代价，值得确认。
 7. **批量任务没有取消入口**（9.3）：注册表里的 controller 从未被 abort，切项目、离开步骤、组件卸载都拦不住在飞请求与 30 分钟视频轮询，钱照扣、结果照写回。
 8. **配额在请求前扣、失败不回滚**（`rateLimit.ts:128-136`）。图片 403/内容过滤、视频创建后失败都会白扣一次配额；Token Plan 用户会看到「用量没了但没出片」。
-9. **非幂等 POST 的重试收口状态**：图片创建**已收口**（`ai/openai.ts:219-227`，`maxRetries: 0` + 单次超时 180s；2026-09-23 实测 1K 单张 29-59s 贴着旧默认 60s 线，超时重发会在服务端重复建任务并重复按张计配额，失败改为交用户手动重试）。**视频创建仍未收口**（`videoService.ts:196-206`，`maxRetries: 3` 且未传 `timeoutMs` → 默认 60s/次）：429 退避是有意的，但超时/5xx 同样会触发重发，视频按秒计费代价更高，是下一个要收的口。
+9. **非幂等 POST 的重试收口状态**：**图片与视频创建的服务层均已收口**（2026-09-23，均改为 `maxRetries: 0` + 单次超时 180s，失败交用户手动重试）。实测依据 —— 图片 1K 单张 29-59s 贴着 `fetchWithRetry` 默认 60s 线；视频 `createMs`（包着整次调用）30 次真实创建里 p50 仅 3.6s 却有 3 次越过 60s（62.8s / 140.8s / 142.8s），说明超时重发在生产里真的发生过，而视频按秒计费、重发一次就是再建一个任务再扣一次秒数；429 已由 `rateLimiter` 在发请求前按 RPM 节流。**剩余的非幂等重发点**：编排层创建重试环（`useVideoActions.ts:59-126`，`MAX_TASK_RETRIES = 2`，创建抛错时最多再发 3 次）—— 收它要先决定「批量跑中一次网络抖动是否还自动救回」，属产品可见行为，未擅自改。
 10. **资产图批量不过滤空提示词**：`generateAssetImages` 的任务只按 `!imageUrl` 筛选，不看 `prompt` 是否为空（`useAssetActions.ts:330-473`）；步骤 1 尾部的自动批量因此会对空 prompt 的资产（例如用户早先手动添加、尚未填设定的场景）发一次只含边界句的生图请求，白扣一档图片配额。手动入口有 `prompt.trim()` 守卫（`StepAssets.tsx:234`），批量没有。
 11. `generateStoryboard` 命中幂等守卫时 `return`（不抛错、不 await 在飞任务），`StepAssets.enterStoryboard` 的 `onProgress` 永不触发 → 极端时序下点「进入分镜」无反应也不报错（`useScriptActions.ts:327` + `StepAssets.tsx:113-128`）。
 12. ~~`pickShotReferences` 注释写「总上限 3 张」且把场景图列为首位参考，代码实为上限 4 张且排除场景图~~ **已修（2026-09-23）**：`promptComposer.ts` 函数头注释按实现改写（角色定妆照 → 产品 → 道具，≤4 张，场景图与风格母版都不进参考，并写入当日四臂实测否决结论）；同类陈旧注释 `useImageActions.ts:68`（原写「场景 → 角色 → 产品/道具，≤3 张」）一并更正。
