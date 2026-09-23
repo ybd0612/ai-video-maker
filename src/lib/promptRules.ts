@@ -405,7 +405,7 @@ Return strict JSON in exactly this format, no other text:
 只输出这一个镜头的 JSON 对象（不是数组），不要包含任何其他文字。所有返回字段都必须非空。`,
     en: `You are a professional video storyboard designer. You get the storyboard outline and the plan of ONE shot. Write that single shot completely:
 1. scriptText: the narrative script for this shot (action and emotion, follow the user's language)
-2. visualPrompt: a complete Chinese image prompt — subject appearance (reuse the provided asset appearance descriptions verbatim), action, environment, composition and camera; describe only this shot
+2. visualPrompt: a complete Chinese image prompt — subject appearance (**use only the one-line brief appearance anchor provided**; do NOT expand species / appearance / outfit / signature into it), action, environment, composition and camera; describe only this shot
 3. motionPrompt: a complete Chinese motion prompt — subject motion, camera movement, environmental changes
 4. Fill every other description field (sceneDesc/detailDesc/lightingDesc/styleDesc/actionDesc/cameraDesc/envChangeDesc/motionSpeedDesc); put subject information only in visualPrompt, with no separate subjectDesc
 5. dialogues when needed (characterId = character name); activeCharacterIds/activeSceneId/activeProductIds/activePropIds use existing asset IDs; any identifiable prop or product mentioned in visualPrompt or scriptText must also be included in the matching active ID list; duration from 4/5/8

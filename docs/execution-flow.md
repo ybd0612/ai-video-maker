@@ -340,7 +340,7 @@ RPM 与配额表（`lib/plans.ts:73-134`，格式 文本 / 图片1K,2K,3K,4K / �
 9. **非幂等 POST 的重试收口状态**：图片创建**已收口**（`ai/openai.ts:219-227`，`maxRetries: 0` + 单次超时 180s；2026-09-23 实测 1K 单张 29-59s 贴着旧默认 60s 线，超时重发会在服务端重复建任务并重复按张计配额，失败改为交用户手动重试）。**视频创建仍未收口**（`videoService.ts:196-206`，`maxRetries: 3` 且未传 `timeoutMs` → 默认 60s/次）：429 退避是有意的，但超时/5xx 同样会触发重发，视频按秒计费代价更高，是下一个要收的口。
 10. **资产图批量不过滤空提示词**：`generateAssetImages` 的任务只按 `!imageUrl` 筛选，不看 `prompt` 是否为空（`useAssetActions.ts:330-473`）；步骤 1 尾部的自动批量因此会对空 prompt 的资产（例如用户早先手动添加、尚未填设定的场景）发一次只含边界句的生图请求，白扣一档图片配额。手动入口有 `prompt.trim()` 守卫（`StepAssets.tsx:234`），批量没有。
 11. `generateStoryboard` 命中幂等守卫时 `return`（不抛错、不 await 在飞任务），`StepAssets.enterStoryboard` 的 `onProgress` 永不触发 → 极端时序下点「进入分镜」无反应也不报错（`useScriptActions.ts:327` + `StepAssets.tsx:113-128`）。
-12. `pickShotReferences` 注释写「总上限 3 张」，代码实为 `out.length < 4`（`promptComposer.ts:282` 起，push 上限 4）。
+12. ~~`pickShotReferences` 注释写「总上限 3 张」且把场景图列为首位参考，代码实为上限 4 张且排除场景图~~ **已修（2026-09-23）**：`promptComposer.ts` 函数头注释按实现改写（角色定妆照 → 产品 → 道具，≤4 张，场景图与风格母版都不进参考，并写入当日四臂实测否决结论）；同类陈旧注释 `useImageActions.ts:68`（原写「场景 → 角色 → 产品/道具，≤3 张」）一并更正。
 13. 步骤 4/5 的 `onFinally` 错误文案硬编码中文（`useImageActions.ts:185`、`useVideoActions.ts:178`），违反「用户可见文本必须进 i18n」；`StepAssembly.tsx:168` 的「缺少镜头：#1、#2」同。
 14. 步骤 1 的 `IDEA_POLISH_PROMPT` / `IDEA_POLISH_PROMPT_EN` 长提示词写在组件里（`StepIdea.tsx:14-28`），未进 `promptRules` 注册表，用户不可编辑、设置对话框里也看不到。
 15. ~~视觉方向链完成即置 `project.status = "idle"`，此时资产提取链可能仍在跑 → 侧栏状态短暂显示空闲~~ **已修复（2026-09-22）**。现在链 A 只写 `visualDirection` + `wizardStep: 2`，**两链都完成才** `status = "idle"`（`useScriptActions.ts:285`）；该状态同时是步骤 1 的门禁信号（「AI 提取」按钮、输入框、底部「下一步」都以它为准），并在向导容器挂载时按注册表实况复位残留值（见 §3 与 9.3）。

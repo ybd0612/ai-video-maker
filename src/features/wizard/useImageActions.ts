@@ -65,7 +65,7 @@ function extractShotImageRules(): RegistryRuleText {
 
 /**
  * Compose the complete image prompt and the multi-reference list for a shot.
- * - 参考图：pickShotReferences（场景 → 角色 → 产品/道具，≤3 张；风格通过文本注入）
+ * - 参考图：pickShotReferences（角色定妆照 → 产品 → 道具，≤4 张；场景图与风格母版都不进参考，只以文本注入）
  * - 有参考图：composeMultiReferencePrompt（参考图角色说明 + 图像关系指令）
  * - 无参考图：composeTextToImagePrompt 六段式
  * - rules：composeShot / negativeStrategy 注册表生效规则，作为正向约束拼入提示词

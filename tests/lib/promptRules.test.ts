@@ -139,6 +139,17 @@ describe("SKELETONS", () => {
     expect(SKELETONS.characterFidelityAudit.en).toContain("Must NOT be flagged");
     expect(SKELETONS.characterFidelityAudit.en).toContain("fixes");
   });
+
+  it("storyboardShot 中英骨架同口径：主体外观都只允许一句短锚点", () => {
+    // 上一轮短锚点修复只改了 zh 骨架，en 骨架仍写「reuse the provided asset
+    // appearance descriptions verbatim」→ language=en 项目的 visualPrompt 膨胀
+    // 缺陷（实测 9 镜 1100-1400 字、多角色镜头画出两只猫）至今仍在。
+    expect(SKELETONS.storyboardShot.zh).toContain("只用所给的一句短外观锚点");
+    const en = SKELETONS.storyboardShot.en;
+    expect(en).not.toContain("descriptions verbatim");
+    expect(en).toContain("one-line brief appearance anchor");
+    expect(en).not.toMatch(/[一-鿿]/);
+  });
 });
 
 /* ── mergeRules ───────────────────────────────────────────────────────────── */
