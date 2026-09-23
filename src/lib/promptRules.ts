@@ -37,6 +37,12 @@ export type PromptTask =
 export type RuleSection = "rules" | "examples" | "safety";
 
 export interface PromptRule {
+  /**
+   * 真正发给模型的渲染文本。缺省表示该条目只服务提示词作者（AI 或人），
+   * 不参与拼装 —— 避免把「怎么写提示词」的元指令发给生图/生视频模型。
+   * 用户覆盖条目时同 id 一并覆盖此字段。
+   */
+  renderContent?: { zh: string; en: string };
   /** 唯一标识；内置条目为 "task.name" 形式，自定义条目为 "custom.*" */
   id: string;
   task: PromptTask;
@@ -910,6 +916,28 @@ export const BUILTIN_RULES: PromptRule[] = [
     source: "builtin",
   },
   {
+    id: "storyboard.paintable-environment-state",
+    task: "storyboardShot",
+    section: "rules",
+    content: {
+      zh: "- 环境状态必须写成**看得见的事实**，不要写时间态或否定词。生图模型不执行「暴雨将至」「大雨未落」「还没有下雨」「不再」这类表述，它会按语料先验直接画出正在下雨\n  - 「暴雨前」→ 空中无雨丝，水泥地面干燥发白，无积水反光，仅远处天空有闪电\n  - 「暴雨中」→ 密集雨丝划过画面，地面汇水成浅流，水面布满雨滴砸出的涟漪\n  - 「雨停后」→ 空中无雨丝，地面残留水洼与反光，衣物边缘悬挂将落未落的水珠\n- 同一场景的不同幕，必须靠这些可见事实区分开；只换情绪词与形容词等于没有换幕",
+      en: "- Write environment state as **visible facts**, never tense words or negations. The image model does not execute 'storm approaching', 'rain has not started', 'no longer' — it follows its prior and draws rain already falling\n  - 'before the storm' → no rain streaks in the air, dry pale concrete, no standing-water reflections, lightning only in the distant sky\n  - 'during the storm' → dense rain streaks across frame, water gathering into shallow runs, the surface covered in raindrop ripples\n  - 'after the rain' → no rain streaks, leftover puddles with reflections, water hanging at the edge of dripping clothes\n- Different acts of the same scene must be told apart by these visible facts; swapping only mood words and adjectives is the same as never changing acts",
+    },
+    enabled: true,
+    source: "builtin",
+  },
+  {
+    id: "storyboard.handoff-previous",
+    task: "storyboardShot",
+    section: "rules",
+    content: {
+      zh: "- 上下文给出「上一镜已生成的内容」时，本镜必须在主体姿态、位置、景别、光线与色温上承接它：景别只允许同档或相邻档（中景↔全景），要跳档就用本镜的开头自然过渡，不要硬切；上一镜已经画过的画面不得再画一遍\n- 承接前先比对上一镜的实际内容：若本镜与上一镜是同一主体、同一姿态、同一景别（只是换个说法），**必须换节拍**——改景别、改动作或把两镜合并为一镜。两镜内容重复会让收尾拖沓且剪出来必然跳",
+      en: "- When the context provides 'the previous shot as generated', this shot must hand off from it in pose, position, shot size, lighting and colour temperature: stay in the same or an adjacent shot size (medium ↔ wide); to jump two sizes, transition within this shot rather than hard-cutting, and never redraw what the previous shot already showed\n- Before handing off, compare against the previous shot's actual content: if this shot has the same subject, same pose and same shot size and only rephrases it, CHANGE THE BEAT — alter the shot size, alter the action, or merge the two shots. Two shots with duplicated content drag the ending and always cut as a jump",
+    },
+    enabled: true,
+    source: "builtin",
+  },
+  {
     id: "storyboard.single-setup",
     task: "storyboardShot",
     section: "rules",
@@ -1040,6 +1068,10 @@ export const BUILTIN_RULES: PromptRule[] = [
   /* ── composeShot（分镜画面提示词拼装规范） ── */
   {
     id: "compose.multi-reference",
+    renderContent: {
+      zh: "参考图只作为画风、色调与角色形象锚点，不要复制参考图的内容与构图",
+      en: "references anchor art style, palette and character identity only; do not copy their content or composition",
+    },
     task: "composeShot",
     section: "rules",
     content: {
@@ -1064,6 +1096,10 @@ export const BUILTIN_RULES: PromptRule[] = [
   /* ── negativeStrategy（负向提示词策略） ── */
   {
     id: "negative.strategy",
+    renderContent: {
+      zh: "画面细节清晰，解剖结构正常，无多余肢体与融合部位，无伪影与畸变",
+      en: "clean detail, correct anatomy, no extra limbs, no fused parts, no artifacts or warping",
+    },
     task: "negativeStrategy",
     section: "rules",
     content: {
@@ -1187,6 +1223,18 @@ function renderSectionBlock(
  * （BUILTIN_RULES 定义顺序，custom 追加其后）；enabled=false 剔除。
  * 纯函数：rules 由调用方传入（一般为 getActiveRules() 的结果）。
  */
+/**
+ * 取某任务用于**渲染进最终提示词**的文本：只收带 renderContent 的生效条目。
+ * 与 buildSystemPrompt 分工 —— 那个给提示词作者看，这个发给生成模型。
+ */
+export function getActiveRenderRules(task: PromptTask, language: "zh" | "en"): string {
+  return getActiveRules()
+    .filter((r) => r.task === task && r.section === "rules")
+    .flatMap((r) => (r.renderContent ? [r.renderContent[language].trim()] : []))
+    .filter((text) => text !== "")
+    .join(", ");
+}
+
 export function buildSystemPrompt(
   task: PromptTask,
   language: "zh" | "en",
