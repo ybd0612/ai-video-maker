@@ -174,6 +174,7 @@ The rewrite must keep the original overall style tone and only remove the overre
 
 不得判为越界的情形：
 - 想法没有给出的细节被补全（毛色层次、修剪样式、眼神、配饰等），只要与已有事实指向同一个主体
+- 想法原文写明的**状态事实**（失明、跛行、愈合疤痕等）在外观/识别特征字段被改写成了**等效部件**（例：左眼失明 → 黑色布质眼罩），只要这条状态仍原样保留在性格或背景等叙事字段里——这是可画性改写，**不是换主体**
 - 表述风格、措辞长短、信息多寡的差异
 
 只返回 JSON：
@@ -194,6 +195,7 @@ Must be flagged (clean=false):
 
 Must NOT be flagged:
 - Details the idea never stated were invented (coat shading, grooming style, expression, accessories) as long as they point at the same subject
+- A **condition** fact stated in the idea (blindness, limping, a healed scar) was rewritten in the appearance/signature fields as an **equivalent part-shaped marker** (e.g. a blind left eye becomes a black cloth eye patch), as long as that condition is still kept verbatim in a narrative field such as personality or background — this is a paintability rewrite, **not a subject swap**
 - Differences in wording, length or amount of detail
 
 Return JSON only:
@@ -750,11 +752,22 @@ export const BUILTIN_RULES: PromptRule[] = [
     source: "builtin",
   },
   {
+    id: "extract.paintable-features",
+    task: "extractAssets",
+    section: "rules",
+    content: {
+      zh: "- **外观字段只写可画的部件**：`appearance` / `signature` / `outfit` 等可视化字段优先给出**有形状、可描边、能整体画出来的附加部件**（例如眼罩、绷带、夹板、缺了一角的耳朵、额前一撮白毛、领圈、背包、身上某块不同颜色的毛斑）。\n- 改变已有部位的状态、材质或颜色（例如失明、眼球浑浊、愈合疤痕、缝合线、流血、消瘦、跛行）当前图像模型画不出来，不要写进外观字段（含 `description` 第 1 行摘要，它同样直接喂生图）。想法原文给的是这类**状态事实**时：① 外观字段改写成等效的部件型外观（例：左眼失明 → 左眼戴黑色布质眼罩，细绳绕过额头与耳后，边缘磨损发白）；② 原始状态事实原样保留在 `personality` / `background` 等叙事字段里，一条都不许丢——**主体忠实高于可画性**。\n- 上面两组例子只说明「部件 vs 状态」的区分，**不是清单也不穷尽**；某个词有没有出现在例子里都不改变判据，判断与转写一律由你逐条自行完成。",
+      en: "- **Visual fields carry only paintable parts**: fill `appearance`, `signature` and `outfit` first with **added parts that have an outline and can be drawn whole** (for example an eye patch, a bandage, a splint, an ear with one corner missing, a white tuft on the forehead, a collar, a backpack, a differently coloured patch of fur on the body).\n- Changing the state, material or colour of an existing body part (for example blindness, a cloudy eye, a healed scar, sutures, bleeding, emaciation, limping) is not renderable by the current image model, so never put it in a visual field (including the first line of `description`, which is fed to image generation directly). When the idea text states such a **condition fact**: (1) rewrite the visual field as an equivalent part-shaped appearance (e.g. a blind left eye becomes a black cloth eye patch over the left eye, its cord running around the forehead and behind the ear, edges frayed white); (2) keep the original condition fact verbatim in a narrative field such as `personality` or `background`, dropping none of it — **subject fidelity outranks paintability**.\n- Both example lists above only illustrate the parts-vs-condition distinction; they are **not a checklist and not exhaustive**. Whether a word appears in them changes nothing — judge and rewrite each asset yourself.",
+    },
+    enabled: true,
+    source: "builtin",
+  },
+  {
     id: "extract.assets-animals",
     task: "extractAssets",
     section: "rules",
     content: {
-      zh: "- **description 第 1 行（一句话总述）只能写该资产自身的身份与外观**，禁止出现剧情动作、场景、时间天气或其他角色（例：写「一只左眼失明的年长橘猫」，不要写「在天台与边牧幼犬对峙、争水、最终相依的橘猫」）——生图提示词会直接取用这一行\n- characters：涵盖故事中的**一切角色主体**——人物、动物（如小兔子、小猫）、拟人化角色、机器人等，只要是故事的主角/配角就必须全部填入；仅纯风景内容才 []\n- 每个角色 description 必须严格保留 9 行：第 1 行一句话总述，后面按顺序逐行输出物种、身份、年龄、性格、外貌、服饰、记忆点、背景；禁止用句号/分号压成一行",
+      zh: "- **description 第 1 行（一句话总述）只能写该资产自身的身份与外观**，禁止出现剧情动作、场景、时间天气或其他角色（例：写「一只左眼戴黑色布质眼罩的年长橘猫」，不要写「在天台与边牧幼犬对峙、争水、最终相依的橘猫」）——生图提示词会直接取用这一行\n- characters：涵盖故事中的**一切角色主体**——人物、动物（如小兔子、小猫）、拟人化角色、机器人等，只要是故事的主角/配角就必须全部填入；仅纯风景内容才 []\n- 每个角色 description 必须严格保留 9 行：第 1 行一句话总述，后面按顺序逐行输出物种、身份、年龄、性格、外貌、服饰、记忆点、背景；禁止用句号/分号压成一行",
       en: "- characters: ONLY fill if content has characters, otherwise []\n- Each character description MUST preserve exactly 9 lines: one summary line followed by species, role, age, personality, looks, outfit, signature and background; never compress the elements into one sentence",
     },
     enabled: true,

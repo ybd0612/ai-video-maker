@@ -241,6 +241,54 @@ describe("buildSystemPrompt", () => {
     // 英文条目不得夹带未翻译的中文词（en 版会喂给 language=en 的项目）
     expect(en).not.toMatch(/[一-鿿]/);
   });
+
+  it("extractAssets 生效提示词含「状态词转可画部件」条目，且排在主体忠实之后", () => {
+    // 实测依据：给主体新增有形状的部件（双头、黑色眼罩）一次命中；改变已有部位的
+    // 状态/材质（失明、闭眼、三条腿、刀疤、缝合线、流血）六组全失败，
+    // 与内容审查无关（过滤器是显式 400）。判据只能是「部件 vs 状态」。
+    const zh = buildSystemPrompt("extractAssets", "zh", BUILTIN_RULES);
+    expect(zh).toContain("外观字段只写可画的部件");
+    expect(zh).toContain("左眼失明 → 左眼戴黑色布质眼罩");
+    // 状态事实一条不许丢：主体忠实高于可画性
+    expect(zh).toContain("主体忠实高于可画性");
+    // 例子只作说明，不构成清单（禁止品种词表 / 状态词黑名单 / 枚举白名单）
+    expect(zh).toContain("不是清单也不穷尽");
+    expect(zh.indexOf("主体忠实（最高优先）")).toBeLessThan(zh.indexOf("外观字段只写可画的部件"));
+
+    const en = buildSystemPrompt("extractAssets", "en", BUILTIN_RULES);
+    expect(en).toContain("Visual fields carry only paintable parts");
+    expect(en).toContain("a blind left eye becomes a black cloth eye patch");
+    expect(en).toContain("subject fidelity outranks paintability");
+    expect(en).toContain("not a checklist and not exhaustive");
+    expect(en.indexOf("Subject fidelity (highest priority)")).toBeLessThan(
+      en.indexOf("Visual fields carry only paintable parts"),
+    );
+    expect(en).not.toMatch(/[一-鿿]/);
+  });
+
+  it("主体忠实审计不把「状态转写为部件」判为越界（与提取条目同口径，两档一起改）", () => {
+    // 只改提取条目不改审计：转写结果会在写回前被审计按想法原文改回状态词 → 等于没改
+    expect(SKELETONS.characterFidelityAudit.zh).toContain("等效部件");
+    expect(SKELETONS.characterFidelityAudit.zh).toContain("不是换主体");
+    expect(SKELETONS.characterFidelityAudit.en).toContain("equivalent part-shaped marker");
+    expect(SKELETONS.characterFidelityAudit.en).toContain("not a subject swap");
+    // 审计骨架 en 同样不得夹带中文
+    expect(SKELETONS.characterFidelityAudit.en).not.toMatch(/[一-鿿]/);
+  });
+
+  it("摘要行作用域与示例全链路一致（两档只改一档等于没改的回归锁）", () => {
+    const entry = BUILTIN_RULES.find((r) => r.id === "extract.paintable-features")!;
+    // 摘要行由生图直接取用，必须一并纳入「不写状态词」的作用域
+    expect(entry.content.zh).toContain("含 `description` 第 1 行摘要");
+    expect(entry.content.en).toContain("including the first line of `description`");
+
+    // 同一份渲染里不得残留教模型往摘要行写状态词的示例，否则新条目被就地抵消
+    const animals = BUILTIN_RULES.find((r) => r.id === "extract.assets-animals")!.content.zh;
+    expect(animals).toContain("一只左眼戴黑色布质眼罩的年长橘猫");
+    expect(animals).not.toContain("一只左眼失明的年长橘猫");
+    const zh = buildSystemPrompt("extractAssets", "zh", BUILTIN_RULES);
+    expect(zh).not.toContain("写「一只左眼失明的年长橘猫」");
+  });
 });
 
 /* ── getActiveRuleText（供提示词拼装链注入正向约束） ──────────────────────── */

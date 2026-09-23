@@ -67,7 +67,7 @@
 3. 发起即清空：只保留 `source === "manual"` 资产，清 `styleReferenceUrl` / `styleReferenceError`，`assetsReviewed = false`，`status = "scripting"`（:175-185）
 4. **两条链并行**（`Promise.allSettled`，:269）：
    - 链 A 视觉方向：`extractVisualDirectionFromIdea` → `refineWithAudit`（配 `auditVisualDirection` 自检，最多 1 轮，`VISUAL_DIRECTION_MAX_ROUNDS = 1` :34）→ 写 `visualDirection`（`revision+1`、`status="draft"`）+ **`wizardStep: 2`**（:201-228）。即「切页时机 = 视觉方向完成」，早于资产提取；**不复位 `project.status`**
-   - 链 B 资产：`character / scene / product / prop` **4 个独立小请求并发**（:237,241），每类完成立刻追加写回 → 卡片逐类出现；**角色类写回前先过一次主体忠实自检**（`auditCharacterFidelity`，把想法原文与角色身份交给模型核对，越界则按名字改回 description / appearancePrompt，审计失败一律保留原提取结果）；单类失败不影响其他类，全部失败才算失败（:283-286）
+   - 链 B 资产：`character / scene / product / prop` **4 个独立小请求并发**（:237,241），每类完成立刻追加写回 → 卡片逐类出现；**角色类写回前先过一次主体忠实自检**（`auditCharacterFidelity`，把想法原文与角色身份交给模型核对，越界则按名字改回 description / appearancePrompt，审计失败一律保留原提取结果）；提取提示词另含内置条目 `extract.paintable-features` —— 外观/识别特征字段（含摘要行）只写可画的**部件型**特征，想法给出的**状态型**事实（失明、疤痕、跛行等）改写成等效部件并把原状态留在 `personality` / `background`，`auditCharacterFidelity` 对这种转写**不判越界**（实测：新增部件可画、改状态六组全失败，属模型能力边界）；单类失败不影响其他类，全部失败才算失败（:283-286）。**请求条数不变**
 5. 任一链失败 → 项目 `status="failed"` + `error`，抛给 StepIdea 上屏（:273-282）
 6. 两链都完成才 `status="idle"`（:285），`finally` 注销注册表（:302-304）。即 **`scripting` 精确覆盖"提取未收尾"**：步骤 1 的「AI 提取」与底部「下一步」、侧栏转圈都以它为准
 7. 两链都成功后 fire-and-forget 后台链：`generateStyleReference(targetProjectId)` → `generateAssetImages(undefined, targetProjectId)`（:288-291，顺序不可颠倒，风格图先行）
