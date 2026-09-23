@@ -11,6 +11,7 @@
 // ────────────────────────────────────────────────────────────────────────────
 
 import type { Asset, Project, Shot } from "@/stores/projectStore";
+import type { ShotSize } from "@/lib/shotSize";
 import { CHARACTER_FIELD_ALIASES, splitAssetDescription } from "@/lib/assetDetails";
 
 /** 多图合成中参考图的角色语义 */
@@ -278,9 +279,10 @@ export function composePortraitPrompt(i: {
 /* ── 分镜图多参考选取 ────────────────────────────────────────────────────── */
 
 /**
- * 分镜图参考图选取（有序去重，总上限 4 张）。
+ * 分镜图参考图选取（有序去重，总上限 4 张，按景别分配额度）。
  * 顺序：角色定妆照（imageUrl 优先、avatarUrl 兜底）→ 显式产品 → 显式道具，
  * 只收镜头显式引用的资产，避免把全局产品/道具污染到无关镜头。
+ * 远景/极远景不接收道具图 —— 见 MAX_REFERENCES_BY_SIZE。
  *
  * ⚠️ 2026-09-15 事故决策（主理人裁决）：**风格母版不进入参考图**。实测 i2i 模型对
  * 参考图内容的复制强度远高于文本否定 —— 母版里不管是猫还是抽象样张方块，都会被
@@ -290,14 +292,46 @@ export function composePortraitPrompt(i: {
  * 与「少一张道具参考」本身的漂移（+0.0211）同量级，无法归因；跨镜头空间一致要靠
  * 文本层锚点，不是靠多送一张成品场景图。
  */
+/** 分镜图 i2i 的参考图总上限（服务端实测可用上限内更保守的工程约束） */
+const MAX_TOTAL_REFERENCES = 4;
+
+/**
+ * 参考位分配：远景/极远景不接收道具图。
+ * 成因（2026-09-23 实测）：i2i 复制参考图构图的能力远高于文本否定，
+ * 而道具图是单个物体的近景/微距样张 —— 四张近景参考塞满一个要求"极远"的镜头，
+ * 景别必然被压成中近景，且道具细节会顶替画面主体（晾衣绳画成一串灯泡）。
+ */
+export const MAX_REFERENCES_BY_SIZE: Record<
+  ShotSize | "unknown",
+  { characters: number; props: number }
+> = {
+  "extreme-wide": { characters: 2, props: 0 },
+  wide: { characters: 2, props: 0 },
+  medium: { characters: 2, props: 2 },
+  close: { characters: 2, props: 2 },
+  "close-up": { characters: 1, props: 3 },
+  unknown: { characters: 2, props: 2 },
+};
+
 export function pickShotReferences(
   shot: Shot,
   project: { assets: Asset[]; styleReferenceUrl?: string },
 ): string[] {
   const out: string[] = [];
+  const budget = MAX_REFERENCES_BY_SIZE[shot.shotSize ?? "unknown"];
+  let charUsed = 0;
+  let propUsed = 0;
 
-  const push = (url: string | undefined | null): void => {
-    if (url && !out.includes(url) && out.length < 4) out.push(url);
+  const push = (url: string | undefined | null, kind: "character" | "prop"): void => {
+    if (!url || out.length >= MAX_TOTAL_REFERENCES) return;
+    if (kind === "character") {
+      if (charUsed >= budget.characters) return;
+      charUsed += 1;
+    } else {
+      if (propUsed >= budget.props) return;
+      propUsed += 1;
+    }
+    if (!out.includes(url)) out.push(url);
   };
 
   // 场景图不进入分镜图 i2i：场景参考图是成品构图，会压平同组镜头差异；
@@ -306,17 +340,17 @@ export function pickShotReferences(
   // 1. 角色定妆照（activeCharacterIds 命中；imageUrl 优先，avatarUrl 兜底）
   for (const id of shot.activeCharacterIds ?? []) {
     const c = project.assets.find((a) => a.id === id && a.type === "character");
-    push(c?.imageUrl ?? c?.avatarUrl);
+    push(c?.imageUrl ?? c?.avatarUrl, "character");
   }
 
   // 3. 产品图：只使用镜头显式引用，避免把全局产品污染到无关镜头。
   for (const id of shot.activeProductIds ?? []) {
-    push(project.assets.find((a) => a.id === id && a.type === "product")?.imageUrl);
+    push(project.assets.find((a) => a.id === id && a.type === "product")?.imageUrl, "character");
   }
 
   // 4. 道具图：只使用镜头显式引用。
   for (const id of shot.activePropIds ?? []) {
-    push(project.assets.find((a) => a.id === id && a.type === "prop")?.imageUrl);
+    push(project.assets.find((a) => a.id === id && a.type === "prop")?.imageUrl, "prop");
   }
 
   // 风格母版不进入参考图（见函数头注释）；风格由 stylePrompt 文本承载。
