@@ -7,11 +7,13 @@ import { useSettingsStore } from "@/stores/settingsStore";
 import { resolvePlan, type PlanId } from "@/lib/plans";
 import { generateVideo, aspectRatioToVideoAspect, VideoTaskCreatedError } from "@/services/videoService";
 import { planShotVideoMedia } from "@/lib/videoPlan";
+import { extractTailFrameUrl } from "@/services/renderService";
+import { releaseTailFrames, setTailFrame, snapshotTailFrames } from "@/lib/tailFrameStore";
 import { pendingVideoShots } from "@/lib/shotQueue";
 import { composeMotionPrompt } from "@/lib/promptUtils";
 import { createBatchRunner } from "@/lib/batchRunner";
 import { appendRegistryRules, type RegistryRuleText } from "@/lib/promptComposer";
-import { getActiveRules, getActiveRuleText } from "@/lib/promptRules";
+import { getActiveRenderRules } from "@/lib/promptRules";
 import { restoreProjectStatusIfReady } from "./wizardActionUtils";
 
 const activeVideoTasks = new Map<string, AbortController>();
@@ -21,10 +23,13 @@ const activeVideoTasks = new Map<string, AbortController>();
  * motionPrompt 恒为英文，故取 en；调用方读 store，lib 保持纯函数。
  * 不新增 API negative 字段、不污染 stylePrompt。
  */
+/**
+ * 取视频提示词的正向质量约束文本（negativeStrategy 的渲染文本）。
+ * 只收 renderContent，作者向元指令不进请求体；motionPrompt 的否定句式仍按英文实测口径。
+ */
 function extractVideoRules(): RegistryRuleText {
-  const rules = getActiveRules();
   return {
-    negativeStrategy: getActiveRuleText("negativeStrategy", "en", rules),
+    negativeStrategy: getActiveRenderRules("negativeStrategy", "en"),
   };
 }
 
@@ -74,7 +79,7 @@ const runVideoBatch = createBatchRunner({
             styleReferenceUrl: latestProject.styleReferenceUrl,
             consistency: videoConsistency,
             // Task 4 接入 tailFrameStore 前恒空：衔接判定通过但取不到末帧时自动降级为仅锁首帧
-            tailFrames: {},
+            tailFrames: snapshotTailFrames(),
           });
           const result = await generateVideo(
             {
@@ -98,6 +103,12 @@ const runVideoBatch = createBatchRunner({
             { videoUrl: result.videoUrl, status: "videoed" },
           );
           if (!applied) return;
+          // 末帧只服务后续镜头的首帧衔接：抽取失败静默降级，绝不影响本镜结果
+          try {
+            setTailFrame(shot.id, await extractTailFrameUrl(result.videoUrl, signal));
+          } catch {
+            /* 无末帧可用，下一镜自动退回仅锁首帧 */
+          }
           return;
         } catch (err) {
           // 任务已在服务端创建：继续等待同一个任务，不创建重复任务。
@@ -219,6 +230,8 @@ export function useVideoActions(): VideoActions {
     if (!shot || !shot.imageUrl) return;
 
     const expectedRevision = shot.renderRevision ?? 0;
+    // 旧视频即将作废：先释放它的末帧，下一镜不会再接到过期画面
+    releaseTailFrames([shotId]);
     store.setShotStatusByProjectId(targetProjectId, shotId, "videoing");
     store.updateShotByProjectId(targetProjectId, shotId, { videoProgress: 0 });
 
@@ -263,6 +276,11 @@ export function useVideoActions(): VideoActions {
         { videoUrl: result.videoUrl, status: "videoed" },
       );
       if (!applied) return;
+      try {
+        setTailFrame(shotId, await extractTailFrameUrl(result.videoUrl, signal));
+      } catch {
+        /* 无末帧可用，下一镜自动退回仅锁首帧 */
+      }
       restoreProjectStatusIfReady(targetProjectId, (currentProject) =>
         currentProject.shots.every((item) => !!item.videoUrl),
       );
