@@ -347,3 +347,43 @@ describe("getActiveRuleText", () => {
     expect(getActiveRuleText("composeShot", "en", [])).toBe("");
   });
 });
+
+describe("storyboardShot 骨架：机读景别字段", () => {
+  it("zh / en 骨架都把 shotSize 列入必填输出字段与取值域", () => {
+    for (const lang of ["zh", "en"] as const) {
+      const prompt = buildSystemPrompt("storyboardShot", lang, BUILTIN_RULES);
+      expect(prompt).toContain("shotSize");
+      // 取值域必须写死在骨架里，否则模型会给任意字符串
+      expect(prompt).toContain("extreme-wide");
+      expect(prompt).toContain("close-up");
+    }
+  });
+});
+
+describe("storyboardShot：一镜一机位与静帧相容", () => {
+  const built = buildSystemPrompt("storyboardShot", "zh", BUILTIN_RULES);
+
+  it("禁止把剪辑语汇写进单镜提示词", () => {
+    expect(built).toContain("一镜一机位");
+    expect(built).toContain("反打");
+    expect(built).toContain("拆成两个镜头");
+  });
+
+  it("要求 motionPrompt 的起幅等于本镜静帧", () => {
+    expect(built).toContain("起幅");
+    expect(built).toContain("静帧中已经发生的事不得重复");
+  });
+
+  it("两条新条目排在 shot-craft 之前（先讲单一性，再讲时长与连续性）", () => {
+    const iSingle = built.indexOf("一镜一机位");
+    const iCraft = built.indexOf("每个镜头聚焦一个核心动作");
+    expect(iSingle).toBeGreaterThan(-1);
+    expect(iCraft).toBeGreaterThan(-1);
+    expect(iSingle).toBeLessThan(iCraft);
+  });
+
+  it("骨架第 2/3 条把单一机位与起幅口径写进字段要求", () => {
+    expect(built).toContain("只写这一个机位、这一个瞬间、这一个景别");
+    expect(built).toContain("起幅＝visualPrompt 的那一帧");
+  });
+});

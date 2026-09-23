@@ -17,6 +17,7 @@ import { getTranslation } from "@/i18n";
 import { resolveGenerationParams } from "@/lib/generationParams";
 import { composeAssetBriefAppearance, composeAssetDescription } from "@/lib/assetDetails";
 import { toIdRef, toIdRefList } from "@/lib/shotReferences";
+import { normalizeShotSize } from "@/lib/shotSize";
 import type { AuditOutcome } from "@/lib/refineContent";
 
 interface GenerateScriptOptions {
@@ -34,6 +35,8 @@ export interface RawShot {
   visualPrompt: string;
   motionPrompt: string;
   duration: number;
+  /** 模型给的景别原文，未归一化；取值域见 @/lib/shotSize */
+  shotSize?: string;
   dialogues?: Array<{ characterId: string | null; text: string; delivery?: string }>;
   activeCharacterIds?: unknown;
   activeSceneId?: unknown;
@@ -363,6 +366,7 @@ export function normalizeRawShot(s: RawShot): RawShot {
     envChangeDesc: s.envChangeDesc ?? "",
     motionSpeedDesc: s.motionSpeedDesc ?? "",
     duration: [4, 5, 8].includes(s.duration) ? s.duration : 5,
+    shotSize: normalizeShotSize(s.shotSize),
     useDualFrame: s.useDualFrame ?? false,
   };
   // 最小安全兜底：不注入任何风格词（严禁 photorealistic/8k/Slow cinematic 等硬编码），

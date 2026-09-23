@@ -6,6 +6,8 @@
 // 项目域类型（SSOT）：Asset / Shot / Project / 各类 details / ProjectState。
 // 纯类型，无运行时依赖。
 
+import type { ShotSize } from "@/lib/shotSize";
+
 export type ProjectStatus =
   | "idle"
   | "scripting"
@@ -184,6 +186,8 @@ export interface Shot {
   /** 镜头显式引用的道具 / 关键物件 */
   activePropIds: string[];
   duration: number;
+  /** 机读景别，由分镜模型产出；衔接与参考图分配的依据。旧数据与模型未给时为 undefined */
+  shotSize?: ShotSize;
   status: ShotStatus;
   imageUrl?: string;
   videoUrl?: string;

@@ -376,5 +376,12 @@ export function migratePersistedState(
     }
   }
 
+  // Migrate from v16 to v17: 新增 Shot.shotSize（机读景别）。
+  // 刻意不补默认值：景别只能由分镜模型产出，代码凭空补一档会让衔接闸门误放行。
+  // 因此本块只做版本号占位与注释锚点，不改写数据；旧镜头保持 undefined（判为未知）。
+  if (version < 17) {
+    // no-op：见上方说明
+  }
+
   return state;
 }

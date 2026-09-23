@@ -423,3 +423,27 @@ describe("migratePersistedState：坏结构幂等不抛错", () => {
     expect(assets[0]).toBeNull();
   });
 });
+
+describe("v16 → v17：shotSize 字段引入", () => {
+  it("旧镜头缺 shotSize 时保持缺省（不凭空补默认景别）", () => {
+    const state = {
+      projects: [{ id: "p1", shots: [{ id: "s1", index: 0, scriptText: "x" }] }],
+    };
+    const out = migratePersistedState(structuredClone(state), 16) as {
+      projects: Array<{ shots: Array<Record<string, unknown>> }>;
+    };
+    expect("shotSize" in out.projects[0].shots[0]).toBe(false);
+  });
+
+  it("重复执行幂等，且不改动既有 shotSize", () => {
+    const state = {
+      projects: [{ id: "p1", shots: [{ id: "s1", index: 0, shotSize: "wide" }] }],
+    };
+    const once = JSON.stringify(migratePersistedState(structuredClone(state), 15));
+    const twice = JSON.stringify(
+      migratePersistedState(structuredClone(JSON.parse(once)), 16),
+    );
+    expect(JSON.parse(twice).projects[0].shots[0].shotSize).toBe("wide");
+    expect(twice).toBe(JSON.stringify(JSON.parse(once)));
+  });
+});

@@ -46,6 +46,7 @@ export function pickShotFields(
     visualPrompt: shot.visualPrompt,
     motionPrompt: shot.motionPrompt,
     duration: shot.duration,
+    shotSize: shot.shotSize,
     sceneDesc: shot.sceneDesc,
     detailDesc: shot.detailDesc,
     lightingDesc: shot.lightingDesc,

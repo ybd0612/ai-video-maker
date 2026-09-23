@@ -28,6 +28,7 @@ import { refineWithAudit } from "@/lib/refineContent";
 import { beginTrace, logger } from "@/lib/logger";
 import { hasActiveTask, runWithConcurrency } from "@/lib/batchRunner";
 import { pickShotFields } from "@/lib/shotFields";
+import { normalizeShotSize } from "@/lib/shotSize";
 import { resolveAssetId, resolveAssetIds } from "@/lib/shotReferences";
 import { restoreProjectStatusIfReady, resetStuckShots } from "./wizardActionUtils";
 
@@ -87,6 +88,8 @@ function buildShotUpdate(raw: RawShot, assets: Asset[]): Partial<Shot> {
   return {
     ...pickShotFields({
       ...raw,
+      // RawShot.shotSize 是模型原文（任意 string），写回前必须收口为机读枚举
+      shotSize: normalizeShotSize(raw.shotSize),
       dialogues: resolvedDialogues,
       activeCharacterIds,
       activeProductIds,
