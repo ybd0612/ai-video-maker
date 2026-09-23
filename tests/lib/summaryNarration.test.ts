@@ -36,7 +36,7 @@ describe("摘要行含剧情时只取第一个分句", () => {
 
   it("短档外观同样只留身份", () => {
     const brief = composeAssetBriefAppearance({ type: "character", description: NARRATIVE_SUMMARY, details: DOG });
-    expect(brief).toBe("一只黑白边境牧羊犬幼犬，狗（边境牧羊犬）");
+    expect(brief).toBe("一只黑白边境牧羊犬幼犬（物种：狗（边境牧羊犬））");
   });
 
   it("摘要只有一个分句时不被截断", () => {
@@ -45,6 +45,6 @@ describe("摘要行含剧情时只取第一个分句", () => {
       description: "一只左眼失明的年长橘猫",
       details: { ...DOG, species: "猫（橘色家猫）" },
     });
-    expect(brief).toBe("一只左眼失明的年长橘猫，猫（橘色家猫）");
+    expect(brief).toBe("一只左眼失明的年长橘猫（物种：猫（橘色家猫））");
   });
 });

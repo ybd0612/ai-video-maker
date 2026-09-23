@@ -82,7 +82,7 @@ describe("composeAssetBriefAppearance", () => {
       description: "一只贵宾犬（泰迪）",
       details: DOG,
     });
-    expect(brief).toBe("一只贵宾犬（泰迪），狗（贵宾犬/泰迪）");
+    expect(brief).toBe("一只贵宾犬（泰迪）（物种：狗（贵宾犬/泰迪））");
     expect(brief.length).toBeLessThan(40);
     expect(brief.split("，").length).toBeLessThanOrEqual(2);
   });
@@ -110,14 +110,14 @@ describe("composeAssetBriefAppearance", () => {
         description: "阳光客厅。",
         details: { kind: "scene", settingType: "住宅客厅（奇幻化室内）" } as AssetDetails,
       }),
-    ).toBe("阳光客厅，住宅客厅（奇幻化室内）");
+    ).toBe("阳光客厅（空间类型：住宅客厅（奇幻化室内））");
     expect(
       composeAssetBriefAppearance({
         type: "prop",
         description: "沙发垫堡垒。",
         details: { kind: "prop", objectType: "软体家居家具部件" } as AssetDetails,
       }),
-    ).toBe("沙发垫堡垒，软体家居家具部件");
+    ).toBe("沙发垫堡垒（物件类型：软体家居家具部件）");
   });
 });
 

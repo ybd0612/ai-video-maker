@@ -865,8 +865,8 @@ export const BUILTIN_RULES: PromptRule[] = [
     task: "storyboardShot",
     section: "rules",
     content: {
-      zh: "- 如有角色出场，visualPrompt 只使用所给的一句短外观锚点；禁止把资产的完整设定（物种/外貌/服饰/识别特征）逐条复制进镜头提示词——那会让提示词膨胀到上千字，并让开头那个主体垄断整张画面",
-      en: "- If characters appear, visualPrompt uses ONLY the one-line appearance anchor provided; never copy the asset's full details (species / looks / outfit / signature) — that bloats the prompt past a thousand characters and lets whichever subject appears first dominate the whole frame",
+      zh: "- 如有角色出场，visualPrompt 只使用所给的一句短外观锚点；禁止把资产的完整设定（物种/外貌/服饰/识别特征）逐条复制进镜头提示词——那会让提示词膨胀到上千字，并让开头那个主体垄断整张画面\n- 锚点括号内的「物种：/空间类型：/天气：」是给你确认身份用的元信息，**不要把标签连同冒号一起复制进 visualPrompt**；正文用自然中文写主体，例如写「一只黑白边境牧羊犬幼犬」，不要写「一只黑白边境牧羊犬幼犬，狗（边境牧羊犬）」",
+      en: "- If characters appear, visualPrompt uses ONLY the one-line appearance anchor provided; never copy the asset's full details (species / looks / outfit / signature) — that bloats the prompt past a thousand characters and lets whichever subject appears first dominate the whole frame\n- The bracketed 「物种：/空间类型：/天气：」 in the anchor is metadata for you to confirm identity — **never copy the label and colon into visualPrompt**; write natural prose, e.g. 「一只黑白边境牧羊犬幼犬」, never 「一只黑白边境牧羊犬幼犬，狗（边境牧羊犬）」",
     },
     enabled: true,
     source: "builtin",

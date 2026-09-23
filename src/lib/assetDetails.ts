@@ -404,6 +404,16 @@ export const BRIEF_APPEARANCE_FIELDS: Record<AssetDetails["kind"], string[]> = {
   style: [],
 };
 
+/** 锚点里各字段的中文标签：让模型知道这是元信息注记，不是要照抄的正文 */
+const BRIEF_FIELD_LABELS: Record<string, string> = {
+  species: "物种",
+  settingType: "空间类型",
+  weather: "天气",
+  time: "时间",
+  category: "品类",
+  objectType: "物件类型",
+};
+
 export function composeAssetBriefAppearance(
   asset: Pick<Asset, "type" | "description" | "details">,
 ): string {
@@ -412,13 +422,18 @@ export function composeAssetBriefAppearance(
   const summaryFull = splitAssetDescription(asset.description ?? "").summary.replace(/[。.]+$/, "");
   const summary = summaryFull.split("，")[0].trim();
   const details = asset.details as Record<string, string> | undefined;
-  const parts: string[] = [];
-  if (summary) parts.push(summary);
+  const tagged: string[] = [];
   for (const key of BRIEF_APPEARANCE_FIELDS[asset.type] ?? []) {
     const value = details?.[key]?.trim().replace(/[。.]+$/, "");
-    if (value && !parts.some((x) => x.includes(value) || value.includes(x))) parts.push(value);
+    if (!value) continue;
+    // 摘要仍是去重池的一员：摘要已完整包含该字段值时不再追加（既有口径）
+    if (summary && (summary.includes(value) || value.includes(summary))) continue;
+    if (tagged.some((x) => x.includes(value) || value.includes(x))) continue;
+    tagged.push(`${BRIEF_FIELD_LABELS[key] ?? key}：${value}`);
   }
-  return parts.join("，");
+  // 无摘要行时（旧数据或模型没写）退化为纯标签并列，绝不能把唯一标签吞掉
+  if (!summary) return tagged.join("，");
+  return tagged.length > 0 ? `${summary}（${tagged.join("；")}）` : summary;
 }
 
 export function detailEntries(
