@@ -177,6 +177,42 @@ async function runConcat(
   }
 }
 
+/** 抽末帧用的临时文件名；与拼接用的输入输出文件名字互不冲突 */
+const TAIL_INPUT_NAME = "tail_src.mp4";
+const TAIL_OUTPUT_NAME = "tail_frame.png";
+
+/**
+ * 从已生成视频抽取最后一帧，返回 blob URL。
+ * 供跨镜首帧衔接使用（见 lib/tailFrameStore）。调用方负责在不使用时 revoke。
+ */
+export async function extractTailFrameUrl(videoUrl: string, signal?: AbortSignal): Promise<string> {
+  const ffmpeg = await getFFmpeg();
+  const bytes = await fetchVideoBytes(toProxyUrl(videoUrl), videoUrl, signal);
+  try {
+    await ffmpeg.writeFile(TAIL_INPUT_NAME, bytes);
+    // -sseof -0.1 取最后 0.1 秒内的第一帧：直接 select 最后一帧需要先知道总帧数
+    await ffmpeg.exec([
+      "-sseof", "-0.1", "-i", TAIL_INPUT_NAME,
+      "-frames:v", "1", "-update", "1", "-y", TAIL_OUTPUT_NAME,
+    ]);
+    const rawOutput = await ffmpeg.readFile(TAIL_OUTPUT_NAME);
+    const data = typeof rawOutput === "string"
+      ? new TextEncoder().encode(rawOutput)
+      : new Uint8Array(rawOutput);
+    return URL.createObjectURL(new Blob([data], { type: "image/png" }));
+  } catch (err) {
+    const detail = err instanceof Error ? err.message : String(err);
+    throw new Error(
+      `${getTranslation("error.tailFrameExtractFailed")}: ${detail} | ${lastFfmpegLog(6)}`,
+    );
+  } finally {
+    // 清理工作区临时文件，避免下一次拼接读到残留
+    for (const name of [TAIL_INPUT_NAME, TAIL_OUTPUT_NAME]) {
+      await ffmpeg.deleteFile(name).catch(() => {});
+    }
+  }
+}
+
 /**
  * Concatenate multiple video URLs into a single MP4.
  * Returns a blob URL of the final video.
