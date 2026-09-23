@@ -107,7 +107,8 @@ CI 测试门禁           ⬜ .github/workflows/deploy.yml 仍只构建不跑测
 | 级联失效规则 | `src/stores/projectOps.ts` | `applyShotUpdates` `:80-145`、`applyAssetUpdate` `:182-213` | 2026-09-21 |
 | 持久化键与版本 | `projectStore.ts:647-650`（`wxhb-project`, v16）、`settingsStore.ts:142-143`（`wxhb-settings`, v4）、`rateLimit.ts:30`（`wxhb-usage`） | 迁移逐版内容见 `execution-flow.md` §13 | 2026-09-21 |
 | 向导步骤与门禁 | `src/features/wizard/CreationWizard.tsx` | `TOTAL_STEPS` `:19`、`canAdvance` `:29-43` | 2026-09-21 |
-| **视频一致性策略** | `src/lib/videoPlan.ts`（素材决策）+ `settingsStore.videoConsistency`（默认 `chain`）+ `src/lib/shotContinuity.ts`（同场景尾帧派生） | 实测约束：`reference` 与 `first_frame`/`last_frame` 服务端互斥（400）；衔接结果只在发请求时派生，**不写 store** | 2026-09-21 |
+| **视频一致性策略** | `src/lib/videoPlan.ts`（素材决策）+ `settingsStore.videoConsistency`（默认 `chain`）+ `src/lib/shotContinuity.ts`（衔接判定）+ `src/lib/tailFrameStore.ts`（前镜末帧，内存） | `chain` = **后镜首帧取前镜末帧**（2026-09-23 纠正方向）；`reference` 与首尾帧服务端互斥（400）；衔接只在发请求时派生，**不写 store** | 2026-09-23 |
+| **机读景别** | `src/lib/shotSize.ts`（`ShotSize` 白名单 + 归一化 + 相邻档判定） | 取值只能由分镜模型产出（`Shot.shotSize`），代码不猜、迁移不补默认值 | 2026-09-23 |
 | 步骤显示名 | `src/i18n/index.ts` | `wizard.step1~6`（zh `:177-182`、en `:607-612`）——第 6 步 UI 作「后期 / Post-production」 | 2026-09-21 |
 | **对外名称（口径）** | 中文「AI 一键成片」/ 英文与仓库名 `AI Video Maker`；载体：`index.html` 标题、`i18n` 的 `pipeline.title`（zh `:76` / en `:506`） | 2026-09-21 已统一，旧变体全仓零残留 | 2026-09-21 |
 | 命令、端口、包版本、Node 要求 | `package.json`、`vite.config.ts`、`vitest.config.ts` | dev **5188** / preview 5180（5173 被本机另一项目占用，已永久改端口） | 2026-09-21 |
@@ -165,6 +166,7 @@ CI 测试门禁           ⬜ .github/workflows/deploy.yml 仍只构建不跑测
 | C16 | `TEST_REPORT.md` 留在根目录，名字像现行测试报告 | 🟠 | 内容是 2026-08-18 手工 API 探测（旧模型世代） | ✅ `git mv` → `docs/history/2026-08-18-test-report.md` + 修订 |
 | C17 | 缺 OSS 基本件：`CONTRIBUTING`、`CHANGELOG`、`adr/`；规范无工具执行（无 eslint / prettier / `.editorconfig`） | 🟠 | `package.json:12-25`、根目录 `ls` | ⬜ 待点头新建（§1.5）；`SECURITY.md` 判定可暂缓（纯前端、无服务端攻击面，README 已含密钥卫生要求） |
 | C18 | 四份流程参考仍在 `docs/` 顶层，与 `history/`、`roadmap/` 分区不对称 | ⚪ | `ls docs` | ⬜ 并入 `docs/design/`（§1.5），搬迁需同步改两份 README 与 `AGENTS.md` 链接 |
+| C19 | 「场景图不进分镜参考」的 A/B 裁决被读成「场景资产对镜头没有价值」 | ✅ 已结案（2026-09-23 限定裁决范围） | `promptComposer.pickShotReferences` 仍排除场景图；`BRIEF_APPEARANCE_FIELDS.scene` 已带 `weather` / `time` | 该裁决**只覆盖空间几何一致**（SSIM 实测无净增益），不覆盖天气 / 时间等环境事实传递；环境事实走文本锚点（`storyboard.paintable-environment-state`） |
 
 ---
 
@@ -173,5 +175,6 @@ CI 测试门禁           ⬜ .github/workflows/deploy.yml 仍只构建不跑测
 | 日期 | 变更 | 责任人 |
 | --- | --- | --- |
 | 2026-09-21 | 新建本索引；按源码取证重写 `README.md` / `README_EN.md`（删幽灵功能「AI 对话」、撤回 MIT 声明、新增「明确不支持」清单、目录与命令按实际文件对齐、限额表改为引用 `plans.ts`）；登记 C1–C17 | Qoder（文档审计） |
+| 2026-09-23 | **成片质量根因修复落地（Task 1–11）**：新增机读景别 `Shot.shotSize`（persist v17）与 `lib/shotSize.ts`；`chain` 衔接方向反转为「后镜首帧取前镜末帧」并落地末帧抽取（`lib/tailFrameStore.ts` + `renderService.extractTailFrameUrl`，内存不持久化）；分镜逐镜头改**串行**并携带上一镜实际产出；场景锚点带上 `weather` / `time` + `storyboard.paintable-environment-state` 条目；按景别分配参考位；外观锚点改括注元信息；作者向规则与 `renderContent` 渲染文本分离；`Shot.videoTaskId` / `videoTaskModel`（persist v18）+ 创建重试环收口。C19 结案：「场景图不进参考」裁决只覆盖空间几何一致 | Qoder |
 | 2026-09-21 | **口径落地 + 第 1、2 批搬迁**：镜头数量改由模型判断（`promptRules.ts` 骨架 zh/en + `storyboard.shot-count` 条目，失效断言同步更新，`idea-breakdown.md` / `flow-map.html` 原文引用同步）；对外名统一（`index.html` 标题、`i18n.pipeline.title` en）；`AGENTS.md` 18 处事实订正 + 时点审计整节迁出为 `docs/history/2026-09-13-agents-audit.md`；6 份快照 `git mv` 进 `docs/history/` 并逐份加顶部修订；全仓入站链接重写（含 `vite.config.ts`、`settingsStore.ts` 注释、`docs/roadmap` 引用）；C1–C12、C14–C16 结案，新增 C18 | Qoder（文档治理） |
 | 2026-09-22 | **步骤 1 想法提取重复触发修复**：新增 `activeIdeaTasks` 单飞守卫（模块级注册表四张 → 五张）；`project.status = "scripting"` 改为覆盖两条链全程（链 A 不再提前置 `idle`）并成为步骤 1 唯一跨组件门禁 —— StepIdea 输入框/按钮/Enter 与底部「下一步」在提取期间一律禁用；`CreationWizard` 挂载时按注册表实况复位残留 `scripting`。同步 `AGENTS.md`（铁律 + 结构注释 + 注册表数量 + 测试数 34 文件/435 用例）、两份 README 贡献须知、`docs/execution-flow.md`（§1/§2/§3/§9.3 事实与行号重排，§12 第 11 条行号、**第 15 条结案**）、`docs/execution-flow-diagrams.md`（图 1 守卫与收尾节点、图 4 行号）、`docs/idea-breakdown.md` 行号。`docs/flow-map.html` 只编码数据/字段引用、不含门禁，无需同步 | Qoder（Bug 修复） |

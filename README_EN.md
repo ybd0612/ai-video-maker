@@ -38,7 +38,7 @@ Step labels match the UI (`wizard.step1~6` in `src/i18n/index.ts`):
 2. **Assets** — a project-level **visual direction** (six dimensions: medium/material, palette, lighting mood, camera texture, composition, emotion) plus four structured asset types: **character / scene / product / prop** (and a derived `style` asset with its style master image). Each reference image can be regenerated individually.
 3. **Storyboard** — an outline first, then one request per shot, producing Chinese script text plus English **visualPrompt** / **motionPrompt** plus duration (normalized to 4 / 5 / 8 seconds only) plus dialogue and asset references. **The shot count is not fixed — the model decides it from the idea's narrative complexity** (override the `storyboard.shot-count` rule in Settings). **Everything is read-only**; the single edit entry is "hand it to AI with one instruction" in the shot detail page.
 4. **Images** — one image per shot (`visualPrompt` plus character/product/prop references as multi-reference input), concurrency 3, single-shot re-roll supported.
-5. **Videos** — `motionPrompt` plus the shot image as first frame; async creation with 5s polling, `size` fixed to `720P`, 4–12 second durations, optional first/last-frame mode; concurrency drops to 1 / 2 / 3 per plan.
+5. **Videos** — `motionPrompt` plus the shot image as first frame; for adjacent same-scene shots the **previous clip's last frame becomes this clip's first frame** (extracted locally, never persisted) so the seam stays continuous. Async creation with 5s polling, `size` fixed to `720P`, 4–12 second durations, optional manual first/last-frame mode; concurrency drops to 1 / 2 / 3 per plan. A failed creation no longer re-creates a task automatically (video is billed per second) — the shot stays failed until you retry it.
 6. **Post-production** — FFmpeg.wasm concatenates clips into a downloadable MP4; a single clip is downloaded directly without FFmpeg.
 
 ### Two progression modes
@@ -162,7 +162,7 @@ The build uses a relative `base` of `./`, so it works both on a custom domain an
 
 - Output depends on external models: structured JSON, prompt quality and image/video consistency remain unstable.
 - Quota is consumed before the HTTP call and **is not rolled back** on failure; image 403 / content filtering and post-creation video failures still burn quota.
-- Both the image and video creation POSTs **no longer retry automatically** (2026-09-23) — a failed shot stays failed until you reroll it, so quota is never silently burned more than once. The residual risk is the video step's orchestration-level loop that re-issues creation on any error (up to 3 attempts) while the server offers no idempotency key.
+- Both the image and video creation POSTs **no longer retry automatically** (2026-09-23) — a failed shot stays failed until you reroll it, so quota is never silently burned more than once. That orchestration-level loop is gone (2026-09-23): the created task id is persisted on the shot, so a page refresh resumes polling the same task via GET instead of creating a billed duplicate.
 - After a shot image is invalidated by the cascade, step 4 has no "fill only the missing items" entry, which pushes users into "regenerate everything".
 - Auto mode stops permanently when any stage has a failed item; it never continues with failures.
 - FFmpeg.wasm is bounded by browser memory and cross-origin resources; long or remote videos may fail to assemble.

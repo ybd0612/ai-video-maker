@@ -499,6 +499,8 @@ Promise.allSettled([链A, 链B])                                      :269
 
 首尾帧参数来源：`DualFrameToggle` 勾选后写 `shot.useDualFrame(首尾帧开关)` / `shot.lastFrameUrl(尾帧地址)`（可点选其他镜头图，也可**手输 URL**）；只有 `useDualFrame && lastFrameUrl` 同时成立，请求才带 `last_frame`。
 
+自动衔接参数流（2026-09-23 反转方向）：`shotContinuity.planShotContinuity` 判定「本镜从上一镜取首帧」→ `buildHandoffMap` 给出 `shotId → 前镜 shotId` → `tailFrameStore.snapshotTailFrames()` 提供前镜末帧（由 `renderService.extractTailFrameUrl` 在前镜视频完成时抽出，内存态）→ `videoPlan.planShotVideo` 以 `autoFirstFrameUrl(前镜末帧)` 作 `first_frame(首帧)`，`reason = auto-handoff`；末帧缺失或景别跨两档时自动降级为 `first-frame-only(仅锁本镜首帧)`。
+
 ---
 
 ## 图 7　步骤 6：本地拼接（零 AI 调用）
@@ -663,4 +665,4 @@ automationMode 自动化模式      顶栏「全自动/半自动」开关       
 1. `assets[].imageUrl`(资产参考图) 一次写回 => 三个审核门禁 + 引用它的镜头图视频一起没（图9 中段）。
 2. `referenceImageUrls`(参考图列表) 只在**分镜图**链路出现；资产图与风格图全是文生图（图2 / 图3 / 图5）。
 3. `duration`(时长) 被规范化两次：`normalizeRawShot` 只允许 {4,5,8}，`videoService` 再 clamp 到 4..12（图4 / 图6）。
-4. 视频槽位在创建前就按秒扣；**服务层的创建重试已全部关闭**（图片 2026-09-23、视频同日），但编排层仍有一圈 `MAX_TASK_RETRIES = 2` 会在创建抛错时重发创建请求（图6 / 图8）—— 这是最后一处非幂等重发点。
+4. 视频槽位在创建前就按秒扣；**服务层与编排层的创建重试均已关闭**（图片与视频服务层 2026-09-23；编排层 `MAX_TASK_RETRIES` 同批删除，裁定 3）——创建失败一律终态 `failed` 并提示手动重试，不再有非幂等重发点。任务恢复由 `Shot.videoTaskId` + `pollVideoTaskById`（只发 GET）承担。

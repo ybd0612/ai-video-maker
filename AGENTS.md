@@ -47,8 +47,8 @@ src/
 │   └── rateLimit.ts                # rateLimiter 单例：RPM 滑窗 + Token Plan 配额
 ├── stores/
 │   ├── projectTypes.ts             # 全部领域类型（AssetType / ShotStatus / VisualDirection / *Details）
-│   ├── projectStore.ts             # 多项目 + persist（key wxhb-project，version 16）
-│   ├── projectMigrations.ts        # v1→v16 迁移，导出纯函数便于单测
+│   ├── projectStore.ts             # 多项目 + persist（key wxhb-project，version 18）
+│   ├── projectMigrations.ts        # v1→v18 迁移，导出纯函数便于单测
 │   ├── projectOps.ts               # 级联失效规则（applyShotUpdates / applyAssetUpdate）
 │   └── settingsStore.ts            # apiKey/baseUrl/plan/theme/language/promptRules（wxhb-settings，v4）
 ├── lib/
@@ -58,7 +58,8 @@ src/
 │   ├── promptUtils.ts / validation.ts / resolveBaseUrl.ts / fetchWithRetry.ts
 │   ├── assetDetails.ts / extractAssets.ts / assetNamespace.ts / characterUtils.ts
 │   ├── shotFields.ts / shotReferences.ts / generationParams.ts / refineContent.ts
-│   ├── shotContinuity.ts           # 同场景首尾帧衔接派生（纯函数，不写 store）
+│   ├── shotSize.ts / tailFrameStore.ts # 机读景别唯一口径 / 前镜末帧内存缓存（不持久化）
+│   ├── shotContinuity.ts           # 相邻镜头衔接判定（后镜取前镜末帧作首帧；纯函数，不写 store）
 │   ├── shotQueue.ts                # 待补做镜头集合的唯一口径（批量生成 + 界面计数共用）
 │   ├── videoPlan.ts                # 视频一致性策略：mode 选择 + 素材互斥（keyframe/reference/text）
 │   ├── batchRunner.ts              # createBatchRunner：注册表 + recoverStuck + 受控并发 + finally 清理
@@ -196,10 +197,10 @@ scripts/run-vitest.mjs              # Windows 盘符规范化后启动 Vitest
 仍然有效的红线（不与上述三份重复，改代码必须遵守）：
 
 - **P0 安全**：发现疑似密钥泄露时停止提交与传播，先轮换再脱敏，并评估 Git 历史清理范围。
-- **P1 非幂等重试**：图片创建与视频创建在没有幂等键 / 任务恢复协议前，不得继续扩大创建请求的自动重试。**两处服务层均已收口**（2026-09-23）：图片 `ai/openai.ts` 与视频 `videoService.ts` 都改为 `maxRetries = 0` + 单次 180s 超时，超时 / 5xx 失败一律交用户手动重试。实测依据 —— 图片 1K 单张 29-59s 贴着 `fetchWithRetry` 默认 60s 线；视频 `createMs`（包着整次调用）30 次真实创建里 p50 仅 3.6s 但有 3 次越过 60s（62.8s / 140.8s / 142.8s），说明超时重发在生产里确实发生过，而 `POST /videos` 按秒计费，重发一次就是再建一个任务、再扣一次秒数。**429 不属于这条红线范围**（2026-09-23 实测推翻旧结论「429 已由 `rateLimiter` 按 RPM 节流兜住」—— 免费档文档 20 RPM，服务端 12 请求/38s 即拒，节流等待分支从未触发）：429 是服务端在建任务前的拒绝，未建任务也未计费，重发安全，因此三个生成入口（文本 / 图片 / 视频创建）统一走 `fetchWithRetry` 的独立通道 —— 回报 `rateLimiter.notifyRateLimited(kind)` 登记分钟级冷却、睡到窗口解除后重发（预算 `RATE_LIMIT_RETRY_BUDGET = 2`，不占 `maxRetries`）。**同批修掉一处真实计费缺陷**：视频轮询的请求级失败（含 429 重试耗尽抛出的 `HttpError`）此前以普通 Error 逃出 `generateVideo`，被 `useVideoActions` 判成「创建失败」而再发一次 `POST /videos`；现由 `pollVideoTask` 统一包成带 `videoId` 的 `VideoTaskCreatedError`，新增轮询/请求级失败一律按「任务已创建」处理。**最后一处非幂等重发点**仍是编排层的创建重试环（`useVideoActions.ts:59-126`，`MAX_TASK_RETRIES = 2`：创建抛错时最多再发 3 次，超时/5xx 与 429 通道预算用尽后的 `HttpError` 都会落到这里），要收它必须先决定「批量跑中一次网络抖动是否还自动救回」——那是产品可见行为，不擅自改。
+- **P1 非幂等重试**：图片创建与视频创建在没有幂等键 / 任务恢复协议前，不得继续扩大创建请求的自动重试。**两处服务层均已收口**（2026-09-23）：图片 `ai/openai.ts` 与视频 `videoService.ts` 都改为 `maxRetries = 0` + 单次 180s 超时，超时 / 5xx 失败一律交用户手动重试。实测依据 —— 图片 1K 单张 29-59s 贴着 `fetchWithRetry` 默认 60s 线；视频 `createMs`（包着整次调用）30 次真实创建里 p50 仅 3.6s 但有 3 次越过 60s（62.8s / 140.8s / 142.8s），说明超时重发在生产里确实发生过，而 `POST /videos` 按秒计费，重发一次就是再建一个任务、再扣一次秒数。**429 不属于这条红线范围**（2026-09-23 实测推翻旧结论「429 已由 `rateLimiter` 按 RPM 节流兜住」—— 免费档文档 20 RPM，服务端 12 请求/38s 即拒，节流等待分支从未触发）：429 是服务端在建任务前的拒绝，未建任务也未计费，重发安全，因此三个生成入口（文本 / 图片 / 视频创建）统一走 `fetchWithRetry` 的独立通道 —— 回报 `rateLimiter.notifyRateLimited(kind)` 登记分钟级冷却、睡到窗口解除后重发（预算 `RATE_LIMIT_RETRY_BUDGET = 2`，不占 `maxRetries`）。**同批修掉一处真实计费缺陷**：视频轮询的请求级失败（含 429 重试耗尽抛出的 `HttpError`）此前以普通 Error 逃出 `generateVideo`，被 `useVideoActions` 判成「创建失败」而再发一次 `POST /videos`；现由 `pollVideoTask` 统一包成带 `videoId` 的 `VideoTaskCreatedError`，新增轮询/请求级失败一律按「任务已创建」处理。**最后一处非幂等重发点已收口**（2026-09-23 裁定 3）：编排层的创建重试环（旧 `MAX_TASK_RETRIES = 2`）已删除，创建失败一律就地 `failed` + 提示手动重试。既定代价（不是缺陷）：批量中遇到网络抖动要人工点一下救回。配套的任务恢复已就位：`generateVideo` 在创建成功后、开始轮询前用 `onTaskCreated` 把 `videoId` 与模型名落盘到 `Shot.videoTaskId` / `videoTaskModel`，刷新后 `resumePendingVideoTasks` 经 `pollVideoTaskById` **续轮询同一个任务**（只发 GET，绝不重建）。
 - **P1 多项目写回**：跨 `await` 一律按 `targetProjectId` 写回，禁止 active-project action 参与异步链路。
 - **P1 取消链路**：新增生成入口必须贯通 `AbortSignal`；补齐前不得宣称「所有 AI 请求可取消」（现状见上方铁律注）。
-- **P1 质量门禁**：`npm run test` 现为 37 文件 / 487 用例通过（2026-09-23 实测）；**CI 仍不跑测试**，把它加成部署前门禁是待办。
+- **P1 质量门禁**：`npm run test` 现为 44 文件 / 530 用例通过（2026-09-23 实测）；**CI 仍不跑测试**，把它加成部署前门禁是待办。
 - **P1 数据契约**：镜头时长与数量口径已收敛（时长 `{4,5,8}` 白名单 + 数量交模型判断）；`scriptService` 之外仍缺统一的`unknown → 解析 → 运行时校验 → 重试/报错` 链路（按类资产提取已具备）。
 
 ## Pipeline 架构（现行链路的权威描述在 docs/execution-flow.md）
@@ -211,9 +212,9 @@ scripts/run-vitest.mjs              # Windows 盘符规范化后启动 Vitest
 
 - 提示词双轨：`visualPrompt` 喂生图、`motionPrompt` 喂视频，均由分镜阶段一次产出，禁止二次翻译覆盖。
 - 参考图注入走 `extra_body.image[]`；**生图阶段**风格母版与场景图不进参考图（只以文本注入，参考图内容会被整体复制）。⚠ 生视频阶段不同：`reference` 模式实测可送 `images`（≤5）锚身份与画风。
-- 并发：资产 / 镜头图片 / 分镜逐镜头各 3；视频按套餐 1（免费）/ 2（企业）/ 3（Token Plan）。
+- 并发：资产 / 镜头图片各 3；**分镜逐镜头串行**（相邻镜头有内容依赖：本镜必须看到上一镜的实际产出与景别，2026-09-23 裁定 1；代价是分镜阶段延迟约 40s → 90–120s）；视频按套餐 1（免费）/ 2（企业）/ 3（Token Plan）。
 - 视频参数体系：`mode` 三选一 —— `keyframe`（`first_frame` / `last_frame`）、`reference`（`images` ≤5，可含 `audios` ≤3，不支持 `videos`）、`text`；⚠ **`reference` 与首尾帧服务端互斥**，同时传返回 400「首尾帧素材与参考素材不能同时使用」。`size` 固定 `"720P"`，画幅 `aspect_ratio`，时长 `seconds`（4–12 秒字符串）；轮询必须带 `model_name`。
-- 视频一致性策略：设置项 `videoConsistency`（`off` / `chain` / `identity`，默认 `chain`），素材统一由 `src/lib/videoPlan.ts:planShotVideoMedia` 决定（批量与单项重摇共用）；同场景尾帧由 `src/lib/shotContinuity.ts` 派生，**只在发请求时计算、绝不写回 store**（`useDualFrame` / `lastFrameUrl` 属 MOTION 字段，写回会清空已生成视频）。
+- 视频一致性策略：设置项 `videoConsistency`（`off` / `chain` / `identity`，默认 `chain`），素材统一由 `src/lib/videoPlan.ts:planShotVideoMedia` 决定（批量与单项重摇共用）；**`chain` = 后镜首帧取前镜末帧**（2026-09-23 裁定 2 纠正方向：旧实现把「下一镜画面图」当本镜尾帧，逼模型在一段视频里凭空造机位位移与物体增减 → 成片「跳」；首尾帧必须属于同一镜头）。衔接判定在 `src/lib/shotContinuity.ts`（`buildHandoffMap`，闸门含同场景 / 共演员 / 景别至多相邻一档），前镜末帧由 `renderService.extractTailFrameUrl` 抽取、存 `src/lib/tailFrameStore.ts`（内存，**不持久化**，刷新后自动降级为仅锁本镜首帧）；两者**只在发请求时计算、绝不写回 store**（`useDualFrame` / `lastFrameUrl` 属 MOTION 字段，写回会清空已生成视频）。
 - 成片地址解析链以**实测**为准：`url`（顶层）→ `metadata.url` → `video_url` → `output.url` → `output.video_url` → `remixed_from_video_id`。
 - 批量用 `createBatchRunner` + 四张批量注册表；另有第五张 `activeIdeaTasks`（步骤 1 想法提取的单飞守卫，不走 `createBatchRunner`，但同一套 `hasActiveTask` + `finally` 注销）；`Promise.allSettled` 收集全部结果，需要失败即停时才用 `all`。
 - 单镜头重roll 必须回填对白与资产引用（名称→store ID 映射，匹配不到的对白置 `null` 归旁白）。
@@ -224,12 +225,12 @@ scripts/run-vitest.mjs              # Windows 盘符规范化后启动 Vitest
 - 每个批量任务用**独立 AbortController**，禁止共享 abortRef 互杀。
 - **步骤 1 想法提取必须单飞 + 状态门禁**（2026-09-22 事故沉淀）：`extractCharactersFromIdea` 入口用 `activeIdeaTasks` 做项目级守卫（命中即 `return true`，`finally` 注销；守卫与登记之间禁止 await）。「提取中」的唯一跨组件信号是 `project.status === "scripting"`，**StepIdea 的本地 `isGenerating` 会随切页卸载丢失，禁止只靠它做门禁**：`canAdvance` 步骤 1 与 StepIdea 的输入框/按钮/Enter 都要吃这个状态。历史成因：提取中点「下一步」→ 返回上一步 → 再点「提取」，两轮提取并发、各按自己入口的 `assets` 快照追加写回 → 同类资产重复入库且资产图翻倍（实测 13 资产 / 12 次生图）。
 - 向导步骤的自动触发 effect 只依赖 `[shots.length]`，**禁止依赖 `*GenerationStarted` 标志**（批量生成内部会把它置 true，导致 effect 重入误杀进行中任务）。
-- 刷新恢复：注册表为空时，残留 `videoing`→`imaged`、`imaging`→`scripted`；挂载时重置卡 true 的 `*GenerationStarted`，避免永久转圈；残留的项目级 `scripting` 由 `CreationWizard` 挂载时按 `hasActiveIdeaTask` / `hasActiveScriptTask` 一次性复位（放容器是因为中断时用户可能停在任意步骤）。
+- 刷新恢复：注册表为空时，**带 `videoTaskId` 的 `videoing` 镜头优先续轮询同一个服务端任务**（`resumePendingVideoTasks`，绝不重建），其余残留 `videoing`→`imaged`、`imaging`→`scripted`；挂载时重置卡 true 的 `*GenerationStarted`，避免永久转圈；残留的项目级 `scripting` 由 `CreationWizard` 挂载时按 `hasActiveIdeaTask` / `hasActiveScriptTask` 一次性复位（放容器是因为中断时用户可能停在任意步骤）。
 - 异步结果一律按项目 ID 写回（`updateXxxByProjectId`），禁止用 active-project 版本，防串写。
 - “重试失败 / 全部重新生成”按钮必须走批量生成函数（幂等 + 并发受控），禁止 forEach 并发 reroll。
 - 视频完成响应解析链：`url`（顶层）→ `metadata.url` → `video_url` → `output.url` → `output.video_url` → `remixed_from_video_id`。
 - **风格母版必须先于资产图生成，但不作为 i2i 参考图**（2026-09-12 建立，2026-09-15 修订）：`generateAssetImages` 分两阶段——阶段 1 串行生成风格图（`generateStyleReference`，幂等 + `activeAssetTasks` 互斥；风格提示词由 AI 从中文风格描述 + 视觉方向六维**零角色派生**，再经 `stylePromptAudit` 越界自检），阶段 2 的角色 / 场景 / 主体 / 道具任务**只以英文 `stylePrompt` 文本注入**生图 prompt，不传风格图作参考（参考图内容会被整体复制，2026-09-15 实锤）；风格图失败不阻塞资产生成。生图请求走 `extra_body.image[]` 多参考，`size` 恒 `1K` + `ratio`（`imageService.aspectRatioToImageParams`；2K/3K/4K 仅在 `plans.ts` 预留，全仓无调用点产生）。定妆照用 `promptComposer.composePortraitPrompt`（物种锁定句 + 全身设定，已移除 `photorealistic` 与 `Portrait of / head and shoulders / looking at camera` 人像语汇）。
-- 步骤 1 两条链**并行**（`Promise.allSettled`）：链 A 视觉方向（提取 + `visualDirectionAudit` 自检，完成即写 `wizardStep: 2`，**但不复位 `project.status`**），链 B 按类资产提取（character/scene/product/prop 各一次请求）；**两链都完成才 `status = "idle"`**（此状态即步骤 1 的门禁），随后 fire-and-forget 依次跑 `generateStyleReference(targetProjectId)` → `generateAssetImages(undefined, targetProjectId)`（顺序不可颠倒）。风格资产（`Asset.type="style"`）由 `generateStyleReference` 内部**懒建**（`ensureStyleAsset` 函数已不存在，2026-09-21 已清掉残留注释）。分镜图经 `pickShotReferences` 取多参考：**只有 角色定妆照 → 主体 → 道具**，场景图与风格母版都不进参考（代码上限 4 张，旧口径「≤2 张 / 风格图恒占末位 / 总数 ≤3」全部作废）。StepAssets 手动「重新生成风格图」传 `force=true` 覆盖已有图。
+- 步骤 1 两条链**并行**（`Promise.allSettled`）：链 A 视觉方向（提取 + `visualDirectionAudit` 自检，完成即写 `wizardStep: 2`，**但不复位 `project.status`**），链 B 按类资产提取（character/scene/product/prop 各一次请求）；**两链都完成才 `status = "idle"`**（此状态即步骤 1 的门禁），随后 fire-and-forget 依次跑 `generateStyleReference(targetProjectId)` → `generateAssetImages(undefined, targetProjectId)`（顺序不可颠倒）。风格资产（`Asset.type="style"`）由 `generateStyleReference` 内部**懒建**（`ensureStyleAsset` 函数已不存在，2026-09-21 已清掉残留注释）。分镜图经 `pickShotReferences` 取多参考：**只有 角色定妆照 → 主体 → 道具**，场景图与风格母版都不进参考（代码上限 4 张，旧口径「≤2 张 / 风格图恒占末位 / 总数 ≤3」全部作废）；**参考位按景别分配**（`MAX_REFERENCES_BY_SIZE`）——远景 / 极远景不接收道具特写图，否则 i2i 会把要求的极远压成中近景。StepAssets 手动「重新生成风格图」传 `force=true` 覆盖已有图。
 - **资产防重复（2026-09-12）**：`Asset.source` 标记来源（`extracted`=AI 提取 / `manual`=手动添加，缺省视为 extracted 兼容旧数据；`addAsset` 默认 manual）。重新提取是**替换式**：旧的 extracted 资产整体被新结果取代、manual 保留且与新结果重名时以手动版为准；有 extracted 资产时先弹 `confirmDialog`（列出将替换的名字）确认，取消则返回 `false` 不推进向导。模型对同一故事命名不稳定（「小兔子」/「小白兔」），**禁止改回纯追加式**。
 - 分镜阶段（`generateStoryboardOutline` + 逐镜头 `generateStoryboardShot`）已产出完整双提示词（**2026-09-22 批 3 起为中文**，与资产设定同语言，不再需要二次翻译），**禁止二次翻译覆盖**（translateToMotion 已移除）。
 - 分镜生成后必须**回填角色 ID 引用**：模型返回的 `activeCharacterIds` / `dialogues.characterId` 可能是自编 ID，需按「角色名 → store 角色 ID」映射统一回填（新资产由 `extractNewAssets` 建映射），匹配不到的对白置 `null`（归旁白），否则角色一致性（图片注入/定妆照参考）与对白归属会失效。
@@ -311,14 +312,15 @@ scripts/run-vitest.mjs              # Windows 盘符规范化后启动 Vitest
   角色另有 `appearancePrompt` / `assetNamespace` / `fullPrompt`
 - **Shot**：`scriptText` / `visualPrompt` / `motionPrompt` + 画面 4 子字段与动态 4 子字段 / `duration`（规范化后只可能 4|5|8）/
   `dialogues[]`（`characterId` 为 `null` 即旁白，`delivery` 为 TTS 预留、不进任何请求）/ `activeCharacterIds` / `activeSceneId` /
-  `activeProductIds` / `activePropIds` / `imageUrl` / `videoUrl` / `videoProgress` / `videoRetryCount` /
+  `activeProductIds` / `activePropIds` / `shotSize`（机读景别，衔接与参考位分配依据）/ `imageUrl` / `videoUrl` /
+  `videoProgress` / `videoRetryCount` / `videoTaskId` + `videoTaskModel`（服务端任务，刷新恢复用）/
   `useDualFrame` / `lastFrameUrl` / `status` / `error` / `renderRevision`
   （⚠️ `firstFrameUrl` 是无消费者的死字段，视频首帧实际取 `imageUrl`）
 - 状态流转：项目 `idle → scripting → imaging → videoing → rendering → done`（可卡 `failed`；批量完成后复位 `idle` 或 `failed`，
   只有成片完成才置 `done`）；分镜 `idle → scripting → scripted → imaging → imaged → videoing → videoed`（可卡 `failed`）
 - `HistoryEntry` / 操作历史已随 persist v15 从持久化中移除，**不再属于数据模型**，勿再加回
 - 多项目：`projects[]` + `activeProjectId`，经 `getActiveProject()` 派生；复制项目保留分镜结构并重置 `idle`
-- persist：`wxhb-project` v16 / `wxhb-settings` v4 / `wxhb-usage`（限流用量）。迁移按版本分块串行，
+- persist：`wxhb-project` v18 / `wxhb-settings` v4 / `wxhb-usage`（限流用量）。迁移按版本分块串行，
   **新增持久化字段必须同时加迁移与 `tests/stores/*` 回归**；块执行顺序与版本号不完全一致（`<11` 排在 `<12`、`<13` 之后），改迁移前先看 `docs/execution-flow.md` §13
 
 ## 多项目管理

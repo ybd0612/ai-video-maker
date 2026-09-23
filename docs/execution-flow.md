@@ -181,14 +181,14 @@
 
 1. `recoverStuck`：残留 `videoing` → 回 `imaged`，`videoProgress=0`（:31-41）
 2. 筛选：`src/lib/shotQueue.ts:pendingVideoShots` = `!videoUrl && imageUrl && status !== "videoing" && (motionPrompt || actionDesc)`；排队数、待消耗秒数与顶部「补做缺失 (N)」按钮全部基于同一函数（含 `failed`）
-3. 提示词：`composeMotionPrompt(shot)`（恒直接返回 `shot.motionPrompt`，子字段不二次拼装，`lib/promptUtils.ts:21`）+ `appendRegistryRules(negativeStrategy)`
-4. 单镜头内部自带重试环：`MAX_TASK_RETRIES = 2`、退避 `8s * (attempt+1)`（:63-64,140-152），退避等待监听 abort 事件；但**当前没有任何入口会触发这个 abort**（见 9.3）
+3. 提示词：`composeMotionPrompt(shot)`（恒直接返回 `shot.motionPrompt`，子字段不二次拼装，`lib/promptUtils.ts:21`）+ `appendRegistryRules(negativeStrategy)` —— 追加的是 `promptRules.getActiveRenderRules()` 的**渲染文本**（只收带 `renderContent` 的条目），写给提示词作者的元指令不再进请求体
+4. **创建不重试**（2026-09-23 裁定 3）：一次 `generateVideo` 调用，失败即 `failed` 并提示手动重试；旧的重试环（`MAX_TASK_RETRIES = 2` + `8s * (attempt+1)` 退避）已删除，因为超时 / 5xx 时服务端可能已建任务，重发就是重复扣秒数。取消链路仍缺（见 9.3）
 5. `generateVideo`（`videoService.ts`）—— 素材由 `src/lib/videoPlan.ts:planShotVideoMedia` 按设置项 `videoConsistency` 决策，批量与单项重摇共用同一函数（`useVideoActions.ts` 不再自己拼素材）：
    - **先限流**：`rateLimiter.acquire("video", { cost: duration || 1, signal })`（:135），配额按秒计、在 HTTP 之前扣
    - 创建体：`size 恒 "720P"`（:71）、`aspect_ratio` 白名单、`seconds = clamp(round(duration), 4, 12)` 转字符串（:139-143）、`n:1`
    - **`mode` 三选一，帧素材与参考图绝不同时出现**：
-     - `keyframe`：优先级 用户手动双帧 > 同场景自动衔接尾帧 > 仅本镜画面图作首帧；
-     - `reference` + `images`（≤5）：`videoConsistency === "identity"` 且同场景衔接取不到尾帧时（换场景、末镜），改送 `[出场角色定妆照…, 风格母版]` 锚身份与画风；
+     - `keyframe`：优先级 用户手动双帧 > 前镜末帧作本镜首帧（`auto-handoff`）> 仅本镜画面图作首帧；自动路径**不再产生 `last_frame`**；
+     - `reference` + `images`（≤5）：`videoConsistency === "identity"` 且衔接取不到前镜末帧时（换场景、首镜、景别跨两档、刷新后末帧已丢失），改送 `[出场角色定妆照…, 风格母版]` 锚身份与画风；
      - `text`：无素材（当前筛选要求有 `imageUrl`，实际不可达）。
    - ⚠️ 实测依据见 `docs/roadmap/competitive-gap-2026-09-21.md` §6：`reference` 与 `first_frame`/`last_frame` 同时传，服务端 400「首尾帧素材与参考素材不能同时使用」。
    - 创建 POST `{baseUrl}/videos`（`videoService.ts`），通用重试 `maxRetries 0`（非幂等，2026-09-23 起超时/5xx 不自动重发）+ 单次超时 180s；**429 例外**，走独立冷却通道（`rateLimitRetries = RATE_LIMIT_RETRY_BUDGET` + `onRateLimited → notifyRateLimited("video", { signal })`，见 9.1）；`video_id ?? task_id ?? id`
@@ -197,7 +197,7 @@
    - **创建后失败的错误类型是 `VideoTaskCreatedError{videoId, stillRunning}`**（`videoService.ts:35-48`）；上层 `useVideoActions.ts:100-122` 对 `stillRunning=true` **只等待不再创建新任务**（避免双倍消耗），false 才判失败
 6. 写回 `videoUrl` + `status:"videoed"`（revision 校验）；`onFinally`：全有视频 → `idle`；全落定（有视频或失败）→ 复位 started + `failed`（`useVideoActions.ts:174-180`，硬编码中文文案）
 
-尾帧来源有两个：**用户手动**（`DualFrameToggle` 勾选后点选其他镜头图或手输 URL，`DualFrameToggle.tsx:82-90`）与**同场景自动衔接**（`shotContinuity` 把下一镜的画面图当本镜尾帧，受设置项 `videoConsistency` 控制，手动值永远优先）。自动衔接**不写 store** —— `useDualFrame` / `lastFrameUrl` 属于 MOTION 字段，写回会清空已生成视频（见 9.4），所以只在发请求那一刻派生。另：`shot.firstFrameUrl` 只被 `normalizeRawShot` / `pickShotFields` 搬运，请求侧从不读取它（`first_frame` 用的是 `shot.imageUrl`），当前是**无消费者的死字段**。
+**`last_frame`（尾帧）现在只有一个来源：用户手动**（`DualFrameToggle` 勾选后点选其他镜头图或手输 URL，`DualFrameToggle.tsx:82-90`）。自动衔接已改为「后镜首帧取前镜末帧」（2026-09-23 裁定 2）：`shotContinuity` 只判定该不该接、从前一镜取，前镜末帧由 `renderService.extractTailFrameUrl` 在前镜视频完成时抽出并放进 `lib/tailFrameStore`（内存），`videoPlan` 用它作本镜 `first_frame`；因此**自动路径不再产生任何尾帧请求**。衔接判定与末帧地址都**不写 store** —— `useDualFrame` / `lastFrameUrl` 属于 MOTION 字段，写回会清空已生成视频（见 9.4），所以只在发请求那一刻派生。另：`shot.firstFrameUrl` 只被 `normalizeRawShot` / `pickShotFields` 搬运，请求侧从不读取它（`first_frame` 用的是 `shot.imageUrl`），当前是**无消费者的死字段**。
 
 推进：步骤 5 没有审核卡点，auto 模式全视频 false→true 时 `setWizardStep(6)`（`StepVideos.tsx:67-76`）；半自动靠底部「下一步」，门禁 `case 5 = 每个镜头都有 videoUrl`（`CreationWizard.tsx:55`）。
 
@@ -341,7 +341,7 @@ RPM 与配额表（`lib/plans.ts:73-134`，格式 文本 / 图片1K,2K,3K,4K / �
 6. **回步骤 2 重新生成任一资产图会连带清空镜头已完成产物**：`applyAssetUpdate` 把生成器自己的 `imageUrl` 写回也算「渲染字段变化」（9.6），并重置三个审核标记；改 style 资产则全部分镜作废。行为有单测锁定，但「补一个缺失资产 = 重做整套镜头图片」是否是你要的代价，值得确认。
 7. **批量任务没有取消入口**（9.3）：注册表里的 controller 从未被 abort，切项目、离开步骤、组件卸载都拦不住在飞请求与 30 分钟视频轮询，钱照扣、结果照写回。
 8. **配额在请求前扣、失败不回滚**（`rateLimit.ts:128-136`）。图片 403/内容过滤、视频创建后失败都会白扣一次配额；Token Plan 用户会看到「用量没了但没出片」。
-9. **非幂等 POST 的重试收口状态**：**图片与视频创建的服务层均已收口**（2026-09-23，均改为 `maxRetries: 0` + 单次超时 180s，超时 / 5xx 失败交用户手动重试）。实测依据 —— 图片 1K 单张 29-59s 贴着 `fetchWithRetry` 默认 60s 线；视频 `createMs`（包着整次调用）30 次真实创建里 p50 仅 3.6s 却有 3 次越过 60s（62.8s / 140.8s / 142.8s），说明超时重发在生产里真的发生过，而视频按秒计费、重发一次就是再建一个任务再扣一次秒数。~~429 已由 `rateLimiter` 在发请求前按 RPM 节流~~（**该前提已被 2026-09-23 实测否定**，见 9.1）：429 现由服务层独立通道处理 —— 回报限流器登记分钟级冷却、等到窗口解除后重发（预算 2 次），因为 429 表示服务端建任务前就拒绝，重发不会重复计费。**同日一并修掉**：轮询的请求级失败此前以普通 Error 逃出 `generateVideo`，被上层误判为「创建失败」而再发一次 `POST /videos`（已计费的重复任务），现由 `pollVideoTask` 统一包装成带 `videoId` 的 `VideoTaskCreatedError`（`tests/services/videoService.test.ts` 有绊线）。**剩余的非幂等重发点**：编排层创建重试环（`useVideoActions.ts:59-126`，`MAX_TASK_RETRIES = 2`，创建抛错时最多再发 3 次）—— 超时 / 5xx 与「429 通道预算用尽后抛出的 `HttpError`」都仍会落到这个环里；收它要先决定「批量跑中一次网络抖动是否还自动救回」，属产品可见行为，未擅自改。
+9. **非幂等 POST 的重试收口状态**：**图片与视频创建的服务层均已收口**（2026-09-23，均改为 `maxRetries: 0` + 单次超时 180s，超时 / 5xx 失败交用户手动重试）。实测依据 —— 图片 1K 单张 29-59s 贴着 `fetchWithRetry` 默认 60s 线；视频 `createMs`（包着整次调用）30 次真实创建里 p50 仅 3.6s 却有 3 次越过 60s（62.8s / 140.8s / 142.8s），说明超时重发在生产里真的发生过，而视频按秒计费、重发一次就是再建一个任务再扣一次秒数。~~429 已由 `rateLimiter` 在发请求前按 RPM 节流~~（**该前提已被 2026-09-23 实测否定**，见 9.1）：429 现由服务层独立通道处理 —— 回报限流器登记分钟级冷却、等到窗口解除后重发（预算 2 次），因为 429 表示服务端建任务前就拒绝，重发不会重复计费。**同日一并修掉**：轮询的请求级失败此前以普通 Error 逃出 `generateVideo`，被上层误判为「创建失败」而再发一次 `POST /videos`（已计费的重复任务），现由 `pollVideoTask` 统一包装成带 `videoId` 的 `VideoTaskCreatedError`（`tests/services/videoService.test.ts` 有绊线）。**编排层创建重试环已收口**（2026-09-23 裁定 3）：不再有 `MAX_TASK_RETRIES`，创建失败一律终态 `failed` + 提示手动重试，网络抖动的代价是人工点一次救回（已确认的产品决定）。任务恢复改由 `Shot.videoTaskId` + `videoService.pollVideoTaskById` 承担（`CreationWizard` 挂载时 `resumePendingVideoTasks` 续轮询，只发 GET）。
 10. **资产图批量不过滤空提示词**：`generateAssetImages` 的任务只按 `!imageUrl` 筛选，不看 `prompt` 是否为空（`useAssetActions.ts:330-473`）；步骤 1 尾部的自动批量因此会对空 prompt 的资产（例如用户早先手动添加、尚未填设定的场景）发一次只含边界句的生图请求，白扣一档图片配额。手动入口有 `prompt.trim()` 守卫（`StepAssets.tsx:234`），批量没有。
 11. `generateStoryboard` 命中幂等守卫时 `return`（不抛错、不 await 在飞任务），`StepAssets.enterStoryboard` 的 `onProgress` 永不触发 → 极端时序下点「进入分镜」无反应也不报错（`useScriptActions.ts:327` + `StepAssets.tsx:113-128`）。
 12. ~~`pickShotReferences` 注释写「总上限 3 张」且把场景图列为首位参考，代码实为上限 4 张且排除场景图~~ **已修（2026-09-23）**：`promptComposer.ts` 函数头注释按实现改写（角色定妆照 → 产品 → 道具，≤4 张，场景图与风格母版都不进参考，并写入当日四臂实测否决结论）；同类陈旧注释 `useImageActions.ts:68`（原写「场景 → 角色 → 产品/道具，≤3 张」）一并更正。
@@ -356,9 +356,11 @@ RPM 与配额表（`lib/plans.ts:73-134`，格式 文本 / 图片1K,2K,3K,4K / �
 
 ## 13. 数据生命周期（持久化）
 
-`projectStore`：key `wxhb-project`，**version 16**，`migrate: migratePersistedState`（`projectStore.ts:647-651`）。
+`projectStore`：key `wxhb-project`，**version 18**，`migrate: migratePersistedState`。
 
-迁移块按文件顺序串行执行，实测顺序为 **2 → 3 → 4 → 5 → 6 → 7 → 8 → 9 → 10 → 12 → 13 → 11 → 14 → 15 → 16**（`projectMigrations.ts:29-375`）：`version < 11` 的块被放在 `<12`、`<13` 之后（:263），因此 v10 及更早的数据会先跑 v12/v13 再跑 v11。三块作用于互不相交的字段（镜头引用数组 / visualDirection 保留 / 资产 details 物化），当前不影响结果，但顺序与版本号不一致，属可读性风险。
+v17 / v18（2026-09-23）是**刻意 no-op 的占位块**：v17 引入 `Shot.shotSize`、v18 引入 `Shot.videoTaskId` / `videoTaskModel`，二者都只能由模型或运行期产出，迁移**绝不补默认值**（凭空补一档景别会让衔接闸门误放行；任务 ID 无法从旧数据推出）。
+
+迁移块按文件顺序串行执行，实测顺序为 **2 → 3 → 4 → 5 → 6 → 7 → 8 → 9 → 10 → 12 → 13 → 11 → 14 → 15 → 16 → 17 → 18**（`projectMigrations.ts:29-375`）：`version < 11` 的块被放在 `<12`、`<13` 之后（:263），因此 v10 及更早的数据会先跑 v12/v13 再跑 v11。三块作用于互不相交的字段（镜头引用数组 / visualDirection 保留 / 资产 details 物化），当前不影响结果，但顺序与版本号不一致，属可读性风险。
 
 各版内容：
 
