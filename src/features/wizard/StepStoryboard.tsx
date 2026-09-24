@@ -13,6 +13,8 @@ import { ShotDetail } from "./ShotDetail";
 import { useWizardActions, hasActiveScriptTask } from "./useWizardActions";
 import { useSettingsStore } from "@/stores/settingsStore";
 import { SHELL_CONTAINER_CLASS } from "@/lib/mediaLayout";
+import { WizardMessages } from "./WizardMessages";
+import { StepProgressBar } from "./StepProgressBar";
 import { confirmDialog } from "@/components/ui/ConfirmDialog";
 import { Sparkles, Loader2 } from "lucide-react";
 
@@ -180,11 +182,7 @@ export function StepStoryboard() {
           {generating ? t("wizard.generating") : t("wizard.generate")}
         </button>
 
-        {error && (
-          <div className="rounded-lg border border-danger bg-danger-deep/30 p-3 text-sm text-danger">
-            {error}
-          </div>
-        )}
+        <WizardMessages error={error} />
 
         <button
           onClick={handleAddShot}
@@ -213,6 +211,9 @@ export function StepStoryboard() {
         </button>
       </div>
 
+      {/* 完成度：与 canAdvance 步骤 3 同一口径（scriptText 非空） */}
+      <StepProgressBar done={shots.filter((s) => s.scriptText.trim()).length} total={shots.length} />
+
       {/* 资产摘要：常驻显示，让用户感知分镜生成时自动提取的资产 */}
       <AssetSummaryBar assets={assets} t={t} styleReady={!!project?.styleReferenceUrl} />
 
@@ -227,11 +228,7 @@ export function StepStoryboard() {
         onAdd={handleAddShot}
       />
 
-      {error && (
-        <div className="rounded-lg border border-danger bg-danger-deep/30 p-3 text-sm text-danger">
-          {error}
-        </div>
-      )}
+      <WizardMessages error={error} />
 
       {/* 分镜确认卡：semi-auto 模式下确认后进入图片生成（auto 模式已自动推进） */}
       {project?.automationMode !== "auto" && (

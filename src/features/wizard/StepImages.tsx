@@ -13,6 +13,7 @@ import { useWizardActions } from "./useWizardActions";
 import { pendingImageShots, shotsWithoutVisualPrompt } from "@/lib/shotQueue";
 import { MEDIA_FRAME, SHELL_CONTAINER_CLASS, resolveAspect } from "@/lib/mediaLayout";
 import { ReviewCheckpoint } from "./ReviewCheckpoint";
+import { StepProgressBar } from "./StepProgressBar";
 import { confirmDialog } from "@/components/ui/ConfirmDialog";
 import { RefreshCw } from "lucide-react";
 
@@ -131,15 +132,7 @@ export function StepImages() {
         </div>
       )}
 
-      {/* 步骤级进度条 */}
-      {shots.length > 0 && (
-        <div className="h-1 w-full overflow-hidden rounded-full bg-raised">
-          <div
-            className="h-full rounded-full bg-accent-solid transition-all duration-300"
-            style={{ width: `${(imagedCount / shots.length) * 100}%` }}
-          />
-        </div>
-      )}
+      <StepProgressBar done={imagedCount} total={shots.length} />
 
       <div className="flex flex-col gap-2">
         {shots.map((shot) => (

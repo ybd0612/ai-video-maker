@@ -12,6 +12,7 @@ import { ChevronDown, RefreshCw, Trash2 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Lightbox } from "@/components/ui/Lightbox";
 import { shotStatusInfo } from "./shotStatus";
+import { WizardMessages } from "./WizardMessages";
 
 type ShotCardMode = "storyboard" | "image" | "video";
 
@@ -115,11 +116,7 @@ export function ShotCard({
               {children}
 
               {/* 失败原因（分镜/图片/视频生成失败均可显示） */}
-              {shot.error && (
-                <p className="rounded border border-danger bg-danger-deep/30 px-2 py-1 text-[0.625rem] text-danger">
-                  {shot.error}
-                </p>
-              )}
+              <WizardMessages error={shot.error} />
 
               {/* Action buttons */}
               <div className="flex items-center gap-2 pt-1">

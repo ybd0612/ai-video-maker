@@ -14,6 +14,7 @@ import { Lightbox } from "@/components/ui/Lightbox";
 import { useWizardActions } from "./useWizardActions";
 import { pendingVideoShots } from "@/lib/shotQueue";
 import { MEDIA_FRAME, SHELL_CONTAINER_CLASS, placeholderClass, resolveAspect } from "@/lib/mediaLayout";
+import { StepProgressBar } from "./StepProgressBar";
 import { confirmDialog } from "@/components/ui/ConfirmDialog";
 import { RefreshCw } from "lucide-react";
 
@@ -150,15 +151,8 @@ export function StepVideos() {
         )}
       </div>
 
-      {/* 步骤级进度条 */}
-      {shots.length > 0 && (
-        <div className="h-1 w-full overflow-hidden rounded-full bg-raised">
-          <div
-            className="h-full rounded-full bg-warn-solid transition-all duration-300"
-            style={{ width: `${(videoedCount / shots.length) * 100}%` }}
-          />
-        </div>
-      )}
+      {/* 步骤级进度条（语义色与图片页统一为 accent） */}
+      <StepProgressBar done={videoedCount} total={shots.length} />
 
       {/* 生成完成 toast */}
       {showDoneToast && (
