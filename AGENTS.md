@@ -30,10 +30,12 @@ src/
 │   │   ├── useWizardActions.ts     # 35 行门面，只组合上述四个域（不再是主实现文件）
 │   │   ├── wizardActionUtils.ts    # 域间共享的写回与守卫工具
 │   │   ├── VisualDirectionEditor.tsx / AssetEditor.tsx / AssetEditorTemplate.tsx
-│   │   ├── AssetListSection.tsx / ShotListSection.tsx / ShotDetail.tsx / ShotCard.tsx
+│   │   ├── AssetListSection.tsx / ShotDetail.tsx   # 旧列表卡与卡片体已删（ShotListSection / ShotCard 由 WizardRail 取代）
 │   │     （统一详情外壳 AssetDetailShell 由 AssetEditorTemplate.tsx 导出，资产与镜头详情共用）
 │   │   ├── shotStatus.tsx / PromptField.tsx / PromptSubFields.tsx / DualFrameToggle.tsx
-│   │   └── ExpandableSection.tsx   # 零引用孤儿，待清理
+│   │   ├── WizardShell.tsx / WizardRail.tsx   # 三页双栏骨架：左镜头轨（两列竖略图 + 景别/状态/待补做）+ 右常驻详情
+│   │   ├── StepHeader.tsx / StepProgressBar.tsx / WizardMessages.tsx   # 统一页头 / 完成度条 / 提示错误块
+│   │   └── ExpandableSection.tsx   # 折叠三档唯一实现（详情区提示词，展开态随 key 重挂载复位）
 │   ├── characters/                 # CharacterEditor.tsx + useCharacterEditorActions.ts（外貌派生与定妆照）
 │   ├── projects/ProjectSidebar.tsx # 项目创建 / 切换 / 复制 / 删除 + 搜索 / 排序
 │   └── script/ScriptPanel.tsx、preview/FinalPreview.tsx、preview/ShotPreview.tsx   # 零引用孤儿，待清理
@@ -61,6 +63,8 @@ src/
 │   ├── shotSize.ts / tailFrameStore.ts # 机读景别唯一口径 / 前镜末帧内存缓存（不持久化）
 │   ├── shotContinuity.ts           # 相邻镜头衔接判定（后镜取前镜末帧作首帧；纯函数，不写 store）
 │   ├── shotQueue.ts                # 待补做镜头集合的唯一口径（批量生成 + 界面计数共用）
+│   ├── mediaLayout.ts / railSelection.ts / shotDisplay.ts / collapse.ts   # 画幅→版式、轨选中与 ↑↓ 导航、景别标签键、折叠档判据（全纯函数）
+│   ├── firstFrameSource.ts / referencePlan.ts   # 首帧来源解释器（与 videoPlan 同走 shotContinuity）、参考位拒收解释（accepted 复用 pickShotReferences）
 │   ├── videoPlan.ts                # 视频一致性策略：mode 选择 + 素材互斥（keyframe/reference/text）
 │   ├── batchRunner.ts              # createBatchRunner：注册表 + recoverStuck + 受控并发 + finally 清理
 │   ├── jsonResponse.ts             # 模型 JSON 响应解析与容错
@@ -96,6 +100,7 @@ scripts/run-vitest.mjs              # Windows 盘符规范化后启动 Vitest
 - **断言必须来自真实实现**：写用例前先读源码，禁止依据注释或文档猜测期望值。若发现实现与注释不一致（例：`isValidApiKey` 注释写「minimum 10 chars」，正则实际只要求 9 位），用例应锁定**真实行为**并加注释说明，让偏差可见而非被掩盖。
 - **网络与时间一律伪造**：涉及重试 / 限流的用例必须用 `vi.stubGlobal("fetch", ...)` 与 `vi.useFakeTimers()`，禁止真实请求与真实等待。
 - **单例隔离**：`rateLimiter` 等模块级单例有跨用例状态，需用 `vi.resetModules()` + 动态 `import()` 取新实例（见 `tests/services/rateLimit.test.ts`）。
+- **组件渲染不可测**：Vitest 是 node 环境、`include` 只收 `tests/**/*.test.ts`、无 jsdom / @testing-library，全仓 `tests/` 不 import 任何组件 → 凡可判定的布局与交互逻辑（画幅→尺寸、轨选中与键盘导航、景别标签、首帧来源解释、参考位拒收原因、折叠档判据）**一律先下沉 `src/lib/*.ts` 并测纯函数**，JSX 只做搬运；**不得声称做过组件测试**。
 - 注意 `tsconfig.json` 的 `include` 仅含 `src`，因此 `tests/` 与 `vitest.config.ts` **不参与 `npm run build` 的类型检查**，需靠 `npm run test` 自行保证正确性。
 
 ## 基础编码规范
@@ -201,7 +206,7 @@ scripts/run-vitest.mjs              # Windows 盘符规范化后启动 Vitest
 - **P1 非幂等重试**：图片创建与视频创建在没有幂等键 / 任务恢复协议前，不得继续扩大创建请求的自动重试。**两处服务层均已收口**（2026-09-23）：图片 `ai/openai.ts` 与视频 `videoService.ts` 都改为 `maxRetries = 0` + 单次 180s 超时，超时 / 5xx 失败一律交用户手动重试。实测依据 —— 图片 1K 单张 29-59s 贴着 `fetchWithRetry` 默认 60s 线；视频 `createMs`（包着整次调用）30 次真实创建里 p50 仅 3.6s 但有 3 次越过 60s（62.8s / 140.8s / 142.8s），说明超时重发在生产里确实发生过，而 `POST /videos` 按秒计费，重发一次就是再建一个任务、再扣一次秒数。**429 不属于这条红线范围**（2026-09-23 实测推翻旧结论「429 已由 `rateLimiter` 按 RPM 节流兜住」—— 免费档文档 20 RPM，服务端 12 请求/38s 即拒，节流等待分支从未触发）：429 是服务端在建任务前的拒绝，未建任务也未计费，重发安全，因此三个生成入口（文本 / 图片 / 视频创建）统一走 `fetchWithRetry` 的独立通道 —— 回报 `rateLimiter.notifyRateLimited(kind)` 登记分钟级冷却、睡到窗口解除后重发（预算 `RATE_LIMIT_RETRY_BUDGET = 2`，不占 `maxRetries`）。**同批修掉一处真实计费缺陷**：视频轮询的请求级失败（含 429 重试耗尽抛出的 `HttpError`）此前以普通 Error 逃出 `generateVideo`，被 `useVideoActions` 判成「创建失败」而再发一次 `POST /videos`；现由 `pollVideoTask` 统一包成带 `videoId` 的 `VideoTaskCreatedError`，新增轮询/请求级失败一律按「任务已创建」处理。**最后一处非幂等重发点已收口**（2026-09-23 裁定 3）：编排层的创建重试环（旧 `MAX_TASK_RETRIES = 2`）已删除，创建失败一律就地 `failed` + 提示手动重试。既定代价（不是缺陷）：批量中遇到网络抖动要人工点一下救回。配套的任务恢复已就位：`generateVideo` 在创建成功后、开始轮询前用 `onTaskCreated` 把 `videoId` 与模型名落盘到 `Shot.videoTaskId` / `videoTaskModel`，刷新后 `resumePendingVideoTasks` 经 `pollVideoTaskById` **续轮询同一个任务**（只发 GET，绝不重建）。
 - **P1 多项目写回**：跨 `await` 一律按 `targetProjectId` 写回，禁止 active-project action 参与异步链路。
 - **P1 取消链路**：新增生成入口必须贯通 `AbortSignal`；补齐前不得宣称「所有 AI 请求可取消」（现状见上方铁律注）。
-- **P1 质量门禁**：`npm run test` 现为 44 文件 / 530 用例通过（2026-09-23 实测）；**CI 仍不跑测试**，把它加成部署前门禁是待办。
+- **P1 质量门禁**：`npm run test` 现为 51 文件 / 572 用例通过（2026-09-24 实测）；**CI 仍不跑测试**，把它加成部署前门禁是待办。
 - **P1 数据契约**：镜头时长与数量口径已收敛（时长 `{4,5,8}` 白名单 + 数量交模型判断）；`scriptService` 之外仍缺统一的`unknown → 解析 → 运行时校验 → 重试/报错` 链路（按类资产提取已具备）。
 
 ## Pipeline 架构（现行链路的权威描述在 docs/execution-flow.md）
@@ -263,6 +268,11 @@ scripts/run-vitest.mjs              # Windows 盘符规范化后启动 Vitest
 - 旧的多轮对话抽屉 `AiAssistDrawer.tsx` 已于 2026-09 结构收敛重构中删除（零引用死代码）；**禁止再引入旁挂式 AI 入口**
 
 ## UI 交互约定
+
+- **三页双栏骨架（2026-09-24 落地）**：分镜 / 图片 / 视频页统一由 `WizardShell`（页头槽 / 轨槽 / 详情槽 / 详情动作槽）承载 —— 左 `WizardRail` 两列竖略图（序号 + 状态图标 + 景别 + 待补做点，宽 `15.5rem`），右详情常驻；轨与详情**各自 `overflow-y-auto` 有界滚动**，页面不再超长；窄于 `lg` 时轨退化为顶部横向带（`grid-cols-4`）。
+  - **选中态是页面局部 state**（`currentShotId` + `railCompact`，不持久化）；切镜靠 `syncSelectionWithShots` 回落首镜，详情子组件用 `key={current.id}` 重挂载复位展开/润色态。
+  - **硬约束**：`WizardShell` 必须在步骤组件内部渲染，禁止改成路由级子组件或给步骤页加 `key`（重挂载会让依赖 `[shots.length]` 的自动生成 effect 再跑一次，直接烧配额）；轨与其祖先不得加 `transform` / `filter`（Lightbox 依赖 body 级 fixed 基准）；轨上待补做徽标只能复用 `shotQueue` 的 `pendingImageShots` / `pendingVideoShots`。
+  - 键盘：轨 `↑↓` 换镜（`moveSelection`，两端夹住不环绕）、`Tab` 进详情；衔接解释与景别徽标**只读**，不得写回 `useDualFrame` / `lastFrameUrl`。
 
 - **卡片的「进入编辑」统一为点击整张卡片**：`role="button"` + `tabIndex={0}` + Enter/Space 键盘可达 + `cursor-pointer` + 语义化 focus 边框（如 `focus:border-success`），卡片上加 `title={t("characters.edit")}` 作为提示；**不再单独放铅笔按钮**（`Pencil` 图标已全项目移除）。资产卡片入口见 `wizard/StepAssets.tsx` 与 `wizard/AssetListSection.tsx`（`characters/CharacterPanel.tsx` 已删除）
 - 卡片内的次级操作（删除等）**必须 `e.stopPropagation()`**，否则会连带触发卡片的进入编辑
@@ -326,7 +336,7 @@ scripts/run-vitest.mjs              # Windows 盘符规范化后启动 Vitest
 
 ## 多项目管理
 
-- 左侧面板只保留**项目**（`ProjectSidebar`）；分镜列表与镜头详情在步骤 3（`ShotListSection` → `ShotDetail`），资产与视觉方向编辑在步骤 2（`AssetListSection` / `AssetEditor` / `VisualDirectionEditor` / `CharacterEditor`），操作历史已整体停用并移出持久化
+- 左侧面板只保留**项目**（`ProjectSidebar`）；分镜镜头轨与镜头详情在步骤 3（`WizardRail` → `ShotDetail`，双栏常驻），资产与视觉方向编辑在步骤 2（`AssetListSection` / `AssetEditor` / `VisualDirectionEditor` / `CharacterEditor`），操作历史已整体停用并移出持久化
 - **分镜内容全只读**：镜头文案 / 结构化子字段 / 英文提示词 / 对白 / 资产引用都不可手改，唯一修改入口是步骤 3 详情页的「交给 AI 修改」（`ShotDetail` + `useScriptActions.reviseShot` → `reviseShotWithInstruction`）；禁再加回逐字段输入框，也禁新增第二套分镜详情布局（必须复用 `AssetDetailShell` 系列）
 - **进入分镜步骤前先在资产页等首个镜头**：`StepAssets.enterStoryboard` 触发 `generateStoryboard` 并在首个镜头写回时切页（与「想法 → 资产」同构）；禁改回「先切页再生成」的一屏转圈体验
 - 项目操作：创建 / 切换 / 删除 / 复制

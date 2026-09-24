@@ -47,8 +47,8 @@
 | `docs/roadmap/competitive-gap-2026-09-21.md` | 对标 Runway / LTX / Flow+Veo / 可灵等，列提示词与流程结构层缺口 | 🟢 评审待决；其「现状」引用四份流程快照，代码变动后需复核 |
 | `docs/roadmap/2026-09-23-film-quality-fix-plan.md` | 成片质量根因修复实施计划（11 任务：景别机读化、衔接方向反转、分镜串行、环境事实进镜头、参考位分配、渲染文本分离、任务恢复与计费收口） | ✅ 已落地（2026-09-23 全部提交）；余下待办是**真实重跑成片**核对 6 条验收判据 |
 | `docs/roadmap/2026-09-23-auto-dual-frame-design.md` | 双帧（首尾帧）自动化设计讨论稿 v2（方案 E/B/A 对比 + 遗留问题清单 + 配套 ADR） | 🟡 讨论稿、未开工；推荐 **E（止态文本，零成本）→ B（末帧质检拿数据）→ A（自动出止幅）**，停在 C 也可接受 |
-| `docs/roadmap/2026-09-23-wizard-layout-redesign-design.md` | 分镜 / 图片 / 视频三页布局重排设计稿（左镜头轨 + 右常驻详情双栏骨架；11 条根因带 `文件:行`；P0 先修 token 层级与画幅版式） | 🟡 设计稿、未开工；等你拍 §16 五个开放问题，建议先只做 P0 |
-| `docs/roadmap/2026-09-23-wizard-layout-redesign-plan.md` | 上表的实施计划：15 个任务（P0 token 与画幅版式 → P1 共享件抽取 → P2 双栏骨架 → P3 折叠与收口），每任务带红绿步骤、行为不变自查与用户目测项 | 📋 待执行（新会话长任务）；基线 44 文件 / 530 用例 |
+| `docs/roadmap/2026-09-23-wizard-layout-redesign-design.md` | 分镜 / 图片 / 视频三页布局重排设计稿（左镜头轨 + 右常驻详情双栏骨架；11 条根因带 `文件:行`；P0 先修 token 层级与画幅版式） | ✅ 已定稿并全部实施（§16 五问 2026-09-23 拍定；2026-09-24 随计划落地） |
+| `docs/roadmap/2026-09-23-wizard-layout-redesign-plan.md` | 上表的实施计划：15 个任务（P0 token 与画幅版式 → P1 共享件抽取 → P2 双栏骨架 → P3 折叠与收口），每任务带红绿步骤、行为不变自查与用户目测项 | ✅ 已落地（2026-09-24，Task 1-15 全部提交；测试 51 文件 / 572 用例）；余下待办 = 用户本地目测 + 20/40 镜两档主观采集 |
 
 ### 1.4 `docs/history/`（时点快照，入库即冻结，只准加顶部修订）
 
@@ -100,6 +100,10 @@ CI 测试门禁           ⬜ .github/workflows/deploy.yml 仍只构建不跑测
 | 镜头时长白名单 | `src/services/scriptService.ts` | `:369`（仅 `{4,5,8}`，否则回落 5；属结构约束，**不交给模型**） | 2026-09-21 |
 | 限流与配额扣减时机 | `src/services/rateLimit.ts` | `guard` `:128-136`（请求前扣，失败不回滚） | 2026-09-21 |
 | 批量并发度 | `useAssetActions.ts:489`、`useImageActions.ts:205`、`useScriptActions.ts:37`、`useVideoActions.ts:198-202` | 固定 3 / 3 / 3 / 按套餐 1·2·3 | 2026-09-21 |
+| 画幅 → 媒体版式 | `src/lib/mediaLayout.ts` | `MEDIA_FRAME`（railThumb / detailPrimary / detailSecondary）+ `ASPECT_RATIO_CSS` + `SHELL_CONTAINER_CLASS` + `placeholderClass` | 2026-09-24 |
+| 镜头首帧来源与降级原因 | `src/lib/firstFrameSource.ts` | `describeFirstFrameSource` / `firstFrameSourceKey`（与 `videoPlan` 同走 `shotContinuity` 闸门；界面侧只读） | 2026-09-24 |
+| 参考图额度与拒收解释 | `src/lib/promptComposer.ts`（`MAX_REFERENCES_BY_SIZE` / `MAX_TOTAL_REFERENCES` / `pickShotReferences`）+ `src/lib/referencePlan.ts` | 额度与资格只在 promptComposer；`explainShotReferences.accepted` 直接复用 `pickShotReferences`，不重算 | 2026-09-24 |
+| 镜头轨选中与键盘导航 | `src/lib/railSelection.ts` | `moveSelection`（两端夹住不环绕）/ `syncSelectionWithShots` | 2026-09-24 |
 | 幂等注册表与批次框架 | `src/lib/batchRunner.ts` + 四个 `use*Actions.ts` 顶部 | `active{Script,Asset,Image,Video}Tasks` | 2026-09-21 |
 | 取消能力现状 | 全仓 `controller.abort()` 调用点共 5 处（`StepAssembly.tsx:114`、`fetchWithRetry.ts:106,115`、`renderService.ts:109,112`） | **只有第 6 步拼接可取消**；批量生成无取消入口 | 2026-09-21 |
 | 提示词任务与骨架 | `src/lib/promptRules.ts` | `PromptTask` `:21-33`（12 个任务）、`SKELETONS`、`BUILTIN_RULES` | 2026-09-21 |
