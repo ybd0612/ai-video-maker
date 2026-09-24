@@ -20,7 +20,7 @@ src/
 ├── i18n/index.ts                   # zh/en 字典 + useT（自研，零第三方依赖）
 ├── features/
 │   ├── wizard/                     # 6 步向导
-│   │   ├── CreationWizard.tsx      # 步骤路由 + 「下一步」唯一门禁表 canAdvance
+│   │   ├── CreationWizard.tsx      # 步骤路由；「下一步」门禁判定引用 lib/wizardGating（唯一口径 + 阻塞原因）
 │   │   ├── StepIdea / StepAssets / StepStoryboard / StepImages / StepVideos / StepAssembly
 │   │   ├── StepIndicator / AutomationModeSwitch / ReviewCheckpoint
 │   │   ├── useScriptActions.ts     # 分镜域：想法提取、大纲+逐镜头、改写、重roll（activeScriptTasks + activeIdeaTasks）
@@ -32,7 +32,7 @@ src/
 │   │   ├── VisualDirectionEditor.tsx / AssetEditor.tsx / AssetEditorTemplate.tsx
 │   │   ├── AssetListSection.tsx / ShotDetail.tsx   # 旧列表卡与卡片体已删（ShotListSection / ShotCard 由 WizardRail 取代）
 │   │     （统一详情外壳 AssetDetailShell 由 AssetEditorTemplate.tsx 导出，资产与镜头详情共用）
-│   │   ├── shotStatus.tsx / PromptField.tsx / PromptSubFields.tsx / DualFrameToggle.tsx
+│   │   ├── shotStatus.tsx / PromptField.tsx / PromptSubFields.tsx
 │   │   ├── WizardShell.tsx / WizardRail.tsx   # 三页双栏骨架：左镜头轨（两列竖略图 + 景别/状态/待补做）+ 右常驻详情
 │   │   ├── StepHeader.tsx / StepProgressBar.tsx / WizardMessages.tsx   # 统一页头 / 完成度条 / 提示错误块
 │   │   └── ExpandableSection.tsx   # 折叠三档唯一实现（详情区提示词，展开态随 key 重挂载复位）
@@ -66,6 +66,7 @@ src/
 │   ├── mediaLayout.ts / railSelection.ts / shotDisplay.ts / collapse.ts   # 画幅→版式、轨选中与 ↑↓ 导航、景别标签键、折叠档判据（全纯函数）
 │   ├── firstFrameSource.ts / referencePlan.ts   # 首帧来源解释器（与 videoPlan 同走 shotContinuity）、参考位拒收解释（accepted 复用 pickShotReferences）
 │   ├── videoPlan.ts                # 视频一致性策略：mode 选择 + 素材互斥（keyframe/reference/text）
+│   ├── wizardGating.ts             # 「下一步」门禁判定 + 阻塞原因唯一口径（纯函数，CreationWizard 引用）
 │   ├── batchRunner.ts              # createBatchRunner：注册表 + recoverStuck + 受控并发 + finally 清理
 │   ├── jsonResponse.ts             # 模型 JSON 响应解析与容错
 │   └── logger.ts / logStorage.ts / devDump.ts / dumpSanitize.ts   # 运行日志与调试落盘（会读写 store / localStorage）
@@ -207,7 +208,7 @@ scripts/run-vitest.mjs              # Windows 盘符规范化后启动 Vitest
 - **P1 非幂等重试**：图片创建与视频创建在没有幂等键 / 任务恢复协议前，不得继续扩大创建请求的自动重试。**两处服务层均已收口**（2026-09-23）：图片 `ai/openai.ts` 与视频 `videoService.ts` 都改为 `maxRetries = 0` + 单次 180s 超时，超时 / 5xx 失败一律交用户手动重试。实测依据 —— 图片 1K 单张 29-59s 贴着 `fetchWithRetry` 默认 60s 线；视频 `createMs`（包着整次调用）30 次真实创建里 p50 仅 3.6s 但有 3 次越过 60s（62.8s / 140.8s / 142.8s），说明超时重发在生产里确实发生过，而 `POST /videos` 按秒计费，重发一次就是再建一个任务、再扣一次秒数。**429 不属于这条红线范围**（2026-09-23 实测推翻旧结论「429 已由 `rateLimiter` 按 RPM 节流兜住」—— 免费档文档 20 RPM，服务端 12 请求/38s 即拒，节流等待分支从未触发）：429 是服务端在建任务前的拒绝，未建任务也未计费，重发安全，因此三个生成入口（文本 / 图片 / 视频创建）统一走 `fetchWithRetry` 的独立通道 —— 回报 `rateLimiter.notifyRateLimited(kind)` 登记分钟级冷却、睡到窗口解除后重发（预算 `RATE_LIMIT_RETRY_BUDGET = 2`，不占 `maxRetries`）。**同批修掉一处真实计费缺陷**：视频轮询的请求级失败（含 429 重试耗尽抛出的 `HttpError`）此前以普通 Error 逃出 `generateVideo`，被 `useVideoActions` 判成「创建失败」而再发一次 `POST /videos`；现由 `pollVideoTask` 统一包成带 `videoId` 的 `VideoTaskCreatedError`，新增轮询/请求级失败一律按「任务已创建」处理。**最后一处非幂等重发点已收口**（2026-09-23 裁定 3）：编排层的创建重试环（旧 `MAX_TASK_RETRIES = 2`）已删除，创建失败一律就地 `failed` + 提示手动重试。既定代价（不是缺陷）：批量中遇到网络抖动要人工点一下救回。配套的任务恢复已就位：`generateVideo` 在创建成功后、开始轮询前用 `onTaskCreated` 把 `videoId` 与模型名落盘到 `Shot.videoTaskId` / `videoTaskModel`，刷新后 `resumePendingVideoTasks` 经 `pollVideoTaskById` **续轮询同一个任务**（只发 GET，绝不重建）。
 - **P1 多项目写回**：跨 `await` 一律按 `targetProjectId` 写回，禁止 active-project action 参与异步链路。
 - **P1 取消链路**：新增生成入口必须贯通 `AbortSignal`；补齐前不得宣称「所有 AI 请求可取消」（现状见上方铁律注）。
-- **P1 质量门禁**：`npm run test` 现为 51 文件 / 572 用例通过（2026-09-24 实测）；**CI 仍不跑测试**，把它加成部署前门禁是待办。
+- **P1 质量门禁**：`npm run test` 现为 52 文件 / 588 用例通过（2026-09-24 实测）；**CI 仍不跑测试**，把它加成部署前门禁是待办。
 - **P1 数据契约**：镜头时长与数量口径已收敛（时长 `{4,5,8}` 白名单 + 数量交模型判断）；`scriptService` 之外仍缺统一的`unknown → 解析 → 运行时校验 → 重试/报错` 链路（按类资产提取已具备）。
 
 ## Pipeline 架构（现行链路的权威描述在 docs/execution-flow.md）
@@ -221,7 +222,7 @@ scripts/run-vitest.mjs              # Windows 盘符规范化后启动 Vitest
 - 参考图注入走 `extra_body.image[]`；**生图阶段**风格母版与场景图不进参考图（只以文本注入，参考图内容会被整体复制）。⚠ 生视频阶段不同：`reference` 模式实测可送 `images`（≤5）锚身份与画风。
 - 并发：资产 / 镜头图片各 3；**分镜逐镜头串行**（相邻镜头有内容依赖：本镜必须看到上一镜的实际产出与景别，2026-09-23 裁定 1；代价是分镜阶段延迟约 40s → 90–120s）；视频按套餐 1（免费）/ 2（企业）/ 3（Token Plan）。
 - 视频参数体系：`mode` 三选一 —— `keyframe`（`first_frame` / `last_frame`）、`reference`（`images` ≤5，可含 `audios` ≤3，不支持 `videos`）、`text`；⚠ **`reference` 与首尾帧服务端互斥**，同时传返回 400「首尾帧素材与参考素材不能同时使用」。`size` 固定 `"720P"`，画幅 `aspect_ratio`，时长 `seconds`（4–12 秒字符串）；轮询必须带 `model_name`。
-- 视频一致性策略：设置项 `videoConsistency`（`off` / `chain` / `identity`，默认 `chain`），素材统一由 `src/lib/videoPlan.ts:planShotVideoMedia` 决定（批量与单项重摇共用）；**`chain` = 后镜首帧取前镜末帧**（2026-09-23 裁定 2 纠正方向：旧实现把「下一镜画面图」当本镜尾帧，逼模型在一段视频里凭空造机位位移与物体增减 → 成片「跳」；首尾帧必须属于同一镜头）。衔接判定在 `src/lib/shotContinuity.ts`（`buildHandoffMap`，闸门含同场景 / 共演员 / 景别至多相邻一档），前镜末帧由 `renderService.extractTailFrameUrl` 抽取、存 `src/lib/tailFrameStore.ts`（内存，**不持久化**，刷新后自动降级为仅锁本镜首帧）；两者**只在发请求时计算、绝不写回 store**（`useDualFrame` / `lastFrameUrl` 属 MOTION 字段，写回会清空已生成视频）。
+- 视频一致性策略：设置项 `videoConsistency`（`off` / `chain` / `identity`，默认 `chain`），素材统一由 `src/lib/videoPlan.ts:planShotVideoMedia` 决定（批量与单项重摇共用）；**`chain` = 后镜首帧取前镜末帧**（2026-09-23 裁定 2 纠正方向：旧实现把「下一镜画面图」当本镜尾帧，逼模型在一段视频里凭空造机位位移与物体增减 → 成片「跳」；首尾帧必须属于同一镜头）。衔接判定在 `src/lib/shotContinuity.ts`（`buildHandoffMap`，闸门含同场景 / 共演员 / 景别至多相邻一档），前镜末帧由 `renderService.extractTailFrameUrl` 抽取、存 `src/lib/tailFrameStore.ts`（内存，**不持久化**，刷新后自动降级为仅锁本镜首帧）；两者**只在发请求时计算、绝不写回 store**。旧的手动「双帧开关」`DualFrameToggle`（勾 `useDualFrame` + 从**其他镜头**画面图取 `lastFrameUrl` 当本镜尾帧）已于 2026-09-24 整体下线——它既违反裁定 2（首尾帧须同镜），又会因写 MOTION 字段清空按秒计费的已生成视频、并静默回收分镜审核位锁死「下一步」。`useDualFrame` / `lastFrameUrl` / `firstFrameUrl` 现归 `projectOps.ts:RUNTIME_SHOT_FIELDS`（运行时/生成参数档），写回**既不清空视频、也不回收 `storyboardReviewed`**；内容型运动字段（`motionPrompt` / `duration` / `actionDesc` / `cameraDesc` 等）仍在 `MOTION_SHOT_FIELDS`，改了照常重审核 + 视频重做。
 - 成片地址解析链以**实测**为准：`url`（顶层）→ `metadata.url` → `video_url` → `output.url` → `output.video_url` → `remixed_from_video_id`。
 - 批量用 `createBatchRunner` + 四张批量注册表；另有第五张 `activeIdeaTasks`（步骤 1 想法提取的单飞守卫，不走 `createBatchRunner`，但同一套 `hasActiveTask` + `finally` 注销）；`Promise.allSettled` 收集全部结果，需要失败即停时才用 `all`。
 - 单镜头重roll 必须回填对白与资产引用（名称→store ID 映射，匹配不到的对白置 `null` 归旁白）。
@@ -234,6 +235,8 @@ scripts/run-vitest.mjs              # Windows 盘符规范化后启动 Vitest
 - 向导步骤的自动触发 effect 只依赖 `[shots.length]`，**禁止依赖 `*GenerationStarted` 标志**（批量生成内部会把它置 true，导致 effect 重入误杀进行中任务）。
 - 刷新恢复：注册表为空时，**带 `videoTaskId` 的 `videoing` 镜头优先续轮询同一个服务端任务**（`resumePendingVideoTasks`，绝不重建），其余残留 `videoing`→`imaged`、`imaging`→`scripted`；挂载时重置卡 true 的 `*GenerationStarted`，避免永久转圈；残留的项目级 `scripting` 由 `CreationWizard` 挂载时按 `hasActiveIdeaTask` / `hasActiveScriptTask` 一次性复位（放容器是因为中断时用户可能停在任意步骤）。
 - 异步结果一律按项目 ID 写回（`updateXxxByProjectId`），禁止用 active-project 版本，防串写。
+- **镜头字段分两档，不可混用**（2026-09-24）：内容档 = `VISUAL_SHOT_FIELDS` + 内容型 `MOTION_SHOT_FIELDS`（`motionPrompt`/`actionDesc`/`cameraDesc`/`envChangeDesc`/`motionSpeedDesc`/`duration`）+ `dialogues`，即 `STORYBOARD_SHOT_FIELDS`，改了**必须**回收 `storyboardReviewed` 并让受影响的图片/视频重做；运行时/生成参数档 = `RUNTIME_SHOT_FIELDS`（`useDualFrame`/`firstFrameUrl`/`lastFrameUrl`），写回**既不清空已生成视频、也不回收审核位**。禁止把 `RUNTIME_SHOT_FIELDS` 塞回内容档（会复现「勾一下开关就白丢一段按秒计费的视频 + 分镜「下一步」静默锁死」），也禁止把内容型运动字段塞进 `RUNTIME_SHOT_FIELDS`（会拆掉真改分镜内容需重审核+重做的防线）。绊线在 `tests/stores/projectStore.test.ts`「运行时字段分档」。
+- **「下一步」门禁唯一口径**（2026-09-24）：判定与阻塞原因都在 `src/lib/wizardGating.ts:evaluateWizardAdvance`（纯函数），`CreationWizard` 只做搬运并渲染 `reasonKey` 对应文案（`wizard.block.*`，zh/en 同步）；禁止在组件里内联门禁或把判定写进 JSX。用例覆盖在 `tests/lib/wizardGating.test.ts`。
 - “重试失败 / 全部重新生成”按钮必须走批量生成函数（幂等 + 并发受控），禁止 forEach 并发 reroll。
 - 视频完成响应解析链：`url`（顶层）→ `metadata.url` → `video_url` → `output.url` → `output.video_url` → `remixed_from_video_id`。
 - **风格母版必须先于资产图生成，但不作为 i2i 参考图**（2026-09-12 建立，2026-09-15 修订）：`generateAssetImages` 分两阶段——阶段 1 串行生成风格图（`generateStyleReference`，幂等 + `activeAssetTasks` 互斥；风格提示词由 AI 从中文风格描述 + 视觉方向六维**零角色派生**，再经 `stylePromptAudit` 越界自检），阶段 2 的角色 / 场景 / 主体 / 道具任务**只以英文 `stylePrompt` 文本注入**生图 prompt，不传风格图作参考（参考图内容会被整体复制，2026-09-15 实锤）；风格图失败不阻塞资产生成。生图请求走 `extra_body.image[]` 多参考，`size` 恒 `1K` + `ratio`（`imageService.aspectRatioToImageParams`；2K/3K/4K 仅在 `plans.ts` 预留，全仓无调用点产生）。定妆照用 `promptComposer.composePortraitPrompt`（物种锁定句 + 全身设定，已移除 `photorealistic` 与 `Portrait of / head and shoulders / looking at camera` 人像语汇）。

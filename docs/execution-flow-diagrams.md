@@ -497,7 +497,7 @@ Promise.allSettled([链A, 链B])                                      :269
   onFinally: 全有视频 -> "idle"；全部落定(有视频或失败) -> 复位 started + "failed" + 中文硬编码
 ```
 
-首尾帧参数来源：`DualFrameToggle` 勾选后写 `shot.useDualFrame(首尾帧开关)` / `shot.lastFrameUrl(尾帧地址)`（可点选其他镜头图，也可**手输 URL**）；只有 `useDualFrame && lastFrameUrl` 同时成立，请求才带 `last_frame`。
+首尾帧参数来源：`videoPlan` 的 `manual-tail` 分支仅在 `useDualFrame && lastFrameUrl` 同时成立时给请求带 `last_frame`。⚠ 2026-09-24 起**已无手动写入来源**——旧的 `DualFrameToggle`（勾选 + 点选其他镜头图 / 手输 URL）整体下线，这两个字段现归 `RUNTIME_SHOT_FIELDS`，`manual-tail` 只可能对历史持久化数据生效，新作品一律走下方自动衔接、不产生尾帧请求。
 
 自动衔接参数流（2026-09-23 反转方向）：`shotContinuity.planShotContinuity` 判定「本镜从上一镜取首帧」→ `buildHandoffMap` 给出 `shotId → 前镜 shotId` → `tailFrameStore.snapshotTailFrames()` 提供前镜末帧（由 `renderService.extractTailFrameUrl` 在前镜视频完成时抽出，内存态）→ `videoPlan.planShotVideo` 以 `autoFirstFrameUrl(前镜末帧)` 作 `first_frame(首帧)`，`reason = auto-handoff`；末帧缺失或景别跨两档时自动降级为 `first-frame-only(仅锁本镜首帧)`。
 
@@ -644,10 +644,10 @@ shot.画面4/动态4 子字段        同上                          步骤4/5 
                                                                 -> rewritePromptFromFields 反写整段
                                                                 并触发 图9 的作废级联
 shot.imageUrl 镜头画面图       图5                           generateVideo 的 first_frame 首帧
-                                                            步骤5 预览 + 尾帧候选列表
+                                                            步骤5 预览
 shot.firstFrameUrl 首帧地址    仅被 normalizeRawShot/         **无消费者（死字段）**
                               pickShotFields 搬运             首帧实际用 shot.imageUrl
-shot.lastFrameUrl 尾帧地址     DualFrameToggle（点选/手输）    generateVideo 的 last_frame 尾帧
+shot.lastFrameUrl 尾帧地址     无 UI 写入（仅历史数据）       generateVideo 的 last_frame 尾帧
 shot.videoUrl 镜头视频地址     图6                           concatenateVideos 的 videoUrls + 预览
 shot.status 镜头状态           各批量与恢复逻辑               批量筛选条件 / recoverStuck / 按钮禁用
 assetsReviewed 资产已审核      步骤2 审核按钮                 底部「下一步」门禁 2 -> 3

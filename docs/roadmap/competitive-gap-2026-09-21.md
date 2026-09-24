@@ -2,6 +2,8 @@
 
 日期：2026-09-21　｜　类型：演进规划（roadmap）　｜　状态：评审待决
 
+> ⚠ **2026-09-24 修订（正文为历史快照，不改写）**：文中「`useDualFrame` / `lastFrameUrl` 属 `MOTION_SHOT_FIELDS`、**写回会清空已生成视频**」的约束口径已作废——这两个字段现归 `projectOps.ts:RUNTIME_SHOT_FIELDS`，写回既不清空视频也不回收审核位；手动 `DualFrameToggle` 已下线。现行权威见 `docs/execution-flow.md` §9.4 与 `AGENTS.md` 视频一致性策略段。
+
 对标对象：Runway（Gen-4 References / Storyboards / Aleph / 多模型聚合）、LTX Studio 与 LTX-2 提示词规范、Google Flow + Veo 3.1、可灵 / 即梦 Seedance、剪映图文成片与电商一键成片类产品。
 对照基线：本仓库当前 6 步向导（想法 → 资产 → 分镜 → 图片 → 视频 → 成片）的四份流程快照文档。
 

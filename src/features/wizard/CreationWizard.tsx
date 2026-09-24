@@ -17,6 +17,7 @@ import { StepImages } from "./StepImages";
 import { StepVideos } from "./StepVideos";
 import { StepAssembly } from "./StepAssembly";
 import { AutomationModeSwitch } from "./AutomationModeSwitch";
+import { evaluateWizardAdvance } from "@/lib/wizardGating";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 
 const TOTAL_STEPS = 6;
@@ -27,7 +28,6 @@ export function CreationWizard() {
   const setWizardStep = useProjectStore((s) => s.setWizardStep);
   const setAutomationMode = useProjectStore((s) => s.setAutomationMode);
   const currentStep = project?.wizardStep ?? 1;
-  const shots = project?.shots ?? [];
 
   // 刷新恢复：模块级注册表随页面销毁清空，上一轮遗留的 scripting 永远等不到写回复位，
   // 会同时卡死步骤 1 的「AI 提取 / 下一步」门禁和侧栏转圈。放在容器做（而非某个步骤组件），
@@ -45,22 +45,10 @@ export function CreationWizard() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const canAdvance = (() => {
-    switch (currentStep) {
-      // 提取期间（scripting）禁止前进：否则可在两链未收尾时切页、返回后重复触发提取
-      case 1: return !!project?.ideaPrompt?.trim() && project?.status !== "scripting";
-      // 半自动流程必须通过 StepAssets 自己的审核卡点进入分镜；
-      // 这里也保留门禁，防止外部导航或恢复旧状态绕过审核。
-      case 2: return project?.automationMode === "auto" || project?.assetsReviewed === true;
-      case 3: return shots.length > 0 && shots.every((s) => s.scriptText.trim()) &&
-        (project?.automationMode === "auto" || project?.storyboardReviewed === true);
-      case 4: return shots.length > 0 && shots.every((s) => !!s.imageUrl) &&
-        (project?.automationMode === "auto" || project?.imagesReviewed === true);
-      case 5: return shots.length > 0 && shots.every((s) => !!s.videoUrl);
-      case 6: return false; // last step
-      default: return false;
-    }
-  })();
+  const advance = evaluateWizardAdvance(project, currentStep);
+  const canAdvance = advance.canAdvance;
+  const blockReason =
+    !canAdvance && advance.reasonKey ? t(advance.reasonKey, advance.vars) : undefined;
 
   const canGoBack = currentStep > 1;
 
@@ -110,10 +98,14 @@ export function CreationWizard() {
           </button>
 
           <div className="flex items-center gap-2">
+            {currentStep < TOTAL_STEPS && blockReason && (
+              <span className="text-[0.6875rem] text-ink-4">{blockReason}</span>
+            )}
             {currentStep < TOTAL_STEPS && (
               <button
                 onClick={handleNext}
                 disabled={!canAdvance}
+                title={blockReason}
                 className="flex items-center gap-1.5 rounded-md bg-success-solid px-4 py-1.5 text-xs font-medium text-white transition hover:bg-success-solid disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {t("wizard.next")}

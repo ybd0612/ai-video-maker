@@ -7,6 +7,12 @@
 import { describe, expect, it } from "vitest";
 import type { Asset, Project, Shot } from "@/stores/projectStore";
 import { applyAssetUpdate, applyShotUpdates } from "@/stores/projectStore";
+import {
+  hasAnyField,
+  MOTION_SHOT_FIELDS,
+  STORYBOARD_SHOT_FIELDS,
+  VISUAL_SHOT_FIELDS,
+} from "@/stores/projectOps";
 
 function makeShot(id: string, overrides: Partial<Shot> = {}): Shot {
   return {
@@ -189,5 +195,60 @@ describe("applyAssetUpdate", () => {
     const project = makeProject([makeAsset("char_1", "character")], [shot]);
 
     expect(applyAssetUpdate(project, "missing", { description: "ignored" })).toBe(project);
+  });
+});
+
+describe("运行时字段分档（问题 2）", () => {
+  it("只勾双帧开关不清空已生成视频，也不回退状态", () => {
+    const shot = makeShot("shot_1");
+
+    const next = applyShotUpdates(shot, { useDualFrame: true });
+
+    expect(next.useDualFrame).toBe(true);
+    expect(next.videoUrl).toBe("https://video.test/shot_1.mp4");
+    expect(next.videoProgress).toBe(100);
+    expect(next.videoRetryCount).toBe(2);
+    expect(next.status).toBe("videoed");
+  });
+
+  it("只写尾帧/首帧 URL（运行时字段）不清空视频", () => {
+    const shot = makeShot("shot_1");
+
+    const withTail = applyShotUpdates(shot, { lastFrameUrl: "https://img.test/tail.png" });
+    const withFirst = applyShotUpdates(shot, { firstFrameUrl: "https://img.test/first.png" });
+
+    expect(withTail.videoUrl).toBe("https://video.test/shot_1.mp4");
+    expect(withTail.status).toBe("videoed");
+    expect(withFirst.videoUrl).toBe("https://video.test/shot_1.mp4");
+    expect(withFirst.status).toBe("videoed");
+  });
+
+  it("运行时字段不入 STORYBOARD_SHOT_FIELDS；内容型运动字段仍入（既有防线不丢）", () => {
+    // 运行时字段：不回收分镜审核位
+    expect(hasAnyField({ useDualFrame: true }, STORYBOARD_SHOT_FIELDS)).toBe(false);
+    expect(hasAnyField({ lastFrameUrl: "x" }, STORYBOARD_SHOT_FIELDS)).toBe(false);
+    expect(hasAnyField({ firstFrameUrl: "x" }, STORYBOARD_SHOT_FIELDS)).toBe(false);
+    // 内容型运动字段：改了仍必须重新审核
+    expect(hasAnyField({ motionPrompt: "x" }, STORYBOARD_SHOT_FIELDS)).toBe(true);
+    expect(hasAnyField({ duration: 8 }, STORYBOARD_SHOT_FIELDS)).toBe(true);
+    expect(hasAnyField({ actionDesc: "x" }, STORYBOARD_SHOT_FIELDS)).toBe(true);
+    expect(hasAnyField({ cameraDesc: "x" }, STORYBOARD_SHOT_FIELDS)).toBe(true);
+    // 且它们不属于 VISUAL_SHOT_FIELDS（不回收图片审核位）
+    expect(hasAnyField({ motionPrompt: "x" }, VISUAL_SHOT_FIELDS)).toBe(false);
+    // MOTION_SHOT_FIELDS 现在只含内容型运动字段
+    expect(MOTION_SHOT_FIELDS).toContain("motionPrompt");
+    expect(MOTION_SHOT_FIELDS).toContain("duration");
+    expect(MOTION_SHOT_FIELDS).not.toContain("useDualFrame");
+    expect(MOTION_SHOT_FIELDS).not.toContain("lastFrameUrl");
+    expect(MOTION_SHOT_FIELDS).not.toContain("firstFrameUrl");
+  });
+
+  it("真改内容型运动字段仍使已生成视频失效（不得因分档而丢失）", () => {
+    const shot = makeShot("shot_1");
+
+    const next = applyShotUpdates(shot, { motionPrompt: "New motion" });
+
+    expect(next.videoUrl).toBeUndefined();
+    expect(next.status).toBe("imaged");
   });
 });

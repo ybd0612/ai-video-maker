@@ -1,5 +1,7 @@
 # 三页双栏骨架布局重排 Implementation Plan
 
+> ⚠ **2026-09-24 修订（本文为已落地的历史执行记录，正文不改写）**：计划中挂载/改造的手动 `DualFrameToggle`（尾帧候选与预览）已于 2026-09-24 **整体下线并删除**；下文 ~1646 行「写回 `useDualFrame`/`lastFrameUrl` 会清空已生成视频」的铁律已作废（字段现归 `projectOps.ts:RUNTIME_SHOT_FIELDS`）。现行权威见 `docs/execution-flow.md` §9.4。
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development（推荐，逐任务派新代理）或 superpowers:executing-plans 逐任务实现本计划。步骤用 checkbox（`- [ ]`）跟踪。
 >
 > **执行环境提示**：本计划设计为由**新会话的长任务**连续执行。每个任务都以「红 → 绿 → 提交」闭环结束；不要并行乱序，任务间有依赖（见每个任务的 Consumes）。

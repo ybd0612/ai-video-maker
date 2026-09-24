@@ -52,6 +52,11 @@ export const MOTION_SHOT_FIELDS = [
   "envChangeDesc",
   "motionSpeedDesc",
   "duration",
+] as const;
+
+// 运行时 / 生成参数类字段：用户勾选或衔接机制在发请求时读写，不参与分镜内容审核，
+// 也不应因改动而使按秒计费的已生成视频失效。故既不入 MOTION_SHOT_FIELDS 也不入 STORYBOARD_SHOT_FIELDS。
+export const RUNTIME_SHOT_FIELDS = [
   "useDualFrame",
   "firstFrameUrl",
   "lastFrameUrl",

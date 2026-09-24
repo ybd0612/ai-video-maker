@@ -1,11 +1,11 @@
 // ────────────────────────────────────────────────────────────────────────────
 // src/features/wizard/StepVideos.tsx
-// Step 5: Generate videos for all shots, with dual-frame control.
-// 2026-09-24 双栏改造：左镜头轨 + 右常驻详情（播放器、镜级进度、衔接解释、首尾帧控制）。
+// Step 5: Generate videos for all shots.
+// 2026-09-24 双栏改造：左镜头轨 + 右常驻详情（播放器、镜级进度、衔接解释）。
 // ⚠ 页面继续在组件内部渲染 WizardShell，不得加 key：重挂载会让下方自动生成
 // effect 再跑一次批量视频任务（按秒计费）。
-// ⚠ 衔接解释只读：绝不把 planShotContinuity / tailFrame 的结果写回
-// useDualFrame / lastFrameUrl —— 写回属 MOTION 字段变更，会清空已生成视频。
+// ⚠ 衔接解释只读：planShotContinuity / tailFrame 的结果只在发请求时派生、绝不写回 store，
+// 以维持「随请求重算、刷新后自动降级为仅锁本镜首帧」（useDualFrame/lastFrameUrl 已归 RUNTIME 字段，写回不再清空视频）。
 // ────────────────────────────────────────────────────────────────────────────
 
 import { useEffect, useState, useRef } from "react";
@@ -13,7 +13,6 @@ import { useProjectStore, selectActiveProject } from "@/stores/projectStore";
 import { useSettingsStore } from "@/stores/settingsStore";
 import { useT } from "@/i18n";
 import { PromptSubFields } from "./PromptSubFields";
-import { DualFrameToggle } from "./DualFrameToggle";
 import { Lightbox } from "@/components/ui/Lightbox";
 import { useWizardActions } from "./useWizardActions";
 import { pendingVideoShots } from "@/lib/shotQueue";
@@ -271,9 +270,6 @@ export function StepVideos() {
 
           <ExpandableSection title={t("pipeline.motionPrompt")} text={current.motionPrompt} />
           <PromptSubFields shotId={current.id} sections={["motion"]} />
-
-          {/* 首尾帧控制 */}
-          <DualFrameToggle shot={current} />
 
           <WizardMessages error={current.error} />
         </div>

@@ -20,11 +20,11 @@
 
 配置来源唯一：`useSettingsStore.getState().providerConfig`（apiKey / baseUrl / plan），由编排层在每次动作开始时读出后**显式传参**给服务层；服务层内部不读 apiKey/baseUrl，也不读当前活动项目。
 
-步骤容器：`CreationWizard.tsx:21` 固定 6 步；`:89-94` 按 `project.wizardStep` 路由组件；`:44-59` 是「下一步」的唯一门禁表；`:31-42` 挂载时一次性复位残留的 `scripting`（注册表已随页面销毁清空）。
+步骤容器：`CreationWizard.tsx:23` 固定 6 步；`:81-86` 按 `project.wizardStep` 路由组件；`:35-46` 挂载时一次性复位残留的 `scripting`（注册表已随页面销毁清空）。「下一步」的唯一门禁判定不再内联，已下沉到 `src/lib/wizardGating.ts:30 evaluateWizardAdvance`（纯函数，同时产出阻塞原因 `reasonKey`），`CreationWizard.tsx:48-50` 搬运其结果并在门禁不满足时就地显示原因文案（`wizard.block.*`）。
 
 三种推进动力，必须分清：
 
-1. 用户点底部「下一步」→ 受 `canAdvance` 门禁表约束（`CreationWizard.tsx:44-59`）；步骤 1 额外要求 `status !== "scripting"`，想法提取全程不放行
+1. 用户点底部「下一步」→ 受 `evaluateWizardAdvance` 门禁约束（`src/lib/wizardGating.ts:30`；`CreationWizard.tsx:48-50` 搬运，不满足时按钮 `disabled` 且就地显示原因）；步骤 1 额外要求 `status !== "scripting"`，想法提取全程不放行
 2. 步骤内专用按钮（如「提取并继续」「确认这批资产」「审核通过」）→ 直接 `setWizardStep`，绕过底部门禁
 3. `automationMode === "auto"` → 各步骤挂载的条件 effect 自动推进（半自动模式下这些 effect 全部不触发）
 
@@ -117,7 +117,7 @@
 - 半自动：底部「确认这批资产并生成分镜」→ `assetsReviewed = true` → `enterStoryboard()`（`StepAssets.tsx:131-136`）
 - `enterStoryboard` 关键行为（:101-128）：**已有分镜内容则直接切页不覆盖**；否则在**本页** `await generateStoryboard(idea, { onProgress })`，首个镜头写回（成功或失败都算）即 `setWizardStep(3)`，其余镜头继续在后台填充
 - auto：`allAssetsImaged` 由 false→true 时才自动进入分镜（:142-153），且要求**每个资产都有图**——任一资产失败会永久卡住自动推进（代码注释已承认，:141）
-- 底部「下一步」门禁：`case 2 = automationMode==="auto" || assetsReviewed===true`（`CreationWizard.tsx:50`）
+- 底部「下一步」门禁：`case 2 = automationMode==="auto" || assetsReviewed===true`（`src/lib/wizardGating.ts:46`）；不满足时按钮禁用并显示 `wizard.block.assetsNotReviewed`
 - 刷新恢复：`assetGenerationStarted === true` 且 `hasActiveAssetTask(project.id)` 为假 → 复位 false，避免按钮永久转圈（:88-93）
 
 ---
@@ -151,7 +151,7 @@
 
 - 半自动：底部审核卡点要求「所有镜头 scriptText 非空 且 visualPrompt 非空」（`StepStoryboard.tsx:249`）→ `storyboardReviewed=true` + 切步骤 4
 - auto：`generateStoryboard` 成功后立刻 `setWizardStep(4)`（:57-61 与 :117-121 两处）
-- 底部门禁：`case 3 = 有镜头 && 全部 scriptText 非空 && (auto || storyboardReviewed)`（`CreationWizard.tsx:51-52`）
+- 底部门禁：`case 3 = 有镜头 && 全部 scriptText 非空 && (auto || storyboardReviewed)`（`src/lib/wizardGating.ts:50`）；阻塞时按顺序给出 `noShots` / `missingScript {count}` / `storyboardNotReviewed` 原因
 
 ---
 
@@ -197,9 +197,9 @@
    - **创建后失败的错误类型是 `VideoTaskCreatedError{videoId, stillRunning}`**（`videoService.ts:35-48`）；上层 `useVideoActions.ts:100-122` 对 `stillRunning=true` **只等待不再创建新任务**（避免双倍消耗），false 才判失败
 6. 写回 `videoUrl` + `status:"videoed"`（revision 校验）；`onFinally`：全有视频 → `idle`；全落定（有视频或失败）→ 复位 started + `failed`（`useVideoActions.ts:174-180`，硬编码中文文案）
 
-**`last_frame`（尾帧）现在只有一个来源：用户手动**（`DualFrameToggle` 勾选后点选其他镜头图或手输 URL，`DualFrameToggle.tsx:82-90`）。自动衔接已改为「后镜首帧取前镜末帧」（2026-09-23 裁定 2）：`shotContinuity` 只判定该不该接、从前一镜取，前镜末帧由 `renderService.extractTailFrameUrl` 在前镜视频完成时抽出并放进 `lib/tailFrameStore`（内存），`videoPlan` 用它作本镜 `first_frame`；因此**自动路径不再产生任何尾帧请求**。衔接判定与末帧地址都**不写 store** —— `useDualFrame` / `lastFrameUrl` 属于 MOTION 字段，写回会清空已生成视频（见 9.4），所以只在发请求那一刻派生。另：`shot.firstFrameUrl` 只被 `normalizeRawShot` / `pickShotFields` 搬运，请求侧从不读取它（`first_frame` 用的是 `shot.imageUrl`），当前是**无消费者的死字段**。
+**`last_frame`（尾帧）现在没有任何手动来源**：旧的手动 `DualFrameToggle`（勾选后点选其他镜头画面图或手输 URL）已于 2026-09-24 **整体下线**——它把「他镜画面」当本镜尾帧违反裁定 2，且写回这些字段既会清空按秒计费的已生成视频、又会静默回收 `storyboardReviewed` 锁死分镜「下一步」。自动衔接仍是唯一机制：「后镜首帧取前镜末帧」（2026-09-23 裁定 2），`shotContinuity` 只判定该不该接、从前一镜取，前镜末帧由 `renderService.extractTailFrameUrl` 在前镜视频完成时抽出并放进 `lib/tailFrameStore`（内存），`videoPlan` 用它作本镜 `first_frame`；因此**自动路径不产生任何尾帧请求**。衔接判定与末帧地址都**不写 store**。`useDualFrame` / `lastFrameUrl` / `firstFrameUrl` 已归 `projectOps.ts:RUNTIME_SHOT_FIELDS`（见 9.4），写回**不清空已生成视频、也不回收审核位**；字段本身保留，`videoPlan` 的 `manual-tail` 分支只读消费历史数据，但已无 UI 再写入。另：`shot.firstFrameUrl` 只被 `normalizeRawShot` / `pickShotFields` 搬运，请求侧从不读取它（`first_frame` 用的是 `shot.imageUrl`），仍是**无消费者的死字段**。
 
-推进：步骤 5 没有审核卡点，auto 模式全视频 false→true 时 `setWizardStep(6)`（`StepVideos.tsx:67-76`）；半自动靠底部「下一步」，门禁 `case 5 = 每个镜头都有 videoUrl`（`CreationWizard.tsx:55`）。
+推进：步骤 5 没有审核卡点，auto 模式全视频 false→true 时 `setWizardStep(6)`（`StepVideos.tsx:67-76`）；半自动靠底部「下一步」，门禁 `case 5 = 每个镜头都有 videoUrl`（`src/lib/wizardGating.ts:66`），缺视频时显示 `missingVideo {count}`。
 
 ---
 
@@ -265,9 +265,10 @@ RPM 与配额表（`lib/plans.ts:73-134`，格式 文本 / 图片1K,2K,3K,4K / �
 | 命中 VISUAL 字段 | 清空图片与视频全部产物，`status = scriptText 非空 ? scripted : idle`，revision +1 |
 | 命中 MOTION 字段 | 只清视频产物，`status = imageUrl ? imaged : (scriptText ? scripted : idle)`，revision +1 |
 
-- `VISUAL_SHOT_FIELDS`（:35-46）= `scriptText, visualPrompt, sceneDesc, detailDesc, lightingDesc, styleDesc, activeCharacterIds, activeSceneId, activeProductIds, activePropIds`
-- `MOTION_SHOT_FIELDS`（:48-58）= `motionPrompt, actionDesc, cameraDesc, envChangeDesc, motionSpeedDesc, duration, useDualFrame, firstFrameUrl, lastFrameUrl`
-- **推论**：在步骤 4/5 改一个子字段（如 `sceneDesc`）会立即作废该镜头已生成的图片和视频；改时长或首尾帧只作废视频。这就是「改完必须重新生成」的真实机制。
+- `VISUAL_SHOT_FIELDS`（`projectOps.ts:35-46`）= `scriptText, visualPrompt, sceneDesc, detailDesc, lightingDesc, styleDesc, activeCharacterIds, activeSceneId, activeProductIds, activePropIds`
+- `MOTION_SHOT_FIELDS`（`projectOps.ts:48-55`）= `motionPrompt, actionDesc, cameraDesc, envChangeDesc, motionSpeedDesc, duration`（仅内容型运动字段）
+- `RUNTIME_SHOT_FIELDS`（`projectOps.ts:59-63`）= `useDualFrame, firstFrameUrl, lastFrameUrl`（运行时/生成参数档，**不在** STORYBOARD_SHOT_FIELDS 内）
+- **推论**：在步骤 4/5 改一个子字段（如 `sceneDesc`）会立即作废该镜头已生成的图片和视频；改内容型运动字段（如 `duration` / `motionPrompt`）只作废视频。而勾双帧开关或写首/尾帧 URL（`RUNTIME_SHOT_FIELDS`）**既不作废视频、也不回收分镜审核位**——2026-09-24 分档前的旧行为（写这些字段清空按秒计费的视频并静默锁死「下一步」）已随 `DualFrameToggle` 下线和 `RUNTIME_SHOT_FIELDS` 拆分一并修掉。这就是「改完必须重新生成」的真实机制。
 - 前两条里的 `outputChanged` 要求**值确实不同**（`projectOps.ts:83-85`）；写回相同 URL 不会递增 revision。
 
 **9.5 跨项目写回**：四个 `useXxxActions` 的生成链路统一在开始时 `const targetProjectId = project.id`，回写只用 `updateProjectById` / `*ByProjectId` / `setProjectStatusById`。仍有 active-project 版 action 跨异步边界使用的地方集中在角色编辑器与步骤 4/5 子字段（见第 12 节第 2、4 条）。
