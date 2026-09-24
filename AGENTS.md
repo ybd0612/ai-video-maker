@@ -114,7 +114,7 @@ scripts/run-vitest.mjs              # Windows 盘符规范化后启动 Vitest
 - 国际化使用自研 `useT()` hook，翻译键在 `src/i18n/index.ts` 的 `zh` / `en` 字典中
 - 新增翻译键时必须同时添加 zh 和 en 两个字典
 - 成片预览使用组件内 state 管理（blob URL 不持久化到 store，避免刷新后失效）
-- **界面缩放与字号**：整体缩放由 `src/styles/globals.css` 的 `:root { font-size: 112.5% }` 统一控制（Tailwind 的尺寸/间距/字号类均以 rem 为单位）；**新增样式禁止写死 `text-[Npx]`**，小字用 `text-[0.625rem]` / `text-[0.6875rem]` 这类 rem 写法或 Tailwind 预设类，否则不参与整体缩放。需要整体调大/调小界面时只改这一个数字
+- **界面缩放与字号**：整体缩放由 `src/styles/globals.css` 的 `:root { font-size: 112.5% }` 统一控制（Tailwind 的尺寸/间距/字号类均以 rem 为单位）；**新增样式禁止写死 `text-[Npx]`**，小字用 `text-[0.625rem]` / `text-[0.6875rem]` 这类 rem 写法或 Tailwind 预设类，否则不参与整体缩放。需要整体调大/调小界面时只改这一个数字。图标尺寸一律用 `className="h-N w-N"`（rem）传，**禁止再新增 `size={数字}`**（px 不随根字号缩放）；仅两处例外：`components/ui/AiPolishField.tsx` 的 12px 属用户两次微调的定稿几何（要改先拍），以及 `features/script/ScriptPanel.tsx`、`features/preview/ShotPreview.tsx`、`features/preview/FinalPreview.tsx` 三个零引用孤儿文件（待清理，不值得改）
 - **黑白主题（2026-09-12 方案 A 落地）**：语义色 token 定义在 `src/styles/globals.css`（light 为默认值，`html[data-theme="dark"]` 覆盖，经 `@theme inline` 映射为 `bg-app` / `bg-surface` / `bg-raised` / `bg-hover` / `border-line(-soft/-strong)` / `text-ink~ink-5` / `accent` / `info` / `success` / `warn` / `danger` 等工具类，支持 `/xx` 透明度修饰符）。**新组件禁用 slate/red/emerald 等原始色类，一律用语义 token**；主题状态在 settingsStore（persist v3，默认 `light`），App.tsx effect 同步到 `<html data-theme>`，index.html 内联脚本防首帧闪白；顶栏 ☀️/🌙 按钮切换
 - **层级 token 用途边界（2026-09-23）**：浅色主题五档文字 `ink` > `ink-2` > `ink-3` > `ink-4` > `ink-5` 严格递浅，**`ink-4` 起只用于非关键信息**（计数、进度百分比、图标按钮标题、占位提示），正文与可读文本一律 `ink` / `ink-2` / `ink-3`。边框两档各司其职：`border-line` 外框与模块分割线，`border-line-soft` 内部分隔。回归绊线在 `tests/lib/themeTokens.test.ts`（改回同值会红）
 - **验证方式**：本项目**不使用浏览器/预览服务做验证**（由用户本地手动确认界面效果）；AI 侧只跑 `npx tsc --noEmit` + `git diff --check` + `npm run build`
@@ -164,6 +164,7 @@ scripts/run-vitest.mjs              # Windows 盘符规范化后启动 Vitest
 - 共享函数必须显式接收依赖和参数，禁止通过隐式全局状态、当前活动项目或闭包变量改变行为。
 - 复用不能牺牲可读性：单次使用、尚未稳定的逻辑不提前抽象；抽取后必须保留清晰命名、输入输出类型和边界测试。
 - 修复一个入口后必须搜索同类入口，确认没有同样缺陷；新增规则、参数或错误处理时同步检查批量、单项、重试和手动入口。
+- **近似 markup 不等于同一语义（2026-09-24 评估定论）**：向导页的 `WizardMessages`（静态提示 + 错误块）与资产详情外壳的 `AssetEditorMessages`（生成过程 notice + 字段级错误）**保持两份实现，不合并**。资产编辑的 notice 承载「正在生成 / 已生成」的过程语义、随编辑器状态变化，合一会把两套差异塞进一个布尔开关，正是本节反对的「只看代码长得像」。共享件的收敛范围止于四个向导页之间。
 
 ### 6. API、异常与安全
 
