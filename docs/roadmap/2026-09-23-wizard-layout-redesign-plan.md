@@ -558,7 +558,7 @@ git commit -m "feat(layout): 三页与卡片按真实画幅排版媒体，页面
   - `WizardMessages(props: { notice?: string | null; error?: string | null })`
   - `StepProgressBar(props: { done: number; total: number })`
 
-- [ ] **Step 1: 写两个共享件**
+- [x] **Step 1: 写两个共享件**
 
 ```tsx
 // src/features/wizard/WizardMessages.tsx
@@ -619,7 +619,7 @@ export function StepProgressBar({ done, total }: StepProgressBarProps) {
 }
 ```
 
-- [ ] **Step 2: 替换两处进度条与四处错误框**
+- [x] **Step 2: 替换两处进度条与四处错误框**
 
 - `StepImages.tsx:132-140` 整段 → `<StepProgressBar done={imagedCount} total={shots.length} />`
 - `StepVideos.tsx:151-159` 整段 → `<StepProgressBar done={videoedCount} total={shots.length} />`
@@ -627,7 +627,7 @@ export function StepProgressBar({ done, total }: StepProgressBarProps) {
 - `ShotCard.tsx:113-117` → `<WizardMessages error={shot.error} />`
 - `AssetEditorMessages`（`AssetEditorTemplate.tsx:378-398`）**本任务不动**：资产编辑有 notice 语义，等 Task 15 统一评估后再合
 
-- [ ] **Step 3: 分镜页补上进度条**
+- [x] **Step 3: 分镜页补上进度条**
 
 `StepStoryboard.tsx` 列表态页头之后插入：
 
@@ -637,7 +637,7 @@ export function StepProgressBar({ done, total }: StepProgressBarProps) {
 
 该谓词与 `CreationWizard.tsx:53` 的 `canAdvance` 步骤 3 判定同源 —— **不得另发明一套"完成"定义**。
 
-- [ ] **Step 4: 全量验证 + 行为不变自查**
+- [x] **Step 4: 全量验证 + 行为不变自查**
 
 Run:
 ```bash
@@ -646,7 +646,7 @@ git diff -- src/features/wizard | grep -E "^[+-].*(updateShot|setProjectStatus|g
 ```
 Expected: 四项全绿；第二条输出 `OK：无行为改动` 或仅出现成对的 markup 搬运（逐条核对后在交付说明里写明）
 
-- [ ] **Step 5: 提交**
+- [x] **Step 5: 提交**
 
 ```bash
 git add src/features/wizard/WizardMessages.tsx src/features/wizard/StepProgressBar.tsx \
@@ -667,7 +667,7 @@ git commit -m "refactor(wizard): 统一提示错误框与步骤完成度条，�
 
 **Interfaces Produces:** `StepHeader(props: { titleKey: TranslationKey; done?: number; total?: number; actions?: ReactNode })`
 
-- [ ] **Step 1: 写组件**
+- [x] **Step 1: 写组件**
 
 ```tsx
 // src/features/wizard/StepHeader.tsx
@@ -698,7 +698,7 @@ export function StepHeader({ titleKey, done, total, actions }: StepHeaderProps) 
 }
 ```
 
-- [ ] **Step 2: 三页接入**
+- [x] **Step 2: 三页接入**
 
 `StepImages.tsx`：删掉 `:64-66` 的 `<h2>`，改为
 
@@ -717,7 +717,7 @@ export function StepHeader({ titleKey, done, total, actions }: StepHeaderProps) 
 
 `StepStoryboard.tsx`：`:202-204` 的 `t("wizard.step2")` → `titleKey="wizard.step3"`（**这就是文案错位的修复**，键已存在于 `i18n` 的 `wizard.step3`）；重摇按钮搬进 `actions`。
 
-- [ ] **Step 3: 验证**
+- [x] **Step 3: 验证**
 
 ```bash
 npx tsc --noEmit && git diff --check && npm run test && npm run build
@@ -725,9 +725,9 @@ git diff -- src/features/wizard | grep -E "^[+-].*(onClick|confirmDialog|updateS
 ```
 Expected: 全绿；第二条只有成对的移动
 
-- [ ] **Step 4: 用户目测项**：三页页头字号与按钮排布是否一致；分镜页标题是否已从"资产"变成"分镜"。
+- [x] **Step 4: 用户目测项**：三页页头字号与按钮排布是否一致；分镜页标题是否已从"资产"变成"分镜"。
 
-- [ ] **Step 5: 提交**
+- [x] **Step 5: 提交**
 
 ```bash
 git add src/features/wizard/StepHeader.tsx src/features/wizard/StepImages.tsx \
@@ -751,7 +751,7 @@ git commit -m "refactor(wizard): 统一三页页头并修正分镜页误用的�
 - Consumes: 现有 `ReviewCheckpointProps { mode: AutomationMode; onConfirm: () => void; failedShots?: FailedShotInfo[]; onRetryFailed?: () => void }`；`mode === "auto"` 返回 `null` 的行为**保持不变**
 - Produces: 上述 props 追加 `hintKey: TranslationKey; confirmLabelKey: TranslationKey; titleKey?: TranslationKey; confirmDisabled?: boolean`
 
-- [ ] **Step 1: 给组件加可选入参（图片页现有调用点不改也能编译）**
+- [x] **Step 1: 给组件加可选入参（图片页现有调用点不改也能编译）**
 
 `ReviewCheckpointProps` 追加：
 
@@ -766,7 +766,7 @@ git commit -m "refactor(wizard): 统一三页页头并修正分镜页误用的�
 
 组件内：写死的 `review.qualityCheck` → `t(titleKey ?? "review.qualityCheck")`；`review.hint` → `t(hintKey)`；`review.confirmImages` → `t(confirmLabelKey)`；确认按钮 `disabled` → `disabled={confirmDisabled ?? false}`（图片页未传 → 行为与今天完全一致）。
 
-- [ ] **Step 2: 分镜页与资产页换组件**
+- [x] **Step 2: 分镜页与资产页换组件**
 
 `StepStoryboard.tsx:236-255` 整块 →
 
@@ -784,7 +784,7 @@ git commit -m "refactor(wizard): 统一三页页头并修正分镜页误用的�
 
 `StepAssets.tsx:462-478` 同法（`hintKey="review.assetsHint"`、`confirmLabelKey="review.confirmAssets"`）。
 
-- [ ] **Step 3: 视频页只加完成 CTA，不引入新审核位**
+- [x] **Step 3: 视频页只加完成 CTA，不引入新审核位**
 
 > **按钮类串不要新造**：直接复用 `CreationWizard.tsx:113-122`「下一步」按钮已有的那组类（`bg-success-solid` + 其前景色与 hover 类逐字照抄），以保证同一语义的颜色全站一致，并避免引入 `text-white` 这类原始色类。
 
@@ -807,11 +807,11 @@ git commit -m "refactor(wizard): 统一三页页头并修正分镜页误用的�
 
 需要从 store 取现成的 `setWizardStep`（`useProjectStore((s) => s.setWizardStep)`）。**禁止**新增 `videosReviewed` 位或改 `canAdvance` 步骤 5 的判定 —— 那是产品可见的门禁收紧，本计划不做。
 
-- [ ] **Step 4: i18n 双写**
+- [x] **Step 4: i18n 双写**
 
 zh 段加 `"wizard.goAssembly": "去后期合成",`，en 段同位置加 `"wizard.goAssembly": "Go to assembly",`。同时确认 `wizard.storyboardConfirmHint` 已存在（`StepStoryboard.tsx` 内联块在用）；若不存在则按同样方式补齐 —— **不得在 JSX 里留硬编码中文**。
 
-- [ ] **Step 5: 验证（重点：门禁一个字符都没动）**
+- [x] **Step 5: 验证（重点：门禁一个字符都没动）**
 
 ```bash
 npx tsc --noEmit && git diff --check && npm run test && npm run build
@@ -820,7 +820,7 @@ git diff -- src/features/wizard/CreationWizard.tsx
 Expected: 全绿；第二条**必须为空**（`canAdvance` 未被触碰）
 用户目测项：半自动下分镜/资产的卡点文案与禁用条件与改造前一致；视频页出现"去后期合成"且步骤 5 的推进条件没变严。
 
-- [ ] **Step 6: 提交**
+- [x] **Step 6: 提交**
 
 ```bash
 git add src/features/wizard/ReviewCheckpoint.tsx src/features/wizard/StepStoryboard.tsx \
@@ -840,7 +840,7 @@ git commit -m "refactor(wizard): 审核卡点收敛为唯一实现，视频页�
 - `function moveSelection(ids: readonly string[], currentId: string | undefined, delta: 1 | -1): string | undefined`
 - `function syncSelectionWithShots(ids: readonly string[], currentId: string | undefined): string | undefined`
 
-- [ ] **Step 1: 写失败测试**
+- [x] **Step 1: 写失败测试**
 
 ```ts
 // tests/lib/railSelection.test.ts
@@ -881,9 +881,9 @@ describe("syncSelectionWithShots", () => {
 });
 ```
 
-- [ ] **Step 2: 跑测试确认失败** Run: `npm run test -- tests/lib/railSelection.test.ts` Expected: FAIL（模块不存在）
+- [x] **Step 2: 跑测试确认失败** Run: `npm run test -- tests/lib/railSelection.test.ts` Expected: FAIL（模块不存在）
 
-- [ ] **Step 3: 实现**
+- [x] **Step 3: 实现**
 
 ```ts
 // ────────────────────────────────────────────────────────────────────────────
@@ -914,8 +914,8 @@ export function syncSelectionWithShots(
 }
 ```
 
-- [ ] **Step 4: 跑测试确认通过** Expected: PASS（4 个用例）
-- [ ] **Step 5: 全量验证 + 提交**
+- [x] **Step 4: 跑测试确认通过** Expected: PASS（4 个用例）
+- [x] **Step 5: 全量验证 + 提交**
 
 ```bash
 npx tsc --noEmit && git diff --check && npm run test && npm run build
@@ -935,7 +935,7 @@ git commit -m "feat(layout): 新增镜头轨选中与键盘导航纯逻辑"
 - `const SHOT_SIZE_LABEL_KEYS: Record<ShotSize, TranslationKey>`
 - `function shotSizeLabelKey(size: ShotSize | undefined): TranslationKey`
 
-- [ ] **Step 1: 写失败测试**
+- [x] **Step 1: 写失败测试**
 
 ```ts
 // tests/lib/shotDisplay.test.ts
@@ -976,9 +976,9 @@ describe("shotSizeLabelKey", () => {
 });
 ```
 
-- [ ] **Step 2: 跑测试确认失败** Expected: FAIL（`shotDisplay` 不存在；且 `zh` / `en` 当前**未被导出**，会先报 import 错 —— 属预期红）
+- [x] **Step 2: 跑测试确认失败** Expected: FAIL（`shotDisplay` 不存在；且 `zh` / `en` 当前**未被导出**，会先报 import 错 —— 属预期红）
 
-- [ ] **Step 3: 导出字典 + 实现 + 补键**
+- [x] **Step 3: 导出字典 + 实现 + 补键**
 
 `src/i18n/index.ts`：给 `const zh = { ... } as const;` 与 `const en: Record<TranslationKey, string> = { ... };`（以实际写法为准）**加 `export` 修饰**，不改内容。
 
@@ -1022,8 +1022,8 @@ export function shotSizeLabelKey(size: ShotSize | undefined): TranslationKey {
 }
 ```
 
-- [ ] **Step 4: 跑测试确认通过** Expected: PASS（3 个用例）
-- [ ] **Step 5: 全量验证 + 提交**
+- [x] **Step 4: 跑测试确认通过** Expected: PASS（3 个用例）
+- [x] **Step 5: 全量验证 + 提交**
 
 ```bash
 npx tsc --noEmit && git diff --check && npm run test && npm run build
@@ -1046,7 +1046,7 @@ git commit -m "feat(layout): 景别五档与未知态的展示映射，导出字
   - `function describeFirstFrameSource(input: { shotId: string; shots: readonly ShotForContinuity[]; useDualFrame: boolean; lastFrameUrl?: string; consistency: VideoConsistency; tailFrames: Record<string, string> }): FirstFrameSource`
   - `function firstFrameSourceKey(src: FirstFrameSource): TranslationKey`
 
-- [ ] **Step 1: 写失败测试**
+- [x] **Step 1: 写失败测试**
 
 ```ts
 // tests/lib/firstFrameSource.test.ts
@@ -1145,9 +1145,9 @@ describe("describeFirstFrameSource", () => {
 });
 ```
 
-- [ ] **Step 2: 跑测试确认失败** Expected: FAIL（模块不存在）
+- [x] **Step 2: 跑测试确认失败** Expected: FAIL（模块不存在）
 
-- [ ] **Step 3: 实现 + 补 11 个文案键**
+- [x] **Step 3: 实现 + 补 11 个文案键**
 
 ```ts
 // ────────────────────────────────────────────────────────────────────────────
@@ -1247,8 +1247,8 @@ export function firstFrameSourceKey(src: FirstFrameSource): TranslationKey {
 "videoPlan.firstFrame.sizeGap": "First frame is this shot's still (shot size jumps two or more steps)",
 ```
 
-- [ ] **Step 4: 跑测试确认通过** Expected: PASS（7 个用例）
-- [ ] **Step 5: 全量验证 + 提交**
+- [x] **Step 4: 跑测试确认通过** Expected: PASS（7 个用例）
+- [x] **Step 5: 全量验证 + 提交**
 
 ```bash
 npx tsc --noEmit && git diff --check && npm run test && npm run build
@@ -1272,7 +1272,7 @@ git commit -m "feat(video): 首帧来源纯解释器，把衔接降级原因变�
   - `interface ReferenceAssignment { accepted: string[]; rejected: RejectedReference[]; }`
   - `function explainShotReferences(shot: Shot, project: { assets: Asset[]; styleReferenceUrl?: string }): ReferenceAssignment`
 
-- [ ] **Step 1: 写失败测试**
+- [x] **Step 1: 写失败测试**
 
 ```ts
 // tests/lib/referencePlan.test.ts
@@ -1343,9 +1343,9 @@ describe("explainShotReferences", () => {
 });
 ```
 
-- [ ] **Step 2: 跑测试确认失败** Expected: FAIL（`referencePlan` 不存在 / `MAX_REFERENCES_BY_SIZE` 已导出但 `MAX_TOTAL_REFERENCES` 私有不影响）
+- [x] **Step 2: 跑测试确认失败** Expected: FAIL（`referencePlan` 不存在 / `MAX_REFERENCES_BY_SIZE` 已导出但 `MAX_TOTAL_REFERENCES` 私有不影响）
 
-- [ ] **Step 3: 实现（并把总数上限导出供 UI 用）**
+- [x] **Step 3: 实现（并把总数上限导出供 UI 用）**
 
 `src/lib/promptComposer.ts`：`const MAX_TOTAL_REFERENCES = 4;` → `export const MAX_TOTAL_REFERENCES = 4;`
 
@@ -1394,8 +1394,8 @@ export function explainShotReferences(
 
 > 若某条用例因 `used` 计数口径红，**以测试为准改本函数**（不得反向放宽测试去迁就实现），并在交付说明写清改了什么。
 
-- [ ] **Step 4: 跑测试确认通过** Expected: PASS（5 个用例）
-- [ ] **Step 5: 全量验证 + 提交**
+- [x] **Step 4: 跑测试确认通过** Expected: PASS（5 个用例）
+- [x] **Step 5: 全量验证 + 提交**
 
 ```bash
 npx tsc --noEmit && git diff --check && npm run test && npm run build
@@ -1986,3 +1986,5 @@ Task 15 是本计划唯一允许改 AGENTS.md / README / docs 口径的任务，
 | 棒 | 任务 | commit | 测试（文件/用例） | 未验证 / 待目测 |
 |---|---|---|---|---|
 | 1（P0） | Task 1-3 | `164172b` / `1e01543` / `f136c45` | 46 文件 / 550 用例（基线 44 / 530；净增 themeTokens 6 + mediaLayout 14） | 全部为界面观感项，待用户本地目测：浅色层级分档、三页画幅版式（9:16 卡头缩略图为窄条、图片页展开后主图 58vh 变高）；未做浏览器验证（本仓库禁用） |
+| 2（P1） | Task 4-6 | `df8f5f8` / `533b3a4` / `1497cf5` | 46 文件 / 550 用例（本期纯 markup 收敛，零新增用例，基线不减） | 行为不变自查三条已跑：Task 4 → `OK：无行为改动`；Task 5 → 仅 `onClick={handleGenerateStoryboard}` 成对搬运（缩进变化）；Task 6 → `git diff -- CreationWizard.tsx` 为空。现场偏差 4 处：① 分镜页错误框吃局部 `error` state（计划写的 `project?.error` 与现场不符）；② ReviewCheckpoint 的 disabled 定为 `failedShots.length > 0 \|\| confirmDisabled`（计划原式 `confirmDisabled ?? false` 会让图片页在有失败镜头时解禁确认键 = 门禁回归）；③ 资产页卡点另加 `confirmPending` / `confirmPendingLabelKey` / `footer` 三个纯展示入参，否则「正在生成分镜」转圈、按钮换文案与两条尾注会在收敛中丢失；④ 分镜页 wizard.step2→step3 连空态分支一并修（同类缺陷） |
+| 3 前半（P2） | Task 7-10 | `9749af2` / `8bf4bbe` / `d32b21e` / `8d4cdb5` | 50 文件 / 569 用例（净增 railSelection 4 + shotDisplay 3 + firstFrameSource 7 + referencePlan 5，均实测值） | i18n 另导出 `zh` / `en` 供回归断言，新增 shotSize 6 键 + videoPlan.firstFrame 12 键（zh/en 同步）。现场偏差：`explainShotReferences` 的候选资格改为与 `pickShotReferences` 完全同口径（角色 `type==="character"` 且 `imageUrl ?? avatarUrl` 兜底、产品与角色共用 characters 额度）——计划原式的 `find(a => a.id === id)` 会让解释器与真实请求分叉。构建产物 gzip：JS 207.11→207.99 kB、CSS 7.98→7.98 kB（棒 1 结束 → 本期结束） |
