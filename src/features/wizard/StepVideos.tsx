@@ -1,21 +1,31 @@
 // ────────────────────────────────────────────────────────────────────────────
 // src/features/wizard/StepVideos.tsx
 // Step 5: Generate videos for all shots, with dual-frame control.
+// 2026-09-24 双栏改造：左镜头轨 + 右常驻详情（播放器、镜级进度、衔接解释、首尾帧控制）。
+// ⚠ 页面继续在组件内部渲染 WizardShell，不得加 key：重挂载会让下方自动生成
+// effect 再跑一次批量视频任务（按秒计费）。
+// ⚠ 衔接解释只读：绝不把 planShotContinuity / tailFrame 的结果写回
+// useDualFrame / lastFrameUrl —— 写回属 MOTION 字段变更，会清空已生成视频。
 // ────────────────────────────────────────────────────────────────────────────
 
 import { useEffect, useState, useRef } from "react";
 import { useProjectStore, selectActiveProject } from "@/stores/projectStore";
 import { useSettingsStore } from "@/stores/settingsStore";
 import { useT } from "@/i18n";
-import { ShotCard } from "./ShotCard";
 import { PromptSubFields } from "./PromptSubFields";
 import { DualFrameToggle } from "./DualFrameToggle";
 import { Lightbox } from "@/components/ui/Lightbox";
 import { useWizardActions } from "./useWizardActions";
 import { pendingVideoShots } from "@/lib/shotQueue";
-import { MEDIA_FRAME, SHELL_CONTAINER_CLASS, placeholderClass, resolveAspect } from "@/lib/mediaLayout";
+import { MEDIA_FRAME, placeholderClass, resolveAspect } from "@/lib/mediaLayout";
+import { syncSelectionWithShots } from "@/lib/railSelection";
+import { describeFirstFrameSource, firstFrameSourceKey } from "@/lib/firstFrameSource";
+import { snapshotTailFrames } from "@/lib/tailFrameStore";
 import { StepProgressBar } from "./StepProgressBar";
 import { StepHeader } from "./StepHeader";
+import { WizardShell } from "./WizardShell";
+import { WizardRail } from "./WizardRail";
+import { WizardMessages } from "./WizardMessages";
 import { confirmDialog } from "@/components/ui/ConfirmDialog";
 import { RefreshCw } from "lucide-react";
 
@@ -24,6 +34,7 @@ export function StepVideos() {
   const project = useProjectStore(selectActiveProject);
   const aspect = resolveAspect(project?.aspectRatio);
   const plan = useSettingsStore((s) => s.providerConfig.plan);
+  const videoConsistency = useSettingsStore((s) => s.videoConsistency);
   const setWizardStep = useProjectStore((s) => s.setWizardStep);
   const { generateVideosForStep, rerollVideo } = useWizardActions();
 
@@ -40,6 +51,12 @@ export function StepVideos() {
   // 成本预估：成片总时长 + 待生成视频的配额消耗（时长秒数）
   const totalDuration = shots.reduce((sum, s) => sum + (s.duration || 0), 0);
   const pendingSeconds = pending.reduce((sum, s) => sum + (s.duration || 0), 0);
+
+  // 双栏选中态：页面局部，不持久化（设计稿 §16 决策 2）
+  const [currentShotId, setCurrentShotId] = useState<string | undefined>(undefined);
+  const [railCompact, setRailCompact] = useState(false);
+  const currentId = syncSelectionWithShots(shots.map((s) => s.id), currentShotId);
+  const current = shots.find((s) => s.id === currentId);
 
   // 生成完成 toast：allVideoed 从 false→true 时短暂提示
   const [showDoneToast, setShowDoneToast] = useState(false);
@@ -78,167 +95,211 @@ export function StepVideos() {
     }
   }, [allVideoed, project?.id, project?.automationMode, setWizardStep]);
 
+  // 首帧来源解释：与 videoPlan 的素材决策同源（都走 shotContinuity 闸门），只读不写回
+  const firstFrameSource = current && project
+    ? describeFirstFrameSource({
+        shotId: current.id,
+        shots: project.shots.map((s) => ({
+          id: s.id,
+          index: s.index,
+          imageUrl: s.imageUrl,
+          activeSceneId: s.activeSceneId,
+          activeCharacterIds: s.activeCharacterIds,
+          shotSize: s.shotSize,
+        })),
+        useDualFrame: current.useDualFrame,
+        lastFrameUrl: current.lastFrameUrl,
+        consistency: videoConsistency,
+        tailFrames: snapshotTailFrames(),
+      })
+    : null;
+  const handoffIndex = firstFrameSource?.kind === "handoff"
+    ? shots.find((s) => s.id === firstFrameSource.fromShotId)?.index
+    : undefined;
+
   return (
-    <div className={SHELL_CONTAINER_CLASS}>
-      <StepHeader
-        titleKey="wizard.step5"
-        done={videoedCount}
-        total={shots.length}
-        actions={<>
-          {generatingCount > 0 && (
-            <span className="flex items-center gap-1 text-[0.6875rem] text-warn">
-              <RefreshCw size={11} className="animate-spin" />
-              {generatingCount} {t("wizard.generating")}
-            </span>
-          )}
-          {queueCount > 0 && (
-            <span className="text-[0.6875rem] text-ink-4">
-              {t("wizard.queueCount", { count: queueCount })} ·{" "}
-              {t(plan === "default" ? "wizard.queueHintDefault" : "wizard.queueHintFaster")}
-            </span>
-          )}
-          {pendingCount > 0 && (
+    <WizardShell
+      header={<>
+        <StepHeader
+          titleKey="wizard.step5"
+          done={videoedCount}
+          total={shots.length}
+          actions={<>
+            {generatingCount > 0 && (
+              <span className="flex items-center gap-1 text-[0.6875rem] text-warn">
+                <RefreshCw size={11} className="animate-spin" />
+                {generatingCount} {t("wizard.generating")}
+              </span>
+            )}
+            {queueCount > 0 && (
+              <span className="text-[0.6875rem] text-ink-4">
+                {t("wizard.queueCount", { count: queueCount })} ·{" "}
+                {t(plan === "default" ? "wizard.queueHintDefault" : "wizard.queueHintFaster")}
+              </span>
+            )}
+            {pendingCount > 0 && (
+              <button
+                onClick={() => generateVideosForStep()}
+                disabled={generatingCount > 0}
+                className={`flex items-center gap-1 rounded px-2 py-1 text-[0.6875rem] transition disabled:opacity-50 ${
+                  failedCount > 0 ? "text-danger hover:bg-danger-deep/30" : "text-warn hover:bg-warn-deep/30"
+                }`}
+                title={t("wizard.retryPendingHint")}
+              >
+                <RefreshCw size={11} />
+                {t(failedCount > 0 ? "wizard.retryFailed" : "wizard.retryPending")} ({pendingCount})
+              </button>
+            )}
             <button
-              onClick={() => generateVideosForStep()}
+              onClick={async () => {
+                // 全部重新生成：先确认成本（整套视频配额），再清空走批量生成（幂等 + 并发受控）
+                const ok = await confirmDialog({
+                  title: t("wizard.rerollAllConfirmTitle"),
+                  message: t("wizard.rerollAllVideosConfirm", { count: shots.filter((s) => !!s.videoUrl).length }),
+                  confirmLabel: t("dialog.confirm"),
+                  variant: "danger",
+                });
+                if (!ok) return;
+                const pid = project?.id;
+                if (!pid) return;
+                for (const s of shots) {
+                  if (s.videoUrl) {
+                    useProjectStore.getState().updateShotByProjectId(pid, s.id, {
+                      videoUrl: undefined,
+                      status: "imaged",
+                      videoProgress: 0,
+                    });
+                  }
+                }
+                generateVideosForStep();
+              }}
               disabled={generatingCount > 0}
-              className={`flex items-center gap-1 rounded px-2 py-1 text-[0.6875rem] transition disabled:opacity-50 ${
-                failedCount > 0 ? "text-danger hover:bg-danger-deep/30" : "text-warn hover:bg-warn-deep/30"
-              }`}
-              title={t("wizard.retryPendingHint")}
+              className="flex items-center gap-1 rounded px-2 py-1 text-[0.6875rem] text-success hover:bg-success-deep/30 transition disabled:opacity-50"
             >
               <RefreshCw size={11} />
-              {t(failedCount > 0 ? "wizard.retryFailed" : "wizard.retryPending")} ({pendingCount})
+              {t("wizard.rerollAll")}
             </button>
+          </>}
+        />
+
+        {/* 成本预估：成片总时长 + 待生成视频配额消耗 */}
+        <div className="flex flex-wrap gap-x-4 gap-y-1 text-[0.6875rem] text-ink-4">
+          <span>{t("wizard.videoDurationEstimate", { seconds: totalDuration })}</span>
+          {pendingSeconds > 0 && (
+            <span className="text-warn/80">
+              {t("wizard.videoQuotaEstimate", { seconds: pendingSeconds })}
+            </span>
           )}
-          <button
-            onClick={async () => {
-              // 全部重新生成：先确认成本（整套视频配额），再清空走批量生成（幂等 + 并发受控）
-              const ok = await confirmDialog({
-                title: t("wizard.rerollAllConfirmTitle"),
-                message: t("wizard.rerollAllVideosConfirm", { count: shots.filter((s) => !!s.videoUrl).length }),
-                confirmLabel: t("dialog.confirm"),
-                variant: "danger",
-              });
-              if (!ok) return;
-              const pid = project?.id;
-              if (!pid) return;
-              for (const s of shots) {
-                if (s.videoUrl) {
-                  useProjectStore.getState().updateShotByProjectId(pid, s.id, {
-                    videoUrl: undefined,
-                    status: "imaged",
-                    videoProgress: 0,
-                  });
-                }
-              }
-              generateVideosForStep();
-            }}
-            disabled={generatingCount > 0}
-            className="flex items-center gap-1 rounded px-2 py-1 text-[0.6875rem] text-success hover:bg-success-deep/30 transition disabled:opacity-50"
-          >
-            <RefreshCw size={11} />
-            {t("wizard.rerollAll")}
-          </button>
-        </>}
-      />
-
-      {/* 成本预估：成片总时长 + 待生成视频配额消耗 */}
-      <div className="flex flex-wrap gap-x-4 gap-y-1 text-[0.6875rem] text-ink-4">
-        <span>{t("wizard.videoDurationEstimate", { seconds: totalDuration })}</span>
-        {pendingSeconds > 0 && (
-          <span className="text-warn/80">
-            {t("wizard.videoQuotaEstimate", { seconds: pendingSeconds })}
-          </span>
-        )}
-      </div>
-
-      {/* 步骤级进度条（语义色与图片页统一为 accent） */}
-      <StepProgressBar done={videoedCount} total={shots.length} />
-
-      {/* 生成完成 toast */}
-      {showDoneToast && (
-        <div className="rounded-lg border border-success bg-success-deep/40 px-4 py-2.5 text-center text-xs text-success">
-          ✓ {t("wizard.videosDone")}
         </div>
-      )}
 
-      <div className="flex flex-col gap-2">
-        {shots.map((shot) => (
-          <ShotCard
-            key={shot.id}
-            shot={shot}
-            mode="video"
-            aspect={aspect}
-            onReroll={() => rerollVideo(shot.id)}
-            isGenerating={shot.status === "videoing"}
-          >
-            <div className="flex gap-2">
-              {shot.imageUrl && (
-                <Lightbox src={shot.imageUrl} alt={`Ref ${shot.index + 1}`}>
-                  <div className={`${MEDIA_FRAME.detailSecondary[aspect].containerClass} shrink-0 overflow-hidden rounded-md border border-line`}>
-                    <img
-                      src={shot.imageUrl}
-                      alt={`Ref ${shot.index + 1}`}
-                      className={MEDIA_FRAME.detailSecondary[aspect].mediaClass}
-                    />
-                  </div>
-                </Lightbox>
-              )}
-              {shot.videoUrl ? (
-                <div className={`${MEDIA_FRAME.detailPrimary[aspect].containerClass} overflow-hidden rounded-md border border-line bg-surface`}>
-                  <video
-                    src={shot.videoUrl}
-                    controls
-                    loop
-                    className={`${MEDIA_FRAME.detailPrimary[aspect].mediaClass} bg-app`}
+        {/* 步骤级进度条（语义色与图片页统一为 accent） */}
+        <StepProgressBar done={videoedCount} total={shots.length} />
+
+        {/* 生成完成 toast */}
+        {showDoneToast && (
+          <div className="rounded-lg border border-success bg-success-deep/40 px-4 py-2.5 text-center text-xs text-success">
+            ✓ {t("wizard.videosDone")}
+          </div>
+        )}
+      </>}
+      rail={
+        <WizardRail
+          shots={shots}
+          currentId={currentId}
+          onSelect={setCurrentShotId}
+          aspect={aspect}
+          mode="video"
+          pendingIds={pending.map((s) => s.id)}
+          compact={railCompact}
+          onToggleCompact={() => setRailCompact((v) => !v)}
+        />
+      }
+      detail={current && firstFrameSource ? (
+        <div key={current.id} className="flex flex-col gap-3">
+          {/* 衔接解释：说清本镜首帧从哪来、为什么没接上 */}
+          <p className="text-[0.6875rem] text-ink-3">
+            {t(firstFrameSourceKey(firstFrameSource), handoffIndex === undefined ? {} : { index: handoffIndex + 1 })}
+          </p>
+
+          <div className="flex gap-2">
+            {current.imageUrl && (
+              <Lightbox src={current.imageUrl} alt={`Ref ${current.index + 1}`}>
+                <div className={`${MEDIA_FRAME.detailSecondary[aspect].containerClass} shrink-0 overflow-hidden rounded-md border border-line`}>
+                  <img
+                    src={current.imageUrl}
+                    alt={`Ref ${current.index + 1}`}
+                    className={MEDIA_FRAME.detailSecondary[aspect].mediaClass}
                   />
                 </div>
-              ) : shot.status === "videoing" ? (
-                <div className={`${placeholderClass(aspect)} border-warn bg-warn-deep/10`}>
-                  <div className="flex flex-col items-center gap-1">
-                    <div className="h-1.5 w-20 overflow-hidden rounded-full bg-raised">
-                      <div
-                        className="h-full rounded-full bg-warn-solid transition-all duration-500"
-                        style={{ width: `${shot.videoProgress ?? 0}%` }}
-                      />
-                    </div>
-                    <span className="text-[0.625rem] text-warn">
-                      {shot.videoProgress ?? 0}%
-                    </span>
-                    {shot.videoRetryCount && shot.videoRetryCount > 0 && (
-                      <span className="text-[0.5625rem] text-ink-4">
-                        Retry {shot.videoRetryCount}/3
-                      </span>
-                    )}
+              </Lightbox>
+            )}
+            {current.videoUrl ? (
+              <div className={`${MEDIA_FRAME.detailPrimary[aspect].containerClass} overflow-hidden rounded-md border border-line bg-surface`}>
+                <video
+                  src={current.videoUrl}
+                  controls
+                  loop
+                  className={`${MEDIA_FRAME.detailPrimary[aspect].mediaClass} bg-app`}
+                />
+              </div>
+            ) : current.status === "videoing" ? (
+              <div className={`${placeholderClass(aspect)} border-warn bg-warn-deep/10`}>
+                <div className="flex flex-col items-center gap-1">
+                  <div className="h-1.5 w-20 overflow-hidden rounded-full bg-raised">
+                    <div
+                      className="h-full rounded-full bg-warn-solid transition-all duration-500"
+                      style={{ width: `${current.videoProgress ?? 0}%` }}
+                    />
                   </div>
+                  <span className="text-[0.625rem] text-warn">
+                    {current.videoProgress ?? 0}%
+                  </span>
+                  {current.videoRetryCount && current.videoRetryCount > 0 && (
+                    <span className="text-[0.5625rem] text-ink-4">
+                      Retry {current.videoRetryCount}
+                    </span>
+                  )}
                 </div>
-              ) : (
-                <div className={`${placeholderClass(aspect)} border-line bg-raised/30`}>
-                  <span className="text-[0.625rem] text-ink-5">{t("wizard.waiting")}</span>
-                </div>
-              )}
-            </div>
+              </div>
+            ) : (
+              <div className={`${placeholderClass(aspect)} border-line bg-raised/30`}>
+                <span className="text-[0.625rem] text-ink-5">{t("wizard.waiting")}</span>
+              </div>
+            )}
+          </div>
 
-            <PromptSubFields shotId={shot.id} sections={["motion"]} />
+          <PromptSubFields shotId={current.id} sections={["motion"]} />
 
-            {/* 首尾帧控制 */}
-            <DualFrameToggle shot={shot} />
-          </ShotCard>
-        ))}
-      </div>
+          {/* 首尾帧控制 */}
+          <DualFrameToggle shot={current} />
 
-      {allVideoed && (
-        <div className="flex items-center justify-between gap-3 rounded-xl border border-success/40 bg-success-deep/30 px-4 py-3">
-          <span className="text-xs text-ink-2">✓ {t("wizard.allReady")}</span>
+          <WizardMessages error={current.error} />
+        </div>
+      ) : (
+        <p className="text-xs text-ink-4">{t("rail.empty")}</p>
+      )}
+      detailActions={current ? (
+        <>
           <button
             type="button"
-            onClick={() => setWizardStep(6)}
-            className="flex items-center gap-1.5 rounded-md bg-success-solid px-4 py-1.5 text-xs font-medium text-white transition hover:bg-success-solid"
+            onClick={() => rerollVideo(current.id)}
+            disabled={current.status === "videoing"}
+            className="flex items-center gap-1 rounded-md border border-line px-3 py-1.5 text-xs text-success transition hover:bg-success-deep/30 disabled:opacity-50"
           >
-            {t("wizard.goAssembly")}
+            <RefreshCw size={11} className={current.status === "videoing" ? "animate-spin" : undefined} />
+            {t("wizard.reroll")}
           </button>
-        </div>
-      )}
-    </div>
+          {allVideoed && (
+            <button
+              type="button"
+              onClick={() => setWizardStep(6)}
+              className="flex items-center gap-1.5 rounded-md bg-success-solid px-4 py-1.5 text-xs font-medium text-white transition hover:bg-success-solid"
+            >
+              {t("wizard.goAssembly")}
+            </button>
+          )}
+        </>
+      ) : null}
+    />
   );
 }

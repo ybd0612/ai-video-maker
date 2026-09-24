@@ -8,17 +8,18 @@
 import { useEffect, useRef, useState } from "react";
 import { useProjectStore, selectActiveProject, type Asset, type Shot } from "@/stores/projectStore";
 import { useT, type TranslationKey } from "@/i18n";
-import { ShotListSection } from "./ShotListSection";
 import { ShotDetail } from "./ShotDetail";
 import { useWizardActions, hasActiveScriptTask } from "./useWizardActions";
 import { useSettingsStore } from "@/stores/settingsStore";
-import { SHELL_CONTAINER_CLASS } from "@/lib/mediaLayout";
+import { syncSelectionWithShots } from "@/lib/railSelection";
 import { WizardMessages } from "./WizardMessages";
 import { StepProgressBar } from "./StepProgressBar";
 import { StepHeader } from "./StepHeader";
 import { ReviewCheckpoint } from "./ReviewCheckpoint";
+import { WizardShell } from "./WizardShell";
+import { WizardRail } from "./WizardRail";
 import { confirmDialog } from "@/components/ui/ConfirmDialog";
-import { Sparkles, Loader2 } from "lucide-react";
+import { Sparkles, Loader2, Plus, Trash2 } from "lucide-react";
 
 export function StepStoryboard() {
   const t = useT();
@@ -42,7 +43,10 @@ export function StepStoryboard() {
   const allShotsHaveVisualPrompt = shots.length > 0 && shots.every((shot) => shot.visualPrompt.trim());
   // 「生成中」以 store 为准：从资产页切进来时任务已在飞，只靠局部 isGenerating 会漏判
   const generating = isGenerating || shots.some((shot) => shot.status === "scripting");
-  const editingShot = editingShotId ? shots.find((shot) => shot.id === editingShotId) ?? null : null;
+  const [railCompact, setRailCompact] = useState(false);
+  // 双栏选中态（页面局部，不持久化）：选中项被删除时回落首镜，不留悬空选中
+  const currentId = syncSelectionWithShots(shots.map((shot) => shot.id), editingShotId ?? undefined);
+  const editingShot = shots.find((shot) => shot.id === currentId) ?? null;
 
   const handleGenerateStoryboard = async () => {
     if (!ideaPrompt.trim() || !project) return;
@@ -135,20 +139,6 @@ export function StepStoryboard() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [shots.length, ideaPromptTrimmed]);
 
-  // ── 详情视图（整页替换，与资产详情同一模式） ──────────────────────────
-  if (editingShot) {
-    return (
-      <ShotDetail
-        shot={editingShot}
-        assets={assets}
-        hasApiKey={hasApiKey}
-        onClose={() => setEditingShotId(null)}
-        onRevise={(instruction) => reviseShot(editingShot.id, instruction)}
-        onReroll={() => rerollShot(editingShot.id)}
-      />
-    );
-  }
-
   // Show generate prompt when no shots exist
   if (shots.length === 0) {
     return (
@@ -199,55 +189,86 @@ export function StepStoryboard() {
   }
 
   return (
-    <div className={SHELL_CONTAINER_CLASS}>
-      {/* Header：标题键从 wizard.step2（「资产」）纠正为 wizard.step3 */}
-      <StepHeader
-        titleKey="wizard.step3"
-        done={scriptedCount}
-        total={shots.length}
-        actions={
-          <button
-            onClick={handleGenerateStoryboard}
-            disabled={generating}
-            className="flex items-center gap-1 rounded px-2 py-1 text-[0.6875rem] text-accent transition hover:bg-accent-deep/30 disabled:opacity-50"
-          >
-            {generating ? <Loader2 size={11} className="animate-spin" /> : <Sparkles size={11} />}
-            {generating ? t("wizard.generating") : t("wizard.reroll")}
-          </button>
-        }
-      />
+    <WizardShell
+      header={<>
+        <StepHeader
+          titleKey="wizard.step3"
+          done={scriptedCount}
+          total={shots.length}
+          actions={
+            <button
+              onClick={handleGenerateStoryboard}
+              disabled={generating}
+              className="flex items-center gap-1 rounded px-2 py-1 text-[0.6875rem] text-accent transition hover:bg-accent-deep/30 disabled:opacity-50"
+            >
+              {generating ? <Loader2 size={11} className="animate-spin" /> : <Sparkles size={11} />}
+              {generating ? t("wizard.generating") : t("wizard.reroll")}
+            </button>
+          }
+        />
 
-      {/* 完成度：与 canAdvance 步骤 3 同一口径（scriptText 非空） */}
-      <StepProgressBar done={scriptedCount} total={shots.length} />
+        {/* 完成度：与 canAdvance 步骤 3 同一口径（scriptText 非空） */}
+        <StepProgressBar done={scriptedCount} total={shots.length} />
 
-      {/* 资产摘要：常驻显示，让用户感知分镜生成时自动提取的资产 */}
-      <AssetSummaryBar assets={assets} t={t} styleReady={!!project?.styleReferenceUrl} />
-
-      {/* Shot list：整卡点击进入详情 */}
-      <ShotListSection
-        shots={shots}
-        emptyHint={t("shotList.emptyHint")}
-        addLabel={t("wizard.addShot")}
-        deleteLabel={t("dialog.delete")}
-        onOpen={(shot) => setEditingShotId(shot.id)}
-        onDelete={(shot) => void handleDeleteShot(shot)}
-        onAdd={handleAddShot}
-      />
-
-      <WizardMessages error={error} />
-
-      {/* 分镜确认卡：semi-auto 模式下确认后进入图片生成（auto 模式由组件内部跳过） */}
-      <ReviewCheckpoint
-        mode={project?.automationMode ?? "semi-auto"}
-        hintKey="wizard.storyboardConfirmHint"
-        confirmLabelKey="wizard.confirmStoryboard"
-        confirmDisabled={!allShotsHaveScript || !allShotsHaveVisualPrompt}
-        onConfirm={() => {
-          updateProject({ storyboardReviewed: true });
-          setWizardStep(4);
-        }}
-      />
-    </div>
+        {/* 资产摘要：常驻显示，让用户感知分镜生成时自动提取的资产 */}
+        <AssetSummaryBar assets={assets} t={t} styleReady={!!project?.styleReferenceUrl} />
+      </>}
+      rail={
+        <WizardRail
+          shots={shots}
+          currentId={currentId}
+          onSelect={setEditingShotId}
+          aspect={project?.aspectRatio}
+          mode="storyboard"
+          compact={railCompact}
+          onToggleCompact={() => setRailCompact((v) => !v)}
+          footer={
+            <button
+              onClick={handleAddShot}
+              className="flex items-center justify-center gap-2 rounded-xl border border-dashed border-line-strong bg-raised/30 px-4 py-2 text-xs text-ink-3 transition hover:border-success hover:text-success"
+            >
+              <Plus size={14} />
+              {t("wizard.addShot")}
+            </button>
+          }
+        />
+      }
+      detail={editingShot ? (
+        <div key={editingShot.id} className="flex min-h-0 flex-1 flex-col gap-3">
+          <ShotDetail
+            shot={editingShot}
+            assets={assets}
+            hasApiKey={hasApiKey}
+            onClose={() => setEditingShotId(shots[0]?.id ?? null)}
+            onRevise={(instruction) => reviseShot(editingShot.id, instruction)}
+            onReroll={() => rerollShot(editingShot.id)}
+          />
+          <WizardMessages error={error} />
+          {/* 分镜确认卡：semi-auto 模式下确认后进入图片生成（auto 模式由组件内部跳过） */}
+          <ReviewCheckpoint
+            mode={project?.automationMode ?? "semi-auto"}
+            hintKey="wizard.storyboardConfirmHint"
+            confirmLabelKey="wizard.confirmStoryboard"
+            confirmDisabled={!allShotsHaveScript || !allShotsHaveVisualPrompt}
+            onConfirm={() => {
+              updateProject({ storyboardReviewed: true });
+              setWizardStep(4);
+            }}
+          />
+        </div>
+      ) : (
+        <p className="text-xs text-ink-4">{t("rail.empty")}</p>
+      )}
+      detailActions={editingShot ? (
+        <button
+          onClick={() => void handleDeleteShot(editingShot)}
+          className="flex items-center gap-1 rounded-md border border-line px-3 py-1.5 text-xs text-danger transition hover:bg-danger-deep/30"
+        >
+          <Trash2 size={11} />
+          {t("dialog.delete")}
+        </button>
+      ) : null}
+    />
   );
 }
 
