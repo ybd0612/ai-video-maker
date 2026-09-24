@@ -15,6 +15,7 @@ import { useSettingsStore } from "@/stores/settingsStore";
 import { SHELL_CONTAINER_CLASS } from "@/lib/mediaLayout";
 import { WizardMessages } from "./WizardMessages";
 import { StepProgressBar } from "./StepProgressBar";
+import { StepHeader } from "./StepHeader";
 import { confirmDialog } from "@/components/ui/ConfirmDialog";
 import { Sparkles, Loader2 } from "lucide-react";
 
@@ -35,6 +36,8 @@ export function StepStoryboard() {
   const assets = project?.assets ?? [];
   const ideaPrompt = project?.ideaPrompt ?? "";
   const allShotsHaveScript = shots.length > 0 && shots.every((shot) => shot.scriptText.trim());
+  // 分镜完成度唯一口径：与 allShotsHaveScript / canAdvance 步骤 3 同源
+  const scriptedCount = shots.filter((shot) => shot.scriptText.trim()).length;
   const allShotsHaveVisualPrompt = shots.length > 0 && shots.every((shot) => shot.visualPrompt.trim());
   // 「生成中」以 store 为准：从资产页切进来时任务已在飞，只靠局部 isGenerating 会漏判
   const generating = isGenerating || shots.some((shot) => shot.status === "scripting");
@@ -151,7 +154,7 @@ export function StepStoryboard() {
       <div className="mx-auto flex max-w-2xl flex-col items-center gap-6 py-16">
         <div className="text-center">
           <h2 className="text-lg font-bold text-ink">
-            {t("wizard.step2")}
+            {t("wizard.step3")}
           </h2>
           <p className="mt-2 text-xs text-ink-4">
             {t("wizard.storyboardHint")}
@@ -196,23 +199,25 @@ export function StepStoryboard() {
 
   return (
     <div className={SHELL_CONTAINER_CLASS}>
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <h2 className="text-sm font-bold text-ink">
-          {t("wizard.step2")} ({shots.length})
-        </h2>
-        <button
-          onClick={handleGenerateStoryboard}
-          disabled={generating}
-          className="flex items-center gap-1 rounded px-2 py-1 text-[0.6875rem] text-accent transition hover:bg-accent-deep/30 disabled:opacity-50"
-        >
-          {generating ? <Loader2 size={11} className="animate-spin" /> : <Sparkles size={11} />}
-          {generating ? t("wizard.generating") : t("wizard.reroll")}
-        </button>
-      </div>
+      {/* Header：标题键从 wizard.step2（「资产」）纠正为 wizard.step3 */}
+      <StepHeader
+        titleKey="wizard.step3"
+        done={scriptedCount}
+        total={shots.length}
+        actions={
+          <button
+            onClick={handleGenerateStoryboard}
+            disabled={generating}
+            className="flex items-center gap-1 rounded px-2 py-1 text-[0.6875rem] text-accent transition hover:bg-accent-deep/30 disabled:opacity-50"
+          >
+            {generating ? <Loader2 size={11} className="animate-spin" /> : <Sparkles size={11} />}
+            {generating ? t("wizard.generating") : t("wizard.reroll")}
+          </button>
+        }
+      />
 
       {/* 完成度：与 canAdvance 步骤 3 同一口径（scriptText 非空） */}
-      <StepProgressBar done={shots.filter((s) => s.scriptText.trim()).length} total={shots.length} />
+      <StepProgressBar done={scriptedCount} total={shots.length} />
 
       {/* 资产摘要：常驻显示，让用户感知分镜生成时自动提取的资产 */}
       <AssetSummaryBar assets={assets} t={t} styleReady={!!project?.styleReferenceUrl} />

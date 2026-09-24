@@ -15,6 +15,7 @@ import { useWizardActions } from "./useWizardActions";
 import { pendingVideoShots } from "@/lib/shotQueue";
 import { MEDIA_FRAME, SHELL_CONTAINER_CLASS, placeholderClass, resolveAspect } from "@/lib/mediaLayout";
 import { StepProgressBar } from "./StepProgressBar";
+import { StepHeader } from "./StepHeader";
 import { confirmDialog } from "@/components/ui/ConfirmDialog";
 import { RefreshCw } from "lucide-react";
 
@@ -79,11 +80,11 @@ export function StepVideos() {
 
   return (
     <div className={SHELL_CONTAINER_CLASS}>
-      <div className="flex items-center justify-between">
-        <h2 className="text-sm font-bold text-ink">
-          {t("wizard.step5")} ({videoedCount}/{shots.length})
-        </h2>
-        <div className="flex items-center gap-2">
+      <StepHeader
+        titleKey="wizard.step5"
+        done={videoedCount}
+        total={shots.length}
+        actions={<>
           {generatingCount > 0 && (
             <span className="flex items-center gap-1 text-[0.6875rem] text-warn">
               <RefreshCw size={11} className="animate-spin" />
@@ -138,8 +139,8 @@ export function StepVideos() {
             <RefreshCw size={11} />
             {t("wizard.rerollAll")}
           </button>
-        </div>
-      </div>
+        </>}
+      />
 
       {/* 成本预估：成片总时长 + 待生成视频配额消耗 */}
       <div className="flex flex-wrap gap-x-4 gap-y-1 text-[0.6875rem] text-ink-4">

@@ -14,6 +14,7 @@ import { pendingImageShots, shotsWithoutVisualPrompt } from "@/lib/shotQueue";
 import { MEDIA_FRAME, SHELL_CONTAINER_CLASS, resolveAspect } from "@/lib/mediaLayout";
 import { ReviewCheckpoint } from "./ReviewCheckpoint";
 import { StepProgressBar } from "./StepProgressBar";
+import { StepHeader } from "./StepHeader";
 import { confirmDialog } from "@/components/ui/ConfirmDialog";
 import { RefreshCw } from "lucide-react";
 
@@ -63,11 +64,11 @@ export function StepImages() {
 
   return (
     <div className={SHELL_CONTAINER_CLASS}>
-      <div className="flex items-center justify-between">
-        <h2 className="text-sm font-bold text-ink">
-          {t("wizard.step4")} ({imagedCount}/{shots.length})
-        </h2>
-        <div className="flex items-center gap-2">
+      <StepHeader
+        titleKey="wizard.step4"
+        done={imagedCount}
+        total={shots.length}
+        actions={<>
           {generatingCount > 0 && (
             <span className="flex items-center gap-1 text-[0.6875rem] text-accent">
               <RefreshCw size={11} className="animate-spin" />
@@ -115,8 +116,8 @@ export function StepImages() {
             <RefreshCw size={11} />
             {t("wizard.rerollAll")}
           </button>
-        </div>
-      </div>
+        </>}
+      />
 
       {/* 待补做镜头（可能被失效规则清空过）：给出定点补做入口，避免整套重做 */}
       {pendingCount > 0 && generatingCount === 0 && (
