@@ -169,9 +169,9 @@ export function StepStoryboard() {
           className="flex items-center gap-2 rounded-xl bg-success-solid px-8 py-3 text-sm font-semibold text-white transition hover:bg-success-solid disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {generating ? (
-            <Loader2 size={16} className="animate-spin" />
+            <Loader2 className="h-4 w-4 animate-spin" />
           ) : (
-            <Sparkles size={16} />
+            <Sparkles className="h-4 w-4" />
           )}
           {generating ? t("wizard.generating") : t("wizard.generate")}
         </button>
@@ -201,7 +201,7 @@ export function StepStoryboard() {
               disabled={generating}
               className="flex items-center gap-1 rounded px-2 py-1 text-[0.6875rem] text-accent transition hover:bg-accent-deep/30 disabled:opacity-50"
             >
-              {generating ? <Loader2 size={11} className="animate-spin" /> : <Sparkles size={11} />}
+              {generating ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
               {generating ? t("wizard.generating") : t("wizard.reroll")}
             </button>
           }
@@ -227,7 +227,7 @@ export function StepStoryboard() {
               onClick={handleAddShot}
               className="flex items-center justify-center gap-2 rounded-xl border border-dashed border-line-strong bg-raised/30 px-4 py-2 text-xs text-ink-3 transition hover:border-success hover:text-success"
             >
-              <Plus size={14} />
+              <Plus className="h-3.5 w-3.5" />
               {t("wizard.addShot")}
             </button>
           }
@@ -264,7 +264,7 @@ export function StepStoryboard() {
           onClick={() => void handleDeleteShot(editingShot)}
           className="flex items-center gap-1 rounded-md border border-line px-3 py-1.5 text-xs text-danger transition hover:bg-danger-deep/30"
         >
-          <Trash2 size={11} />
+          <Trash2 className="h-3 w-3" />
           {t("dialog.delete")}
         </button>
       ) : null}

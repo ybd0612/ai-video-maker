@@ -17,13 +17,13 @@ export function WizardMessages({ notice, error }: WizardMessagesProps) {
     <div className="flex flex-col gap-2">
       {notice ? (
         <p className="flex items-start gap-2 rounded-lg border border-info/40 bg-info/10 px-3 py-2 text-xs text-ink-2">
-          <Info size={14} className="mt-0.5 shrink-0 text-info" />
+          <Info className="h-3.5 w-3.5 mt-0.5 shrink-0 text-info" />
           <span>{notice}</span>
         </p>
       ) : null}
       {error ? (
         <p className="flex items-start gap-2 rounded-lg border border-danger/50 bg-danger-deep/30 px-3 py-2 text-xs text-danger">
-          <AlertCircle size={14} className="mt-0.5 shrink-0" />
+          <AlertCircle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
           <span className="break-words">{error}</span>
         </p>
       ) : null}

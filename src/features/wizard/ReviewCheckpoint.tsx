@@ -77,7 +77,7 @@ export function ReviewCheckpoint({
               onClick={onRetryFailed}
               className="mt-2 flex items-center gap-1 rounded px-2 py-1 text-[0.6875rem] text-danger hover:bg-danger-deep/40 transition"
             >
-              <RefreshCw size={11} />
+              <RefreshCw className="h-3 w-3" />
               {t("review.retryFailedShots")}
             </button>
           )}
@@ -101,7 +101,7 @@ export function ReviewCheckpoint({
           disabled={failedShots.length > 0 || confirmDisabled}
           className="flex items-center gap-1.5 rounded-lg bg-success-solid px-4 py-2 text-sm font-medium text-white transition hover:bg-success-solid disabled:cursor-not-allowed disabled:opacity-50"
         >
-          {confirmPending && <Loader2 size={12} className="animate-spin" />}
+          {confirmPending && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
           {t(confirmPending && confirmPendingLabelKey ? confirmPendingLabelKey : (confirmLabelKey ?? "review.confirmImages"))}
         </button>
       </div>

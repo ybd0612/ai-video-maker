@@ -82,7 +82,7 @@ export function WizardRail({
               <span className="flex items-center justify-between px-0.5 text-[0.625rem] text-ink-4">
                 <span>{String(shot.index + 1).padStart(2, "0")}</span>
                 <span className={status.color}>
-                  <StatusIcon size={11} />
+                  <StatusIcon className="h-3 w-3" />
                 </span>
               </span>
 

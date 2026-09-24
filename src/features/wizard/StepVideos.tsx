@@ -128,7 +128,7 @@ export function StepVideos() {
           actions={<>
             {generatingCount > 0 && (
               <span className="flex items-center gap-1 text-[0.6875rem] text-warn">
-                <RefreshCw size={11} className="animate-spin" />
+                <RefreshCw className="h-3 w-3 animate-spin" />
                 {generatingCount} {t("wizard.generating")}
               </span>
             )}
@@ -147,7 +147,7 @@ export function StepVideos() {
                 }`}
                 title={t("wizard.retryPendingHint")}
               >
-                <RefreshCw size={11} />
+                <RefreshCw className="h-3 w-3" />
                 {t(failedCount > 0 ? "wizard.retryFailed" : "wizard.retryPending")} ({pendingCount})
               </button>
             )}
@@ -177,7 +177,7 @@ export function StepVideos() {
               disabled={generatingCount > 0}
               className="flex items-center gap-1 rounded px-2 py-1 text-[0.6875rem] text-success hover:bg-success-deep/30 transition disabled:opacity-50"
             >
-              <RefreshCw size={11} />
+              <RefreshCw className="h-3 w-3" />
               {t("wizard.rerollAll")}
             </button>
           </>}
@@ -288,7 +288,7 @@ export function StepVideos() {
             disabled={current.status === "videoing"}
             className="flex items-center gap-1 rounded-md border border-line px-3 py-1.5 text-xs text-success transition hover:bg-success-deep/30 disabled:opacity-50"
           >
-            <RefreshCw size={11} className={current.status === "videoing" ? "animate-spin" : undefined} />
+            <RefreshCw className={`h-3 w-3 ${current.status === "videoing" ? "animate-spin" : ""}`} />
             {t("wizard.reroll")}
           </button>
           {allVideoed && (

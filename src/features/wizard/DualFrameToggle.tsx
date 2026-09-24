@@ -41,7 +41,7 @@ export function DualFrameToggle({ shot }: DualFrameToggleProps) {
           className="h-3.5 w-3.5 rounded border-line-strong bg-raised text-warn focus:ring-warn focus:ring-offset-0"
         />
         <span className="flex items-center gap-1 text-[0.6875rem] text-ink-3">
-          <Film size={11} className="text-warn" />
+          <Film className="h-3 w-3 text-warn" />
           {t("wizard.useDualFrame")}
         </span>
       </label>

@@ -47,8 +47,7 @@ export function ExpandableSection({ title, text, children }: ExpandableSectionPr
         <span className="text-xs font-medium text-ink-2">{title}</span>
         {offerExpand && (
           <ChevronDown
-            size={14}
-            className={`shrink-0 text-ink-4 transition-transform duration-200 ${expanded ? "rotate-180" : ""}`}
+            className={`h-3.5 w-3.5 shrink-0 text-ink-4 transition-transform duration-200 ${expanded ? "rotate-180" : ""}`}
           />
         )}
       </div>
