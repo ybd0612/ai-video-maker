@@ -16,6 +16,7 @@ import { SHELL_CONTAINER_CLASS } from "@/lib/mediaLayout";
 import { WizardMessages } from "./WizardMessages";
 import { StepProgressBar } from "./StepProgressBar";
 import { StepHeader } from "./StepHeader";
+import { ReviewCheckpoint } from "./ReviewCheckpoint";
 import { confirmDialog } from "@/components/ui/ConfirmDialog";
 import { Sparkles, Loader2 } from "lucide-react";
 
@@ -235,27 +236,17 @@ export function StepStoryboard() {
 
       <WizardMessages error={error} />
 
-      {/* 分镜确认卡：semi-auto 模式下确认后进入图片生成（auto 模式已自动推进） */}
-      {project?.automationMode !== "auto" && (
-        <div className="rounded-xl border border-line bg-raised/50 p-6">
-          <h3 className="text-sm font-semibold text-ink">
-            {t("review.qualityCheck")}
-          </h3>
-          <p className="mt-2 text-xs text-ink-3">
-            {t("wizard.storyboardConfirmHint")}
-          </p>
-          <button
-            onClick={() => {
-              updateProject({ storyboardReviewed: true });
-              setWizardStep(4);
-            }}
-            disabled={!allShotsHaveScript || !allShotsHaveVisualPrompt}
-            className="mt-4 rounded-lg bg-success-solid px-4 py-2 text-sm font-medium text-white transition hover:bg-success-solid disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            {t("wizard.confirmStoryboard")}
-          </button>
-        </div>
-      )}
+      {/* 分镜确认卡：semi-auto 模式下确认后进入图片生成（auto 模式由组件内部跳过） */}
+      <ReviewCheckpoint
+        mode={project?.automationMode ?? "semi-auto"}
+        hintKey="wizard.storyboardConfirmHint"
+        confirmLabelKey="wizard.confirmStoryboard"
+        confirmDisabled={!allShotsHaveScript || !allShotsHaveVisualPrompt}
+        onConfirm={() => {
+          updateProject({ storyboardReviewed: true });
+          setWizardStep(4);
+        }}
+      />
     </div>
   );
 }

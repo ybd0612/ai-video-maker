@@ -228,8 +228,15 @@ export function StepVideos() {
       </div>
 
       {allVideoed && (
-        <div className="text-center text-success text-xs">
-          ✓ {t("wizard.allReady")}
+        <div className="flex items-center justify-between gap-3 rounded-xl border border-success/40 bg-success-deep/30 px-4 py-3">
+          <span className="text-xs text-ink-2">✓ {t("wizard.allReady")}</span>
+          <button
+            type="button"
+            onClick={() => setWizardStep(6)}
+            className="flex items-center gap-1.5 rounded-md bg-success-solid px-4 py-1.5 text-xs font-medium text-white transition hover:bg-success-solid"
+          >
+            {t("wizard.goAssembly")}
+          </button>
         </div>
       )}
     </div>

@@ -3,10 +3,11 @@
 // 审核卡点：semi-auto/manual 模式下图片生成完成后需确认才进入视频阶段
 // ────────────────────────────────────────────────────────────────────────────
 
-import { useT } from "@/i18n";
+import type { ReactNode } from "react";
+import { useT, type TranslationKey } from "@/i18n";
 import type { AutomationMode } from "@/stores/projectStore";
 import { getQuotaUsageSnapshot } from "@/services/rateLimit";
-import { RefreshCw } from "lucide-react";
+import { RefreshCw, Loader2 } from "lucide-react";
 
 interface FailedShotInfo {
   index: number;
@@ -20,9 +21,24 @@ interface ReviewCheckpointProps {
   failedShots?: FailedShotInfo[];
   /** 重试失败镜头的入口（通常指向批量生成函数） */
   onRetryFailed?: () => void;
+  /** 三页原本各写一份中文：标题 / 提示 / 确认按钮的文案键 */
+  titleKey?: TranslationKey;
+  hintKey?: TranslationKey;
+  confirmLabelKey?: TranslationKey;
+  /** 自定义禁用条件：分镜要的是"脚本与画面提示词齐备"，与图片步的 allSettled 不同 */
+  confirmDisabled?: boolean;
+  /** 确认动作正在进行（资产页要转圈并换按钮文案，避免重复触发分镜生成） */
+  confirmPending?: boolean;
+  confirmPendingLabelKey?: TranslationKey;
+  /** 卡内按钮之后的附加说明 / 错误行 */
+  footer?: ReactNode;
 }
 
-export function ReviewCheckpoint({ mode, onConfirm, failedShots = [], onRetryFailed }: ReviewCheckpointProps) {
+export function ReviewCheckpoint({
+  mode, onConfirm, failedShots = [], onRetryFailed,
+  titleKey, hintKey, confirmLabelKey, confirmDisabled = false,
+  confirmPending = false, confirmPendingLabelKey, footer,
+}: ReviewCheckpointProps) {
   const t = useT();
 
   // 全自动模式下自动跳过审核
@@ -35,10 +51,10 @@ export function ReviewCheckpoint({ mode, onConfirm, failedShots = [], onRetryFai
   return (
     <div className="rounded-xl border border-line bg-raised/50 p-6">
       <h3 className="text-lg font-semibold text-ink">
-        {t("review.qualityCheck")}
+        {t(titleKey ?? "review.qualityCheck")}
       </h3>
       <p className="mt-2 text-sm text-ink-3">
-        {t("review.hint")}
+        {t(hintKey ?? "review.hint")}
       </p>
 
       {failedShots.length > 0 && (
@@ -82,12 +98,15 @@ export function ReviewCheckpoint({ mode, onConfirm, failedShots = [], onRetryFai
       <div className="mt-4">
         <button
           onClick={onConfirm}
-          disabled={failedShots.length > 0}
-          className="rounded-lg bg-success-solid px-4 py-2 text-sm font-medium text-white transition hover:bg-success-solid disabled:cursor-not-allowed disabled:opacity-50"
+          disabled={failedShots.length > 0 || confirmDisabled}
+          className="flex items-center gap-1.5 rounded-lg bg-success-solid px-4 py-2 text-sm font-medium text-white transition hover:bg-success-solid disabled:cursor-not-allowed disabled:opacity-50"
         >
-          {t("review.confirmImages")}
+          {confirmPending && <Loader2 size={12} className="animate-spin" />}
+          {t(confirmPending && confirmPendingLabelKey ? confirmPendingLabelKey : (confirmLabelKey ?? "review.confirmImages"))}
         </button>
       </div>
+
+      {footer}
     </div>
   );
 }

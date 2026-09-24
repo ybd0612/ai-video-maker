@@ -17,6 +17,7 @@ import { CharacterEditor } from "@/features/characters/CharacterEditor";
 import { AssetListSection } from "./AssetListSection";
 import { VisualDirectionEditor } from "./VisualDirectionEditor";
 import { AssetEditor } from "./AssetEditor";
+import { ReviewCheckpoint } from "./ReviewCheckpoint";
 import { useWizardActions, hasActiveAssetTask } from "./useWizardActions";
 import { generateImage, aspectRatioToImageParams } from "@/services/imageService";
 import { Lightbox } from "@/components/ui/Lightbox";
@@ -459,27 +460,25 @@ export function StepAssets() {
 
 
 
-      {/* ── Asset review gate ──────────────────────────────────────────── */}
-      {project?.automationMode !== "auto" && (
-        <div className="rounded-xl border border-line bg-raised/50 p-4">
-          <h3 className="text-sm font-semibold text-ink">{t("review.assetsQualityCheck")}</h3>
-          <p className="mt-1 text-xs text-ink-3">{t("review.assetsHint")}</p>
-          <button
-            onClick={() => void handleConfirmAssets()}
-            disabled={anyGenerating || enteringStoryboard}
-            className="mt-3 flex items-center gap-1.5 rounded-lg bg-success-solid px-4 py-2 text-xs font-medium text-white transition hover:bg-success-solid disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            {enteringStoryboard && <Loader2 size={12} className="animate-spin" />}
-            {enteringStoryboard ? t("wizard.storyboardPreparing") : t("review.confirmAssets")}
-          </button>
+      {/* ── Asset review gate（统一卡点实现）───────────────────────────── */}
+      <ReviewCheckpoint
+        mode={project?.automationMode ?? "semi-auto"}
+        titleKey="review.assetsQualityCheck"
+        hintKey="review.assetsHint"
+        confirmLabelKey="review.confirmAssets"
+        confirmDisabled={anyGenerating || enteringStoryboard}
+        confirmPending={enteringStoryboard}
+        confirmPendingLabelKey="wizard.storyboardPreparing"
+        onConfirm={() => void handleConfirmAssets()}
+        footer={<>
           {enteringStoryboard && (
             <p className="mt-2 text-[0.625rem] text-ink-5">{t("wizard.storyboardEnterHint")}</p>
           )}
           {storyboardError && (
             <p className="mt-2 text-[0.625rem] text-danger">{storyboardError}</p>
           )}
-        </div>
-      )}
+        </>}
+      />
     </div>
   );
 }
