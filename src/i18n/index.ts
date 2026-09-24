@@ -2,7 +2,7 @@ import { useSettingsStore } from "@/stores/settingsStore";
 
 /* ── Translation dictionaries ───────────────────────────────────────────── */
 
-const zh = {
+export const zh = {
   // Sidebar
   "sidebar.settings": "设置",
   "sidebar.theme": "切换黑白主题",
@@ -243,6 +243,12 @@ const zh = {
   "wizard.shotDeleteConfirm": "删除镜头 {index}？该镜头的文案、提示词与引用会一并移除。",
   "wizard.allReady": "全部就绪",
   "wizard.goAssembly": "去后期合成",
+  "shotSize.extremeWide": "极远",
+  "shotSize.wide": "远",
+  "shotSize.medium": "中",
+  "shotSize.close": "近",
+  "shotSize.closeUp": "特",
+  "shotSize.unknown": "景别未知",
   "wizard.enterIdea": "输入你的视频主题或想法",
   "wizard.ideaPlaceholder": "例如：一个关于城市早晨的治愈系短视频...",
   "wizard.generate": "生成分镜",
@@ -448,7 +454,7 @@ const zh = {
 
 } as const;
 
-const en = {
+export const en = {
   // Sidebar
   "sidebar.settings": "Settings",
   "sidebar.theme": "Toggle light/dark theme",
@@ -690,6 +696,12 @@ const en = {
   "wizard.shotDeleteConfirm": "Delete shot {index}? Its script, prompts and references will be removed.",
   "wizard.allReady": "All Ready",
   "wizard.goAssembly": "Go to assembly",
+  "shotSize.extremeWide": "Extreme wide",
+  "shotSize.wide": "Wide",
+  "shotSize.medium": "Medium",
+  "shotSize.close": "Close",
+  "shotSize.closeUp": "Close-up",
+  "shotSize.unknown": "Shot size unknown",
   "wizard.enterIdea": "Enter your video topic or idea",
   "wizard.ideaPlaceholder": "e.g. A healing short video about city mornings...",
   "wizard.generate": "Generate Storyboard",
