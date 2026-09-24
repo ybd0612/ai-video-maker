@@ -293,7 +293,7 @@ export function composePortraitPrompt(i: {
  * 文本层锚点，不是靠多送一张成品场景图。
  */
 /** 分镜图 i2i 的参考图总上限（服务端实测可用上限内更保守的工程约束） */
-const MAX_TOTAL_REFERENCES = 4;
+export const MAX_TOTAL_REFERENCES = 4;
 
 /**
  * 参考位分配：远景/极远景不接收道具图。
