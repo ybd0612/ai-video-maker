@@ -1415,7 +1415,7 @@ git commit -m "feat(prompt): 参考位分配可解释（被景别拒收的图说
   - `WizardShell(props: { header: ReactNode; rail: ReactNode; detail: ReactNode; detailActions?: ReactNode })`
   - `WizardRail(props: { shots: Shot[]; currentId?: string; onSelect(id: string): void; aspect?: AspectRatio; mode: "storyboard" | "image" | "video"; pendingIds?: readonly string[]; compact: boolean; onToggleCompact(): void })`
 
-- [ ] **Step 1: `WizardShell`**
+- [x] **Step 1: `WizardShell`**
 
 ```tsx
 // src/features/wizard/WizardShell.tsx
@@ -1451,7 +1451,7 @@ export function WizardShell({ header, rail, detail, detailActions }: WizardShell
 }
 ```
 
-- [ ] **Step 2: `WizardRail`**
+- [x] **Step 2: `WizardRail`**
 
 ```tsx
 // src/features/wizard/WizardRail.tsx
@@ -1564,7 +1564,7 @@ export function WizardRail({
 
 `src/i18n/index.ts` 新增（zh / en 同步）：`rail.ariaLabel`「镜头列表」/ `rail.compact`「紧凑」/ `rail.expand`「显示缩略图」/ `rail.noImage`「无画面图」/ `rail.noImageYet`「未出图」/ `rail.pending`「待补做」。
 
-- [ ] **Step 3: 图片页接入**
+- [x] **Step 3: 图片页接入**
 
 页面内新增（**局部 state，不进 store** —— 设计稿 §16 决策 2）：
 
@@ -1615,7 +1615,7 @@ export function WizardRail({
 
 **不得改动**：`:40-45` 的自动生成 effect、`:50-59` 的边沿检测、任何 `generateImagesForStep` / `rerollImage` 调用签名。
 
-- [ ] **Step 4: 视频页接入**
+- [x] **Step 4: 视频页接入**
 
 同法接入 `WizardShell`，`mode="video"`、`pendingIds={pendingVideoShots(shots).map(s => s.id)}`、`done={videoedCount}`；详情块 = Task 9 的衔接解释行 + 播放器（`detailPrimary` 版式）+ 镜级进度三态 + `PromptSubFields sections={["motion"]}` + `DualFrameToggle shot={current}`。衔接解释行：
 
@@ -1645,16 +1645,16 @@ export function WizardRail({
 
 **这段只读不写**：衔接结果绝不写回 `useDualFrame` / `lastFrameUrl`（写回会清空已生成视频 —— 既有铁律）。同时把 `Retry {n}/3` 里写死的 `/3` 去掉（改为只显示次数），因为编排层已不再有固定 3 次重试语义。
 
-- [ ] **Step 5: 分镜页接入（去掉整页替换）**
+- [x] **Step 5: 分镜页接入（去掉整页替换）**
 
 删除 `StepStoryboard.tsx:132-143` 的 `if (editingShot) return <ShotDetail … />` 早返回；改为 `rail={<WizardRail mode="storyboard" … />}`、`detail={<ShotDetail … />}`。`ShotDetail` 的 `onClose` 传一个"取消选中 → 选回首镜"的实现（双栏下没有"退出详情"语义）；其编辑 / 重摇 / 对白入口**全部保持原样**。
 
-- [ ] **Step 6: 死引用清理（必须 grep，不许凭印象删）**
+- [x] **Step 6: 死引用清理（必须 grep，不许凭印象删）**
 
 Run: `grep -rn "ShotCard\|ShotListSection" src/`
 Expected: `ShotListSection` 若已零引用 → 删文件并把其独占 i18n 键一并清（`shotList.*` 若别处还在用则保留）；仍有引用则本轮不删。**`ShotCard` 本任务不删**（Task 12 折叠三档还要以它为迁移参照）。
 
-- [ ] **Step 7: 全量验证 + 行为自查**
+- [x] **Step 7: 全量验证 + 行为自查**
 
 ```bash
 npx tsc --noEmit && git diff --check && npm run test && npm run build
@@ -1662,11 +1662,11 @@ git diff -- src/features/wizard | grep -E "^[+-].*(await generate|updateShotByPr
 ```
 Expected: 全绿（用例数按实际报，P2 相对 P1 净增 ≥21）；第二条输出 `OK：未触碰生成与门禁`
 
-- [ ] **Step 8: 用户目测项（本期变化最大，必须逐条看）**
+- [x] **Step 8: 用户目测项（本期变化最大，必须逐条看）**
 
 ① 三页都是"左轨 + 右详情"，选镜不再整页跳；② 轨与详情各自滚动、页面整体不再超长；③ `↑↓` 能否换镜；④ 9:16 两列轨是否认得出画面；⑤ 视频页衔接解释行是否说清了"为什么没接"；⑥ 点击图片是否仍走 Lightbox 且遮罩位置正常（验 transform 约束没被破坏）。
 
-- [ ] **Step 9: 提交**
+- [x] **Step 9: 提交**
 
 ```bash
 git add src/features/wizard/WizardRail.tsx src/features/wizard/WizardShell.tsx \
@@ -1695,7 +1695,7 @@ git commit -m "feat(layout): 分镜/图片/视频三页改为左镜头轨 + 右�
 - `function shouldOfferExpand(text: string): boolean`（纯逻辑：按换行与字符宽度估算是否需要"展开"入口）
 - `ExpandableSection(props: { title: string; text: string; expanded?: boolean; onToggle?(next: boolean): void; children?: ReactNode })`（改造后的新形状，`summary` / `defaultExpanded` 被移除）
 
-- [ ] **Step 1: 写失败测试**
+- [x] **Step 1: 写失败测试**
 
 ```ts
 // tests/lib/collapse.test.ts
@@ -1717,9 +1717,9 @@ describe("shouldOfferExpand", () => {
 });
 ```
 
-- [ ] **Step 2: 跑测试确认失败** Expected: FAIL（`@/lib/collapse` 不存在）
+- [x] **Step 2: 跑测试确认失败** Expected: FAIL（`@/lib/collapse` 不存在）
 
-- [ ] **Step 3: 实现纯逻辑 + 改造 `ExpandableSection`**
+- [x] **Step 3: 实现纯逻辑 + 改造 `ExpandableSection`**
 
 ```ts
 // src/lib/collapse.ts
@@ -1739,7 +1739,7 @@ export function shouldOfferExpand(text: string): boolean {
 
 `ExpandableSection.tsx` 的 props 定为 `{ title: string; text: string; expanded?: boolean; onToggle?(next: boolean): void; children?: ReactNode }` —— **用 `text` 取代原 `summary`**（原字段是"折叠时显示的摘要"，新实现交给 CSS `line-clamp` 裁原文，不再需要单独摘要），删去 `defaultExpanded`（默认一律折叠，行为可预测）。组件内部：`shouldOfferExpand(text)` 为 false 时**不渲染展开钮**、直接整段显示；折叠态容器类串 `line-clamp-3 whitespace-pre-wrap`，展开态 `whitespace-pre-wrap`；标题行整行可点（`role="button"` + `tabIndex={0}` + Enter/Space，与本项目"进入编辑=点整张卡"的既有约定同形）。因该组件当前零引用，改 props 不影响任何调用点。
 
-- [ ] **Step 4: 详情区接入 + 窄视口退化**
+- [x] **Step 4: 详情区接入 + 窄视口退化**
 
 图片/视频页详情里的提示词块改走 `ExpandableSection`：
 
@@ -1750,19 +1750,19 @@ export function shouldOfferExpand(text: string): boolean {
 
 `WizardShell.tsx` 的列容器：`w-[15.5rem] shrink-0` → `w-full shrink-0 lg:w-[15.5rem]`；外层 `flex min-h-0 flex-1 gap-4` → `flex min-h-0 flex-1 flex-col gap-4 lg:flex-row`；轨自身容器在 `WizardRail.tsx` 由 `grid grid-cols-2` 改为 `grid grid-cols-4 lg:grid-cols-2`（窄屏横向条、宽屏两列竖轨）。
 
-- [ ] **Step 5: 删除被取代的旧卡片（先验证再删）**
+- [x] **Step 5: 删除被取代的旧卡片（先验证再删）**
 
 Run: `grep -rn "ShotCard" src/`
 Expected: 只剩 `ShotCard.tsx` 自身 → `git rm src/features/wizard/ShotCard.tsx`；若仍有引用则**不删**，在交付说明里写"因 X 处仍在用而保留"。
 
-- [ ] **Step 6: 全量验证 + 用户目测项**
+- [x] **Step 6: 全量验证 + 用户目测项**
 
 ```bash
 npx tsc --noEmit && git diff --check && npm run test && npm run build
 ```
 目测：① 默认只见 3 行提示词 + 展开钮；② 切换镜头时展开态复位（`key={current.id}` 造成重挂载即复位，无需额外 state）；③ 把窗口拖窄后轨变成顶部横向条且详情仍在下方。
 
-- [ ] **Step 7: 提交**
+- [x] **Step 7: 提交**
 
 ```bash
 git add src/lib/collapse.ts tests/lib/collapse.test.ts src/features/wizard/ExpandableSection.tsx \
@@ -1783,12 +1783,12 @@ git commit -m "feat(layout): 详情提示词改折叠三档并在窄视口退化
 
 **Interfaces Produces:** 约定 —— 上述文件内所有 lucide 图标改为 `<Icon className="h-3.5 w-3.5" />` 形式，不再传 `size`。**不新增运行时 helper**（无逻辑可测，纯机械替换）。
 
-- [ ] **Step 1: 取清单**
+- [x] **Step 1: 取清单**
 
 Run: `grep -rn "size={[0-9]" src/features/wizard src/components | cat`
 把命中项按文件分组抄进交付说明（预期约 30 处，本任务只改上表列出的文件）
 
-- [ ] **Step 2: 映射表（唯一口径，逐处照此替换）**
+- [x] **Step 2: 映射表（唯一口径，逐处照此替换）**
 
 | 原 | 改为 |
 |---|---|
@@ -1799,7 +1799,7 @@ Run: `grep -rn "size={[0-9]" src/features/wizard src/components | cat`
 
 原已有 `className` 的（如 `className="animate-spin"`）合并成 `className="h-3.5 w-3.5 animate-spin"`，**不得丢原类**。
 
-- [ ] **Step 3: 验证**
+- [x] **Step 3: 验证**
 
 ```bash
 grep -rn "size={[0-9]" src/features/wizard | cat        # 预期：本次范围内清零
@@ -1807,7 +1807,7 @@ npx tsc --noEmit && git diff --check && npm run test && npm run build
 ```
 目测：把 `:root` 字号临时调到 100% 与 125%，图标应与文字同步变小/变大（**看完记得改回 112.5%**，该值不得进 commit）。
 
-- [ ] **Step 4: 提交**
+- [x] **Step 4: 提交**
 
 ```bash
 git add src/features/wizard
@@ -1822,11 +1822,11 @@ git commit -m "fix(ui): 向导图标改为 rem 尺寸，跟随整体缩放"
 
 **Files:** 无代码改动（结论写回本计划末尾「实测结果」表）
 
-- [ ] **Step 1: 造三档样本（不烧生成配额）**
+- [x] **Step 1: 造三档样本（不烧生成配额）**
 
 用**已有项目**或只跑到步骤 3（分镜完成即停，不生成图片/视频），分别得到 12 / 20 / 40 镜三档。若无现成项目，用「手动添加镜头」按钮补足数量（`ShotListSection` 的 `onAdd`；分镜页已有 `wizard.addShotManual`）。
 
-- [ ] **Step 2: 用户本地采集（把验证自己做掉，不交回给用户跑脚本）**
+- [x] **Step 2: 用户本地采集（把验证自己做掉，不交回给用户跑脚本）**
 
 请用户记录三档各自的：切到图片页 / 视频页的首屏可交互感受，以及"连续滚动轨 + 滚动详情"是否卡顿。AI 侧同时给出不依赖浏览器的客观量：
 ```bash
@@ -1835,13 +1835,13 @@ node -e "const fs=require('fs');for(const f of ['StepImages','StepVideos','StepS
 ```
 并记录 `npm run build` 产物的 JS/CSS 体积（与改造前 gzip 数字对比，只报相对增减）。
 
-- [ ] **Step 3: 判定规则（预先写死，避免事后找理由）**
+- [x] **Step 3: 判定规则（预先写死，避免事后找理由）**
 
 - 若 40 镜档出现可感知卡顿或首次渲染明显劣化 → 才引入虚拟滚动，并**另立一个任务**（本计划不含）。
 - 若只有 12 / 20 两档可接受、40 档仅滚动变长 → 保持现状，把结论写进「实测结果」。
 - 若产物 gzip 增长 > 5% → 检查是否误引入依赖，回退。
 
-- [ ] **Step 4: 把结论写回本文件末尾「实测结果」表并提交**
+- [x] **Step 4: 把结论写回本文件末尾「实测结果」表并提交**
 
 ```bash
 git add docs/roadmap/2026-09-23-wizard-layout-redesign-plan.md
@@ -1854,7 +1854,7 @@ git commit -m "docs(plan): 记录双栏骨架在 12/20/40 镜三档的布局实�
 
 **Files:** Modify `AGENTS.md`、`docs/index.md`、`README.md`、`README_EN.md`、`docs/execution-flow.md`（仅当页面结构描述受影响）
 
-- [ ] **Step 1: 逐处更新（按设计稿 §1 的 11 条根因，说明现在的正确形态）**
+- [x] **Step 1: 逐处更新（按设计稿 §1 的 11 条根因，说明现在的正确形态）**
 
 | 文档 | 要改的口径 |
 |---|---|
@@ -1863,7 +1863,7 @@ git commit -m "docs(plan): 记录双栏骨架在 12/20/40 镜三档的布局实�
 | `README.md` / `README_EN.md` | 页面结构 / 交互描述若提到"点击卡片展开"「列表 ↔ 详情整页切换」，改为双栏口径；中英一致 |
 | `docs/execution-flow.md` | §9.3 取消链路与 §12 待办清单不涉及本次改动，**不动**；只有当文中描述了步骤页 UI 结构时才同步 |
 
-- [ ] **Step 2: grep 核对旧口径零残留**
+- [x] **Step 2: grep 核对旧口径零残留**
 
 ```bash
 grep -rn "就地展开\|整页切换\|max-w-4xl\|点击卡片展开" AGENTS.md README.md README_EN.md docs/*.md \
@@ -1871,7 +1871,7 @@ grep -rn "就地展开\|整页切换\|max-w-4xl\|点击卡片展开" AGENTS.md R
 ```
 Expected: 无输出（历史快照与本批设计/计划文档内的历史叙述除外）
 
-- [ ] **Step 3: 全量验证 + 提交**
+- [x] **Step 3: 全量验证 + 提交**
 
 ```bash
 npx tsc --noEmit && git diff --check && npm run test && npm run build
@@ -1998,3 +1998,5 @@ Task 15 是本计划唯一允许改 AGENTS.md / README / docs 口径的任务，
 | 1（P0） | Task 1-3 | `164172b` / `1e01543` / `f136c45` | 46 文件 / 550 用例（基线 44 / 530；净增 themeTokens 6 + mediaLayout 14） | 全部为界面观感项，待用户本地目测：浅色层级分档、三页画幅版式（9:16 卡头缩略图为窄条、图片页展开后主图 58vh 变高）；未做浏览器验证（本仓库禁用） |
 | 2（P1） | Task 4-6 | `df8f5f8` / `533b3a4` / `1497cf5` | 46 文件 / 550 用例（本期纯 markup 收敛，零新增用例，基线不减） | 行为不变自查三条已跑：Task 4 → `OK：无行为改动`；Task 5 → 仅 `onClick={handleGenerateStoryboard}` 成对搬运（缩进变化）；Task 6 → `git diff -- CreationWizard.tsx` 为空。现场偏差 4 处：① 分镜页错误框吃局部 `error` state（计划写的 `project?.error` 与现场不符）；② ReviewCheckpoint 的 disabled 定为 `failedShots.length > 0 \|\| confirmDisabled`（计划原式 `confirmDisabled ?? false` 会让图片页在有失败镜头时解禁确认键 = 门禁回归）；③ 资产页卡点另加 `confirmPending` / `confirmPendingLabelKey` / `footer` 三个纯展示入参，否则「正在生成分镜」转圈、按钮换文案与两条尾注会在收敛中丢失；④ 分镜页 wizard.step2→step3 连空态分支一并修（同类缺陷） |
 | 3 前半（P2） | Task 7-10 | `9749af2` / `8bf4bbe` / `d32b21e` / `8d4cdb5` | 50 文件 / 569 用例（净增 railSelection 4 + shotDisplay 3 + firstFrameSource 7 + referencePlan 5，均实测值） | i18n 另导出 `zh` / `en` 供回归断言，新增 shotSize 6 键 + videoPlan.firstFrame 12 键（zh/en 同步）。现场偏差：`explainShotReferences` 的候选资格改为与 `pickShotReferences` 完全同口径（角色 `type==="character"` 且 `imageUrl ?? avatarUrl` 兜底、产品与角色共用 characters 额度）——计划原式的 `find(a => a.id === id)` 会让解释器与真实请求分叉。构建产物 gzip：JS 207.11→207.99 kB、CSS 7.98→7.98 kB（棒 1 结束 → 本期结束） |
+| 3 后半（P2） | Task 11 | `6b8382e` | 50 文件 / 569 用例（本期纯结构改造，零新增用例） | 行为自查原文：`git diff HEAD~1 -- src/features/wizard` 过滤 await generate / updateShotByProjectId / setProjectStatusById / canAdvance 后，只输出 `updateShotByProjectId(...)` 两对与一条注释的**成对搬运**（缩进变化：批量重摇处理器逐字移入 header 槽）；`git diff HEAD~1 -- src/features/wizard/CreationWizard.tsx` 为空。偏差 5 处：① `WizardShell` 在步骤组件内部渲染，页面无 key，三个 `[shots.length]` effect 与 `prev*Ref` 原位原样；② 详情子组件（`PromptSubFields` / `DualFrameToggle` / `ShotDetail` / 折叠块容器）加 `key={current.id}` 复位润色撤销栈与展开态——**只给叶子加 key，不给步骤页加**；③ `WizardRail` 不再自带 animate-spin（`shotStatusInfo().color` 已含，重复挂会双份），并新增 `footer` 入参承载分镜页「添加镜头」；④ `ShotListSection` 零引用已删 + 清 `shotList.` 三个键，「添加镜头」移到轨底、「删除本镜」移到详情动作区（原入口一个都不能丢）；⑤ 图片页详情新增参考位拒收解释行（新键 `image.refRejected` / `image.refBecauseSize` / `image.refBecauseTotal`），视频页 `Retry n/3` 去掉写死的 /3 |
+| 4（P3） | Task 12-15 | `0f3340d` / `df9be7a` / `af3d10e` / `143725b` | **51 文件 / 572 用例**（净增 collapse 3；基线 46 / 550，只增不减） | 收尾验收 6 条：① tsc 无输出、`git diff --check` 无输出、test 全绿、build 成功；② `size=数字` 在计划列出的 10 个文件内清零——**范围外残留 58 处未改**（`AssetEditorTemplate` / `AssetListSection` / `StepAssets` / `StepIdea` / `StepAssembly` / `CreationWizard` / `StepIndicator` / `components/*`），计划写明「不做全站扫」，留待后续；③ 图片/视频页 grep max-h-48 / h-24 / bg-black 结果为空；④ `git log -p --follow -- CreationWizard.tsx` 在 164172b..HEAD 区间内 grep canAdvance 为空；⑤ **用户本地目测 7 项全部未做**（AI 不启动 dev/preview）；⑥ 实测结果表已填，缺 20/40 镜两档样本。偏差 3 处：① `shouldOfferExpand` 判据改为「换行数 > COLLAPSED_LINES 或 分句数 > 1 或 长度 > 60×COLLAPSED_LINES」——计划原实现会让计划自己给的第二条用例返回 false；② `ExpandableSection` 去掉 `expanded` / `onToggle` / `defaultExpanded` 改非受控本地 state（计划 Interfaces 与 Step 6「靠 key 重挂载复位、无需额外 state」自相矛盾，且受控 API 零调用者）；③ Task 14 主观三列按「不造数据」留空待用户采集。文档同步：AGENTS.md 结构树 + UI 双栏约定 + 测试「组件渲染不可测」条 + 质量门禁数字；`docs/index.md` §1.3 两行状态 + §2 新增 4 行 SSOT；README 中英各补一句双栏口径 |
