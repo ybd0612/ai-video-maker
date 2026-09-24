@@ -1913,3 +1913,76 @@ git commit -m "docs(agents): 同步双栏骨架与布局口径，登记新增 li
 7. **不在范围内**：跨镜头空间几何一致、眼罩属性绑定的模型能力边界、批量取消链路、CI 跑测试、双帧自动化（见 `2026-09-23-auto-dual-frame-design.md`）。
 8. **上一份计划的遗留**（不在本计划内，别顺手做）：服务层诊断文案结构化改造（`videoService` 5 处 + `renderService` 2 处，详见双帧方案 §10 同源登记）；`AssetEditorMessages` 与 `WizardMessages` 的合并只在 Task 15 评估。
 
+
+---
+
+## 附录 C：各棒开工提示词（目标模式，逐棒执行）
+
+> 本计划 15 个任务**不要整份交给一场会话**（单会话上下文越大，每次模型往返越慢）。
+> 按四棒推进：P0 → P1 → P2 → P3。每棒开始前把下面对应代码块整段粘贴给新会话。
+> 每棒收尾必须做三件事：① 把本棒完成的 Step checkbox 改成 `- [x]`；② 在文件末尾「执行日志」追加一行结论（已验证 / 未验证 / 待用户目测）；③ 逐任务提交，不 push。
+
+### 棒 1（P0：Task 1-3）
+
+```text
+执行 docs/roadmap/2026-09-23-wizard-layout-redesign-plan.md 的 Task 1、2、3（只这三条，做完就收口）。
+
+【先读，按顺序】
+1. 计划文件本身（Global Constraints + 文件结构 + Task 1-3 全部步骤与代码）
+2. 设计稿 docs/roadmap/2026-09-23-wizard-layout-redesign-design.md 的 §17（实施硬约束）
+3. 仓库约定 AGENTS.md（测试约定、编码规范、UI 约定全部适用）
+
+【本棒范围与停止点】
+- Task 1 浅色主题层级 token + 绊线测试；Task 2 src/lib/mediaLayout.ts 纯口径；Task 3 三页与卡片接入画幅版式。
+- 不做 Task 4 及以后；不改任何生成链路、请求体、store 写回、canAdvance 门禁。
+- 文档只允许动 AGENTS.md 的「层级 token 用途边界」那一条（Task 1 Step 6），其余文档留给 Task 15。
+
+【执行纪律】
+- 逐任务走完红→绿→提交；commit message 用计划里给好的原文；精确 git add，禁止 git add -A；不 push。
+- 计划里的 文件:行 基于旧工作树，会漂。改任何文件前先读它，按符号/文本定位，不按行号。
+- 计划代码是设计意图：与真实类型或既有约定冲突时以真实代码为准，并在交付说明里写清改了什么、为什么。
+- 单 turn 接近 80 次工具调用或 250 条消息就收口汇报，不要硬撑。
+
+【基线与验收】
+- 测试基线 44 文件 / 530 用例（2026-09-24 实测）；本棒应净增 themeTokens 6 + mediaLayout 12 个用例，报出实际数字。
+- 每次提交前：npx tsc --noEmit && git diff --check && npm run test && npm run build，结果如实记录。
+- 禁止浏览器 / E2E 测试；不启动 dev/preview 核对界面 —— 界面观感由用户本地确认，本棒结束时列出「待你目测项」。
+
+【停下来问用户，不要自行改设计】
+① 需要改 canAdvance / 审核位才能收敛；② 需要改请求体或写回逻辑；③ 想引入任何新依赖；
+④ token 改动导致某处文字对比度肉眼不可读（列出 文件:行 与现象，等裁定）。
+
+【收尾】
+把三条 commit 号、测试结果、Task 1 Step 5 的 ink-4 用法清单、以及计划末尾「执行日志」新增一行，一并汇报。
+```
+
+### 棒 2（P1：Task 4-6）—— 只把上面第一段的范围行替换为：
+```text
+执行 docs/roadmap/2026-09-23-wizard-layout-redesign-plan.md 的 Task 4、5、6（共享件抽取，只做这三条）。
+额外硬约束：本棒三个 commit 的 diff 里不得出现回调体、store action 调用或请求构造改动；
+每个任务结束都跑计划里给的「行为不变自查」grep 并把输出原文记进交付说明。
+前置：棒 1 已完成（依赖 mediaLayout 的 SHELL_CONTAINER_CLASS）。基线用例数以棒 1 结束时的实际值为准。
+```
+
+### 棒 3（P2：Task 7-11）—— 范围行替换为：
+```text
+执行 docs/roadmap/2026-09-23-wizard-layout-redesign-plan.md 的 Task 7、8、9、10、11（双栏骨架，只做这五条）。
+额外硬约束：WizardShell 必须在步骤组件内部渲染，不得改成路由级子组件、不得给步骤页加 key；
+各步骤页依赖 [shots.length] 的自动生成 effect 与边沿检测 ref 一律保持原位原样；
+衔接与末帧信息只读不写回 store。Task 11 完成前不得删除 ShotCard。
+前置：棒 2 已完成（依赖 StepHeader / StepProgressBar / 统一卡点）。
+```
+
+### 棒 4（P3：Task 12-15）—— 范围行替换为：
+```text
+执行 docs/roadmap/2026-09-23-wizard-layout-redesign-plan.md 的 Task 12、13、14、15（折叠三档、图标缩放、实测、文档同步）。
+额外硬约束：Task 14 的判据只用相对值，不得新增绝对阈值；是否引入虚拟滚动按预先写死的规则判；
+Task 15 是本计划唯一允许改 AGENTS.md / README / docs 口径的任务，改完必须跑它给的 grep 核对旧口径零残留。
+前置：棒 3 已完成。收尾按「收尾验收」六条逐条核对并如实标注未验证项。
+```
+
+## 执行日志（每棒追加一行）
+
+| 棒 | 任务 | commit | 测试（文件/用例） | 未验证 / 待目测 |
+|---|---|---|---|---|
+| | | | | |
