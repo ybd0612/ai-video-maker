@@ -22,6 +22,7 @@ import { StepHeader } from "./StepHeader";
 import { WizardShell } from "./WizardShell";
 import { WizardRail } from "./WizardRail";
 import { WizardMessages } from "./WizardMessages";
+import { ExpandableSection } from "./ExpandableSection";
 import { confirmDialog } from "@/components/ui/ConfirmDialog";
 import { RefreshCw } from "lucide-react";
 
@@ -195,6 +196,7 @@ export function StepImages() {
             </p>
           )}
 
+          <ExpandableSection title={t("pipeline.visualPrompt")} text={current.visualPrompt} />
           <PromptSubFields shotId={current.id} sections={["image"]} />
           <WizardMessages error={current.error} />
 

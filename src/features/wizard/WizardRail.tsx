@@ -58,7 +58,7 @@ export function WizardRail({
         {compact ? t("rail.expand") : t("rail.compact")}
       </button>
 
-      <div className={compact ? "flex flex-col gap-1" : "grid grid-cols-2 gap-2"}>
+      <div className={compact ? "flex flex-col gap-1" : "grid grid-cols-4 gap-2 lg:grid-cols-2"}>
         {shots.map((shot) => {
           const selected = shot.id === currentId;
           const status = shotStatusInfo(shot.status);

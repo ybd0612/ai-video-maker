@@ -21,8 +21,8 @@ export function WizardShell({ header, rail, detail, detailActions }: WizardShell
   return (
     <div className={`${SHELL_CONTAINER_CLASS} h-full`}>
       {header}
-      <div className="flex min-h-0 flex-1 gap-4">
-        <div className="w-[15.5rem] shrink-0 overflow-y-auto pr-1">{rail}</div>
+      <div className="flex min-h-0 flex-1 flex-col gap-4 lg:flex-row">
+        <div className="w-full shrink-0 overflow-y-auto pr-1 lg:w-[15.5rem]">{rail}</div>
         <div className="flex min-w-0 flex-1 flex-col gap-3 overflow-y-auto pb-2">
           {detail}
           {detailActions ? <div className="mt-auto flex flex-wrap items-center gap-2 pt-1">{detailActions}</div> : null}

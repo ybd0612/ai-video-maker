@@ -26,6 +26,7 @@ import { StepHeader } from "./StepHeader";
 import { WizardShell } from "./WizardShell";
 import { WizardRail } from "./WizardRail";
 import { WizardMessages } from "./WizardMessages";
+import { ExpandableSection } from "./ExpandableSection";
 import { confirmDialog } from "@/components/ui/ConfirmDialog";
 import { RefreshCw } from "lucide-react";
 
@@ -268,6 +269,7 @@ export function StepVideos() {
             )}
           </div>
 
+          <ExpandableSection title={t("pipeline.motionPrompt")} text={current.motionPrompt} />
           <PromptSubFields shotId={current.id} sections={["motion"]} />
 
           {/* 首尾帧控制 */}
