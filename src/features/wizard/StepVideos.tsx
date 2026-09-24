@@ -13,12 +13,14 @@ import { DualFrameToggle } from "./DualFrameToggle";
 import { Lightbox } from "@/components/ui/Lightbox";
 import { useWizardActions } from "./useWizardActions";
 import { pendingVideoShots } from "@/lib/shotQueue";
+import { MEDIA_FRAME, SHELL_CONTAINER_CLASS, placeholderClass, resolveAspect } from "@/lib/mediaLayout";
 import { confirmDialog } from "@/components/ui/ConfirmDialog";
 import { RefreshCw } from "lucide-react";
 
 export function StepVideos() {
   const t = useT();
   const project = useProjectStore(selectActiveProject);
+  const aspect = resolveAspect(project?.aspectRatio);
   const plan = useSettingsStore((s) => s.providerConfig.plan);
   const setWizardStep = useProjectStore((s) => s.setWizardStep);
   const { generateVideosForStep, rerollVideo } = useWizardActions();
@@ -75,7 +77,7 @@ export function StepVideos() {
   }, [allVideoed, project?.id, project?.automationMode, setWizardStep]);
 
   return (
-    <div className="mx-auto flex max-w-4xl flex-col gap-4 py-4">
+    <div className={SHELL_CONTAINER_CLASS}>
       <div className="flex items-center justify-between">
         <h2 className="text-sm font-bold text-ink">
           {t("wizard.step5")} ({videoedCount}/{shots.length})
@@ -171,32 +173,33 @@ export function StepVideos() {
             key={shot.id}
             shot={shot}
             mode="video"
+            aspect={aspect}
             onReroll={() => rerollVideo(shot.id)}
             isGenerating={shot.status === "videoing"}
           >
             <div className="flex gap-2">
               {shot.imageUrl && (
                 <Lightbox src={shot.imageUrl} alt={`Ref ${shot.index + 1}`}>
-                  <div className="w-1/3 overflow-hidden rounded-md border border-line">
+                  <div className={`${MEDIA_FRAME.detailSecondary[aspect].containerClass} shrink-0 overflow-hidden rounded-md border border-line`}>
                     <img
                       src={shot.imageUrl}
                       alt={`Ref ${shot.index + 1}`}
-                      className="w-full object-cover h-24"
+                      className={MEDIA_FRAME.detailSecondary[aspect].mediaClass}
                     />
                   </div>
                 </Lightbox>
               )}
               {shot.videoUrl ? (
-                <div className="flex-1 overflow-hidden rounded-md border border-line">
+                <div className={`${MEDIA_FRAME.detailPrimary[aspect].containerClass} overflow-hidden rounded-md border border-line bg-surface`}>
                   <video
                     src={shot.videoUrl}
                     controls
                     loop
-                    className="w-full h-24 object-contain bg-black"
+                    className={`${MEDIA_FRAME.detailPrimary[aspect].mediaClass} bg-app`}
                   />
                 </div>
               ) : shot.status === "videoing" ? (
-                <div className="flex flex-1 items-center justify-center rounded-md border border-dashed border-warn bg-warn-deep/10 h-24">
+                <div className={`${placeholderClass(aspect)} border-warn bg-warn-deep/10`}>
                   <div className="flex flex-col items-center gap-1">
                     <div className="h-1.5 w-20 overflow-hidden rounded-full bg-raised">
                       <div
@@ -215,7 +218,7 @@ export function StepVideos() {
                   </div>
                 </div>
               ) : (
-                <div className="flex flex-1 items-center justify-center rounded-md border border-dashed border-line bg-raised/30 h-24">
+                <div className={`${placeholderClass(aspect)} border-line bg-raised/30`}>
                   <span className="text-[0.625rem] text-ink-5">{t("wizard.waiting")}</span>
                 </div>
               )}

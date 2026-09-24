@@ -7,6 +7,7 @@ import { useProjectStore, selectActiveProject, type Shot } from "@/stores/projec
 import { useT } from "@/i18n";
 import { Film } from "lucide-react";
 import { Lightbox } from "@/components/ui/Lightbox";
+import { MEDIA_FRAME, resolveAspect } from "@/lib/mediaLayout";
 
 interface DualFrameToggleProps {
   shot: Shot;
@@ -16,6 +17,7 @@ export function DualFrameToggle({ shot }: DualFrameToggleProps) {
   const t = useT();
   const updateShot = useProjectStore((s) => s.updateShot);
   const project = useProjectStore(selectActiveProject);
+  const aspect = resolveAspect(project?.aspectRatio);
 
   // 其他已生成图片的分镜，供用户点选作为尾帧
   const candidateFrames = (project?.shots ?? []).filter(
@@ -59,6 +61,8 @@ export function DualFrameToggle({ shot }: DualFrameToggleProps) {
                     key={s.id}
                     onClick={() => updateShot(shot.id, { lastFrameUrl: s.imageUrl })}
                     className={`shrink-0 overflow-hidden rounded border transition ${
+                      MEDIA_FRAME.detailSecondary[aspect].containerClass
+                    } ${
                       shot.lastFrameUrl === s.imageUrl
                         ? "border-warn ring-1 ring-warn"
                         : "border-line hover:border-line-strong"
@@ -68,7 +72,7 @@ export function DualFrameToggle({ shot }: DualFrameToggleProps) {
                     <img
                       src={s.imageUrl}
                       alt={`Shot ${s.index + 1}`}
-                      className="h-12 w-20 object-cover"
+                      className={MEDIA_FRAME.detailSecondary[aspect].mediaClass}
                     />
                   </button>
                 ))}
@@ -90,12 +94,12 @@ export function DualFrameToggle({ shot }: DualFrameToggleProps) {
           />
           {/* 尾帧预览（点击放大查看） */}
           {shot.lastFrameUrl && (
-            <div className="mt-1 overflow-hidden rounded border border-line w-20 h-14">
+            <div className={`mt-1 overflow-hidden rounded border border-line ${MEDIA_FRAME.detailSecondary[aspect].containerClass}`}>
               <Lightbox src={shot.lastFrameUrl} alt={t("wizard.lastFrameUrl")}>
                 <img
                   src={shot.lastFrameUrl}
                   alt={t("wizard.lastFrameUrl")}
-                  className="h-full w-full object-cover"
+                  className={MEDIA_FRAME.detailSecondary[aspect].mediaClass}
                 />
               </Lightbox>
             </div>

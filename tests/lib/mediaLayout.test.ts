@@ -10,6 +10,8 @@ import {
   ASPECT_RATIO_CSS,
   DEFAULT_ASPECT,
   MEDIA_FRAME,
+  SHELL_CONTAINER_CLASS,
+  placeholderClass,
   resolveAspect,
   type MediaSlot,
 } from "@/lib/mediaLayout";
@@ -83,5 +85,44 @@ describe("MEDIA_FRAME", () => {
     expect(MEDIA_FRAME.railThumb["9:16"].containerClass).toContain("aspect-[9/16]");
     expect(MEDIA_FRAME.railThumb["16:9"].containerClass).toContain("aspect-[16/9]");
     expect(MEDIA_FRAME.railThumb["1:1"].containerClass).toContain("aspect-square");
+  });
+});
+
+describe("SHELL_CONTAINER_CLASS", () => {
+  it("根容器已放开 max-w-4xl，并统一了水平内边距", () => {
+    expect(SHELL_CONTAINER_CLASS).not.toContain("max-w-4xl");
+    expect(SHELL_CONTAINER_CLASS).toContain("max-w-[90rem]");
+    expect(SHELL_CONTAINER_CLASS).toContain("px-4");
+  });
+});
+
+describe("placeholderClass", () => {
+  it("与同画幅的详情主媒体占同一块面积（容器类串被完整包含）", () => {
+    for (const aspect of ["9:16", "16:9", "1:1"] as const) {
+      expect(placeholderClass(aspect)).toContain(
+        MEDIA_FRAME.detailPrimary[aspect].containerClass,
+      );
+    }
+  });
+
+  it("三画幅的占位框互不相同（缺图时也能看出项目是什么画幅）", () => {
+    const aspects = ["9:16", "16:9", "1:1"] as const;
+    const set = new Set(aspects.map((a) => placeholderClass(a)));
+    expect(set.size).toBe(3);
+  });
+
+  it("不得带 flex-1：竖幅在媒体行里会被撑成数倍视口高的巨框", () => {
+    for (const aspect of ["9:16", "16:9", "1:1"] as const) {
+      expect(placeholderClass(aspect)).not.toMatch(/(^| )flex-1( |$)/);
+    }
+  });
+
+  it("不自带底色与边框色（留给调用方的 warn / line 语义，同元素两个 bg-* 会互相覆盖）", () => {
+    for (const aspect of ["9:16", "16:9", "1:1"] as const) {
+      expect(placeholderClass(aspect)).not.toMatch(/(^| )bg-/);
+      expect(placeholderClass(aspect)).not.toMatch(/(^| )border-(line|warn|danger|success|info)/);
+      // 但必须自带虚线边框的形状与容器类
+      expect(placeholderClass(aspect)).toContain("border-dashed");
+    }
   });
 });

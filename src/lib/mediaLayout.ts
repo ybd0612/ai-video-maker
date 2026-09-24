@@ -44,9 +44,9 @@ export const MEDIA_FRAME: Record<MediaSlot, Record<AspectRatio, MediaFrame>> = {
   // 详情主媒体：必须完整看得见（用户就是来验收这一帧的），因此竖幅按高度优先，
   // 绝不再用「w-full + max-h」—— 那正是今天竖屏两侧留白的直接原因。
   detailPrimary: {
-    "9:16": { containerClass: "h-[58vh] max-h-[620px] aspect-[9/16]", mediaClass: "h-full w-full object-contain" },
-    "16:9": { containerClass: "w-full max-h-[62vh] aspect-[16/9]", mediaClass: "h-full w-full object-contain" },
-    "1:1": { containerClass: "h-[52vh] max-h-[560px] aspect-square", mediaClass: "h-full w-full object-contain" },
+    "9:16": { containerClass: "h-[58vh] max-h-[620px] aspect-[9/16] shrink-0", mediaClass: "h-full w-full object-contain" },
+    "16:9": { containerClass: "w-full max-h-[62vh] aspect-[16/9] min-w-0", mediaClass: "h-full w-full object-contain" },
+    "1:1": { containerClass: "h-[52vh] max-h-[560px] aspect-square shrink-0", mediaClass: "h-full w-full object-contain" },
   },
   // 详情次级位（参考图条、尾帧预览等）：小图裁剪填满
   detailSecondary: {
@@ -55,3 +55,16 @@ export const MEDIA_FRAME: Record<MediaSlot, Record<AspectRatio, MediaFrame>> = {
     "1:1": { containerClass: "h-20 w-20", mediaClass: "h-full w-full object-cover" },
   },
 };
+
+/** 步骤页根容器：统一水平内边距与最大宽（1920 基准，随根字号缩放） */
+export const SHELL_CONTAINER_CLASS =
+  "mx-auto flex w-full max-w-[90rem] flex-col gap-4 px-4 py-4";
+
+/**
+ * 缺图 / 等待中的占位框：与同画幅的详情主媒体占同一块面积，不再用固定 6rem 横条。
+ * 底色与边框色留给调用方（warn / line 语义各异），这里不写，避免同一元素上两个
+ * bg-* 类互相覆盖；也不给 flex-1 —— 竖幅会按可用宽度算出数倍视口高的巨框。
+ */
+export function placeholderClass(aspect: AspectRatio): string {
+  return `flex items-center justify-center overflow-hidden rounded-md border border-dashed ${MEDIA_FRAME.detailPrimary[aspect].containerClass}`;
+}

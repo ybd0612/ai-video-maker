@@ -11,6 +11,7 @@ import { PromptSubFields } from "./PromptSubFields";
 import { Lightbox } from "@/components/ui/Lightbox";
 import { useWizardActions } from "./useWizardActions";
 import { pendingImageShots, shotsWithoutVisualPrompt } from "@/lib/shotQueue";
+import { MEDIA_FRAME, SHELL_CONTAINER_CLASS, resolveAspect } from "@/lib/mediaLayout";
 import { ReviewCheckpoint } from "./ReviewCheckpoint";
 import { confirmDialog } from "@/components/ui/ConfirmDialog";
 import { RefreshCw } from "lucide-react";
@@ -18,6 +19,7 @@ import { RefreshCw } from "lucide-react";
 export function StepImages() {
   const t = useT();
   const project = useProjectStore(selectActiveProject);
+  const aspect = resolveAspect(project?.aspectRatio);
   const setWizardStep = useProjectStore((s) => s.setWizardStep);
   const updateProject = useProjectStore((s) => s.updateProject);
   const { generateImagesForStep, rerollImage } = useWizardActions();
@@ -59,7 +61,7 @@ export function StepImages() {
   }, [allImaged, project?.id, project?.automationMode, setWizardStep]);
 
   return (
-    <div className="mx-auto flex max-w-4xl flex-col gap-4 py-4">
+    <div className={SHELL_CONTAINER_CLASS}>
       <div className="flex items-center justify-between">
         <h2 className="text-sm font-bold text-ink">
           {t("wizard.step4")} ({imagedCount}/{shots.length})
@@ -145,16 +147,18 @@ export function StepImages() {
             key={shot.id}
             shot={shot}
             mode="image"
+            aspect={aspect}
             onReroll={() => rerollImage(shot.id)}
             isGenerating={shot.status === "imaging"}
           >
             {shot.imageUrl && (
               <Lightbox src={shot.imageUrl} alt={`Shot ${shot.index + 1}`}>
-                <div className="overflow-hidden rounded-md border border-line">
+                <div className={`${MEDIA_FRAME.detailPrimary[aspect].containerClass} overflow-hidden rounded-md border border-line`}>
                   <img
                     src={shot.imageUrl}
                     alt={`Shot ${shot.index + 1}`}
-                    className="w-full object-contain max-h-48"
+                    loading="lazy"
+                    className={MEDIA_FRAME.detailPrimary[aspect].mediaClass}
                   />
                 </div>
               </Lightbox>

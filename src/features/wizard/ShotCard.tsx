@@ -5,6 +5,8 @@
 
 import { useState } from "react";
 import type { Shot } from "@/stores/projectStore";
+import type { AspectRatio } from "@/stores/projectTypes";
+import { ASPECT_RATIO_CSS, resolveAspect } from "@/lib/mediaLayout";
 import { useT } from "@/i18n";
 import { ChevronDown, RefreshCw, Trash2 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -16,6 +18,8 @@ type ShotCardMode = "storyboard" | "image" | "video";
 interface ShotCardProps {
   shot: Shot;
   mode: ShotCardMode;
+  /** 项目画幅：决定卡头缩略图的宽高比，缺省回落 16:9 */
+  aspect?: AspectRatio;
   onReroll?: () => void;
   onDelete?: () => void;
   isGenerating?: boolean;
@@ -25,6 +29,7 @@ interface ShotCardProps {
 export function ShotCard({
   shot,
   mode,
+  aspect,
   onReroll,
   onDelete,
   isGenerating,
@@ -69,7 +74,7 @@ export function ShotCard({
 
         {/* Image thumbnail for image/video modes（点击放大查看） */}
         {(mode === "image" || mode === "video") && shot.imageUrl && (
-          <div className="h-8 w-8 shrink-0 overflow-hidden rounded border border-line">
+          <div className={`h-8 shrink-0 overflow-hidden rounded-sm border border-line-soft ${ASPECT_RATIO_CSS[resolveAspect(aspect)]}`}>
             <Lightbox src={shot.imageUrl} alt={`Shot ${shot.index + 1}`}>
               <img
                 src={shot.imageUrl}

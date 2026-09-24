@@ -12,6 +12,7 @@ import { ShotListSection } from "./ShotListSection";
 import { ShotDetail } from "./ShotDetail";
 import { useWizardActions, hasActiveScriptTask } from "./useWizardActions";
 import { useSettingsStore } from "@/stores/settingsStore";
+import { SHELL_CONTAINER_CLASS } from "@/lib/mediaLayout";
 import { confirmDialog } from "@/components/ui/ConfirmDialog";
 import { Sparkles, Loader2 } from "lucide-react";
 
@@ -196,7 +197,7 @@ export function StepStoryboard() {
   }
 
   return (
-    <div className="mx-auto flex max-w-4xl flex-col gap-4 py-4">
+    <div className={SHELL_CONTAINER_CLASS}>
       {/* Header */}
       <div className="flex items-center justify-between">
         <h2 className="text-sm font-bold text-ink">
