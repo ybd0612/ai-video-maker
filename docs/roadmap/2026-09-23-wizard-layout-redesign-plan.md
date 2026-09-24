@@ -91,7 +91,7 @@
 - Consumes: 无（首个任务）
 - Produces: 浅色主题下 `ink` / `ink-2` / `ink-3` / `ink-4` / `ink-5` 五档互不相同、`line` ≠ `line-soft`；`tests/lib/themeTokens.test.ts` 作为回归绊线
 
-- [ ] **Step 1: 写失败测试**
+- [x] **Step 1: 写失败测试**
 
 ```ts
 // tests/lib/themeTokens.test.ts
@@ -179,12 +179,12 @@ describe("浅色主题层级 token", () => {
 });
 ```
 
-- [ ] **Step 2: 跑测试确认失败**
+- [x] **Step 2: 跑测试确认失败**
 
 Run: `npm run test -- tests/lib/themeTokens.test.ts`
 Expected: FAIL —— 「文字四档两档不同值」与「边框两档不再同值」两条红（当前同为 `#64748b` / `#e2e8f0`）。若第一条"解析到全部变量"就红，说明解析器没对上文件结构，先修解析器再继续（不得靠放宽断言蒙过去）。
 
-- [ ] **Step 3: 改 token 值**
+- [x] **Step 3: 改 token 值**
 
 `src/styles/globals.css` 的 `:root` 段内，两行改为：
 
@@ -198,17 +198,17 @@ Expected: FAIL —— 「文字四档两档不同值」与「边框两档不再�
 
 其余行**一律不动**（尤其 `--c-line: #e2e8f0` 与 `--c-ink-5: #94a3b8`；`html[data-theme="dark"]` 整段不碰）。
 
-- [ ] **Step 4: 跑测试确认通过**
+- [x] **Step 4: 跑测试确认通过**
 
 Run: `npm run test -- tests/lib/themeTokens.test.ts`
 Expected: PASS（6 个用例）
 
-- [ ] **Step 5: 核对既有 ink-4 用法有没有被误当正文用**
+- [x] **Step 5: 核对既有 ink-4 用法有没有被误当正文用**
 
 Run: `grep -rn "text-ink-4" src/ | wc -l` 与逐条浏览 `grep -rn "text-ink-4" src/`
 Expected: 用法数不变（本任务不改调用点）。若发现某处 ink-4 承载的是**必须读的正文**（不是计数/标签），记下 `文件:行` 写进交付说明，**不当场改**（留给 Task 15 统一判定）。
 
-- [ ] **Step 6: 同步 AGENTS.md 的 token 说明**
+- [x] **Step 6: 同步 AGENTS.md 的 token 说明**
 
 在 `AGENTS.md`「黑白主题（2026-09-12 方案 A 落地）」那条里，语义色 token 清单之后追加一句（**这是文档同步的唯一例外，因为它是本次改动的直接口径**）：
 
@@ -216,16 +216,16 @@ Expected: 用法数不变（本任务不改调用点）。若发现某处 ink-4 
 - **层级 token 用途边界（2026-09-23）**：浅色主题五档文字 `ink` > `ink-2` > `ink-3` > `ink-4` > `ink-5` 严格递浅，**`ink-4` 起只用于非关键信息**（计数、进度百分比、图标按钮标题、占位提示），正文与可读文本一律 `ink` / `ink-2` / `ink-3`。边框两档各司其职：`border-line` 外框与模块分割线，`border-line-soft` 内部分隔。回归绊线在 `tests/lib/themeTokens.test.ts`（改回同值会红）。
 ```
 
-- [ ] **Step 7: 全量验证**
+- [x] **Step 7: 全量验证**
 
 Run: `npx tsc --noEmit && git diff --check && npm run test && npm run build`
 Expected: tsc 无输出；test 全绿（44 文件 → 45 文件，用例数比基线 530 多 6）；build 成功
 
-- [ ] **Step 8: 用户目测项（记入交付说明，AI 不做界面核对）**
+- [x] **Step 8: 用户目测项（记入交付说明，AI 不做界面核对）**
 
 请在本地看浅色主题：① 卡片外框与内部细分隔线现在能分辨；② `wizard.queueCount`、进度百分比这类小字是否仍清晰；③ 步骤状态徽标（`shotStatus` 用了 `text-ink-4` 表示 idle）观感。
 
-- [ ] **Step 9: 提交**
+- [x] **Step 9: 提交**
 
 ```bash
 git add src/styles/globals.css tests/lib/themeTokens.test.ts AGENTS.md
@@ -252,7 +252,7 @@ git commit -m "fix(theme): 拆开浅色主题塌缩的层级 token，并加绊�
   - `const MEDIA_FRAME: Record<MediaSlot, Record<AspectRatio, MediaFrame>>`
   - `const ASPECT_RATIO_CSS: Record<AspectRatio, string>`
 
-- [ ] **Step 1: 写失败测试**
+- [x] **Step 1: 写失败测试**
 
 ```ts
 // tests/lib/mediaLayout.test.ts
@@ -346,12 +346,12 @@ describe("MEDIA_FRAME", () => {
 });
 ```
 
-- [ ] **Step 2: 跑测试确认失败**
+- [x] **Step 2: 跑测试确认失败**
 
 Run: `npm run test -- tests/lib/mediaLayout.test.ts`
 Expected: FAIL —— 模块不存在
 
-- [ ] **Step 3: 实现 `src/lib/mediaLayout.ts`**
+- [x] **Step 3: 实现 `src/lib/mediaLayout.ts`**
 
 ```ts
 // ────────────────────────────────────────────────────────────────────────────
@@ -413,17 +413,17 @@ export const MEDIA_FRAME: Record<MediaSlot, Record<AspectRatio, MediaFrame>> = {
 };
 ```
 
-- [ ] **Step 4: 跑测试确认通过**
+- [x] **Step 4: 跑测试确认通过**
 
 Run: `npm run test -- tests/lib/mediaLayout.test.ts`
 Expected: PASS（12 个用例）
 
-- [ ] **Step 5: 全量验证**
+- [x] **Step 5: 全量验证**
 
 Run: `npx tsc --noEmit && git diff --check && npm run test && npm run build`
 Expected: 全绿（46 文件 / 542 用例）
 
-- [ ] **Step 6: 提交**
+- [x] **Step 6: 提交**
 
 ```bash
 git add src/lib/mediaLayout.ts tests/lib/mediaLayout.test.ts
@@ -445,7 +445,7 @@ git commit -m "feat(layout): 新增 mediaLayout 纯口径，把画幅与版式�
 - Consumes: Task 2 的 `resolveAspect` / `MEDIA_FRAME` / `ASPECT_RATIO_CSS`
 - Produces: 三页的根容器类串统一为 `SHELL_CONTAINER_CLASS`（Task 4 之后由 `StepHeader`/`WizardShell` 复用）；页面开始读 `project.aspectRatio`
 
-- [ ] **Step 1: 在 `src/lib/mediaLayout.ts` 追加容器与占位常量（本任务唯一新增实现）**
+- [x] **Step 1: 在 `src/lib/mediaLayout.ts` 追加容器与占位常量（本任务唯一新增实现）**
 
 ```ts
 /** 步骤页根容器：统一水平内边距与最大宽（1920 基准，随根字号缩放） */
@@ -458,7 +458,7 @@ export function placeholderClass(aspect: AspectRatio): string {
 }
 ```
 
-- [ ] **Step 2: 图片页接入**
+- [x] **Step 2: 图片页接入**
 
 `StepImages.tsx` 顶部加导入：
 
@@ -487,7 +487,7 @@ import { MEDIA_FRAME, SHELL_CONTAINER_CLASS, resolveAspect } from "@/lib/mediaLa
   </div>
 ```
 
-- [ ] **Step 3: 视频页接入**
+- [x] **Step 3: 视频页接入**
 
 `StepVideos.tsx` 同样加 `import { MEDIA_FRAME, SHELL_CONTAINER_CLASS, placeholderClass, resolveAspect } from "@/lib/mediaLayout";`、`const aspect = resolveAspect(project?.aspectRatio);`、根容器改 `SHELL_CONTAINER_CLASS`。
 
@@ -498,7 +498,7 @@ import { MEDIA_FRAME, SHELL_CONTAINER_CLASS, resolveAspect } from "@/lib/mediaLa
   （**`bg-black` 是原始色字面量，必须去掉**：深色靠 `bg-app` / `bg-surface` 表达，浅色主题下不再一片死黑）
 - 两个占位框 → `${placeholderClass(aspect)} flex-1`，保留各自原有的 `border-warn` / `border-line` 与 tint 类，只替换 `h-24` 与形状
 
-- [ ] **Step 4: 分镜页容器 + 卡片缩略图 + 尾帧预览**
+- [x] **Step 4: 分镜页容器 + 卡片缩略图 + 尾帧预览**
 
 `StepStoryboard.tsx:199` 根容器 → `SHELL_CONTAINER_CLASS`（其空态 `max-w-2xl` 分支保持不动）。
 
@@ -512,21 +512,21 @@ import { MEDIA_FRAME, SHELL_CONTAINER_CLASS, resolveAspect } from "@/lib/mediaLa
 
 `DualFrameToggle.tsx` 的候选帧条（`h-12 w-20`）与尾帧预览（`w-20 h-14`）→ 用 `MEDIA_FRAME.detailSecondary[resolveAspect(project?.aspectRatio)]`（该组件已接收 `shot`，画幅从 `useProjectStore` 里取当前活动项目；只读不改写）。
 
-- [ ] **Step 5: 确认同类入口无遗漏（本仓库铁律：修一个入口必须搜同类）**
+- [x] **Step 5: 确认同类入口无遗漏（本仓库铁律：修一个入口必须搜同类）**
 
 Run: `grep -rn "max-h-48\|h-24\|w-8 h-8\|bg-black" src/features src/components | grep -v "Lightbox.tsx"`
 Expected: 只剩确实与画幅无关的命中（如 Lightbox 内部的缩放按钮）；把残留逐条判断并在交付说明里写明"为什么不改"
 
-- [ ] **Step 6: 全量验证**
+- [x] **Step 6: 全量验证**
 
 Run: `npx tsc --noEmit && git diff --check && npm run test && npm run build`
 Expected: 全绿（46 文件 / 542 用例；本任务不加测试 —— 纯 JSX 搬运，见 Global Constraints「组件渲染不可测」）
 
-- [ ] **Step 7: 用户目测项**
+- [x] **Step 7: 用户目测项**
 
 用同一个 9:16 项目对比改造前后：① 图片页主图不再两侧留白、按竖屏比例显示；② 视频页播放器不再是 6rem 扁条；③ 切到 16:9 项目时同一处版式真的变了。
 
-- [ ] **Step 8: 提交**
+- [x] **Step 8: 提交**
 
 ```bash
 git add src/lib/mediaLayout.ts src/features/wizard/StepImages.tsx src/features/wizard/StepVideos.tsx \
@@ -1985,4 +1985,4 @@ Task 15 是本计划唯一允许改 AGENTS.md / README / docs 口径的任务，
 
 | 棒 | 任务 | commit | 测试（文件/用例） | 未验证 / 待目测 |
 |---|---|---|---|---|
-| | | | | |
+| 1（P0） | Task 1-3 | `164172b` / `1e01543` / `f136c45` | 46 文件 / 550 用例（基线 44 / 530；净增 themeTokens 6 + mediaLayout 14） | 全部为界面观感项，待用户本地目测：浅色层级分档、三页画幅版式（9:16 卡头缩略图为窄条、图片页展开后主图 58vh 变高）；未做浏览器验证（本仓库禁用） |
