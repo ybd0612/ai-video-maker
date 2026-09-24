@@ -106,7 +106,7 @@ async function pollVideoTask(pollUrl: string, apiKey: string, videoId: string): 
   } catch (err) {
     const detail = err instanceof Error ? err.message : String(err);
     throw new VideoTaskCreatedError(
-      `视频任务 ${videoId} 轮询请求失败：${detail}。已保留服务端任务，不重复创建。`,
+      `${getTranslation("error.videoPollRequestFailedWithId", { videoId, detail })} ${getTranslation("error.videoTaskKept")}`,
       videoId,
     );
   }

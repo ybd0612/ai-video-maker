@@ -126,7 +126,7 @@ const runVideoBatch = createBatchRunner({
                 shot.id,
                 expectedRevision,
                 "failed",
-                err.message,
+                `${err.message} ${getTranslation("error.videoTaskFailedManualRetry")}`,
               );
             } else {
               useProjectStore.getState().updateShotByProjectIdIfRevision(
@@ -135,7 +135,7 @@ const runVideoBatch = createBatchRunner({
                 expectedRevision,
                 {
                   videoProgress: 0,
-                  error: `${err.message} 已保留服务端任务，不重复创建。`,
+                  error: `${err.message} ${getTranslation("error.videoTaskKept")}`,
                 },
               );
             }
@@ -348,7 +348,7 @@ export function useVideoActions(): VideoActions {
             shotId,
             expectedRevision,
             "failed",
-            err.message,
+            `${err.message} ${getTranslation("error.videoTaskFailedManualRetry")}`,
           );
         } else {
           useProjectStore.getState().updateShotByProjectIdIfRevision(
@@ -357,7 +357,7 @@ export function useVideoActions(): VideoActions {
             expectedRevision,
             {
               videoProgress: 0,
-              error: `${err.message} 已保留服务端任务，不重复创建。`,
+              error: `${err.message} ${getTranslation("error.videoTaskKept")}`,
             },
           );
         }
@@ -367,7 +367,7 @@ export function useVideoActions(): VideoActions {
           shotId,
           expectedRevision,
           "failed",
-          err instanceof Error ? err.message : String(err),
+          `${err instanceof Error ? err.message : String(err)} ${getTranslation("error.videoCreateManualRetry")}`,
         );
       }
     }
