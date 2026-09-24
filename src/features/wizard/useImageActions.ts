@@ -16,7 +16,8 @@ import {
   pickShotReferences,
   type RegistryRuleText,
 } from "@/lib/promptComposer";
-import { getActiveRules, getActiveRuleText } from "@/lib/promptRules";
+import { getActiveRenderRules } from "@/lib/promptRules";
+import { getTranslation } from "@/i18n";
 import { pendingImageShots } from "@/lib/shotQueue";
 import { restoreProjectStatusIfReady } from "./wizardActionUtils";
 
@@ -51,15 +52,14 @@ function describeReferenceNote(
 }
 
 /**
- * 从注册表提取分镜图提示词拼装所需的正向约束文本。
- * visualPrompt / motionPrompt 恒为英文（见 promptRules 的 storyboard 约束），故取 en。
+ * 取分镜图提示词的正向约束渲染文本（只收带 renderContent 的生效条目）。
+ * 否定句式仍未实测中文等效，故按英文口径取 en（2026-09-23 记录）。
  * 调用方（非 lib）读 store 取生效规则，lib 保持纯函数。
  */
 function extractShotImageRules(): RegistryRuleText {
-  const rules = getActiveRules();
   return {
-    composeShot: getActiveRuleText("composeShot", "en", rules),
-    negativeStrategy: getActiveRuleText("negativeStrategy", "en", rules),
+    composeShot: getActiveRenderRules("composeShot", "en"),
+    negativeStrategy: getActiveRenderRules("negativeStrategy", "en"),
   };
 }
 
@@ -181,7 +181,7 @@ const runImageBatch = createBatchRunner({
       useProjectStore.getState().setProjectStatusById(
         pid,
         "failed",
-        `图片生成失败 ${failedCount} 个镜头，请重试失败项。`,
+        getTranslation("error.imageBatchFailed", { count: failedCount }),
       );
     }
   },

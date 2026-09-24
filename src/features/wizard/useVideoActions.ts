@@ -173,7 +173,7 @@ const runVideoBatch = createBatchRunner({
       useProjectStore.getState().setProjectStatusById(
         pid,
         "failed",
-        `视频生成失败 ${failedCount} 个镜头，请重试失败项。`,
+        getTranslation("error.videoBatchFailed", { count: failedCount }),
       );
     }
   },
