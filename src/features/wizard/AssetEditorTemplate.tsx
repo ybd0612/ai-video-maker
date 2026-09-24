@@ -42,7 +42,7 @@ export function AssetDetailShell({
         title={backLabel}
         className="flex w-fit items-center gap-2 rounded p-1 text-xs font-medium text-ink-2 transition hover:bg-raised disabled:opacity-50"
       >
-        <ArrowLeft size={14} />
+        <ArrowLeft className="h-3.5 w-3.5" />
         <span>{title}</span>
       </button>
 
@@ -235,7 +235,7 @@ export function AssetInstructionRow({
         title={applyLabel}
         className="flex shrink-0 items-center gap-1 rounded-md bg-accent px-2 py-1.5 text-[0.6875rem] font-medium text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
       >
-        {applying ? <Loader2 size={10} className="animate-spin" /> : <Sparkles size={10} />}
+        {applying ? <Loader2 className="h-2.5 w-2.5 animate-spin" /> : <Sparkles className="h-2.5 w-2.5" />}
         {applying ? applyingLabel : applyLabel}
       </button>
       {onUndo && (
@@ -246,7 +246,7 @@ export function AssetInstructionRow({
           title={undoLabel}
           className="shrink-0 rounded-md border border-line px-2 py-1.5 text-[0.6875rem] text-ink-3 transition hover:bg-raised disabled:opacity-50"
         >
-          <Undo2 size={11} />
+          <Undo2 className="h-3 w-3" />
         </button>
       )}
     </div>
@@ -291,7 +291,7 @@ export function AssetPreviewColumn({
     </AssetPreviewFrame>
   ) : (
     <AssetPreviewFrame>
-      <ImageIcon size={24} className="text-ink-5" />
+      <ImageIcon className="h-6 w-6 text-ink-5" />
     </AssetPreviewFrame>
   );
 
@@ -306,7 +306,7 @@ export function AssetPreviewColumn({
         title={generateTitle}
         className="flex w-full shrink-0 items-center justify-center gap-1 rounded border border-line px-1.5 py-1 text-[0.625rem] text-accent transition hover:bg-accent-deep/30 disabled:cursor-not-allowed disabled:opacity-50"
       >
-        {generating ? <Loader2 size={10} className="animate-spin" /> : <ImageIcon size={10} />}
+        {generating ? <Loader2 className="h-2.5 w-2.5 animate-spin" /> : <ImageIcon className="h-2.5 w-2.5" />}
         {generateLabel}
       </button>
       {generating && generatingHint && (
@@ -367,7 +367,7 @@ export function AssetEditorFooter({
         disabled={saveDisabled}
         className="flex items-center gap-1 rounded-md bg-accent-solid px-3 py-1.5 text-xs font-medium text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
       >
-        {saving && <Loader2 size={11} className="animate-spin" />}
+        {saving && <Loader2 className="h-3 w-3 animate-spin" />}
         {saveLabel}
       </button>
     </div>

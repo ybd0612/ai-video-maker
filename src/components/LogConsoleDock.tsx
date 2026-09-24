@@ -217,7 +217,7 @@ export function LogConsoleDock() {
           {t("log.title")}
           {/* 日志恒持久化到本机浏览器（系统固有行为，无开关），故标识常显 */}
           <span title={t("log.persistedMark")} className="text-ink-5">
-            <Save size={10} />
+            <Save className="h-2.5 w-2.5" />
           </span>
           {errorCount > 0 && (
             <span className="rounded border border-danger/50 px-1 text-[0.5625rem] text-danger">
@@ -258,7 +258,7 @@ export function LogConsoleDock() {
           title={allExpanded ? t("log.collapseAll") : t("log.expandAll")}
           className="rounded p-1 text-ink-4 hover:bg-raised disabled:opacity-40"
         >
-          {allExpanded ? <ChevronsDownUp size={11} /> : <ChevronsUpDown size={11} />}
+          {allExpanded ? <ChevronsDownUp className="h-3 w-3" /> : <ChevronsUpDown className="h-3 w-3" />}
         </button>
         <button
           type="button"
@@ -266,7 +266,7 @@ export function LogConsoleDock() {
           title={t("log.copy")}
           className="rounded p-1 text-ink-4 hover:bg-raised"
         >
-          <Copy size={11} />
+          <Copy className="h-3 w-3" />
         </button>
         <button
           type="button"
@@ -274,7 +274,7 @@ export function LogConsoleDock() {
           title={t("log.export")}
           className="rounded p-1 text-ink-4 hover:bg-raised"
         >
-          <Download size={11} />
+          <Download className="h-3 w-3" />
         </button>
         <button
           type="button"
@@ -282,7 +282,7 @@ export function LogConsoleDock() {
           title={loggingEnabled ? t("log.pauseCollection") : t("log.resumeCollection")}
           className={`rounded p-1 hover:bg-raised ${loggingEnabled ? "text-ink-4" : "text-warn"}`}
         >
-          {loggingEnabled ? <Pause size={11} /> : <Play size={11} />}
+          {loggingEnabled ? <Pause className="h-3 w-3" /> : <Play className="h-3 w-3" />}
         </button>
         <button
           type="button"
@@ -290,7 +290,7 @@ export function LogConsoleDock() {
           title={t("log.clear")}
           className="rounded p-1 text-danger hover:bg-raised"
         >
-          <Trash2 size={11} />
+          <Trash2 className="h-3 w-3" />
         </button>
         <button
           type="button"
@@ -298,7 +298,7 @@ export function LogConsoleDock() {
           title={t("log.close")}
           className="rounded p-1 text-ink-4 hover:bg-raised"
         >
-          <X size={12} />
+          <X className="h-3.5 w-3.5" />
         </button>
         {copied && <span className="text-[0.625rem] text-success">{t("log.copied")}</span>}
       </div>
@@ -343,7 +343,7 @@ export function LogConsoleDock() {
                   className={`flex items-start gap-2 px-2 py-0.5 ${hasData ? "cursor-pointer hover:bg-raised" : ""}`}
                 >
                   <span className="w-3 shrink-0 pt-0.5 text-ink-5">
-                    {hasData ? (isOpen ? <ChevronDown size={10} /> : <ChevronRight size={10} />) : null}
+                    {hasData ? (isOpen ? <ChevronDown className="h-2.5 w-2.5" /> : <ChevronRight className="h-2.5 w-2.5" />) : null}
                   </span>
                   <span className="shrink-0 text-ink-5">{timeLabel(entry.ts)}</span>
                   <span className={`w-11 shrink-0 rounded border px-1 text-center text-[0.5625rem] ${LEVEL_BADGE[entry.level]}`}>

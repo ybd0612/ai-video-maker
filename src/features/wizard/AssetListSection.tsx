@@ -101,7 +101,7 @@ export function AssetListSection({
                     </div>
                   ) : (
                     <div className="flex h-full w-full items-center justify-center text-ink-5">
-                      <ImageIcon size={16} />
+                      <ImageIcon className="h-4 w-4" />
                     </div>
                   )}
                 </div>
@@ -126,7 +126,7 @@ export function AssetListSection({
                     className="rounded p-1.5 text-ink-4 hover:bg-danger-deep hover:text-danger"
                     title={deleteLabel}
                   >
-                    <Trash2 size={12} />
+                    <Trash2 className="h-3.5 w-3.5" />
                   </button>
                 </div>
               </div>
@@ -135,7 +135,7 @@ export function AssetListSection({
         </div>
       ) : (
         <div className="flex flex-col items-center gap-3 py-4 text-center">
-          <ImageIcon size={24} className="text-ink-5" />
+          <ImageIcon className="h-6 w-6 text-ink-5" />
           <p className="text-xs text-ink-5">{emptyHint}</p>
         </div>
       )}
@@ -144,7 +144,7 @@ export function AssetListSection({
         onClick={onAdd}
         className="flex items-center justify-center gap-2 rounded-xl border border-dashed border-line-strong bg-raised/30 px-4 py-2.5 text-xs text-ink-3 transition hover:border-success hover:text-success"
       >
-        <AddIcon size={14} />
+        <AddIcon className="h-3.5 w-3.5" />
         {addLabel}
       </button>
     </section>

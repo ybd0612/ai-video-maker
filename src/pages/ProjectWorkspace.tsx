@@ -56,7 +56,7 @@ export function ProjectWorkspace() {
             }`}
             title={showLogPanel ? t("log.hidePanel") : t("log.showPanel")}
           >
-            <TerminalSquare size={14} />
+            <TerminalSquare className="h-3.5 w-3.5" />
           </button>
 
           {/* Theme toggle: light / dark */}
@@ -65,7 +65,7 @@ export function ProjectWorkspace() {
             className="rounded-md p-1.5 text-ink-4 hover:bg-raised hover:text-ink-2"
             title={t("sidebar.theme")}
           >
-            {theme === "dark" ? <Sun size={14} /> : <Moon size={14} />}
+            {theme === "dark" ? <Sun className="h-3.5 w-3.5" /> : <Moon className="h-3.5 w-3.5" />}
           </button>
 
           {/* Settings */}
@@ -74,7 +74,7 @@ export function ProjectWorkspace() {
             className="rounded-md p-1.5 text-ink-4 hover:bg-raised hover:text-ink"
             title={t("sidebar.settings")}
           >
-            <Settings size={14} />
+            <Settings className="h-3.5 w-3.5" />
           </button>
         </div>
       </header>

@@ -47,7 +47,7 @@ export function StepIndicator() {
               }`}
             >
               {isCompleted ? (
-                <Check size={11} />
+                <Check className="h-3 w-3" />
               ) : (
                 <span className="flex h-4 w-4 items-center justify-center rounded-full border text-[0.5625rem]">
                   {step}

@@ -43,8 +43,7 @@ export function HelpTooltip({ children }: { children: ReactNode }) {
       onMouseLeave={hide}
     >
       <HelpCircle
-        size={12}
-        className="cursor-help text-ink-5 transition hover:text-ink-3"
+        className="h-3.5 w-3.5 cursor-help text-ink-5 transition hover:text-ink-3"
       />
       {visible &&
         createPortal(

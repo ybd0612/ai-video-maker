@@ -182,13 +182,13 @@ function PromptRulesSettings({
       {/* 全局操作：恢复默认 / 导出 / 导入 */}
       <div className="flex flex-wrap gap-2">
         <button type="button" onClick={() => void handleResetAll()} className={iconBtn}>
-          <RotateCcw size={12} /> {t("settings.rules.resetAll")}
+          <RotateCcw className="h-3.5 w-3.5" /> {t("settings.rules.resetAll")}
         </button>
         <button type="button" onClick={handleExport} className={iconBtn}>
-          <Download size={12} /> {t("settings.rules.export")}
+          <Download className="h-3.5 w-3.5" /> {t("settings.rules.export")}
         </button>
         <button type="button" onClick={() => fileRef.current?.click()} className={iconBtn}>
-          <Upload size={12} /> {t("settings.rules.import")}
+          <Upload className="h-3.5 w-3.5" /> {t("settings.rules.import")}
         </button>
         <input
           ref={fileRef}
@@ -256,7 +256,7 @@ function PromptRulesSettings({
                           title={t("settings.rules.delete")}
                           className="shrink-0 rounded p-1 text-ink-4 hover:bg-raised hover:text-danger"
                         >
-                          <Trash2 size={12} />
+                          <Trash2 className="h-3.5 w-3.5" />
                         </button>
                       ) : (
                         overridden && (
@@ -266,7 +266,7 @@ function PromptRulesSettings({
                             title={t("settings.rules.restoreItem")}
                             className="shrink-0 rounded p-1 text-ink-4 hover:bg-raised hover:text-warn"
                           >
-                            <RotateCcw size={12} />
+                            <RotateCcw className="h-3.5 w-3.5" />
                           </button>
                         )
                       )}
@@ -326,7 +326,7 @@ function PromptRulesSettings({
           disabled={!newContent.trim()}
           className="flex items-center gap-1 rounded-lg bg-success-solid px-3 py-1.5 text-[0.6875rem] font-semibold text-white transition hover:bg-success-solid disabled:cursor-not-allowed disabled:opacity-50"
         >
-          <Plus size={12} /> {t("settings.rules.add")}
+          <Plus className="h-3.5 w-3.5" /> {t("settings.rules.add")}
         </button>
       </div>
     </div>
@@ -455,7 +455,7 @@ export function SettingsDialog() {
               <div className="mb-4 flex items-center justify-between">
                 <h2 className="text-sm font-bold text-ink">{t("settings.title")}</h2>
                 <button onClick={() => setOpen(false)} className="text-ink-4 hover:text-ink-2">
-                  <X size={16} />
+                  <X className="h-4 w-4" />
                 </button>
               </div>
 
@@ -507,7 +507,7 @@ export function SettingsDialog() {
                       onClick={() => setShowKey(!showKey)}
                       className="absolute right-2 top-1/2 -translate-y-1/2 text-ink-4 hover:text-ink-2"
                     >
-                      {showKey ? <EyeOff size={14} /> : <Eye size={14} />}
+                      {showKey ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
                     </button>
                   </div>
                 </div>
@@ -560,7 +560,7 @@ export function SettingsDialog() {
                   >
                     {testing ? (
                       <>
-                        <Loader2 size={14} className="animate-spin" /> {t("settings.testing")}
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" /> {t("settings.testing")}
                       </>
                     ) : (
                       t("settings.testConnection")
@@ -570,7 +570,7 @@ export function SettingsDialog() {
 
                 {testResult.status !== "idle" && (
                   <div className={`flex items-start gap-2 rounded-lg border px-3 py-2 text-[0.6875rem] leading-relaxed ${testResult.status === "success" ? "border-success bg-success-deep/40 text-success" : "border-danger bg-danger-deep/40 text-danger"}`}>
-                    {testResult.status === "success" ? <CheckCircle2 size={14} className="mt-0.5" /> : <AlertTriangle size={14} className="mt-0.5" />}
+                    {testResult.status === "success" ? <CheckCircle2 className="h-3.5 w-3.5 mt-0.5" /> : <AlertTriangle className="h-3.5 w-3.5 mt-0.5" />}
                     <span>{testResult.message}</span>
                   </div>
                 )}
@@ -652,7 +652,7 @@ export function SettingsDialog() {
             exit={{ opacity: 0, y: -20 }}
             className={`fixed top-6 right-6 z-[200] flex items-center gap-2 rounded-lg border px-4 py-2.5 text-xs font-medium shadow-xl backdrop-blur-sm ${toast.type === "success" ? "border-success bg-success-deep/90 text-success" : "border-danger bg-danger-deep/90 text-danger"}`}
           >
-            {toast.type === "success" ? <CheckCircle2 size={15} /> : <AlertTriangle size={15} />}
+            {toast.type === "success" ? <CheckCircle2 className="h-4 w-4" /> : <AlertTriangle className="h-4 w-4" />}
             {toast.message}
           </motion.div>
         )}

@@ -351,7 +351,7 @@ export function StepAssets() {
               <Lightbox src={styleReferenceUrl} alt={t("wizard.visualDirectionReference" as never) as string}>
                 <img src={styleReferenceUrl} alt={t("wizard.visualDirectionReference" as never) as string} className="h-full w-full object-cover" />
               </Lightbox>
-            ) : <ImageIcon size={20} className="text-ink-5" />}
+            ) : <ImageIcon className="h-5 w-5 text-ink-5" />}
           </div>
           <div className="min-w-0 flex-1">
             <p className="text-[0.6875rem] font-medium uppercase tracking-[0.12em] text-accent">{t("wizard.visualDirectionTitle" as never) as string}</p>
@@ -371,7 +371,7 @@ export function StepAssets() {
             <p className="mt-0.5 text-[0.6875rem] text-ink-5">{t("wizard.assetReadinessHint")}</p>
           </div>
           <button onClick={() => void handleFillMissing()} disabled={anyGenerating || !hasMissingAssets} className="flex shrink-0 items-center gap-1.5 rounded-lg bg-accent-solid px-3 py-2 text-[0.6875rem] font-medium text-white transition hover:bg-accent-solid disabled:cursor-not-allowed disabled:opacity-50">
-            {anyGenerating ? <Loader2 size={12} className="animate-spin" /> : <Wand2 size={12} />}
+            {anyGenerating ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Wand2 className="h-3.5 w-3.5" />}
             {t("wizard.fillMissingAssets")}
           </button>
         </div>

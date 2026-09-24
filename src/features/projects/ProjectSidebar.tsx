@@ -59,16 +59,16 @@ export function ProjectSidebar() {
   const statusIcon = (status: string) => {
     switch (status) {
       case "done":
-        return <CheckCircle2 size={10} className="text-success" />;
+        return <CheckCircle2 className="h-2.5 w-2.5 text-success" />;
       case "scripting":
       case "imaging":
       case "videoing":
       case "rendering":
-        return <Loader2 size={10} className="animate-spin text-info" />;
+        return <Loader2 className="h-2.5 w-2.5 animate-spin text-info" />;
       case "failed":
         return <span className="block h-2 w-2 rounded-full bg-danger-solid" />;
       default:
-        return <Film size={10} className="text-ink-5" />;
+        return <Film className="h-2.5 w-2.5 text-ink-5" />;
     }
   };
 
@@ -101,7 +101,7 @@ export function ProjectSidebar() {
             onClick={() => setIsCreating(true)}
             className="flex w-full items-center justify-center gap-1 rounded border border-dashed border-line py-1.5 text-[0.625rem] text-ink-4 hover:border-success hover:text-success transition"
           >
-            <Plus size={10} />
+            <Plus className="h-2.5 w-2.5" />
             {t("pipeline.newProject")}
           </button>
         )}
@@ -110,7 +110,7 @@ export function ProjectSidebar() {
       {/* Search + Sort */}
       <div className="flex items-center gap-1 border-b border-line-soft px-2 py-1.5">
         <div className="relative flex-1">
-          <Search size={10} className="absolute left-1.5 top-1/2 -translate-y-1/2 text-ink-5" />
+          <Search className="h-2.5 w-2.5 absolute left-1.5 top-1/2 -translate-y-1/2 text-ink-5" />
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
@@ -123,7 +123,7 @@ export function ProjectSidebar() {
           title={t(sort === 'newest' ? "pipeline.sortOldest" : "pipeline.sortNewest")}
           className="rounded p-1 text-ink-5 hover:text-success"
         >
-          {sort === 'newest' ? <SortDesc size={10} /> : <SortAsc size={10} />}
+          {sort === 'newest' ? <SortDesc className="h-2.5 w-2.5" /> : <SortAsc className="h-2.5 w-2.5" />}
         </button>
       </div>
 
@@ -184,7 +184,7 @@ export function ProjectSidebar() {
                         className="rounded p-0.5 text-ink-5 hover:text-info"
                         title={t("pipeline.duplicateProject")}
                       >
-                        <Copy size={10} />
+                        <Copy className="h-2.5 w-2.5" />
                       </button>
                       <button
                         onClick={(e) => {
@@ -194,7 +194,7 @@ export function ProjectSidebar() {
                         className="rounded p-0.5 text-ink-5 hover:text-danger"
                         title={t("pipeline.deleteProject")}
                       >
-                        <Trash2 size={10} />
+                        <Trash2 className="h-2.5 w-2.5" />
                       </button>
                     </div>
                   </div>

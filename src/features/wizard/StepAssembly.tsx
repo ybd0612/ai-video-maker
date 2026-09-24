@@ -180,12 +180,12 @@ export function StepAssembly() {
           >
             {isRendering ? (
               <>
-                <Loader2 size={16} className="animate-spin" />
+                <Loader2 className="h-4 w-4 animate-spin" />
                 {t("wizard.generating")} {renderProgress}%
               </>
             ) : (
               <>
-                <Film size={16} />
+                <Film className="h-4 w-4" />
                 {t("pipeline.concatVideos")}
               </>
             )}
@@ -195,7 +195,7 @@ export function StepAssembly() {
               onClick={handleCancelRender}
               className="flex items-center gap-1.5 rounded-lg bg-danger-solid px-4 py-2.5 text-sm font-medium text-white transition hover:bg-danger-solid"
             >
-              <Square size={14} />
+              <Square className="h-3.5 w-3.5" />
               {t("wizard.cancelRender")}
             </button>
           )}
@@ -240,14 +240,14 @@ export function StepAssembly() {
               disabled={isRendering}
               className="flex items-center gap-2 rounded-lg bg-hover px-6 py-2.5 text-sm font-medium text-ink transition hover:bg-hover disabled:opacity-50"
             >
-              <Film size={14} />
+              <Film className="h-3.5 w-3.5" />
               {t("wizard.reassemble")}
             </button>
             <button
               onClick={handleDownload}
               className="flex items-center gap-2 rounded-lg bg-info-solid px-6 py-2.5 text-sm font-medium text-white transition hover:bg-info-solid"
             >
-              <Download size={14} />
+              <Download className="h-3.5 w-3.5" />
               {t("pipeline.download")}
             </button>
           </div>

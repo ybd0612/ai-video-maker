@@ -105,7 +105,7 @@ export function CreationWizard() {
             disabled={!canGoBack}
             className="flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium text-ink-3 transition hover:bg-raised hover:text-ink disabled:opacity-30 disabled:cursor-not-allowed"
           >
-            <ChevronLeft size={14} />
+            <ChevronLeft className="h-3.5 w-3.5" />
             {t("wizard.prev")}
           </button>
 
@@ -117,7 +117,7 @@ export function CreationWizard() {
                 className="flex items-center gap-1.5 rounded-md bg-success-solid px-4 py-1.5 text-xs font-medium text-white transition hover:bg-success-solid disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {t("wizard.next")}
-                <ChevronRight size={14} />
+                <ChevronRight className="h-3.5 w-3.5" />
               </button>
             )}
           </div>

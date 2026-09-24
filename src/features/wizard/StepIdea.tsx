@@ -154,7 +154,7 @@ export function StepIdea({ onGenerated }: StepIdeaProps) {
         {generating && (
           <div className="absolute inset-0 flex items-center justify-center rounded-xl bg-surface/80 backdrop-blur-sm">
             <div className="flex flex-col items-center gap-2">
-              <Loader2 size={24} className="animate-spin text-success" />
+              <Loader2 className="h-6 w-6 animate-spin text-success" />
               <span className="text-sm text-success">{t("wizard.generating")}</span>
             </div>
           </div>
@@ -180,7 +180,7 @@ export function StepIdea({ onGenerated }: StepIdeaProps) {
                 : "border-line bg-raised text-ink-3 hover:border-line-strong"
             }`}
           >
-            <Icon size={16} />
+            <Icon className="h-4 w-4" />
             {label}
           </button>
         ))}
@@ -193,9 +193,9 @@ export function StepIdea({ onGenerated }: StepIdeaProps) {
         className="mx-auto flex items-center gap-2 rounded-xl bg-success-solid px-8 py-3 text-sm font-semibold text-white transition hover:bg-success-solid disabled:opacity-50 disabled:cursor-not-allowed"
       >
         {generating ? (
-          <Loader2 size={16} className="animate-spin" />
+          <Loader2 className="h-4 w-4 animate-spin" />
         ) : (
-          <Sparkles size={16} />
+          <Sparkles className="h-4 w-4" />
         )}
         {t("wizard.extractAndContinue")}
       </button>
