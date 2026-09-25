@@ -234,7 +234,7 @@ export function StepStoryboard() {
         />
       }
       detail={editingShot ? (
-        <div key={editingShot.id} className="flex min-h-0 flex-1 flex-col gap-3">
+        <div key={editingShot.id} className="flex flex-col gap-3">
           <ShotDetail
             shot={editingShot}
             assets={assets}
