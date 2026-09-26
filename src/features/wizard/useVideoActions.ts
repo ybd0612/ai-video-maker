@@ -9,10 +9,10 @@ import { generateVideo, aspectRatioToVideoAspect, pollVideoTaskById, VideoTaskCr
 import { planShotVideoMedia } from "@/lib/videoPlan";
 import { extractTailFrameUrl } from "@/services/renderService";
 import { releaseTailFrames, setTailFrame, snapshotTailFrames } from "@/lib/tailFrameStore";
-import { pendingVideoShots } from "@/lib/shotQueue";
+import { pendingVideoShots, hasResumableVideoTask } from "@/lib/shotQueue";
 import { getTranslation } from "@/i18n";
 import { composeMotionPrompt } from "@/lib/promptUtils";
-import { createBatchRunner, hasActiveTask } from "@/lib/batchRunner";
+import { createBatchRunner } from "@/lib/batchRunner";
 import { appendRegistryRules, type RegistryRuleText } from "@/lib/promptComposer";
 import { getActiveRenderRules } from "@/lib/promptRules";
 import { restoreProjectStatusIfReady } from "./wizardActionUtils";
@@ -38,7 +38,13 @@ const runVideoBatch = createBatchRunner({
   registry: activeVideoTasks,
   recoverStuck: (pid) => {
     const latestProject = useProjectStore.getState().projects.find((p) => p.id === pid);
-    const stuckVideoing = (latestProject?.shots ?? []).filter((shot) => shot.status === "videoing");
+    // 只复位「没有可续轮询任务」的在飞镜头。带 videoTaskId 的必须留给
+    // resumePendingVideoTasks 续轮询同一个任务：复位成 imaged 会让它重新进
+    // pendingVideoShots 集合 → 再发一次 POST /videos → 旧任务被覆盖 ID 后无人问，
+    // 服务端白多一个按秒计费的任务（2026-09-26 实测：同一镜头三次刷新三次重建）。
+    const stuckVideoing = (latestProject?.shots ?? []).filter(
+      (shot) => shot.status === "videoing" && !hasResumableVideoTask(shot),
+    );
     for (const shot of stuckVideoing) {
       useProjectStore.getState().updateShotByProjectId(pid, shot.id, {
         status: "imaged",
@@ -59,7 +65,14 @@ const runVideoBatch = createBatchRunner({
       if (signal.aborted) return;
       const expectedRevision = shot.renderRevision ?? 0;
       useProjectStore.getState().setShotStatusByProjectId(pid, shot.id, "videoing");
-      useProjectStore.getState().updateShotByProjectId(pid, shot.id, { videoProgress: 0 });
+      // 清掉上一轮遗留的任务 ID：它同时是「本镜头由谁在轮询」的判据 —— 留着旧 ID，
+      // 挂载时的 resumePendingVideoTasks 会把本批量正在轮询的镜头误判成上一会话的孤儿，
+      // 于是同一个镜头被两处轮询，旧任务一报错就把在飞镜头打成 failed。
+      useProjectStore.getState().updateShotByProjectId(pid, shot.id, {
+        videoProgress: 0,
+        videoTaskId: undefined,
+        videoTaskModel: undefined,
+      });
 
       // 创建请求非幂等：POST /videos 按秒计费，超时/5xx 时服务端可能已经建了任务，
       // 自动重发就是重复扣秒数。因此这里不重试创建；任务已建的场景由
@@ -183,20 +196,25 @@ const runVideoBatch = createBatchRunner({
  * 刷新恢复：模块级注册表随页面销毁清空，但服务端任务还在跑。
  * 有 videoTaskId 说明任务确实存在（按秒计费）→ 继续轮询同一个任务，绝不重建；
  * 没有 ID 才按旧口径复位为 imaged，交用户手动重做。
- * 必须在 hasActiveTask 守卫之后执行，避免与正在跑的批量任务重复轮询。
+ *
+ * ⚠ 这里**不能**用 hasActiveTask 做项目级跳过：步骤页（子组件）的挂载 effect 先于
+ * CreationWizard（父组件）执行，视频批量在那一同步时刻已把项目登记进注册表，
+ * 项目级 continue 会让上一会话遗留的在飞任务永远无人续轮询 —— 镜头停在「生成中」、
+ * 用户只能刷新，而每次刷新又多烧一个按秒计费的任务（2026-09-26 实测）。
+ * 逐镜头判定即可安全区分归属：本批量正在处理的镜头已在任务开始时清掉任务 ID
+ * （见 buildTasks），所以「videoing + ID 齐全」只可能是待续轮询的孤儿任务。
  */
 export async function resumePendingVideoTasks(): Promise<void> {
   const { providerConfig } = useSettingsStore.getState();
   if (!providerConfig.apiKey || !providerConfig.baseUrl) return;
 
   for (const project of useProjectStore.getState().projects) {
-    if (hasActiveTask(activeVideoTasks, project.id)) continue;
     const targetProjectId = project.id;
 
     for (const shot of project.shots) {
       if (shot.status !== "videoing") continue;
 
-      if (!shot.videoTaskId || !shot.videoTaskModel) {
+      if (!hasResumableVideoTask(shot)) {
         useProjectStore.getState().updateShotByProjectId(targetProjectId, shot.id, {
           status: "imaged",
           videoProgress: 0,

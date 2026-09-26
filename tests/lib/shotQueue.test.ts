@@ -6,6 +6,7 @@
 
 import { describe, expect, it } from "vitest";
 import {
+  hasResumableVideoTask,
   pendingImageShots,
   pendingVideoShots,
   shotsWithoutMotion,
@@ -94,5 +95,25 @@ describe("不可生成集合（用于单独提示，不能静默跳过）", () =
       shot({ id: "ok", imageUrl: "https://cdn.test/b.png", motionPrompt: "walk" }),
     ];
     expect(shotsWithoutMotion(shots).map((s) => s.id)).toEqual(["imaged"]);
+  });
+});
+
+describe("hasResumableVideoTask（在飞任务可否续轮询的唯一口径）", () => {
+  const task = { videoTaskId: "task_abc", videoTaskModel: "agnes-video-2.5-flash" };
+
+  it("videoing 且 ID 齐全 → 可续轮询（复位重建就是重复扣秒数）", () => {
+    expect(hasResumableVideoTask(shot({ id: "a", status: "videoing", ...task }))).toBe(true);
+  });
+
+  it("缺 videoTaskId 或缺 videoTaskModel → 不可续轮询，只能复位", () => {
+    expect(hasResumableVideoTask(shot({ id: "b", status: "videoing" }))).toBe(false);
+    expect(hasResumableVideoTask(shot({ id: "c", status: "videoing", videoTaskId: "task_abc" }))).toBe(false);
+    expect(hasResumableVideoTask(shot({ id: "d", status: "videoing", videoTaskModel: "m" }))).toBe(false);
+  });
+
+  it("非 videoing 状态一律不可续轮询（已完成的任务 ID 不应让镜头留在在飞集合）", () => {
+    expect(hasResumableVideoTask(shot({ id: "e", status: "videoed", videoUrl: "https://cdn.test/e.mp4", ...task }))).toBe(false);
+    expect(hasResumableVideoTask(shot({ id: "f", status: "failed", ...task }))).toBe(false);
+    expect(hasResumableVideoTask(shot({ id: "g", status: "imaged", imageUrl: "https://cdn.test/g.png", ...task }))).toBe(false);
   });
 });

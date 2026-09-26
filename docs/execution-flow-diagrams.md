@@ -448,7 +448,9 @@ Promise.allSettled([链A, 链B])                                      :269
 ```
 [编排] generateVideosForStep()
   并发 = 套餐 accessType=="tokenplan" ? 3 : 视频 RPM<=1 ? 1 : 2          :198
-  recoverStuck: status=="videoing 出视频中" -> {status:"imaged", videoProgress:0, error:清}
+  recoverStuck: status=="videoing" 且 !hasResumableVideoTask(缺 videoTaskId 或 videoTaskModel)
+              -> {status:"imaged", videoProgress:0, error:清}
+              带任务 ID 的 videoing 镜头跳过复位，交 resumePendingVideoTasks 续轮询同一任务
   筛选待生成: 无 videoUrl && 有 imageUrl && status!="videoing"
               && (motionPrompt 动态提示词 或 actionDesc 动作 非空)
   |
