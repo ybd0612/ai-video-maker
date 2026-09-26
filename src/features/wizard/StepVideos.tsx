@@ -72,6 +72,8 @@ export function StepVideos() {
   }, [allVideoed]);
 
   // 自动开始/恢复视频生成：挂载时触发一次（shots.length 变化时重算）。
+  // 存在已计费的在飞任务时批量会自行不新建（见 useVideoActions.buildTasks），
+  // 那些镜头由容器挂载时的 resumePendingVideoTasks 并发续轮询，故此处无需并入该集合。
   // 注意：不依赖 videoGenerationStarted —— 批量生成内部会把它置 true，
   // 若加入依赖会导致 effect 重入，generateVideosForStep 的幂等守卫会跳过，但更稳妥的做法是只触发一次。
   useEffect(() => {

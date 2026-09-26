@@ -450,7 +450,11 @@ Promise.allSettled([链A, 链B])                                      :269
   并发 = 套餐 accessType=="tokenplan" ? 3 : 视频 RPM<=1 ? 1 : 2          :198
   recoverStuck: status=="videoing" 且 !hasResumableVideoTask(缺 videoTaskId 或 videoTaskModel)
               -> {status:"imaged", videoProgress:0, error:清}
-              带任务 ID 的 videoing 镜头跳过复位，交 resumePendingVideoTasks 续轮询同一任务
+              带任务 ID 的 videoing 镜头跳过复位，改由本轮批量续轮询同一任务（只发 GET）
+  前置闸门: inFlightVideoShots(在飞+任务 ID 齐备) 非空 → 直接 return 空任务列表（不注册）
+          已计费任务改由 resumePendingVideoTasks 并发续轮询（只发 GET）；
+          偿清前不开新任务，剩余镜头由用户点「补做缺失 (N)」继续
+  任务列表: [ ...pendingVideoShots 创建任务 ]
   筛选待生成: 无 videoUrl && 有 imageUrl && status!="videoing"
               && (motionPrompt 动态提示词 或 actionDesc 动作 非空)
   |

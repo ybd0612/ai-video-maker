@@ -7,6 +7,7 @@
 import { describe, expect, it } from "vitest";
 import {
   hasResumableVideoTask,
+  inFlightVideoShots,
   pendingImageShots,
   pendingVideoShots,
   shotsWithoutMotion,
@@ -115,5 +116,31 @@ describe("hasResumableVideoTask（在飞任务可否续轮询的唯一口径）"
     expect(hasResumableVideoTask(shot({ id: "e", status: "videoed", videoUrl: "https://cdn.test/e.mp4", ...task }))).toBe(false);
     expect(hasResumableVideoTask(shot({ id: "f", status: "failed", ...task }))).toBe(false);
     expect(hasResumableVideoTask(shot({ id: "g", status: "imaged", imageUrl: "https://cdn.test/g.png", ...task }))).toBe(false);
+  });
+});
+
+describe("inFlightVideoShots（批量续轮询集合，与待补做集合互斥）", () => {
+  const img = { imageUrl: "https://cdn.test/a.png" };
+  const task = { videoTaskId: "task_abc", videoTaskModel: "agnes-video-2.5-flash" };
+
+  it("只收 videoing 且 ID 齐备的镜头，并保持镜头顺序", () => {
+    const shots = [
+      shot({ id: "s0", ...img, status: "imaged" }),
+      shot({ id: "s1", ...img, status: "videoing", ...task }),
+      shot({ id: "s2", ...img, status: "videoing", videoTaskId: "task_def" }),
+      shot({ id: "s3", ...img, status: "videoed", videoUrl: "https://cdn.test/s3.mp4", ...task }),
+    ];
+    expect(inFlightVideoShots(shots).map((s) => s.id)).toEqual(["s1"]);
+  });
+
+  it("不变量：进了在飞集合的镜头绝不进待补做集合（进了就会被重建、重复扣秒数）", () => {
+    const inFlight = shot({ id: "run", ...img, status: "videoing", ...task });
+    expect(pendingVideoShots([inFlight])).toEqual([]);
+  });
+
+  it("videoing 但缺 ID 的镜头两个集合都不进 —— 必须先复位成 imaged 才可补做", () => {
+    const lost = shot({ id: "lost", ...img, status: "videoing" });
+    expect(inFlightVideoShots([lost])).toEqual([]);
+    expect(pendingVideoShots([lost])).toEqual([]);
   });
 });

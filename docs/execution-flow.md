@@ -177,13 +177,14 @@
 
 ## 7. 步骤 5：镜头视频
 
-`useVideoActions.ts`，`runVideoBatch`（:37-199）。并发按套餐：`tokenplan → 3`，`rpm.video <= 1 → 1`，否则 `2`（:281-284）。
+`useVideoActions.ts`，`runVideoBatch`（:124-244）。并发按套餐：`tokenplan → 3`，`rpm.video <= 1 → 1`，否则 `2`（:303-306）。
 
-1. `recoverStuck`：残留 `videoing` 且**无可续轮询任务**（口径 `src/lib/shotQueue.ts:40 hasResumableVideoTask` = `videoTaskId` 与 `videoTaskModel` 同时齐备）→ 回 `imaged`，`videoProgress=0`（:39-53）。带任务 ID 的镜头**跳过复位**，留给挂载时的 `resumePendingVideoTasks` 续轮询：旧实现无条件复位会让该镜头重新进 `pendingVideoShots` 集合，于是每刷新一次就再发一次 `POST /videos`（按秒计费的重复任务，旧任务 ID 被覆盖后从此无人轮询）——2026-09-26 实测同一镜头三次刷新烧掉三个任务，`debug-dump/runtime.log` 三条 CREATE 记录提示词逐字相同
-2. 筛选：`src/lib/shotQueue.ts:pendingVideoShots` = `!videoUrl && imageUrl && status !== "videoing" && (motionPrompt || actionDesc)`；排队数、待消耗秒数与顶部「补做缺失 (N)」按钮全部基于同一函数（含 `failed`）
-3. 提示词：`composeMotionPrompt(shot)`（恒直接返回 `shot.motionPrompt`，子字段不二次拼装，`lib/promptUtils.ts:21`）+ `appendRegistryRules(negativeStrategy)` —— 追加的是 `promptRules.getActiveRenderRules()` 的**渲染文本**（只收带 `renderContent` 的条目），写给提示词作者的元指令不再进请求体
-4. **创建不重试**（2026-09-23 裁定 3）：一次 `generateVideo` 调用，失败即 `failed` 并提示手动重试；旧的重试环（`MAX_TASK_RETRIES = 2` + `8s * (attempt+1)` 退避）已删除，因为超时 / 5xx 时服务端可能已建任务，重发就是重复扣秒数。取消链路仍缺（见 9.3）
-5. `generateVideo`（`videoService.ts`）—— 素材由 `src/lib/videoPlan.ts:planShotVideoMedia` 按设置项 `videoConsistency` 决策，批量与单项重摇共用同一函数（`useVideoActions.ts` 不再自己拼素材）：
+1. `recoverStuck`：残留 `videoing` 且**无可续轮询任务**（口径 `src/lib/shotQueue.ts:40 hasResumableVideoTask` = `videoTaskId` 与 `videoTaskModel` 同时齐备）→ 回 `imaged`，`videoProgress=0`（:126-142）。带任务 ID 的镜头**跳过复位**，由同一轮批量的续轮询任务接管（见下条）：旧实现无条件复位会让该镜头重新进 `pendingVideoShots` 集合，于是每刷新一次就再发一次 `POST /videos`（按秒计费的重复任务，旧任务 ID 被覆盖后从此无人轮询）——2026-09-26 实测同一镜头三次刷新烧掉三个任务，`debug-dump/runtime.log` 三条 CREATE 记录提示词逐字相同
+2. **有在飞任务时一律不新建**（2026-09-26）：`buildTasks` 开头判 `shotQueue.ts:54 inFlightVideoShots`（`videoing` + 任务 ID 齐备）非空即 `return []` —— 批量是 N 个 worker 顺序领取任务列表，免费档 N=1，把续轮询排进列表等于让一个卡死的孤儿任务占住 worker 最长 30 分钟（`VIDEO_POLL_TIMEOUT_MS`），后面待补做镜头全轮不到；这些镜头改由 `resumePendingVideoTasks` **并发**独占续轮询（只发 GET）。返回空列表时 `createBatchRunner` 走 `onEmpty` 且不注册，故该函数的项目级 `hasActiveTask` 跳过不会误伤自己。已计费任务偿清前不开新任务、剩余镜头由用户点「补做缺失 (N)」继续，是既定取舍。成功/失败写回统一走 `useVideoActions.ts:commitVideoResult` / `commitVideoFailure`（批量创建、批量续轮询、单镜头重摇三路共用；终态失败一并清 `videoTaskId`/`videoTaskModel`，否则镜头掉进既不进待补做集合、也无人轮询的死区）
+3. 筛选：`src/lib/shotQueue.ts:pendingVideoShots` = `!videoUrl && imageUrl && status !== "videoing" && (motionPrompt || actionDesc)`；排队数、待消耗秒数与顶部「补做缺失 (N)」按钮全部基于同一函数（含 `failed`）
+4. 提示词：`composeMotionPrompt(shot)`（恒直接返回 `shot.motionPrompt`，子字段不二次拼装，`lib/promptUtils.ts:21`）+ `appendRegistryRules(negativeStrategy)` —— 追加的是 `promptRules.getActiveRenderRules()` 的**渲染文本**（只收带 `renderContent` 的条目），写给提示词作者的元指令不再进请求体
+5. **创建不重试**（2026-09-23 裁定 3）：一次 `generateVideo` 调用，失败即 `failed` 并提示手动重试；旧的重试环（`MAX_TASK_RETRIES = 2` + `8s * (attempt+1)` 退避）已删除，因为超时 / 5xx 时服务端可能已建任务，重发就是重复扣秒数。取消链路仍缺（见 9.3）
+6. `generateVideo`（`videoService.ts`）—— 素材由 `src/lib/videoPlan.ts:planShotVideoMedia` 按设置项 `videoConsistency` 决策，批量与单项重摇共用同一函数（`useVideoActions.ts` 不再自己拼素材）：
    - **先限流**：`rateLimiter.acquire("video", { cost: duration || 1, signal })`（:135），配额按秒计、在 HTTP 之前扣
    - 创建体：`size 恒 "720P"`（:71）、`aspect_ratio` 白名单、`seconds = clamp(round(duration), 4, 12)` 转字符串（:139-143）、`n:1`
    - **`mode` 三选一，帧素材与参考图绝不同时出现**：
@@ -195,7 +196,7 @@
    - 轮询 `GET {origin}/agnesapi?video_id=...&model_name=agnes-video-2.5-flash`，间隔 5s、超时 30 分钟、`task_not_exist` 最多容忍 24 轮。轮询请求经 `pollVideoTask` 包装：**任何请求级失败（含 429 重试耗尽后抛出的 `HttpError`、网络错误、超时）一律转成带 `videoId` 的 `VideoTaskCreatedError`**（2026-09-23 修）。此前 `fetchWithRetry` 耗尽重试是抛错而非返回响应，普通 Error 会被 `useVideoActions` 判成「创建阶段失败」而走自动重发分支，于是对同一个镜头再发一次 `POST /videos` —— 服务端多出已计费的重复任务，一次被限流卡住的 GET 就能触发
    - 完成 URL 顺序（:288-294）：`url → metadata.url → video_url → output.url → output.video_url → remixed_from_video_id`；函数返回 `{ videoUrl, coverImageUrl, duration }`（:64-68,342），但**两个调用点只取 `result.videoUrl`**，cover 与实际时长被丢弃
    - **创建后失败的错误类型是 `VideoTaskCreatedError{videoId, stillRunning}`**（`videoService.ts:35-48`）；上层 `useVideoActions.ts:100-122` 对 `stillRunning=true` **只等待不再创建新任务**（避免双倍消耗），false 才判失败
-6. 写回 `videoUrl` + `status:"videoed"`（revision 校验）；`onFinally`：全有视频 → `idle`；全落定（有视频或失败）→ 复位 started + `failed`（`useVideoActions.ts:174-180`，硬编码中文文案）
+7. 写回 `videoUrl` + `status:"videoed"`（revision 校验）；`onFinally`：全有视频 → `idle`；全落定（有视频或失败）→ 复位 started + `failed`（`useVideoActions.ts:224-243`，硬编码中文文案）
 
 **`last_frame`（尾帧）现在没有任何手动来源**：旧的手动 `DualFrameToggle`（勾选后点选其他镜头画面图或手输 URL）已于 2026-09-24 **整体下线**——它把「他镜画面」当本镜尾帧违反裁定 2，且写回这些字段既会清空按秒计费的已生成视频、又会静默回收 `storyboardReviewed` 锁死分镜「下一步」。自动衔接仍是唯一机制：「后镜首帧取前镜末帧」（2026-09-23 裁定 2），`shotContinuity` 只判定该不该接、从前一镜取，前镜末帧由 `renderService.extractTailFrameUrl` 在前镜视频完成时抽出并放进 `lib/tailFrameStore`（内存），`videoPlan` 用它作本镜 `first_frame`；因此**自动路径不产生任何尾帧请求**。衔接判定与末帧地址都**不写 store**。`useDualFrame` / `lastFrameUrl` / `firstFrameUrl` 已归 `projectOps.ts:RUNTIME_SHOT_FIELDS`（见 9.4），写回**不清空已生成视频、也不回收审核位**；字段本身保留，`videoPlan` 的 `manual-tail` 分支只读消费历史数据，但已无 UI 再写入。另：`shot.firstFrameUrl` 只被 `normalizeRawShot` / `pickShotFields` 搬运，请求侧从不读取它（`first_frame` 用的是 `shot.imageUrl`），仍是**无消费者的死字段**。
 
@@ -248,7 +249,7 @@ RPM 与配额表（`lib/plans.ts:73-134`，格式 文本 / 图片1K,2K,3K,4K / �
 
 `activeScriptTasks` / `activeAssetTasks` / `activeImageTasks` / `activeVideoTasks`（各 `useXxxActions.ts` 顶部，Map<projectId, AbortController>）。`createBatchRunner` 执行序：注册表命中即返回 → `recoverStuck` → 新建独立 AbortController → `buildTasks`（空则 `onEmpty` 且**不登记**）→ 登记 → `onBeforeRun` → `runWithConcurrency`（N 个 worker 共享自增队列，`Promise.allSettled`，abort 后停止领取新任务）→ `finally` 注销 + `onFinally`。
 第五张 `activeIdeaTasks`（`useScriptActions.ts:59`）不走 `createBatchRunner`（步骤 1 是两链并行、不是同构批量），但用同一套 `hasActiveTask` 守卫：命中即 `return true`，`finally` 注销。
-刷新恢复：注册表天然为空 → `recoverStuck` 把 `imaging→scripted`、`scripting→idle`、**无可续轮询任务的** `videoing→imaged`（带 `videoTaskId`+`videoTaskModel` 的 `videoing` 镜头跳过复位，由向导容器挂载时的 `resumePendingVideoTasks` 续轮询同一个任务，`useVideoActions.ts:207`）；`resumePendingVideoTasks` **不做项目级 `hasActiveTask` 跳过** —— 步骤页（子组件）的挂载 effect 先于容器（父组件）执行，批量在那一同步时刻已把项目登记进注册表，项目级跳过会让孤儿任务永远无人续轮询；`assetGenerationStarted` 在步骤 2 挂载时按 `hasActiveAssetTask` 复位；残留的项目级 `scripting` 由向导容器挂载时按 `hasActiveIdeaTask / hasActiveScriptTask` 一次性复位（`CreationWizard.tsx:31-42`）。
+刷新恢复：注册表天然为空 → `recoverStuck` 把 `imaging→scripted`、`scripting→idle`、**无可续轮询任务的** `videoing→imaged`（带 `videoTaskId`+`videoTaskModel` 的 `videoing` 镜头跳过复位，由向导容器挂载时的 `resumePendingVideoTasks` 续轮询同一个任务，`useVideoActions.ts:207`）；`resumePendingVideoTasks` **保留项目级 `hasActiveTask` 跳过**（批量自己会续轮询在飞镜头，跳过才保证「一个镜头只有一个轮询者」），且对无批量在跑的项目用 `Promise.allSettled` **并发**续轮询 —— 旧实现 `for` + `await` 串行，一次只盯一个任务、其余各等最长 30 分钟（2026-09-26 实测同项目 6 个在飞任务全部 progress 0）；`assetGenerationStarted` 在步骤 2 挂载时按 `hasActiveAssetTask` 复位；残留的项目级 `scripting` 由向导容器挂载时按 `hasActiveIdeaTask / hasActiveScriptTask` 一次性复位（`CreationWizard.tsx:31-42`）。
 
 ⚠️ **实测：批量任务实际不可取消。** 全仓 `controller.abort()` 只有 5 处：`StepAssembly.tsx:114`（拼接取消按钮）、`lib/fetchWithRetry.ts:106,115`（单次请求超时 + 外部 signal 转发）、`services/renderService.ts:109,112`（下载超时 + signal 转发）。也就是说，**唯一的用户级取消入口是步骤 6 的「取消拼接」**；各注册表里登记的 AbortController 以及 `generateStyleReference`（`useAssetActions.ts:188`）、`rerollVideo`（`useVideoActions.ts:307`）自建的 controller 没有任何地方 abort。因此 `signal.aborted` 在批量链路里恒为 false：切项目、离开步骤、组件卸载都不会中断在飞请求与视频轮询，任务只在后台跑完并按 projectId 写回。
 

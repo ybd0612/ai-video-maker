@@ -9,10 +9,10 @@ import { generateVideo, aspectRatioToVideoAspect, pollVideoTaskById, VideoTaskCr
 import { planShotVideoMedia } from "@/lib/videoPlan";
 import { extractTailFrameUrl } from "@/services/renderService";
 import { releaseTailFrames, setTailFrame, snapshotTailFrames } from "@/lib/tailFrameStore";
-import { pendingVideoShots, hasResumableVideoTask } from "@/lib/shotQueue";
+import { pendingVideoShots, inFlightVideoShots, hasResumableVideoTask, type ResumableVideoShot } from "@/lib/shotQueue";
 import { getTranslation } from "@/i18n";
 import { composeMotionPrompt } from "@/lib/promptUtils";
-import { createBatchRunner } from "@/lib/batchRunner";
+import { createBatchRunner, hasActiveTask } from "@/lib/batchRunner";
 import { appendRegistryRules, type RegistryRuleText } from "@/lib/promptComposer";
 import { getActiveRenderRules } from "@/lib/promptRules";
 import { restoreProjectStatusIfReady } from "./wizardActionUtils";
@@ -32,6 +32,93 @@ function extractVideoRules(): RegistryRuleText {
   return {
     negativeStrategy: getActiveRenderRules("negativeStrategy", "en"),
   };
+}
+
+/**
+ * 视频成功写回（批量创建 / 批量续轮询 / 单镜头重摇共用）。
+ * 完成即清任务 ID：镜头已有成片，旧任务 ID 再留着会被判成"在飞"而不进待补做集合。
+ */
+async function commitVideoResult(
+  pid: string,
+  shotId: string,
+  expectedRevision: number,
+  videoUrl: string,
+  signal?: AbortSignal,
+): Promise<void> {
+  const applied = useProjectStore.getState().updateShotByProjectIdIfRevision(
+    pid,
+    shotId,
+    expectedRevision,
+    { videoUrl, status: "videoed", videoTaskId: undefined, videoTaskModel: undefined },
+  );
+  if (!applied) return;
+  // 末帧只服务后续镜头的首帧衔接：抽取失败静默降级，绝不影响本镜结果
+  try {
+    setTailFrame(shotId, await extractTailFrameUrl(videoUrl, signal));
+  } catch {
+    /* 无末帧可用，下一镜自动退回仅锁首帧 */
+  }
+}
+
+/**
+ * 视频失败写回（同上三条路径共用）。
+ * 「任务仍在跑」保留 `videoTaskId` 与 `videoing` 状态，让下一轮批量/恢复接着轮询同一个任务；
+ * 终态失败必须一并清掉任务 ID —— 否则该镜头既不在 `pendingVideoShots`（若状态被复位）
+ * 也无人续轮询，会永久卡在已计费但无人认领的状态。
+ */
+function commitVideoFailure(pid: string, shotId: string, expectedRevision: number, err: unknown): void {
+  const store = useProjectStore.getState();
+  if (err instanceof VideoTaskCreatedError) {
+    if (err.stillRunning) {
+      store.updateShotByProjectIdIfRevision(pid, shotId, expectedRevision, {
+        videoProgress: 0,
+        error: `${err.message} ${getTranslation("error.videoTaskKept")}`,
+      });
+    } else {
+      store.updateShotByProjectIdIfRevision(pid, shotId, expectedRevision, {
+        status: "failed",
+        error: `${err.message} ${getTranslation("error.videoTaskFailedManualRetry")}`,
+        videoTaskId: undefined,
+        videoTaskModel: undefined,
+      });
+    }
+    return;
+  }
+
+  store.updateShotByProjectIdIfRevision(pid, shotId, expectedRevision, {
+    status: "failed",
+    error: `${err instanceof Error ? err.message : String(err)} ${getTranslation("error.videoCreateManualRetry")}`,
+    videoTaskId: undefined,
+    videoTaskModel: undefined,
+  });
+}
+
+/**
+ * 只轮询已存在的服务端任务，绝不发 `POST /videos`：视频按秒计费，重建等于重复扣额度。
+ * 与创建路径共用同一套写回，保证「谁在轮询这个镜头」始终只有一个所有者。
+ */
+async function resumeShotVideoTask(
+  pid: string,
+  shot: ResumableVideoShot,
+  providerConfig: { apiKey: string; baseUrl: string },
+  signal?: AbortSignal,
+): Promise<void> {
+  if (signal?.aborted) return;
+  const expectedRevision = shot.renderRevision ?? 0;
+  try {
+    const result = await pollVideoTaskById(
+      providerConfig,
+      shot.videoTaskId,
+      shot.videoTaskModel,
+      (progress) => {
+        useProjectStore.getState().updateShotByProjectId(pid, shot.id, { videoProgress: progress });
+      },
+      signal,
+    );
+    await commitVideoResult(pid, shot.id, expectedRevision, result.videoUrl, signal);
+  } catch (err) {
+    commitVideoFailure(pid, shot.id, expectedRevision, err);
+  }
 }
 
 const runVideoBatch = createBatchRunner({
@@ -58,10 +145,15 @@ const runVideoBatch = createBatchRunner({
     const latestProject = useProjectStore.getState().projects.find((p) => p.id === pid);
     if (!latestProject) return [];
     const shotsNeedingVideos = pendingVideoShots(latestProject.shots);
+    // 有已计费、尚未回收的在飞任务时**一律不新建**：这些镜头由 resumePendingVideoTasks
+    // 的并发通道独占续轮询（见该函数）。不能把它们排进本列表 —— 批量是 N 个 worker
+    // 顺序领取任务，免费档 N=1，一个卡死的孤儿任务最长占住 worker 30 分钟，
+    // 后面所有镜头都轮不到（2026-09-26 实测 6 个在飞任务 progress 全 0）。
+    if (inFlightVideoShots(latestProject.shots).length > 0) return [];
     const videoAspect = aspectRatioToVideoAspect(latestProject.aspectRatio);
     const rules = extractVideoRules();
 
-    return shotsNeedingVideos.map((shot) => async () => {
+    const createTasks = shotsNeedingVideos.map((shot) => async () => {
       if (signal.aborted) return;
       const expectedRevision = shot.renderRevision ?? 0;
       useProjectStore.getState().setShotStatusByProjectId(pid, shot.id, "videoing");
@@ -116,55 +208,14 @@ const runVideoBatch = createBatchRunner({
             signal,
           );
 
-          const applied = useProjectStore.getState().updateShotByProjectIdIfRevision(
-            pid,
-            shot.id,
-            expectedRevision,
-            { videoUrl: result.videoUrl, status: "videoed", videoTaskId: undefined, videoTaskModel: undefined },
-          );
-          if (!applied) return;
-          // 末帧只服务后续镜头的首帧衔接：抽取失败静默降级，绝不影响本镜结果
-          try {
-            setTailFrame(shot.id, await extractTailFrameUrl(result.videoUrl, signal));
-          } catch {
-            /* 无末帧可用，下一镜自动退回仅锁首帧 */
-          }
-          return;
+          await commitVideoResult(pid, shot.id, expectedRevision, result.videoUrl, signal);
         } catch (err) {
-          // 任务已在服务端创建：继续等待同一个任务，不创建重复任务。
-          if (err instanceof VideoTaskCreatedError) {
-            if (!err.stillRunning) {
-              useProjectStore.getState().setShotStatusByProjectIdIfRevision(
-                pid,
-                shot.id,
-                expectedRevision,
-                "failed",
-                `${err.message} ${getTranslation("error.videoTaskFailedManualRetry")}`,
-              );
-            } else {
-              useProjectStore.getState().updateShotByProjectIdIfRevision(
-                pid,
-                shot.id,
-                expectedRevision,
-                {
-                  videoProgress: 0,
-                  error: `${err.message} ${getTranslation("error.videoTaskKept")}`,
-                },
-              );
-            }
-            return;
-          }
-
-          useProjectStore.getState().setShotStatusByProjectIdIfRevision(
-            pid,
-            shot.id,
-            expectedRevision,
-            "failed",
-            `${err instanceof Error ? err.message : String(err)} ${getTranslation("error.videoCreateManualRetry")}`,
-          );
+          commitVideoFailure(pid, shot.id, expectedRevision, err);
         }
       }
     });
+
+    return createTasks;
   },
   onBeforeRun: (pid) => {
     useProjectStore.getState().setVideoGenerationStartedByProjectId(pid, true);
@@ -193,70 +244,40 @@ const runVideoBatch = createBatchRunner({
 });
 
 /**
- * 刷新恢复：模块级注册表随页面销毁清空，但服务端任务还在跑。
- * 有 videoTaskId 说明任务确实存在（按秒计费）→ 继续轮询同一个任务，绝不重建；
- * 没有 ID 才按旧口径复位为 imaged，交用户手动重做。
+ * 刷新恢复：模块级注册表随页面销毁清空，但服务端任务还在跑（按秒计费）。
+ * 归属规则（一个镜头只能有一个轮询者）：
+ * - 该项目有批量正在跑创建 → 整项目跳过（批量见有在飞任务就不新建、也不注册，故此守卫只挡真正在创建的情形）；
+ * - 否则本项目所有「`videoing` + 任务 ID 齐备」的镜头**并发**续轮询同一个任务，绝不重建；
+ * - `videoing` 但缺 ID 的（创建请求在飞的窗口内被刷新）复位为 `imaged`，交批量正常新建。
  *
- * ⚠ 这里**不能**用 hasActiveTask 做项目级跳过：步骤页（子组件）的挂载 effect 先于
- * CreationWizard（父组件）执行，视频批量在那一同步时刻已把项目登记进注册表，
- * 项目级 continue 会让上一会话遗留的在飞任务永远无人续轮询 —— 镜头停在「生成中」、
- * 用户只能刷新，而每次刷新又多烧一个按秒计费的任务（2026-09-26 实测）。
- * 逐镜头判定即可安全区分归属：本批量正在处理的镜头已在任务开始时清掉任务 ID
- * （见 buildTasks），所以「videoing + ID 齐全」只可能是待续轮询的孤儿任务。
+ * 旧实现是 `for` + `await` 串行：一次只真正盯一个任务，其余挂着 ID 的镜头各等最长 30 分钟
+ * 才轮到（2026-09-26 实测同项目 6 个在飞任务全部 progress 0，界面上就是"一个都没成功"）。
  */
 export async function resumePendingVideoTasks(): Promise<void> {
   const { providerConfig } = useSettingsStore.getState();
   if (!providerConfig.apiKey || !providerConfig.baseUrl) return;
 
   for (const project of useProjectStore.getState().projects) {
+    if (hasActiveTask(activeVideoTasks, project.id)) continue;
     const targetProjectId = project.id;
 
+    const waiting: ResumableVideoShot[] = [];
     for (const shot of project.shots) {
       if (shot.status !== "videoing") continue;
-
-      if (!hasResumableVideoTask(shot)) {
+      if (hasResumableVideoTask(shot)) {
+        waiting.push(shot);
+      } else {
         useProjectStore.getState().updateShotByProjectId(targetProjectId, shot.id, {
           status: "imaged",
           videoProgress: 0,
           error: undefined,
         });
-        continue;
-      }
-
-      const expectedRevision = shot.renderRevision ?? 0;
-      const videoId = shot.videoTaskId;
-      const modelName = shot.videoTaskModel;
-      try {
-        const result = await pollVideoTaskById(
-          { apiKey: providerConfig.apiKey, baseUrl: providerConfig.baseUrl },
-          videoId,
-          modelName,
-          (progress) => {
-            useProjectStore.getState().updateShotByProjectId(targetProjectId, shot.id, { videoProgress: progress });
-          },
-        );
-        const applied = useProjectStore.getState().updateShotByProjectIdIfRevision(
-          targetProjectId,
-          shot.id,
-          expectedRevision,
-          { videoUrl: result.videoUrl, status: "videoed", videoTaskId: undefined, videoTaskModel: undefined },
-        );
-        if (applied) {
-          // 恢复路径同样补末帧；失败只降级，不影响本镜结果
-          void extractTailFrameUrl(result.videoUrl)
-            .then((url) => setTailFrame(shot.id, url))
-            .catch(() => {});
-        }
-      } catch (err) {
-        useProjectStore.getState().setShotStatusByProjectIdIfRevision(
-          targetProjectId,
-          shot.id,
-          expectedRevision,
-          "failed",
-          err instanceof Error ? err.message : String(err),
-        );
       }
     }
+
+    await Promise.allSettled(
+      waiting.map((shot) => resumeShotVideoTask(targetProjectId, shot, providerConfig)),
+    );
 
     restoreProjectStatusIfReady(targetProjectId, (currentProject) =>
       currentProject.shots.every((item) => !!item.videoUrl),
@@ -301,7 +322,12 @@ export function useVideoActions(): VideoActions {
     // 旧视频即将作废：先释放它的末帧，下一镜不会再接到过期画面
     releaseTailFrames([shotId]);
     store.setShotStatusByProjectId(targetProjectId, shotId, "videoing");
-    store.updateShotByProjectId(targetProjectId, shotId, { videoProgress: 0 });
+    // 与批量创建路径同口径：重摇即放弃旧任务，遗留 ID 会让镜头被误判成"上一轮在飞、只该续轮询"
+    store.updateShotByProjectId(targetProjectId, shotId, {
+      videoProgress: 0,
+      videoTaskId: undefined,
+      videoTaskModel: undefined,
+    });
 
     // 单镜头重试用独立 controller，不干扰批量生成任务。
     const controller = new AbortController();
@@ -343,51 +369,12 @@ export function useVideoActions(): VideoActions {
         signal,
       );
 
-      const applied = useProjectStore.getState().updateShotByProjectIdIfRevision(
-        targetProjectId,
-        shotId,
-        expectedRevision,
-        { videoUrl: result.videoUrl, status: "videoed", videoTaskId: undefined, videoTaskModel: undefined },
-      );
-      if (!applied) return;
-      try {
-        setTailFrame(shotId, await extractTailFrameUrl(result.videoUrl, signal));
-      } catch {
-        /* 无末帧可用，下一镜自动退回仅锁首帧 */
-      }
+      await commitVideoResult(targetProjectId, shotId, expectedRevision, result.videoUrl, signal);
       restoreProjectStatusIfReady(targetProjectId, (currentProject) =>
         currentProject.shots.every((item) => !!item.videoUrl),
       );
     } catch (err) {
-      if (err instanceof VideoTaskCreatedError) {
-        if (!err.stillRunning) {
-          useProjectStore.getState().setShotStatusByProjectIdIfRevision(
-            targetProjectId,
-            shotId,
-            expectedRevision,
-            "failed",
-            `${err.message} ${getTranslation("error.videoTaskFailedManualRetry")}`,
-          );
-        } else {
-          useProjectStore.getState().updateShotByProjectIdIfRevision(
-            targetProjectId,
-            shotId,
-            expectedRevision,
-            {
-              videoProgress: 0,
-              error: `${err.message} ${getTranslation("error.videoTaskKept")}`,
-            },
-          );
-        }
-      } else {
-        useProjectStore.getState().setShotStatusByProjectIdIfRevision(
-          targetProjectId,
-          shotId,
-          expectedRevision,
-          "failed",
-          `${err instanceof Error ? err.message : String(err)} ${getTranslation("error.videoCreateManualRetry")}`,
-        );
-      }
+      commitVideoFailure(targetProjectId, shotId, expectedRevision, err);
     }
   }, []);
 
