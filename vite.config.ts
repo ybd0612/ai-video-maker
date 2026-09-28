@@ -21,6 +21,14 @@ export default defineConfig({
     port: 5188,
     host: "127.0.0.1",
     open: true,
+    // debug-dump/ 由应用自己写入（store 快照 + 运行日志，见 vite-plugins/debugDumpPlugin.ts）。
+    // 不排除的话每次落盘都会让 Vite 触发整页刷新（2026-09-28 实测约每 60 秒一次），
+    // 而批量生成的任务注册表是模块级内存态 —— 刷新即销毁 worker，
+    // 剩下没领到的镜头从此无人处理，界面表现就是「视频一直加载、只出一段」。
+    // 只影响 dev server；该插件本身 apply:"serve"，不进生产构建。
+    watch: {
+      ignored: ["**/debug-dump/**"],
+    },
     proxy: {
       // 视频/图片输出域名代理（规避浏览器 CORS）。
       // 实测中国站成片地址域名为 cos-platform-outputs.agnes-ai.cn（见 docs/history/2026-08-18-video-generation-investigation.md），
