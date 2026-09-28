@@ -272,7 +272,7 @@ RPM 与配额表（`lib/plans.ts:73-134`，格式 文本 / 图片1K,2K,3K,4K / �
 - **推论**：在步骤 4/5 改一个子字段（如 `sceneDesc`）会立即作废该镜头已生成的图片和视频；改内容型运动字段（如 `duration` / `motionPrompt`）只作废视频。而勾双帧开关或写首/尾帧 URL（`RUNTIME_SHOT_FIELDS`）**既不作废视频、也不回收分镜审核位**——2026-09-24 分档前的旧行为（写这些字段清空按秒计费的视频并静默锁死「下一步」）已随 `DualFrameToggle` 下线和 `RUNTIME_SHOT_FIELDS` 拆分一并修掉。这就是「改完必须重新生成」的真实机制。
 - 前两条里的 `outputChanged` 要求**值确实不同**（`projectOps.ts:83-85`）；写回相同 URL 不会递增 revision。
 
-**9.5 跨项目写回**：四个 `useXxxActions` 的生成链路统一在开始时 `const targetProjectId = project.id`，回写只用 `updateProjectById` / `*ByProjectId` / `setProjectStatusById`。仍有 active-project 版 action 跨异步边界使用的地方集中在角色编辑器与步骤 4/5 子字段（见第 12 节第 2、4 条）。
+**9.5 跨项目写回**：四个 `useXxxActions` 的生成链路统一在开始时 `const targetProjectId = project.id`，回写只用 `updateProjectById` / `*ByProjectId` / `setProjectStatusById`；角色编辑器的定妆照写回同样已按入口锁定的项目 ID 写回（2026-09-28，见第 12 节第 4 条）。仍用 active-project 版 action 参与异步链路的只剩**步骤 4/5 的子字段编辑与提示词重写**（`PromptSubFields.tsx`，见第 12 节第 2 条）。
 
 **9.6 级联失效（两条，都会跨步骤影响已完成产物）**
 
@@ -338,7 +338,7 @@ RPM 与配额表（`lib/plans.ts:73-134`，格式 文本 / 图片1K,2K,3K,4K / �
 1. ~~**镜头图片被失效后，步骤 4 没有对应的补生成入口**~~ **已修复（2026-09-21）**。现在：待补做集合的唯一口径是 `src/lib/shotQueue.ts`（`pendingImageShots` / `pendingVideoShots`，**含 `failed`**），批量生成、挂载自动触发、界面计数与顶部按钮四处共用；按钮只要有待补做就常驻显示「补做缺失 (N)」（走同一个幂等批量函数），非生成中时另有横幅解释成因；只想补单个镜头仍可展开该镜头卡片用「重新生成」。因此改子字段或重生成资产图导致产物被清空后，不再只能整套重做。
 2. **步骤 4/5 的子字段仍可手改**（`PromptSubFields.tsx:41-43` 用 active-project 的 `updateShot`，`onCommit` 再调 `rewritePromptFromFields` 重写整段英文）。与「分镜内容全只读、唯一入口是详情页一句话」相冲：同一段提示词有两个编辑源，且它正是第 1 条的主要触发器。
 3. **单项重生成不登记注册表**：`rerollImage`（`useImageActions.ts:208`）、`rerollVideo`（`useVideoActions.ts:205`）、场景/产品/道具单项生图（`StepAssets.tsx:228`）、定妆照生图（`useCharacterEditorActions.ts:134`）都绕过 `activeImageTasks` / `activeVideoTasks` / `activeAssetTasks`（`generateStyleReference` 是例外，它登记了）。批量任务看不见单项任务，两者可同时对同一镜头/资产发起 → 服务端任务重复创建、配额双倍消耗。步骤 2 用 `anyGenerating` 禁按钮做了规避（`StepAssets.tsx:65-66`），步骤 4/5 没有等价守卫。
-4. **定妆照写回跨异步边界用 active-project action**：`useCharacterEditorActions.ts:161` 的 `updateAsset(character.id, { imageUrl: url })` 与保存路径的 `updateAsset/addAsset` 都不带 projectId。等图片期间切换项目，结果会写进新项目的同名资产（AGENTS.md P1「多项目写回」尚未收口）。
+4. ~~**定妆照写回跨异步边界用 active-project action**~~ **已修复（2026-09-28）**：`useCharacterEditorActions.generatePortraitFrom` 在入口捕获 `targetProjectId = project?.id`，生图返回后走 `updateAssetByProjectId(targetProjectId, ...)`（缺 targetProjectId 则不写）。保存路径 `handleSave` 内部无任何 `await`，属同帧的 active-project 写回，保留 `updateAsset/addAsset` 不变。存储层语义绊线在 `tests/stores/projectStore.crossProject.test.ts`（含"两项目同 ID 时 active-project 版会写错目标"这条成因用例——复制项目保留资产 ID，这正是原缺陷的触发形态）。
 5. **`removeAsset` 注释与实现不一致**（`projectStore.ts:430-453`）：注释写「受影响镜头的图片/视频也必须失效」，实现只剔除引用与审核标记，**没有**清空 `imageUrl` / `videoUrl`，也没调 `invalidateShotForAsset`。删除一个角色后，用它生成的镜头图/视频仍留在项目里并继续参与拼接。
 6. **回步骤 2 重新生成任一资产图会连带清空镜头已完成产物**：`applyAssetUpdate` 把生成器自己的 `imageUrl` 写回也算「渲染字段变化」（9.6），并重置三个审核标记；改 style 资产则全部分镜作废。行为有单测锁定，但「补一个缺失资产 = 重做整套镜头图片」是否是你要的代价，值得确认。
 7. **批量任务没有取消入口**（9.3）：注册表里的 controller 从未被 abort，切项目、离开步骤、组件卸载都拦不住在飞请求与 30 分钟视频轮询，钱照扣、结果照写回。

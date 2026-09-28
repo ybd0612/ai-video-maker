@@ -49,6 +49,8 @@ export function useCharacterEditorActions({
   const t = useT();
   const addAsset = useProjectStore((s) => s.addAsset);
   const updateAsset = useProjectStore((s) => s.updateAsset);
+  /** 跨 await 的写回（定妆照）必须用按项目 ID 版；同步保存路径仍用 active-project 版 */
+  const updateAssetByProjectId = useProjectStore((s) => s.updateAssetByProjectId);
   const project = useProjectStore(selectActiveProject);
   const providerConfig = useSettingsStore((s) => s.providerConfig);
   const autoRegeneratePortrait = useSettingsStore((s) => s.autoRegeneratePortrait);
@@ -109,6 +111,9 @@ export function useCharacterEditorActions({
   const generatePortraitFrom = useCallback(
     async (effectiveAppearance: string) => {
       if (!providerConfig.apiKey || !providerConfig.baseUrl) return;
+      // 跨 await 的写回目标必须在入口锁定：等图期间用户可能切换项目，
+      // 用 active-project 版 updateAsset 会写进新项目里同 ID 的资产（复制项目保留 ID）或静默丢弃
+      const targetProjectId = project?.id;
       setIsGeneratingPortrait(true);
       setError(null);
       try {
@@ -133,8 +138,8 @@ export function useCharacterEditorActions({
           seed: randomSeed(),
         });
         // Save portrait to character（统一资产 imageUrl 字段）
-        if (character) {
-          updateAsset(character.id, { imageUrl: url });
+        if (character && targetProjectId) {
+          updateAssetByProjectId(targetProjectId, character.id, { imageUrl: url });
         }
         setPortraitUrl(url);
       } catch (err) {
@@ -143,7 +148,7 @@ export function useCharacterEditorActions({
         setIsGeneratingPortrait(false);
       }
     },
-    [providerConfig, project, character, updateAsset],
+    [providerConfig, project, character, updateAssetByProjectId],
   );
 
   // 结构化设定文本：description 只存一句话简介，AI 指令必须看到完整设定；
