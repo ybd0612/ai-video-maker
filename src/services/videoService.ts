@@ -328,7 +328,13 @@ export async function pollVideoTaskById(
     if (!pollResp.ok) {
       const text = await pollResp.text().catch(() => "");
 
-      // 任务尚未注册 — 等待后重试
+      // 任务尚未注册 — 窗口内等待重试；窗口耗尽仍是 404 则判终态不存在。
+      // 终态必须显式 stillRunning=false：省略会继承构造器默认的 true，编排层
+      // commitVideoFailure 便走「保留服务端任务」分支，只写 error 而不复位
+      // status / videoTaskId —— 镜头从此恒满足 hasResumableVideoTask，批量见在飞
+      // 任务不新建、恢复通道只轮一个服务端已删除的任务、单项重摇被互斥拒绝，
+      // 每次刷新重轮 2 分钟回到同一结论（2026-09-28 实测 6 个镜头卡死）。
+      // 注意区分：429 / 5xx / 超时是「任务可能仍在排队」，仍按 stillRunning 保留 ID。
       if (text.includes("task_not_exist") || pollResp.status === 404) {
         notExistCount++;
         if (notExistCount > VIDEO_POLL_MAX_NOT_EXIST_RETRIES) {
@@ -336,6 +342,7 @@ export async function pollVideoTaskById(
             `视频任务 ${videoId} 持续不存在（已重试 ${notExistCount} 次，HTTP ${pollResp.status}）。` +
             `轮询 URL: ${pollUrl}。响应: ${text.slice(0, 300)}`,
             videoId,
+            false,
           );
         }
         continue;

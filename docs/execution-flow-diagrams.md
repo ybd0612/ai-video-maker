@@ -493,11 +493,14 @@ Promise.allSettled([链A, 链B])                                      :269
   +-- [store] 成功 updateShotByProjectIdIfRevision({videoUrl, status:"videoed 视频就绪"})
   |
   错误分叉（决定会不会重复烧钱）:
-    VideoTaskCreatedError 且 stillRunning=true  (任务不存在/轮询 HTTP 失败/非 JSON/超时)
+    VideoTaskCreatedError 且 stillRunning=true  (轮询 HTTP 失败/非 JSON/超时——任务可能仍在排队)
         -> 保留服务端任务：videoProgress=0, videoRetryCount=attempt+1, error 文案
         -> **直接结束，不再创建新任务**
-    VideoTaskCreatedError 且 stillRunning=false (已完成但无地址 / 服务端 failed|cancelled)
-        -> status="failed"
+    VideoTaskCreatedError 且 stillRunning=false (已完成但无地址 / 服务端 failed|cancelled
+                                                 / task_not_exist|404 连续 25 次耗尽容忍窗口)
+        -> status="failed" + 清 videoTaskId/videoTaskModel（2026-09-28 起 404 归此类；
+           此前省略参数继承默认 true，镜头恒满足 hasResumableVideoTask → 批量不新建、
+           恢复通道只轮服务端已删除的任务、单项重摇被拒，界面表现为「一直加载」且无报错）
     其他异常 且 attempt < 2 -> 等 8s*(attempt+1) 后重试创建（最多 3 次创建机会）
     其他异常 且 attempt >= 2 -> status="failed"
   onFinally: 全有视频 -> "idle"；全部落定(有视频或失败) -> 复位 started + "failed" + 中文硬编码

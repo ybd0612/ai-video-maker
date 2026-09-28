@@ -23,7 +23,11 @@ vi.mock("@/lib/logger", () => ({
 
 import { fetchWithRetry } from "@/lib/fetchWithRetry";
 import { rateLimiter } from "@/services/rateLimit";
-import { generateVideo, VideoTaskCreatedError } from "@/services/videoService";
+import {
+  generateVideo,
+  pollVideoTaskById,
+  VideoTaskCreatedError,
+} from "@/services/videoService";
 
 const mockedFetch = vi.mocked(fetchWithRetry);
 
@@ -224,5 +228,47 @@ describe("generateVideo 轮询失败的任务保护", () => {
     expect(err).toBeInstanceOf(VideoTaskCreatedError);
     expect((err as VideoTaskCreatedError).videoId).toBe("task_keep");
     expect(mockedFetch).toHaveBeenCalledTimes(2);
+  });
+});
+
+/* ── 持续 404 = 终态，不是「仍在跑」 ─────────────────────────────────────────
+   成因（2026-09-28 实测，debug-dump/state.json 同项目 6 个镜头卡死）：
+   轮询连续 404「任务不存在」耗尽容忍窗口后，抛错时省略了 stillRunning 参数、
+   继承构造器默认 true，编排层 commitVideoFailure 便走「保留服务端任务」分支，
+   只写 error 而不复位 status / videoTaskId。镜头于是永远满足
+   hasResumableVideoTask → 批量见在飞任务即不新建、recoverStuck 与恢复通道都
+   不复位、单项重摇被互斥拒绝，每次刷新重轮 2 分钟后回到同一结论：界面「一直加载」。
+   对照：429 / 5xx / 超时属瞬时失败，任务确可能仍在排队，必须继续保留 ID
+   （由上方两条用例守住，本用例不得削弱）。 */
+describe("pollVideoTaskById 持续 404 的终态判定", () => {
+  function notFoundResponse(): Response {
+    return {
+      ok: false,
+      status: 404,
+      headers: { get: () => null },
+      json: async () => ({}),
+      text: async () => '{"error":{"code":404,"message":"任务不存在"}}',
+    } as unknown as Response;
+  }
+
+  it("任务持续不存在 → stillRunning=false，让镜头落 failed 并清任务 ID", async () => {
+    mockedFetch.mockResolvedValue(notFoundResponse());
+
+    const settled = pollVideoTaskById(
+      { apiKey: "k", baseUrl: "https://api.test/v1" },
+      "task_gone",
+      "agnes-video-2.5-flash",
+    ).catch((e: unknown) => e);
+    await vi.runAllTimersAsync();
+    const err = await settled;
+
+    expect(err).toBeInstanceOf(VideoTaskCreatedError);
+    expect((err as VideoTaskCreatedError).stillRunning).toBe(false);
+    // 必须先给足注册等待窗口（24 次容忍 + 第 25 次判定），不得一遇 404 就判死
+    expect(mockedFetch.mock.calls.length).toBeGreaterThan(24);
+    // 续轮询通道绝不发 POST /videos：判终态也不等于允许重建
+    for (const [url] of mockedFetch.mock.calls) {
+      expect(String(url)).not.toContain("/videos");
+    }
   });
 });
