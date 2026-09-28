@@ -8,7 +8,7 @@ import {
 import { useSettingsStore } from "@/stores/settingsStore";
 import { generateImage, aspectRatioToImageParams } from "@/services/imageService";
 import { composeVisualPrompt } from "@/lib/promptUtils";
-import { createBatchRunner } from "@/lib/batchRunner";
+import { createBatchRunner, hasActiveTask } from "@/lib/batchRunner";
 import {
   composeMultiReferencePrompt,
   composeTextToImagePrompt,
@@ -18,7 +18,7 @@ import {
 } from "@/lib/promptComposer";
 import { getActiveRenderRules } from "@/lib/promptRules";
 import { getTranslation } from "@/i18n";
-import { pendingImageShots } from "@/lib/shotQueue";
+import { pendingImageShots, canStartSingleReroll, isShotInFlight } from "@/lib/shotQueue";
 import { restoreProjectStatusIfReady } from "./wizardActionUtils";
 
 const activeImageTasks = new Map<string, AbortController>();
@@ -131,6 +131,10 @@ const runImageBatch = createBatchRunner({
 
     return shotsNeedingImages.map((shot) => async () => {
       if (signal.aborted) return;
+      // 列表是启动时快照：期间用户可能对同一镜头点了单项重摇，此时本任务再建一张就是重复扣配额
+      const live = useProjectStore.getState().projects
+        .find((p) => p.id === pid)?.shots.find((s) => s.id === shot.id);
+      if (live && isShotInFlight(live)) return;
       const expectedRevision = shot.renderRevision ?? 0;
       useProjectStore.getState().setShotStatusByProjectId(pid, shot.id, "imaging");
 
@@ -215,6 +219,9 @@ export function useImageActions(): ImageActions {
 
     const shot = project.shots.find((item) => item.id === shotId);
     if (!shot) return;
+    // §12-3 幂等守卫：批量在跑或本镜已有任务在飞时不重复发起。
+    // 批量的任务列表在启动时快照，此时再建一张同镜图片它看不见，只会多扣一档图片配额。
+    if (!canStartSingleReroll({ batchActive: hasActiveTask(activeImageTasks, targetProjectId), shot })) return;
 
     const expectedRevision = shot.renderRevision ?? 0;
     store.setShotStatusByProjectId(targetProjectId, shotId, "imaging");

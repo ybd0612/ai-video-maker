@@ -8,6 +8,8 @@ import { describe, expect, it } from "vitest";
 import {
   hasResumableVideoTask,
   inFlightVideoShots,
+  canStartSingleReroll,
+  isShotInFlight,
   pendingImageShots,
   pendingVideoShots,
   shotsWithoutMotion,
@@ -142,5 +144,29 @@ describe("inFlightVideoShots（批量续轮询集合，与待补做集合互斥�
     const lost = shot({ id: "lost", ...img, status: "videoing" });
     expect(inFlightVideoShots([lost])).toEqual([]);
     expect(pendingVideoShots([lost])).toEqual([]);
+  });
+});
+
+describe("canStartSingleReroll / isShotInFlight（单项与批量的互斥口径，§12-3）", () => {
+  it("空闲镜头且无批量在跑 → 允许发起单项重摇", () => {
+    expect(canStartSingleReroll({ batchActive: false, shot: shot({ id: "a", status: "imaged" }) })).toBe(true);
+    expect(canStartSingleReroll({ batchActive: false, shot: shot({ id: "b", status: "failed" }) })).toBe(true);
+  });
+
+  it("批量在跑 → 拒绝（批量列表是启动时快照，同镜再建一次就是重复扣费）", () => {
+    expect(canStartSingleReroll({ batchActive: true, shot: shot({ id: "a", status: "imaged" }) })).toBe(false);
+  });
+
+  it("本镜已被别的任务拥有 → 拒绝（imaging 与 videoing 两类所有者都算）", () => {
+    expect(canStartSingleReroll({ batchActive: false, shot: shot({ id: "a", status: "imaging" }) })).toBe(false);
+    expect(canStartSingleReroll({ batchActive: false, shot: shot({ id: "b", status: "videoing" }) })).toBe(false);
+  });
+
+  it("isShotInFlight 只在两种在飞状态为真，其余一律为假", () => {
+    expect(isShotInFlight(shot({ id: "a", status: "imaging" }))).toBe(true);
+    expect(isShotInFlight(shot({ id: "b", status: "videoing" }))).toBe(true);
+    for (const status of ["idle", "scripted", "imaged", "videoed", "failed"] as const) {
+      expect(isShotInFlight(shot({ id: `s-${status}`, status }))).toBe(false);
+    }
   });
 });

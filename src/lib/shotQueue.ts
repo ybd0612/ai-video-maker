@@ -55,6 +55,30 @@ export function inFlightVideoShots(shots: readonly Shot[]): ResumableVideoShot[]
   return shots.filter((shot): shot is ResumableVideoShot => hasResumableVideoTask(shot));
 }
 
+/**
+ * 某个镜头当前是否已被一个在飞任务拥有（图片或视频）。
+ * 状态即唯一所有者信号：单项重摇与批量 worker 都在发起前把状态置为 imaging / videoing，
+ * 因此 `pendingImageShots` / `pendingVideoShots` 天然排除它们。
+ */
+export function isShotInFlight(shot: Pick<Shot, "status">): boolean {
+  return shot.status === "imaging" || shot.status === "videoing";
+}
+
+/**
+ * 单项重摇能否发起（图片与视频共用同一判据）。
+ *
+ * 为什么必须在这里挡住：批量的任务列表在**启动时快照**，之后再对同一镜头发起的单项请求
+ * 不会被它看见，于是两条链路会各自为该镜头建一次任务 —— 图片多扣一档配额、视频多扣按秒
+ * 计费的任务（docs/execution-flow.md §12-3）。有已计费任务在飞时不新建，与视频域
+ * 「在飞任务单一所有权」（2026-09-26）是同一条取舍。
+ */
+export function canStartSingleReroll(input: {
+  batchActive: boolean;
+  shot: Pick<Shot, "status">;
+}): boolean {
+  return !input.batchActive && !isShotInFlight(input.shot);
+}
+
 /** 有画面提示词但提示词为空 —— 永远不会被生成，需要单独提示用户 */
 export function shotsWithoutVisualPrompt(shots: readonly Shot[]): Shot[] {
   return shots.filter((shot) => !shot.visualPrompt.trim());

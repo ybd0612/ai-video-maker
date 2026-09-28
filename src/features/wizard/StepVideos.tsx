@@ -283,7 +283,7 @@ export function StepVideos() {
           <button
             type="button"
             onClick={() => rerollVideo(current.id)}
-            disabled={current.status === "videoing"}
+            disabled={generatingCount > 0}
             className="flex items-center gap-1 rounded-md border border-line px-3 py-1.5 text-xs text-success transition hover:bg-success-deep/30 disabled:opacity-50"
           >
             <RefreshCw className={`h-3 w-3 ${current.status === "videoing" ? "animate-spin" : ""}`} />

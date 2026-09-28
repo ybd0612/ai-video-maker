@@ -9,7 +9,7 @@ import { generateVideo, aspectRatioToVideoAspect, pollVideoTaskById, VideoTaskCr
 import { planShotVideoMedia } from "@/lib/videoPlan";
 import { extractTailFrameUrl } from "@/services/renderService";
 import { releaseTailFrames, setTailFrame, snapshotTailFrames } from "@/lib/tailFrameStore";
-import { pendingVideoShots, inFlightVideoShots, hasResumableVideoTask, type ResumableVideoShot } from "@/lib/shotQueue";
+import { pendingVideoShots, inFlightVideoShots, hasResumableVideoTask, canStartSingleReroll, isShotInFlight, type ResumableVideoShot } from "@/lib/shotQueue";
 import { getTranslation } from "@/i18n";
 import { composeMotionPrompt } from "@/lib/promptUtils";
 import { createBatchRunner, hasActiveTask } from "@/lib/batchRunner";
@@ -155,6 +155,10 @@ const runVideoBatch = createBatchRunner({
 
     const createTasks = shotsNeedingVideos.map((shot) => async () => {
       if (signal.aborted) return;
+      // 列表是启动时快照：期间该镜头可能已被单项重摇拥有，再建一次就是第二个按秒计费任务
+      const live = useProjectStore.getState().projects
+        .find((p) => p.id === pid)?.shots.find((s) => s.id === shot.id);
+      if (live && isShotInFlight(live)) return;
       const expectedRevision = shot.renderRevision ?? 0;
       useProjectStore.getState().setShotStatusByProjectId(pid, shot.id, "videoing");
       // 清掉上一轮遗留的任务 ID：它同时是「本镜头由谁在轮询」的判据 —— 留着旧 ID，
@@ -317,6 +321,10 @@ export function useVideoActions(): VideoActions {
 
     const shot = project.shots.find((item) => item.id === shotId);
     if (!shot || !shot.imageUrl) return;
+    // §12-3 幂等守卫（与视频域「在飞任务单一所有权」同一条取舍）：
+    // 批量在跑、或本镜正被批量续轮询 / 上一个单项请求拥有时一律不发起 ——
+    // 下面的清理会抹掉 videoTaskId，等于丢弃已计费任务再建第二个（按秒双扣）。
+    if (!canStartSingleReroll({ batchActive: hasActiveTask(activeVideoTasks, targetProjectId), shot })) return;
 
     const expectedRevision = shot.renderRevision ?? 0;
     // 旧视频即将作废：先释放它的末帧，下一镜不会再接到过期画面

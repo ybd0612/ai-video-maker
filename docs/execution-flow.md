@@ -337,9 +337,12 @@ RPM 与配额表（`lib/plans.ts:73-134`，格式 文本 / 图片1K,2K,3K,4K / �
 
 1. ~~**镜头图片被失效后，步骤 4 没有对应的补生成入口**~~ **已修复（2026-09-21）**。现在：待补做集合的唯一口径是 `src/lib/shotQueue.ts`（`pendingImageShots` / `pendingVideoShots`，**含 `failed`**），批量生成、挂载自动触发、界面计数与顶部按钮四处共用；按钮只要有待补做就常驻显示「补做缺失 (N)」（走同一个幂等批量函数），非生成中时另有横幅解释成因；只想补单个镜头仍可展开该镜头卡片用「重新生成」。因此改子字段或重生成资产图导致产物被清空后，不再只能整套重做。
 2. **步骤 4/5 的子字段仍可手改**（`PromptSubFields.tsx:41-43` 用 active-project 的 `updateShot`，`onCommit` 再调 `rewritePromptFromFields` 重写整段英文）。与「分镜内容全只读、唯一入口是详情页一句话」相冲：同一段提示词有两个编辑源，且它正是第 1 条的主要触发器。
-3. **单项重生成不登记注册表**：`rerollImage`（`useImageActions.ts:208`）、`rerollVideo`（`useVideoActions.ts:205`）、场景/产品/道具单项生图（`StepAssets.tsx:228`）、定妆照生图（`useCharacterEditorActions.ts:134`）都绕过 `activeImageTasks` / `activeVideoTasks` / `activeAssetTasks`（`generateStyleReference` 是例外，它登记了）。批量任务看不见单项任务，两者可同时对同一镜头/资产发起 → 服务端任务重复创建、配额双倍消耗。步骤 2 用 `anyGenerating` 禁按钮做了规避（`StepAssets.tsx:65-66`），步骤 4/5 没有等价守卫。
+3. **单项重生成不登记注册表** → **图片 / 视频域已收口（2026-09-28），资产域仍未收口**。
+   - **已修**：`rerollImage`（`useImageActions.ts`）与 `rerollVideo`（`useVideoActions.ts`）在**任何 await 之前**过唯一口径 `src/lib/shotQueue.ts:canStartSingleReroll({ batchActive: hasActiveTask(注册表, pid), shot })` —— 批量在跑或本镜已被别的任务拥有（`imaging` / `videoing`）一律不发起；两个批量 worker 也在**执行每个任务时**按实时状态复核（`isShotInFlight`），因为任务列表是启动时快照，快照之后用户点的单项重摇它看不见。步骤 4/5 的单项「重新生成」按钮同步改为 `generatingCount > 0` 即禁用（否则代码拒绝了、按钮却还能点）。绊线在 `tests/lib/shotQueue.test.ts`，变异反证已做（摘掉 `batchActive` 判据即红）。
+   - **代价（与视频域「在飞任务单一所有权」同一条取舍）**：批量在跑期间整项目的单项重摇都不可用，要等这一批偿清。
+   - **未修**：场景/产品/道具单项生图（`StepAssets.tsx`）与定妆照生图（`useCharacterEditorActions.ts`）仍不进 `activeAssetTasks`，只靠步骤 2 的 `anyGenerating` 禁按钮 + 组件本地 `isGeneratingPortrait` 规避；资产图按张扣一档配额，误点仍是真实损失，但影响面小于按秒计费的视频。
 4. ~~**定妆照写回跨异步边界用 active-project action**~~ **已修复（2026-09-28）**：`useCharacterEditorActions.generatePortraitFrom` 在入口捕获 `targetProjectId = project?.id`，生图返回后走 `updateAssetByProjectId(targetProjectId, ...)`（缺 targetProjectId 则不写）。保存路径 `handleSave` 内部无任何 `await`，属同帧的 active-project 写回，保留 `updateAsset/addAsset` 不变。存储层语义绊线在 `tests/stores/projectStore.crossProject.test.ts`（含"两项目同 ID 时 active-project 版会写错目标"这条成因用例——复制项目保留资产 ID，这正是原缺陷的触发形态）。
-5. **`removeAsset` 注释与实现不一致**（`projectStore.ts:430-453`）：注释写「受影响镜头的图片/视频也必须失效」，实现只剔除引用与审核标记，**没有**清空 `imageUrl` / `videoUrl`，也没调 `invalidateShotForAsset`。删除一个角色后，用它生成的镜头图/视频仍留在项目里并继续参与拼接。
+5. ~~**`removeAsset` 注释与实现不一致**~~ **已修复**（核对于 2026-09-28）：`projectStore.ts` 的 `removeAsset` 现在对引用真的被改动的镜头调用 `invalidateShotForAsset`，删除角色后其镜头图片/视频不再留在项目里参与拼接。
 6. **回步骤 2 重新生成任一资产图会连带清空镜头已完成产物**：`applyAssetUpdate` 把生成器自己的 `imageUrl` 写回也算「渲染字段变化」（9.6），并重置三个审核标记；改 style 资产则全部分镜作废。行为有单测锁定，但「补一个缺失资产 = 重做整套镜头图片」是否是你要的代价，值得确认。
 7. **批量任务没有取消入口**（9.3）：注册表里的 controller 从未被 abort，切项目、离开步骤、组件卸载都拦不住在飞请求与 30 分钟视频轮询，钱照扣、结果照写回。
 8. **配额在请求前扣、失败不回滚**（`rateLimit.ts:128-136`）。图片 403/内容过滤、视频创建后失败都会白扣一次配额；Token Plan 用户会看到「用量没了但没出片」。

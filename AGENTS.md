@@ -230,6 +230,7 @@ scripts/run-vitest.mjs              # Windows 盘符规范化后启动 Vitest
 ## 向导可靠性铁律（踩坑沉淀，改动时必须遵守）
 
 - 批量生成（视频/图片/资产）必须用**模块级注册表**（`activeVideoTasks` / `activeImageTasks` / `activeAssetTasks`）做幂等守卫：同项目任务在跑时不重复启动，避免服务端任务重复创建（token 双倍消耗）。
+- **单项重摇与批量共用同一条互斥口径**（2026-09-28）：`src/lib/shotQueue.ts:canStartSingleReroll({ batchActive, shot })` 与 `isShotInFlight(shot)`——**状态即所有者信号**（`imaging` / `videoing` 表示该镜头正被某个任务拥有）。新增此类入口时必须三条同时成立：① 发起前在**任何 await 之前**过 `canStartSingleReroll`（`batchActive` 用 `hasActiveTask(注册表, pid)`）；② 批量 worker **执行每个任务时**按实时状态复核，不能只信启动时的任务列表快照；③ 按钮禁用条件与代码守卫一致（`generatingCount > 0`），否则会出现"代码拒绝了但按钮还能点"的静默失败。禁止另建第二套单项注册表，也不得只在 UI 层禁按钮。
 - 每个批量任务用**独立 AbortController**，禁止共享 abortRef 互杀。
 - **步骤 1 想法提取必须单飞 + 状态门禁**（2026-09-22 事故沉淀）：`extractCharactersFromIdea` 入口用 `activeIdeaTasks` 做项目级守卫（命中即 `return true`，`finally` 注销；守卫与登记之间禁止 await）。「提取中」的唯一跨组件信号是 `project.status === "scripting"`，**StepIdea 的本地 `isGenerating` 会随切页卸载丢失，禁止只靠它做门禁**：`canAdvance` 步骤 1 与 StepIdea 的输入框/按钮/Enter 都要吃这个状态。历史成因：提取中点「下一步」→ 返回上一步 → 再点「提取」，两轮提取并发、各按自己入口的 `assets` 快照追加写回 → 同类资产重复入库且资产图翻倍（实测 13 资产 / 12 次生图）。
 - 向导步骤的自动触发 effect 只依赖 `[shots.length]`，**禁止依赖 `*GenerationStarted` 标志**（批量生成内部会把它置 true，导致 effect 重入误杀进行中任务）。
