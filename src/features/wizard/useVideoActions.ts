@@ -9,7 +9,7 @@ import { generateVideo, aspectRatioToVideoAspect, pollVideoTaskById, VideoTaskCr
 import { planShotVideoMedia } from "@/lib/videoPlan";
 import { extractTailFrameUrl } from "@/services/renderService";
 import { releaseTailFrames, setTailFrame, snapshotTailFrames } from "@/lib/tailFrameStore";
-import { pendingVideoShots, inFlightVideoShots, hasResumableVideoTask, canStartSingleReroll, canStartVideoBatch, canGiveUpVideoTask, isShotInFlight, type ResumableVideoShot } from "@/lib/shotQueue";
+import { pendingVideoShots, inFlightVideoShots, hasResumableVideoTask, canStartSingleReroll, canStartVideoBatch, canGiveUpVideoTask, canAutoRetryVanishedTask, isShotInFlight, type ResumableVideoShot } from "@/lib/shotQueue";
 import { getTranslation } from "@/i18n";
 import { composeMotionPrompt } from "@/lib/promptUtils";
 import { createBatchRunner, hasActiveTask } from "@/lib/batchRunner";
@@ -65,8 +65,19 @@ async function commitVideoResult(
  * 「任务仍在跑」保留 `videoTaskId` 与 `videoing` 状态，让下一轮批量/恢复接着轮询同一个任务；
  * 终态失败必须一并清掉任务 ID —— 否则该镜头既不在 `pendingVideoShots`（若状态被复位）
  * 也无人续轮询，会永久卡在已计费但无人认领的状态。
+ *
+ * 返回值 = 调用方是否应当**立刻为该镜头重建一次**。只有服务端确认任务不存在
+ * （`err.taskVanished`，即轮询持续 404）且该镜头还有额度时才为 true；额度在这里就扣掉
+ * （`videoRetryCount +1`），所以批量、单项重摇、刷新恢复三条通道共用同一份预算，
+ * 不会各重试一次。超时 / 429 / 5xx / 服务端 failed / 创建失败一律 false ——
+ * 那些情形重发就是重复扣秒数或白扣额度。
  */
-function commitVideoFailure(pid: string, shotId: string, expectedRevision: number, err: unknown): void {
+function commitVideoFailure(
+  pid: string,
+  shotId: string,
+  expectedRevision: number,
+  err: unknown,
+): boolean {
   const store = useProjectStore.getState();
   if (err instanceof VideoTaskCreatedError) {
     if (err.stillRunning) {
@@ -74,15 +85,22 @@ function commitVideoFailure(pid: string, shotId: string, expectedRevision: numbe
         videoProgress: 0,
         error: `${err.message} ${getTranslation("error.videoTaskKept")}`,
       });
-    } else {
-      store.updateShotByProjectIdIfRevision(pid, shotId, expectedRevision, {
-        status: "failed",
-        error: `${err.message} ${getTranslation("error.videoTaskFailedManualRetry")}`,
-        videoTaskId: undefined,
-        videoTaskModel: undefined,
-      });
+      return false;
     }
-    return;
+
+    const shot = store.projects.find((p) => p.id === pid)?.shots.find((s) => s.id === shotId);
+    const retryVanishedTask = !!shot && err.taskVanished && canAutoRetryVanishedTask(shot);
+    const applied = store.updateShotByProjectIdIfRevision(pid, shotId, expectedRevision, {
+      status: "failed",
+      error: `${err.message} ${getTranslation(
+        retryVanishedTask ? "error.videoTaskVanishedAutoRetry" : "error.videoTaskFailedManualRetry",
+      )}`,
+      videoTaskId: undefined,
+      videoTaskModel: undefined,
+      ...(retryVanishedTask ? { videoRetryCount: (shot.videoRetryCount ?? 0) + 1 } : {}),
+    });
+    // 写回没生效（镜头版本已被其他操作推进）时不得重建，否则会给一个已被改动的镜头建任务
+    return retryVanishedTask && applied;
   }
 
   store.updateShotByProjectIdIfRevision(pid, shotId, expectedRevision, {
@@ -91,19 +109,23 @@ function commitVideoFailure(pid: string, shotId: string, expectedRevision: numbe
     videoTaskId: undefined,
     videoTaskModel: undefined,
   });
+  return false;
 }
 
 /**
  * 只轮询已存在的服务端任务，绝不发 `POST /videos`：视频按秒计费，重建等于重复扣额度。
  * 与创建路径共用同一套写回，保证「谁在轮询这个镜头」始终只有一个所有者。
+ *
+ * 返回 true = 服务端确认该任务不存在且镜头还有重建额度，交由 `resumePendingVideoTasks`
+ * 统一走批量通道重建一次（本函数绝不自己发创建请求）。
  */
 async function resumeShotVideoTask(
   pid: string,
   shot: ResumableVideoShot,
   providerConfig: { apiKey: string; baseUrl: string },
   signal?: AbortSignal,
-): Promise<void> {
-  if (signal?.aborted) return;
+): Promise<boolean> {
+  if (signal?.aborted) return false;
   const expectedRevision = shot.renderRevision ?? 0;
   try {
     const result = await pollVideoTaskById(
@@ -117,8 +139,9 @@ async function resumeShotVideoTask(
     );
     await commitVideoResult(pid, shot.id, expectedRevision, result.videoUrl, signal);
   } catch (err) {
-    commitVideoFailure(pid, shot.id, expectedRevision, err);
+    return commitVideoFailure(pid, shot.id, expectedRevision, err);
   }
+  return false;
 }
 
 const runVideoBatch = createBatchRunner({
@@ -140,11 +163,13 @@ const runVideoBatch = createBatchRunner({
       });
     }
   },
-  buildTasks: (pid, signal) => {
+  buildTasks: (pid, signal, onlyShotIds) => {
     const { providerConfig, videoConsistency } = useSettingsStore.getState();
     const latestProject = useProjectStore.getState().projects.find((p) => p.id === pid);
     if (!latestProject) return [];
-    const shotsNeedingVideos = pendingVideoShots(latestProject.shots);
+    let shotsNeedingVideos = pendingVideoShots(latestProject.shots);
+    // 自动重建只针对刚被确认「服务端已不存在」的镜头，不得顺带把其他待补做镜头一起开跑
+    if (onlyShotIds) shotsNeedingVideos = shotsNeedingVideos.filter((s) => onlyShotIds.includes(s.id));
     // 在飞任务数达到上限才不开工（2026-09-28 由「有在飞就整批停摆」改为按上限放行）。
     // 仍然绝不把在飞镜头排进本列表：它们是 resumePendingVideoTasks 并发续轮询的专属对象
     // （pendingVideoShots 已按 status==="videoing" 排除），批量 worker 顺序领取任务，
@@ -168,22 +193,23 @@ const runVideoBatch = createBatchRunner({
         .find((p) => p.id === pid)?.shots.find((s) => s.id === shot.id);
       if (live && isShotInFlight(live)) return;
       const expectedRevision = shot.renderRevision ?? 0;
-      useProjectStore.getState().setShotStatusByProjectId(pid, shot.id, "videoing");
-      // 清掉上一轮遗留的任务 ID：它同时是「本镜头由谁在轮询」的判据 —— 留着旧 ID，
-      // 挂载时的 resumePendingVideoTasks 会把本批量正在轮询的镜头误判成上一会话的孤儿，
-      // 于是同一个镜头被两处轮询，旧任务一报错就把在飞镜头打成 failed。
-      useProjectStore.getState().updateShotByProjectId(pid, shot.id, {
-        videoProgress: 0,
-        videoTaskId: undefined,
-        videoTaskModel: undefined,
-      });
 
-      // 创建请求非幂等：POST /videos 按秒计费，超时/5xx 时服务端可能已经建了任务，
-      // 自动重发就是重复扣秒数。因此这里不重试创建；任务已建的场景由
-      // VideoTaskCreatedError + shot.videoTaskId 承接（见 pollVideoTaskById 恢复），
-      // 其余失败一律就地终态，交用户手动重试。
-      {
-        if (signal.aborted) return;
+      // 创建请求非幂等：POST /videos 按秒计费，超时 / 5xx 时服务端可能已经建了任务，
+      // 重发就是重复扣秒数 —— 因此**不做**通用创建重试；任务已建的场景由
+      // VideoTaskCreatedError + shot.videoTaskId 承接（见 pollVideoTaskById 恢复）。
+      // 唯一的自动重建例外：服务端确认任务不存在（持续 404，产出已不可回收，也没有东西
+      // 在跑），此时按 commitVideoFailure 的额度立刻重建一次，额度跨通道只扣一次。
+      const attempt = async (): Promise<boolean> => {
+        if (signal.aborted) return false;
+        useProjectStore.getState().setShotStatusByProjectId(pid, shot.id, "videoing");
+        // 清掉上一轮遗留的任务 ID：它同时是「本镜头由谁在轮询」的判据 —— 留着旧 ID，
+        // 挂载时的 resumePendingVideoTasks 会把本批量正在轮询的镜头误判成上一会话的孤儿，
+        // 于是同一个镜头被两处轮询，旧任务一报错就把在飞镜头打成 failed。
+        useProjectStore.getState().updateShotByProjectId(pid, shot.id, {
+          videoProgress: 0,
+          videoTaskId: undefined,
+          videoTaskModel: undefined,
+        });
 
         try {
           const motionPrompt = appendRegistryRules(
@@ -222,9 +248,12 @@ const runVideoBatch = createBatchRunner({
 
           await commitVideoResult(pid, shot.id, expectedRevision, result.videoUrl, signal);
         } catch (err) {
-          commitVideoFailure(pid, shot.id, expectedRevision, err);
+          return commitVideoFailure(pid, shot.id, expectedRevision, err);
         }
-      }
+        return false;
+      };
+
+      if (await attempt()) await attempt();
     });
 
     return createTasks;
@@ -287,9 +316,24 @@ export async function resumePendingVideoTasks(): Promise<void> {
       }
     }
 
-    await Promise.allSettled(
+    const resumeResults = await Promise.allSettled(
       waiting.map((shot) => resumeShotVideoTask(targetProjectId, shot, providerConfig)),
     );
+
+    // 服务端确认「任务已不存在」且额度还在的镜头：立刻只重建这几个
+    // （走批量通道，因此在飞上限、注册表互斥、并发按套餐都继续生效）
+    const vanishedShotIds: string[] = [];
+    waiting.forEach((shot, index) => {
+      const result = resumeResults[index];
+      if (result.status === "fulfilled" && result.value) vanishedShotIds.push(shot.id);
+    });
+    if (vanishedShotIds.length > 0) {
+      await runVideoBatch({
+        projectId: targetProjectId,
+        concurrency: videoConcurrencyFor(resolvePlan(providerConfig.plan as PlanId | undefined)),
+        onlyShotIds: vanishedShotIds,
+      });
+    }
 
     restoreProjectStatusIfReady(targetProjectId, (currentProject) =>
       currentProject.shots.every((item) => !!item.videoUrl),
@@ -346,61 +390,73 @@ export function useVideoActions(): VideoActions {
     const expectedRevision = shot.renderRevision ?? 0;
     // 旧视频即将作废：先释放它的末帧，下一镜不会再接到过期画面
     releaseTailFrames([shotId]);
-    store.setShotStatusByProjectId(targetProjectId, shotId, "videoing");
-    // 与批量创建路径同口径：重摇即放弃旧任务，遗留 ID 会让镜头被误判成"上一轮在飞、只该续轮询"
-    store.updateShotByProjectId(targetProjectId, shotId, {
-      videoProgress: 0,
-      videoTaskId: undefined,
-      videoTaskModel: undefined,
-    });
 
     // 单镜头重试用独立 controller，不干扰批量生成任务。
     const controller = new AbortController();
     const signal = controller.signal;
 
-    try {
-      const motionPrompt = appendRegistryRules(
-        composeMotionPrompt(shot),
-        extractVideoRules(),
-      );
-      const { media } = planShotVideoMedia({
-        shot,
-        shots: project.shots,
-        assets: project.assets,
-        styleReferenceUrl: project.styleReferenceUrl,
-        consistency: videoConsistency,
-        tailFrames: {},
+    // 用户手点重摇 = 新的明确意图，自动重建额度重新给一份（否则上一次用掉的额度
+    // 会让这次重摇遇到 404 也不再自愈）
+    useProjectStore.getState().updateShotByProjectId(targetProjectId, shotId, {
+      videoRetryCount: undefined,
+    });
+
+    const attempt = async (): Promise<boolean> => {
+      useProjectStore.getState().setShotStatusByProjectId(targetProjectId, shotId, "videoing");
+      // 与批量创建路径同口径：重摇即放弃旧任务，遗留 ID 会让镜头被误判成"上一轮在飞、只该续轮询"
+      useProjectStore.getState().updateShotByProjectId(targetProjectId, shotId, {
+        videoProgress: 0,
+        videoTaskId: undefined,
+        videoTaskModel: undefined,
       });
-      const result = await generateVideo(
-        {
-          apiKey: providerConfig.apiKey,
-          baseUrl: providerConfig.baseUrl,
-          prompt: motionPrompt,
-          ...media,
-          aspectRatio: aspectRatioToVideoAspect(project.aspectRatio),
-          duration: shot.duration,
-          onTaskCreated: (videoId, modelName) => {
+
+      try {
+        const motionPrompt = appendRegistryRules(
+          composeMotionPrompt(shot),
+          extractVideoRules(),
+        );
+        const { media } = planShotVideoMedia({
+          shot,
+          shots: project.shots,
+          assets: project.assets,
+          styleReferenceUrl: project.styleReferenceUrl,
+          consistency: videoConsistency,
+          tailFrames: {},
+        });
+        const result = await generateVideo(
+          {
+            apiKey: providerConfig.apiKey,
+            baseUrl: providerConfig.baseUrl,
+            prompt: motionPrompt,
+            ...media,
+            aspectRatio: aspectRatioToVideoAspect(project.aspectRatio),
+            duration: shot.duration,
+            onTaskCreated: (videoId, modelName) => {
+              useProjectStore.getState().updateShotByProjectId(targetProjectId, shotId, {
+                videoTaskId: videoId,
+                videoTaskModel: modelName,
+              });
+            },
+          },
+          (progress) => {
             useProjectStore.getState().updateShotByProjectId(targetProjectId, shotId, {
-              videoTaskId: videoId,
-              videoTaskModel: modelName,
+              videoProgress: progress,
             });
           },
-        },
-        (progress) => {
-          useProjectStore.getState().updateShotByProjectId(targetProjectId, shotId, {
-            videoProgress: progress,
-          });
-        },
-        signal,
-      );
+          signal,
+        );
 
-      await commitVideoResult(targetProjectId, shotId, expectedRevision, result.videoUrl, signal);
-      restoreProjectStatusIfReady(targetProjectId, (currentProject) =>
-        currentProject.shots.every((item) => !!item.videoUrl),
-      );
-    } catch (err) {
-      commitVideoFailure(targetProjectId, shotId, expectedRevision, err);
-    }
+        await commitVideoResult(targetProjectId, shotId, expectedRevision, result.videoUrl, signal);
+        restoreProjectStatusIfReady(targetProjectId, (currentProject) =>
+          currentProject.shots.every((item) => !!item.videoUrl),
+        );
+      } catch (err) {
+        return commitVideoFailure(targetProjectId, shotId, expectedRevision, err);
+      }
+      return false;
+    };
+
+    if (await attempt()) await attempt();
   }, []);
 
   /**

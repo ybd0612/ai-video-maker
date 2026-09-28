@@ -6,10 +6,12 @@
 
 import { describe, expect, it } from "vitest";
 import {
+  canAutoRetryVanishedTask,
   canGiveUpVideoTask,
   canStartSingleReroll,
   canStartVideoBatch,
   hasResumableVideoTask,
+  MAX_AUTO_RETRY_ON_VANISHED_TASK,
   inFlightVideoShots,
   isShotInFlight,
   pendingImageShots,
@@ -162,6 +164,27 @@ describe("canGiveUpVideoTask（放弃已计费任务的准入判据）", () => {
     expect(canGiveUpVideoTask({ batchActive: false, shot: shot({ id: "c", status: "videoing" }) })).toBe(false);
     expect(canGiveUpVideoTask({ batchActive: false, shot: shot({ id: "d", status: "videoing", videoTaskId: "task_abc" }) })).toBe(false);
     expect(canGiveUpVideoTask({ batchActive: false, shot: shot({ id: "e", status: "imaged", imageUrl: "https://cdn.test/e.png", ...task }) })).toBe(false);
+  });
+});
+
+/* ── 任务确认不存在时的自动重建额度 ──────────────────────────────────────────
+   服务端返回 404「任务不存在」= 该任务的产出已不可回收，重建不会产生并发的重复任务，
+   与「超时/5xx 时服务端可能已建任务、重发就是重复扣秒数」是两回事。
+   但额度必须钉死：9 月 26 日实测过同一镜头被 POST 七次的事故，所以每个镜头只给一次，
+   额度记在持久字段 Shot.videoRetryCount 上（跨刷新、跨批量与续轮询通道都只扣一次）。 */
+describe("canAutoRetryVanishedTask（服务端确认任务不存在后的自动重建额度）", () => {
+  it("额度上限是 1", () => {
+    expect(MAX_AUTO_RETRY_ON_VANISHED_TASK).toBe(1);
+  });
+
+  it("没用过额度（缺省或 0）时允许自动重建一次", () => {
+    expect(canAutoRetryVanishedTask(shot({ id: "a" }))).toBe(true);
+    expect(canAutoRetryVanishedTask(shot({ id: "b", videoRetryCount: 0 }))).toBe(true);
+  });
+
+  it("已用过额度后不再自动重建，交回人工（防止无限循环扣额度）", () => {
+    expect(canAutoRetryVanishedTask(shot({ id: "c", videoRetryCount: 1 }))).toBe(false);
+    expect(canAutoRetryVanishedTask(shot({ id: "d", videoRetryCount: 3 }))).toBe(false);
   });
 });
 

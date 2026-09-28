@@ -264,11 +264,31 @@ describe("pollVideoTaskById 持续 404 的终态判定", () => {
 
     expect(err).toBeInstanceOf(VideoTaskCreatedError);
     expect((err as VideoTaskCreatedError).stillRunning).toBe(false);
+    // 自动重建只认这个结构化标记（禁止靠错误文案判断业务状态）
+    expect((err as VideoTaskCreatedError).taskVanished).toBe(true);
     // 必须先给足注册等待窗口（24 次容忍 + 第 25 次判定），不得一遇 404 就判死
     expect(mockedFetch.mock.calls.length).toBeGreaterThan(24);
     // 续轮询通道绝不发 POST /videos：判终态也不等于允许重建
     for (const [url] of mockedFetch.mock.calls) {
       expect(String(url)).not.toContain("/videos");
     }
+  });
+
+  it("服务端明确判 failed 时 taskVanished=false（模型失败不自动重建，免白扣额度）", async () => {
+    mockedFetch.mockResolvedValueOnce(
+      jsonResponse({ status: "failed", progress: 40, error: "content_policy_violation" }),
+    );
+
+    const settled = pollVideoTaskById(
+      { apiKey: "k", baseUrl: "https://api.test/v1" },
+      "task_failed",
+      "agnes-video-2.5-flash",
+    ).catch((e: unknown) => e);
+    await vi.runAllTimersAsync();
+    const err = await settled;
+
+    expect(err).toBeInstanceOf(VideoTaskCreatedError);
+    expect((err as VideoTaskCreatedError).stillRunning).toBe(false);
+    expect((err as VideoTaskCreatedError).taskVanished).toBe(false);
   });
 });

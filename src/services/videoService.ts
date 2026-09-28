@@ -54,12 +54,25 @@ export class VideoTaskCreatedError extends Error {
   readonly videoId: string;
   /** 服务端任务仍可能运行；真正 failed/cancelled 时为 false。 */
   readonly stillRunning: boolean;
+  /**
+   * 服务端已确认该任务不存在（轮询持续 404「任务不存在」）。
+   * 与「超时/5xx 时服务端可能已建任务」不同：这里没有任何东西在跑，重建不会产生并发
+   * 重复任务，因此编排层允许按额度自动重建一次。判定一律读这个结构化标记，
+   * 禁止匹配错误文案。
+   */
+  readonly taskVanished: boolean;
 
-  constructor(message: string, videoId: string, stillRunning = true) {
+  constructor(message: string, videoId: string, stillRunning = true, taskVanished = false) {
     super(message);
     this.name = "VideoTaskCreatedError";
     this.videoId = videoId;
     this.stillRunning = stillRunning;
+    this.taskVanished = taskVanished;
+  }
+
+  /** 服务端确认任务已不存在：终态（不再续轮询）+ 可自动重建一次 */
+  static taskVanished(message: string, videoId: string): VideoTaskCreatedError {
+    return new VideoTaskCreatedError(message, videoId, false, true);
   }
 }
 
@@ -334,15 +347,15 @@ export async function pollVideoTaskById(
       // status / videoTaskId —— 镜头从此恒满足 hasResumableVideoTask，批量见在飞
       // 任务不新建、恢复通道只轮一个服务端已删除的任务、单项重摇被互斥拒绝，
       // 每次刷新重轮 2 分钟回到同一结论（2026-09-28 实测 6 个镜头卡死）。
-      // 注意区分：429 / 5xx / 超时是「任务可能仍在排队」，仍按 stillRunning 保留 ID。
+      // 注意区分：429 / 5xx / 超时是「任务可能仍在排队」，仍按 stillRunning 保留 ID；
+      // 而持续 404 是唯一允许编排层按额度自动重建一次的情形（见 taskVanished 工厂）。
       if (text.includes("task_not_exist") || pollResp.status === 404) {
         notExistCount++;
         if (notExistCount > VIDEO_POLL_MAX_NOT_EXIST_RETRIES) {
-          throw new VideoTaskCreatedError(
+          throw VideoTaskCreatedError.taskVanished(
             `视频任务 ${videoId} 持续不存在（已重试 ${notExistCount} 次，HTTP ${pollResp.status}）。` +
             `轮询 URL: ${pollUrl}。响应: ${text.slice(0, 300)}`,
             videoId,
-            false,
           );
         }
         continue;

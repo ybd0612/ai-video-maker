@@ -499,21 +499,30 @@ Promise.allSettled([链A, 链B])                                      :269
     VideoTaskCreatedError 且 stillRunning=true  (轮询 HTTP 失败/非 JSON/超时——任务可能仍在排队)
         -> 保留服务端任务：videoProgress=0, error 文案
         -> **直接结束，不再创建新任务**
-    VideoTaskCreatedError 且 stillRunning=false (已完成但无地址 / 服务端 failed|cancelled
-                                                 / task_not_exist|404 连续 25 次耗尽容忍窗口)
-        -> status="failed" + 清 videoTaskId/videoTaskModel（2026-09-28 起 404 归此类；
-           此前省略参数继承默认 true，镜头恒满足 hasResumableVideoTask → 批量不新建、
-           恢复通道只轮服务端已删除的任务、单项重摇被拒，界面表现为「一直加载」且无报错）
+    VideoTaskCreatedError 且 stillRunning=false，taskVanished=true
+        (task_not_exist|404 连续 25 次耗尽容忍窗口 —— 服务端确认任务不存在)
+        -> status="failed" + 清 videoTaskId/videoTaskModel
+        -> 额度还在（canAutoRetryVanishedTask）则 videoRetryCount +1 并**立刻重建一次**：
+           批量/单项重摇在 worker 内重跑一次 attempt；刷新恢复通道用 onlyShotIds 白名单
+           只重建这几个镜头（绝不顺带把其他待补做镜头自动开跑）
+        -> 仍失败或额度已用完 → 落 failed 交人工（不再自动重发）
+    VideoTaskCreatedError 且 stillRunning=false，taskVanished=false
+        (已完成但无地址 / 服务端 failed|cancelled)
+        -> status="failed" + 清 videoTaskId/videoTaskModel，**不自动重建**
+           （2026-09-28 前 404 也归此类：省略参数继承默认 true，镜头恒满足
+           hasResumableVideoTask → 批量不新建、恢复通道只轮服务端已删除的任务、
+           单项重摇被拒，界面表现为「一直加载」且无报错）
     其他异常（创建阶段：网络 / 超时 / 配额 / 429 冷却耗尽）
         -> 一律直接 status="failed" + 提示手动重试
-        -> **编排层没有创建重试环**：旧 `MAX_TASK_RETRIES = 2` + `8s*(attempt+1)` 退避
+        -> **编排层没有通用创建重试环**：旧 `MAX_TASK_RETRIES = 2` + `8s*(attempt+1)` 退避
            已于 2026-09-23 裁定 3 整体删除（超时/5xx 时服务端可能已建任务，重发就是
-           重复扣秒数），见本文件末段第 4 条。任务恢复改由 `Shot.videoTaskId` +
-           `pollVideoTaskById`（只发 GET）承担。
-    ⚠ `videoRetryCount` 现行代码**已无写入点**（旧重试环删除后没人再 ++）：
-        `projectOps.ts` 只在失效时清 `undefined`，`StepVideos.tsx:259` 与
-        孤儿文件 `ShotPreview.tsx:80` 仍按「Retry N」读取 —— 界面上的重试次数
-        徽标恒不出现。属死字段，待清理。
+           重复扣秒数），见本文件末段第 4 条。任务恢复由 `Shot.videoTaskId` +
+           `pollVideoTaskById`（只发 GET）承担；唯一例外是上面的 taskVanished。
+    `videoRetryCount` = 已消耗的自动重建额度（2026-09-28 起重新有写入点，由
+        commitVideoFailure 在决定重建时 +1，上限 MAX_AUTO_RETRY_ON_VANISHED_TASK = 1，
+        三条通道共用同一份预算；用户手点「重新生成」会重置回 0）。
+        界面在进度占位里显示 `pipeline.retryVideo`「视频重试中 (n/1)」——
+        该字段此前长期无写入点、徽标恒不出现，现已接回。
   onFinally: 全有视频 -> "idle"；全部落定(有视频或失败) -> 复位 started + "failed" + 中文硬编码
 ```
 

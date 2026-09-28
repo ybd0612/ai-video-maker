@@ -188,6 +188,7 @@
 3. 筛选：`src/lib/shotQueue.ts:pendingVideoShots` = `!videoUrl && imageUrl && status !== "videoing" && (motionPrompt || actionDesc)`；排队数、待消耗秒数与顶部「补做缺失 (N)」按钮全部基于同一函数（含 `failed`）
 4. 提示词：`composeMotionPrompt(shot)`（返回 `shot.motionPrompt`，子字段不二次拼装，`lib/promptUtils.ts:21`；**分镜声明了止态 `endStateDesc` 时追加结尾句「结束时画面：…」——双帧方案 E；止态缺失或纯空白则与旧行为逐字一致**）+ `appendRegistryRules(negativeStrategy)` —— 追加的是 `promptRules.getActiveRenderRules()` 的**渲染文本**（只收带 `renderContent` 的条目），写给提示词作者的元指令不再进请求体
 5. **创建不重试**（2026-09-23 裁定 3）：一次 `generateVideo` 调用，失败即 `failed` 并提示手动重试；旧的重试环（`MAX_TASK_RETRIES = 2` + `8s * (attempt+1)` 退避）已删除，因为超时 / 5xx 时服务端可能已建任务，重发就是重复扣秒数。取消链路仍缺（见 9.3）
+   - **唯一例外（2026-09-28）**：服务端**确认任务不存在**（持续 404，`VideoTaskCreatedError.taskVanished=true`）时，产出已不可回收也没有东西在跑，允许**立刻重建一次**。额度 `shotQueue.MAX_AUTO_RETRY_ON_VANISHED_TASK = 1`，记在持久字段 `Shot.videoRetryCount`（`commitVideoFailure` 在决定重建时就 +1，所以批量 / 单项重摇 / 刷新恢复共用同一份预算，不会各重试一次）；批量与重摇在 worker 内重跑一次 `attempt`，刷新恢复用 `runVideoBatch({ onlyShotIds })` 白名单只重建这几个镜头。用户手点「重新生成」把额度重置回 0。判定一律走结构化标记 + `canAutoRetryVanishedTask`，**不得匹配错误文案**。
 6. `generateVideo`（`videoService.ts`）—— 素材由 `src/lib/videoPlan.ts:planShotVideoMedia` 按设置项 `videoConsistency` 决策，批量与单项重摇共用同一函数（`useVideoActions.ts` 不再自己拼素材）：
    - **先限流**：`rateLimiter.acquire("video", { cost: duration || 1, signal })`（:135），配额按秒计、在 HTTP 之前扣
    - 创建体：`size 恒 "720P"`（:71）、`aspect_ratio` 白名单、`seconds = clamp(round(duration), 4, 12)` 转字符串（:139-143）、`n:1`

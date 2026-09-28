@@ -46,8 +46,17 @@ export interface BatchRunnerConfig {
   registry: Map<string, AbortController>;
   /** 刷新/新会话恢复：注册表为空但存在残留中间状态时复位（守卫通过后、建任务前调用） */
   recoverStuck?: (projectId: string) => void;
-  /** 构建本轮任务列表（空数组 → onEmpty 分支：不注册、不执行） */
-  buildTasks: (projectId: string, signal: AbortSignal) => Array<() => Promise<void>>;
+  /**
+   * 构建本轮任务列表（空数组 → onEmpty 分支：不注册、不执行）。
+   * `onlyShotIds` 由调用方透传：给了就**只**为这些业务对象建任务。用于刷新恢复通道
+   * 只重建刚被判「服务端已不存在」的那几个镜头，避免顺带把项目里其他待补做对象
+   * 一起自动开跑（对视频而言等于页面一加载就按秒计费）。
+   */
+  buildTasks: (
+    projectId: string,
+    signal: AbortSignal,
+    onlyShotIds?: readonly string[],
+  ) => Array<() => Promise<void>>;
   /** 注册后、执行前调用（设置生成标记 / 项目状态） */
   onBeforeRun?: (projectId: string) => void;
   /** 任务列表为空时调用（不注册，不触发 onBeforeRun/onFinally） */
@@ -68,8 +77,8 @@ export interface BatchRunnerConfig {
  */
 export function createBatchRunner(
   cfg: BatchRunnerConfig,
-): (opts: { projectId: string; concurrency: number }) => Promise<void> {
-  return async ({ projectId, concurrency }) => {
+): (opts: { projectId: string; concurrency: number; onlyShotIds?: readonly string[] }) => Promise<void> {
+  return async ({ projectId, concurrency, onlyShotIds }) => {
     // 幂等守卫：同一项目已有任务在跑时不重复启动
     if (cfg.registry.has(projectId)) return;
 
@@ -79,7 +88,7 @@ export function createBatchRunner(
     const controller = new AbortController();
     const signal = controller.signal;
 
-    const tasks = cfg.buildTasks(projectId, signal);
+    const tasks = cfg.buildTasks(projectId, signal, onlyShotIds);
     if (tasks.length === 0) {
       cfg.onEmpty?.(projectId);
       return;

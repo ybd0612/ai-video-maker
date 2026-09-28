@@ -15,7 +15,7 @@ import { useT } from "@/i18n";
 import { PromptSubFields } from "./PromptSubFields";
 import { Lightbox } from "@/components/ui/Lightbox";
 import { useWizardActions } from "./useWizardActions";
-import { pendingVideoShots } from "@/lib/shotQueue";
+import { pendingVideoShots, MAX_AUTO_RETRY_ON_VANISHED_TASK } from "@/lib/shotQueue";
 import { hasActiveVideoTask } from "./useVideoActions";
 import { MEDIA_FRAME, placeholderClass, resolveAspect } from "@/lib/mediaLayout";
 import { syncSelectionWithShots } from "@/lib/railSelection";
@@ -263,7 +263,10 @@ export function StepVideos() {
                   </span>
                   {current.videoRetryCount && current.videoRetryCount > 0 && (
                     <span className="text-[0.5625rem] text-ink-4">
-                      Retry {current.videoRetryCount}
+                      {t("pipeline.retryVideo", {
+                        count: String(current.videoRetryCount),
+                        max: String(MAX_AUTO_RETRY_ON_VANISHED_TASK),
+                      })}
                     </span>
                   )}
                 </div>

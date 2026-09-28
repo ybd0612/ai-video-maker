@@ -105,6 +105,23 @@ export function canGiveUpVideoTask(input: { batchActive: boolean; shot: Shot }):
   return !input.batchActive && hasResumableVideoTask(input.shot);
 }
 
+/**
+ * 服务端确认任务不存在后，每个镜头允许自动重建的次数。
+ * 钉死为 1：2026-09-26 实测过同一镜头被 `POST /videos` 七次的事故，任何自动重发
+ * 都必须有明确上限，且额度要跨刷新、跨批量与续轮询通道只扣一次。
+ */
+export const MAX_AUTO_RETRY_ON_VANISHED_TASK = 1;
+
+/**
+ * 该镜头还有没有"任务不存在 → 自动重建"的额度。
+ * 额度记在持久字段 `Shot.videoRetryCount` 上（由 `commitVideoFailure` 在真正重建前 +1），
+ * 因此批量、单项重摇、刷新恢复三条通道共用同一份预算，不会各自重试一次。
+ * 用户手动点「重新生成」会把额度重置回 0（那是新的明确意图）。
+ */
+export function canAutoRetryVanishedTask(shot: Pick<Shot, "videoRetryCount">): boolean {
+  return (shot.videoRetryCount ?? 0) < MAX_AUTO_RETRY_ON_VANISHED_TASK;
+}
+
 /** 有画面提示词但提示词为空 —— 永远不会被生成，需要单独提示用户 */
 export function shotsWithoutVisualPrompt(shots: readonly Shot[]): Shot[] {
   return shots.filter((shot) => !shot.visualPrompt.trim());
