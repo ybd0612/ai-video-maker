@@ -172,6 +172,26 @@ describe("composeMotionPrompt", () => {
     expect(composeMotionPrompt(shot)).toBe("The subject walks");
   });
 
+  it("声明了止态时作为结尾句追加（双帧方案 E）", () => {
+    const shot = asShot({
+      motionPrompt: "小猫推开门",
+      endStateDesc: "门完全打开，小猫停在门槛上",
+    });
+    expect(composeMotionPrompt(shot)).toBe(
+      "小猫推开门。结束时画面：门完全打开，小猫停在门槛上",
+    );
+  });
+
+  it("止态为纯空白时不追加，旧数据行为与改造前一致", () => {
+    const shot = asShot({ motionPrompt: "小猫推开门", endStateDesc: "   " });
+    expect(composeMotionPrompt(shot)).toBe("小猫推开门");
+  });
+
+  it("缺 motionPrompt 但有止态时只发止态句，不丢掉止态约束", () => {
+    const shot = asShot({ endStateDesc: "与起幅一致" });
+    expect(composeMotionPrompt(shot)).toBe("结束时画面：与起幅一致");
+  });
+
   it("全部缺失时返回空串", () => {
     expect(composeMotionPrompt(asShot({}))).toBe("");
   });

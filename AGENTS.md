@@ -49,8 +49,8 @@ src/
 │   └── rateLimit.ts                # rateLimiter 单例：RPM 滑窗 + Token Plan 配额
 ├── stores/
 │   ├── projectTypes.ts             # 全部领域类型（AssetType / ShotStatus / VisualDirection / *Details）
-│   ├── projectStore.ts             # 多项目 + persist（key wxhb-project，version 18）
-│   ├── projectMigrations.ts        # v1→v18 迁移，导出纯函数便于单测
+│   ├── projectStore.ts             # 多项目 + persist（key wxhb-project，version 19）
+│   ├── projectMigrations.ts        # v1→v19 迁移，导出纯函数便于单测
 │   ├── projectOps.ts               # 级联失效规则（applyShotUpdates / applyAssetUpdate）
 │   └── settingsStore.ts            # apiKey/baseUrl/plan/theme/language/promptRules（wxhb-settings，v4）
 ├── lib/
@@ -261,7 +261,7 @@ scripts/run-vitest.mjs              # Windows 盘符规范化后启动 Vitest
 文生图和图生视频的提示词逻辑不同，拆分为两个字段：
 
 - **visualPrompt**（文生图）：静态场景描述，包含主体+场景背景+光影色调+艺术风格
-- **motionPrompt**（图生视频）：动态描述，包含主体动作+镜头运镜+环境变化
+- **motionPrompt**（图生视频）：动态描述，包含主体动作+镜头运镜+环境变化。**双帧方案 E（2026-09-28）**：分镜每镜另产出止态 `Shot.endStateDesc`（一句话、看得见、与起幅同机位同景别），发视频请求时由 `promptUtils.composeMotionPrompt` 拼为结尾句「结束时画面：…」。止态只存在于 `endStateDesc`，**禁止复制进 `motionPrompt`**；措辞由内置条目 `storyboard.end-state` 承载（用户在设置里关掉该条目即不再产出止态、结尾句自然不追加，不新增设置项）。止态属内容档 `MOTION_SHOT_FIELDS`：改了重审核 + 视频重做，但不清空已生成的图片。
 
 脚本生成阶段同时产出两套提示词，分别用于图片和视频生成。
 
@@ -331,7 +331,7 @@ scripts/run-vitest.mjs              # Windows 盘符规范化后启动 Vitest
   `name` / `description` / `prompt`（外观提示词派生物：**character 为中文**，由 `assetDetails.composeAssetAppearance` 从 `details` + 摘要行拼装、零模型调用；scene/product/prop 同为拼装中文（叙事字段不入外观）；style 资产上即 `stylePrompt`）/ `details`（分类结构化设定）/
   `imageUrl` / `avatarUrl` / `multiViewUrl` / `error` / `derivation`（`locked` / `dirty`）/ `renderRevision`；
   角色另有 `appearancePrompt` / `assetNamespace` / `fullPrompt`
-- **Shot**：`scriptText` / `visualPrompt` / `motionPrompt` + 画面 4 子字段与动态 4 子字段 / `duration`（规范化后只可能 4|5|8）/
+- **Shot**：`scriptText` / `visualPrompt` / `motionPrompt` + 画面 4 子字段与动态 5 子字段（含止态 `endStateDesc`，见「双提示词系统」）/ `duration`（规范化后只可能 4|5|8）/
   `dialogues[]`（`characterId` 为 `null` 即旁白，`delivery` 为 TTS 预留、不进任何请求）/ `activeCharacterIds` / `activeSceneId` /
   `activeProductIds` / `activePropIds` / `shotSize`（机读景别，衔接与参考位分配依据）/ `imageUrl` / `videoUrl` /
   `videoProgress` / `videoRetryCount` / `videoTaskId` + `videoTaskModel`（服务端任务，刷新恢复用）/
@@ -341,7 +341,7 @@ scripts/run-vitest.mjs              # Windows 盘符规范化后启动 Vitest
   只有成片完成才置 `done`）；分镜 `idle → scripting → scripted → imaging → imaged → videoing → videoed`（可卡 `failed`）
 - `HistoryEntry` / 操作历史已随 persist v15 从持久化中移除，**不再属于数据模型**，勿再加回
 - 多项目：`projects[]` + `activeProjectId`，经 `getActiveProject()` 派生；复制项目保留分镜结构并重置 `idle`
-- persist：`wxhb-project` v18 / `wxhb-settings` v4 / `wxhb-usage`（限流用量）。迁移按版本分块串行，
+- persist：`wxhb-project` v19 / `wxhb-settings` v4 / `wxhb-usage`（限流用量）。迁移按版本分块串行，
   **新增持久化字段必须同时加迁移与 `tests/stores/*` 回归**；块执行顺序与版本号不完全一致（`<11` 排在 `<12`、`<13` 之后），改迁移前先看 `docs/execution-flow.md` §13
 
 ## 多项目管理

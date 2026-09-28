@@ -32,6 +32,7 @@ function makeShot(): Shot {
     cameraDesc: "dolly in",
     envChangeDesc: "steam rising",
     motionSpeedDesc: "slow-motion",
+    endStateDesc: "she looks up and smiles",
     firstFrameUrl: "https://img.example/first.png",
     lastFrameUrl: "https://img.example/last.png",
     useDualFrame: true,
@@ -55,6 +56,7 @@ describe("pickShotFields", () => {
     expect(picked.cameraDesc).toBe("dolly in");
     expect(picked.envChangeDesc).toBe("steam rising");
     expect(picked.motionSpeedDesc).toBe("slow-motion");
+    expect(picked.endStateDesc).toBe("she looks up and smiles");
     expect(picked.firstFrameUrl).toBe("https://img.example/first.png");
   });
 

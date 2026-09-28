@@ -86,6 +86,7 @@ function makeShot(): Shot {
     cameraDesc: "",
     envChangeDesc: "",
     motionSpeedDesc: "",
+    endStateDesc: "小羊抬头看向镜头",
     useDualFrame: false,
   };
 }
@@ -122,6 +123,22 @@ describe("normalizeRawShot 运行时归一化", () => {
     expect(shot.activeCharacterIds).toEqual(["char_1", "小猪"]);
     expect(shot.activeProductIds).toEqual(["主体"]);
     expect(shot.activePropIds).toEqual(["钥匙"]);
+  });
+
+  it("止态缺失归一为空串，模型给了则原样保留（代码不判断内容）", () => {
+    expect(
+      normalizeRawShot({ scriptText: "s", visualPrompt: "v", motionPrompt: "m", duration: 5 })
+        .endStateDesc,
+    ).toBe("");
+
+    const shot = normalizeRawShot({
+      scriptText: "s",
+      visualPrompt: "v",
+      motionPrompt: "m",
+      duration: 5,
+      endStateDesc: "门完全打开，小猫停在门槛上",
+    });
+    expect(shot.endStateDesc).toBe("门完全打开，小猫停在门槛上");
   });
 
   it("dialogues 非数组退化为空数组，字段非字符串补空值", () => {
@@ -190,6 +207,7 @@ describe("reviseShotWithInstruction", () => {
     const user = lastMessages()[1]?.content ?? "";
     expect(user).toContain("改成航拍远景");
     expect(user).toContain("乡间麦田夕阳");
+    expect(user).toContain("小羊抬头看向镜头");
     expect(user).not.toContain("shot_1");
 
     expect(shot.activeSceneId).toBe("乡间麦田夕阳");

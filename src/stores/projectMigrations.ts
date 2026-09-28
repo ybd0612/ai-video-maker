@@ -390,5 +390,13 @@ export function migratePersistedState(
     // no-op：见上方说明
   }
 
+  // Migrate from v18 to v19: 新增 Shot.endStateDesc（止态，双帧方案 E）。
+  // 与 shotSize 同理刻意不补默认值：止态只能由分镜模型产出，代码凭空补写等于把
+  // 模型从未声明的结束状态塞进按秒计费的视频请求。旧镜头保持 undefined，
+  // composeMotionPrompt 遇到缺省即不追加结尾句，行为与改造前一致。
+  if (version < 19) {
+    // no-op：见上方说明
+  }
+
   return state;
 }

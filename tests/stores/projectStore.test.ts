@@ -233,6 +233,7 @@ describe("运行时字段分档（问题 2）", () => {
     expect(hasAnyField({ duration: 8 }, STORYBOARD_SHOT_FIELDS)).toBe(true);
     expect(hasAnyField({ actionDesc: "x" }, STORYBOARD_SHOT_FIELDS)).toBe(true);
     expect(hasAnyField({ cameraDesc: "x" }, STORYBOARD_SHOT_FIELDS)).toBe(true);
+    expect(hasAnyField({ endStateDesc: "x" }, STORYBOARD_SHOT_FIELDS)).toBe(true);
     // 且它们不属于 VISUAL_SHOT_FIELDS（不回收图片审核位）
     expect(hasAnyField({ motionPrompt: "x" }, VISUAL_SHOT_FIELDS)).toBe(false);
     // MOTION_SHOT_FIELDS 现在只含内容型运动字段
@@ -250,5 +251,15 @@ describe("运行时字段分档（问题 2）", () => {
 
     expect(next.videoUrl).toBeUndefined();
     expect(next.status).toBe("imaged");
+  });
+
+  it("改止态按内容型运动档处理：视频重做、图片保留（双帧方案 E）", () => {
+    const shot = makeShot("shot_1");
+
+    const next = applyShotUpdates(shot, { endStateDesc: "门完全打开，小猫停在门槛上" });
+
+    expect(next.videoUrl).toBeUndefined();
+    expect(next.status).toBe("imaged");
+    expect(next.imageUrl).toBe(shot.imageUrl);
   });
 });

@@ -208,6 +208,9 @@ export interface Shot {
   cameraDesc?: string;       // Camera movement: "camera slowly dollies in"
   envChangeDesc?: string;    // Environment changes: "steam rising from cup"
   motionSpeedDesc?: string;  // Motion speed: "cinematic slow-motion, 24fps"
+  /** 止态：本镜动作完成后停住的画面状态（同机位、同景别），由分镜模型产出。
+   *  渲染视频提示词时作为结尾句注入（双帧方案 E）；旧数据与模型未给时为 undefined */
+  endStateDesc?: string;
   // 首尾帧控制
   firstFrameUrl?: string;
   lastFrameUrl?: string;

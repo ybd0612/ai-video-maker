@@ -46,7 +46,7 @@
 | --- | --- | --- |
 | `docs/roadmap/competitive-gap-2026-09-21.md` | 对标 Runway / LTX / Flow+Veo / 可灵等，列提示词与流程结构层缺口 | 🟢 评审待决；其「现状」引用四份流程快照，代码变动后需复核 |
 | `docs/roadmap/2026-09-23-film-quality-fix-plan.md` | 成片质量根因修复实施计划（11 任务：景别机读化、衔接方向反转、分镜串行、环境事实进镜头、参考位分配、渲染文本分离、任务恢复与计费收口） | ✅ 已落地（2026-09-23 全部提交）；余下待办是**真实重跑成片**核对 6 条验收判据 |
-| `docs/roadmap/2026-09-23-auto-dual-frame-design.md` | 双帧（首尾帧）自动化设计讨论稿 v2（方案 E/B/A 对比 + 遗留问题清单 + 配套 ADR） | 🟡 讨论稿、未开工；推荐 **E（止态文本，零成本）→ B（末帧质检拿数据）→ A（自动出止幅）**，停在 C 也可接受 |
+| `docs/roadmap/2026-09-23-auto-dual-frame-design.md` | 双帧（首尾帧）自动化设计讨论稿 v2（方案 E/B/A 对比 + 遗留问题清单 + 配套 ADR） | 🟢 **E 已落地（2026-09-28：`Shot.endStateDesc` + 条目 `storyboard.end-state` + 请求结尾句）**；B（末帧质检拿数据）/ A（自动出止幅）未开工，按门禁等 E 的实测数据 |
 | `docs/roadmap/2026-09-23-wizard-layout-redesign-design.md` | 分镜 / 图片 / 视频三页布局重排设计稿（左镜头轨 + 右常驻详情双栏骨架；11 条根因带 `文件:行`；P0 先修 token 层级与画幅版式） | ✅ 已定稿并全部实施（§16 五问 2026-09-23 拍定；2026-09-24 随计划落地） |
 | `docs/roadmap/2026-09-23-wizard-layout-redesign-plan.md` | 上表的实施计划：15 个任务（P0 token 与画幅版式 → P1 共享件抽取 → P2 双栏骨架 → P3 折叠与收口），每任务带红绿步骤、行为不变自查与用户目测项 | ✅ 已落地（2026-09-24，Task 1-15 全部提交；测试 51 文件 / 572 用例）；余下待办 = 用户本地目测 + 20/40 镜两档主观采集 |
 
@@ -182,6 +182,7 @@ CI 测试门禁           ⬜ .github/workflows/deploy.yml 仍只构建不跑测
 
 | 日期 | 变更 | 责任人 |
 | --- | --- | --- |
+| 2026-09-28 | **双帧方案 E 落地（止态文本约束，零新增请求）**：新增 `Shot.endStateDesc`（persist v19 刻意 no-op，不补默认值）+ 内置条目 `storyboard.end-state` 与 `storyboardShot` 骨架第 7 条；`promptUtils.composeMotionPrompt` 发视频请求时追加结尾句「结束时画面：…」（止态缺失或纯空白则逐字等同旧行为）；止态归 `MOTION_SHOT_FIELDS` 内容档（重审核 + 视频重做、不清空图片），重roll 与「交给 AI 修改」链路均带上。同步 `AGENTS.md`（双提示词系统 / 数据模型 / persist 版本）、`docs/execution-flow.md`（§9.4 字段分档与视频提示词、§13 迁移）、两份 README 步骤 3 —— 并订正 README 里「英文画面/运动提示词」的残留口径（批 3 起已中文化）。B（末帧质检）/ A（自动止幅）按门禁规则等 E 的实测数据再决定 | Qoder |
 | 2026-09-21 | 新建本索引；按源码取证重写 `README.md` / `README_EN.md`（删幽灵功能「AI 对话」、撤回 MIT 声明、新增「明确不支持」清单、目录与命令按实际文件对齐、限额表改为引用 `plans.ts`）；登记 C1–C17 | Qoder（文档审计） |
 | 2026-09-23 | **成片质量根因修复落地（Task 1–11）**：新增机读景别 `Shot.shotSize`（persist v17）与 `lib/shotSize.ts`；`chain` 衔接方向反转为「后镜首帧取前镜末帧」并落地末帧抽取（`lib/tailFrameStore.ts` + `renderService.extractTailFrameUrl`，内存不持久化）；分镜逐镜头改**串行**并携带上一镜实际产出；场景锚点带上 `weather` / `time` + `storyboard.paintable-environment-state` 条目；按景别分配参考位；外观锚点改括注元信息；作者向规则与 `renderContent` 渲染文本分离；`Shot.videoTaskId` / `videoTaskModel`（persist v18）+ 创建重试环收口。C19 结案：「场景图不进参考」裁决只覆盖空间几何一致 | Qoder |
 | 2026-09-21 | **口径落地 + 第 1、2 批搬迁**：镜头数量改由模型判断（`promptRules.ts` 骨架 zh/en + `storyboard.shot-count` 条目，失效断言同步更新，`idea-breakdown.md` / `flow-map.html` 原文引用同步）；对外名统一（`index.html` 标题、`i18n.pipeline.title` en）；`AGENTS.md` 18 处事实订正 + 时点审计整节迁出为 `docs/history/2026-09-13-agents-audit.md`；6 份快照 `git mv` 进 `docs/history/` 并逐份加顶部修订；全仓入站链接重写（含 `vite.config.ts`、`settingsStore.ts` 注释、`docs/roadmap` 引用）；C1–C12、C14–C16 结案，新增 C18 | Qoder（文档治理） |

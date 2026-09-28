@@ -396,6 +396,7 @@ Return strict JSON in exactly this format, no other text:
 4. 其余描述字段（sceneDesc/detailDesc/lightingDesc/styleDesc/actionDesc/cameraDesc/envChangeDesc/motionSpeedDesc）逐项填写；主体信息只写入 visualPrompt，不再单独生成 subjectDesc
 5. dialogues 按需给对白（characterId 用角色名），activeCharacterIds/activeSceneId/activeProductIds/activePropIds 用已有资产的 ID；visualPrompt 或 scriptText 中出现的可识别道具/产品必须同步写入对应 active ID，duration 从 4/5/8 中选
 6. shotSize：本镜的机读景别，只能取 extreme-wide / wide / medium / close / close-up 五个值之一，必须与 visualPrompt 里写的景别一致
+7. endStateDesc：一句话写清本镜**动作完成后画面停住的静止状态**（止态），与起幅同机位、同景别；这句话只写进 endStateDesc，不得复制进 motionPrompt
 {{assets}}
 {{#rules}}
 重要规则：
@@ -417,6 +418,7 @@ Return strict JSON in exactly this format, no other text:
 4. Fill every other description field (sceneDesc/detailDesc/lightingDesc/styleDesc/actionDesc/cameraDesc/envChangeDesc/motionSpeedDesc); put subject information only in visualPrompt, with no separate subjectDesc
 5. dialogues when needed (characterId = character name); activeCharacterIds/activeSceneId/activeProductIds/activePropIds use existing asset IDs; any identifiable prop or product mentioned in visualPrompt or scriptText must also be included in the matching active ID list; duration from 4/5/8
 6. shotSize: this shot's machine-readable shot size, one of extreme-wide / wide / medium / close / close-up, and it must match the shot size stated in visualPrompt
+7. endStateDesc: ONE sentence stating the static frame the shot LANDS ON once its action finishes (same camera, same shot size); keep it in endStateDesc only — never copy it into motionPrompt
 {{assets}}
 {{#rules}}
 Important rules:
@@ -933,6 +935,17 @@ export const BUILTIN_RULES: PromptRule[] = [
     content: {
       zh: "- 上下文给出「上一镜已生成的内容」时，本镜必须在主体姿态、位置、景别、光线与色温上承接它：景别只允许同档或相邻档（中景↔全景），要跳档就用本镜的开头自然过渡，不要硬切；上一镜已经画过的画面不得再画一遍\n- 承接前先比对上一镜的实际内容：若本镜与上一镜是同一主体、同一姿态、同一景别（只是换个说法），**必须换节拍**——改景别、改动作或把两镜合并为一镜。两镜内容重复会让收尾拖沓且剪出来必然跳",
       en: "- When the context provides 'the previous shot as generated', this shot must hand off from it in pose, position, shot size, lighting and colour temperature: stay in the same or an adjacent shot size (medium ↔ wide); to jump two sizes, transition within this shot rather than hard-cutting, and never redraw what the previous shot already showed\n- Before handing off, compare against the previous shot's actual content: if this shot has the same subject, same pose and same shot size and only rephrases it, CHANGE THE BEAT — alter the shot size, alter the action, or merge the two shots. Two shots with duplicated content drag the ending and always cut as a jump",
+    },
+    enabled: true,
+    source: "builtin",
+  },
+  {
+    id: "storyboard.end-state",
+    task: "storyboardShot",
+    section: "rules",
+    content: {
+      zh: "- 每镜的 endStateDesc 必须写**看得见的静止状态**：动作完成后画面里实际留下什么（「门完全打开，小猫停在门槛上」「伞收拢垂在手边，地面只剩水洼的反光」）\n  - 只写一句话，只写状态变化本身带来的差异；不写运镜过程、不写情绪词、不写「变得开心」「气氛缓和」这类画不出来的表述\n  - 与起幅同机位、同景别；止态不得引入起幅里没有的新主体或新道具\n- motionPrompt 只写怎么动，**不得把止态这句话复制进 motionPrompt**：程序在发视频请求时自动把 endStateDesc 追加为结尾句\n- 本镜确实没有可辨识的状态变化（纯氛围、纯运镜）时，endStateDesc 如实写「与起幅一致」，**不要为了显得有变化而编造状态差异**",
+      en: "- endStateDesc must state the **visible static frame** the shot lands on: what is actually left in the picture once the action finishes (\"the door stands fully open, the kitten paused on the threshold\" / \"the umbrella folded shut at his side, only puddle reflections left on the ground\")\n  - ONE sentence, only the difference the state change itself brings; no camera movement, no mood words, nothing unpaintable such as 'feels happier' or 'the atmosphere softens'\n  - Same camera position and same shot size as the opening frame; the end state must not introduce a new subject or prop the opening frame never had\n- motionPrompt describes only how things move — **never copy that end-state sentence into motionPrompt**: the program appends endStateDesc as the closing sentence when the video request is sent\n- When this shot genuinely has no identifiable state change (pure ambience, pure camera move), write \"identical to the opening frame\" in endStateDesc — **do not invent a state change to look eventful**",
     },
     enabled: true,
     source: "builtin",

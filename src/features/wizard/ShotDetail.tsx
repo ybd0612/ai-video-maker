@@ -30,6 +30,7 @@ const SUB_FIELD_ROWS: Array<{ field: keyof Shot; label: TranslationKey }> = [
   { field: "cameraDesc", label: "wizard.promptCamera" },
   { field: "envChangeDesc", label: "wizard.promptEnvChange" },
   { field: "motionSpeedDesc", label: "wizard.promptMotionSpeed" },
+  { field: "endStateDesc", label: "wizard.promptEndState" },
 ];
 
 export interface ShotDetailProps {

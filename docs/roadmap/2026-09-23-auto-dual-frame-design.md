@@ -1,6 +1,6 @@
 # 双帧（首尾帧）自动化方案 —— 设计讨论稿
 
-> 状态：**讨论稿，未开工**。本轮不改任何代码，供决策研究用。
+> 状态：**E 已落地（2026-09-28），B / A 未开工**。E 的实现口径：新增 `Shot.endStateDesc`（止态，persist v19 no-op 迁移）+ 内置条目 `storyboard.end-state` 控制措辞（用户关掉即回到改造前行为）+ `promptUtils.composeMotionPrompt` 发请求时追加结尾句「结束时画面：…」。B（末帧质检拿数据）与 A（自动出止幅）按下方门禁规则等 E 的实测数据再决定；正文仍为历史快照不改写。
 > ⚠ **2026-09-24 顶部修订（正文为历史快照，不改写）**：文中提到的手动「双图流开关 + 尾帧 URL / 点选其他镜头图」通路 `DualFrameToggle` 已**整体下线**（违反裁定 2 + 会清空按秒计费视频 + 静默锁死分镜「下一步」）。§82 所述「`useDualFrame`/`lastFrameUrl` 属 MOTION 字段、写回会清空已生成视频」的铁律**已作废**：这两个字段现归 `projectOps.ts:RUNTIME_SHOT_FIELDS`，写回既不清空视频、也不回收审核位。现行权威见 `AGENTS.md` 视频一致性策略段与 `docs/execution-flow.md` §9.4 / §9.6。
 > v2 补入：方案 **E（纯文本止态约束，零成本）**、末帧质检作为证据来源、重摇成本上限、开关与退路、运动自然度风险、数据采集口径、配套 ADR 动作。**推荐顺序相应改为 E → B → A。**
 > 关联：`docs/roadmap/2026-09-23-film-quality-fix-plan.md`（裁定 2 已把自动衔接方向反转）、`docs/execution-flow.md` §9、`AGENTS.md` 视频一致性策略段。

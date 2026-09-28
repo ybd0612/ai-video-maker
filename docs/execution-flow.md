@@ -182,7 +182,7 @@
 1. `recoverStuck`：残留 `videoing` 且**无可续轮询任务**（口径 `src/lib/shotQueue.ts:40 hasResumableVideoTask` = `videoTaskId` 与 `videoTaskModel` 同时齐备）→ 回 `imaged`，`videoProgress=0`（:126-142）。带任务 ID 的镜头**跳过复位**，由同一轮批量的续轮询任务接管（见下条）：旧实现无条件复位会让该镜头重新进 `pendingVideoShots` 集合，于是每刷新一次就再发一次 `POST /videos`（按秒计费的重复任务，旧任务 ID 被覆盖后从此无人轮询）——2026-09-26 实测同一镜头三次刷新烧掉三个任务，`debug-dump/runtime.log` 三条 CREATE 记录提示词逐字相同
 2. **有在飞任务时一律不新建**（2026-09-26）：`buildTasks` 开头判 `shotQueue.ts:54 inFlightVideoShots`（`videoing` + 任务 ID 齐备）非空即 `return []` —— 批量是 N 个 worker 顺序领取任务列表，免费档 N=1，把续轮询排进列表等于让一个卡死的孤儿任务占住 worker 最长 30 分钟（`VIDEO_POLL_TIMEOUT_MS`），后面待补做镜头全轮不到；这些镜头改由 `resumePendingVideoTasks` **并发**独占续轮询（只发 GET）。返回空列表时 `createBatchRunner` 走 `onEmpty` 且不注册，故该函数的项目级 `hasActiveTask` 跳过不会误伤自己。已计费任务偿清前不开新任务、剩余镜头由用户点「补做缺失 (N)」继续，是既定取舍。成功/失败写回统一走 `useVideoActions.ts:commitVideoResult` / `commitVideoFailure`（批量创建、批量续轮询、单镜头重摇三路共用；终态失败一并清 `videoTaskId`/`videoTaskModel`，否则镜头掉进既不进待补做集合、也无人轮询的死区）
 3. 筛选：`src/lib/shotQueue.ts:pendingVideoShots` = `!videoUrl && imageUrl && status !== "videoing" && (motionPrompt || actionDesc)`；排队数、待消耗秒数与顶部「补做缺失 (N)」按钮全部基于同一函数（含 `failed`）
-4. 提示词：`composeMotionPrompt(shot)`（恒直接返回 `shot.motionPrompt`，子字段不二次拼装，`lib/promptUtils.ts:21`）+ `appendRegistryRules(negativeStrategy)` —— 追加的是 `promptRules.getActiveRenderRules()` 的**渲染文本**（只收带 `renderContent` 的条目），写给提示词作者的元指令不再进请求体
+4. 提示词：`composeMotionPrompt(shot)`（返回 `shot.motionPrompt`，子字段不二次拼装，`lib/promptUtils.ts:21`；**分镜声明了止态 `endStateDesc` 时追加结尾句「结束时画面：…」——双帧方案 E；止态缺失或纯空白则与旧行为逐字一致**）+ `appendRegistryRules(negativeStrategy)` —— 追加的是 `promptRules.getActiveRenderRules()` 的**渲染文本**（只收带 `renderContent` 的条目），写给提示词作者的元指令不再进请求体
 5. **创建不重试**（2026-09-23 裁定 3）：一次 `generateVideo` 调用，失败即 `failed` 并提示手动重试；旧的重试环（`MAX_TASK_RETRIES = 2` + `8s * (attempt+1)` 退避）已删除，因为超时 / 5xx 时服务端可能已建任务，重发就是重复扣秒数。取消链路仍缺（见 9.3）
 6. `generateVideo`（`videoService.ts`）—— 素材由 `src/lib/videoPlan.ts:planShotVideoMedia` 按设置项 `videoConsistency` 决策，批量与单项重摇共用同一函数（`useVideoActions.ts` 不再自己拼素材）：
    - **先限流**：`rateLimiter.acquire("video", { cost: duration || 1, signal })`（:135），配额按秒计、在 HTTP 之前扣
@@ -267,7 +267,7 @@ RPM 与配额表（`lib/plans.ts:73-134`，格式 文本 / 图片1K,2K,3K,4K / �
 | 命中 MOTION 字段 | 只清视频产物，`status = imageUrl ? imaged : (scriptText ? scripted : idle)`，revision +1 |
 
 - `VISUAL_SHOT_FIELDS`（`projectOps.ts:35-46`）= `scriptText, visualPrompt, sceneDesc, detailDesc, lightingDesc, styleDesc, activeCharacterIds, activeSceneId, activeProductIds, activePropIds`
-- `MOTION_SHOT_FIELDS`（`projectOps.ts:48-55`）= `motionPrompt, actionDesc, cameraDesc, envChangeDesc, motionSpeedDesc, duration`（仅内容型运动字段）
+- `MOTION_SHOT_FIELDS`（`projectOps.ts:48-56`）= `motionPrompt, actionDesc, cameraDesc, envChangeDesc, motionSpeedDesc, endStateDesc, duration`（仅内容型运动字段；`endStateDesc` 为止态，2026-09-28 双帧方案 E 新增）
 - `RUNTIME_SHOT_FIELDS`（`projectOps.ts:59-63`）= `useDualFrame, firstFrameUrl, lastFrameUrl`（运行时/生成参数档，**不在** STORYBOARD_SHOT_FIELDS 内）
 - **推论**：在步骤 4/5 改一个子字段（如 `sceneDesc`）会立即作废该镜头已生成的图片和视频；改内容型运动字段（如 `duration` / `motionPrompt`）只作废视频。而勾双帧开关或写首/尾帧 URL（`RUNTIME_SHOT_FIELDS`）**既不作废视频、也不回收分镜审核位**——2026-09-24 分档前的旧行为（写这些字段清空按秒计费的视频并静默锁死「下一步」）已随 `DualFrameToggle` 下线和 `RUNTIME_SHOT_FIELDS` 拆分一并修掉。这就是「改完必须重新生成」的真实机制。
 - 前两条里的 `outputChanged` 要求**值确实不同**（`projectOps.ts:83-85`）；写回相同 URL 不会递增 revision。
@@ -358,9 +358,9 @@ RPM 与配额表（`lib/plans.ts:73-134`，格式 文本 / 图片1K,2K,3K,4K / �
 
 ## 13. 数据生命周期（持久化）
 
-`projectStore`：key `wxhb-project`，**version 18**，`migrate: migratePersistedState`。
+`projectStore`：key `wxhb-project`，**version 19**，`migrate: migratePersistedState`。
 
-v17 / v18（2026-09-23）是**刻意 no-op 的占位块**：v17 引入 `Shot.shotSize`、v18 引入 `Shot.videoTaskId` / `videoTaskModel`，二者都只能由模型或运行期产出，迁移**绝不补默认值**（凭空补一档景别会让衔接闸门误放行；任务 ID 无法从旧数据推出）。
+v17 / v18 / v19 是**刻意 no-op 的占位块**：v17 引入 `Shot.shotSize`、v18 引入 `Shot.videoTaskId` / `videoTaskModel`、v19 引入 `Shot.endStateDesc`（止态，双帧方案 E），三者都只能由模型或运行期产出，迁移**绝不补默认值**（凭空补一档景别会让衔接闸门误放行；任务 ID 无法从旧数据推出；凭空写止态等于把模型从未声明的结束状态塞进按秒计费的视频请求）。旧数据缺省即按「无该字段」走改造前的路径。
 
 迁移块按文件顺序串行执行，实测顺序为 **2 → 3 → 4 → 5 → 6 → 7 → 8 → 9 → 10 → 12 → 13 → 11 → 14 → 15 → 16 → 17 → 18**（`projectMigrations.ts:29-375`）：`version < 11` 的块被放在 `<12`、`<13` 之后（:263），因此 v10 及更早的数据会先跑 v12/v13 再跑 v11。三块作用于互不相交的字段（镜头引用数组 / visualDirection 保留 / 资产 details 物化），当前不影响结果，但顺序与版本号不一致，属可读性风险。
 

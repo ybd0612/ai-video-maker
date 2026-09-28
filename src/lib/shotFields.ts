@@ -55,6 +55,7 @@ export function pickShotFields(
     cameraDesc: shot.cameraDesc,
     envChangeDesc: shot.envChangeDesc,
     motionSpeedDesc: shot.motionSpeedDesc,
+    endStateDesc: shot.endStateDesc,
     firstFrameUrl: shot.firstFrameUrl,
     activeSceneId: shot.activeSceneId,
     activeProductIds: shot.activeProductIds,

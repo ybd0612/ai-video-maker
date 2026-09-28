@@ -51,6 +51,7 @@ export const MOTION_SHOT_FIELDS = [
   "cameraDesc",
   "envChangeDesc",
   "motionSpeedDesc",
+  "endStateDesc",
   "duration",
 ] as const;
 

@@ -51,6 +51,8 @@ export interface RawShot {
   cameraDesc?: string;
   envChangeDesc?: string;
   motionSpeedDesc?: string;
+  /** 止态：动作完成后停住的画面状态，渲染视频提示词时作为结尾句注入 */
+  endStateDesc?: string;
   useDualFrame?: boolean;
 }
 
@@ -366,6 +368,7 @@ export function normalizeRawShot(s: RawShot): RawShot {
     cameraDesc: s.cameraDesc ?? "",
     envChangeDesc: s.envChangeDesc ?? "",
     motionSpeedDesc: s.motionSpeedDesc ?? "",
+    endStateDesc: s.endStateDesc ?? "",
     duration: [4, 5, 8].includes(s.duration) ? s.duration : 5,
     shotSize: normalizeShotSize(s.shotSize),
     useDualFrame: s.useDualFrame ?? false,
@@ -504,6 +507,7 @@ function buildShotEditPayload(shot: Shot, assets: Asset[]): Record<string, unkno
     cameraDesc: shot.cameraDesc ?? "",
     envChangeDesc: shot.envChangeDesc ?? "",
     motionSpeedDesc: shot.motionSpeedDesc ?? "",
+    endStateDesc: shot.endStateDesc ?? "",
     duration: shot.duration,
     dialogues: shot.dialogues.map((line) => ({
       characterName: nameOf(line.characterId ?? undefined, "character") ?? "",
