@@ -177,10 +177,14 @@
 
 ## 7. 步骤 5：镜头视频
 
-`useVideoActions.ts`，`runVideoBatch`（:124-244）。并发按套餐：`tokenplan → 3`，`rpm.video <= 1 → 1`，否则 `2`（:303-306）。
+`useVideoActions.ts`，`runVideoBatch`（:124-244）。并发按套餐取 `plans.ts:videoConcurrencyFor`：`tokenplan → 3`，`rpm.video <= 1 → 1`，否则 `2`。
 
 1. `recoverStuck`：残留 `videoing` 且**无可续轮询任务**（口径 `src/lib/shotQueue.ts:40 hasResumableVideoTask` = `videoTaskId` 与 `videoTaskModel` 同时齐备）→ 回 `imaged`，`videoProgress=0`（:126-142）。带任务 ID 的镜头**跳过复位**，由同一轮批量的续轮询任务接管（见下条）：旧实现无条件复位会让该镜头重新进 `pendingVideoShots` 集合，于是每刷新一次就再发一次 `POST /videos`（按秒计费的重复任务，旧任务 ID 被覆盖后从此无人轮询）——2026-09-26 实测同一镜头三次刷新烧掉三个任务，`debug-dump/runtime.log` 三条 CREATE 记录提示词逐字相同
-2. **有在飞任务时一律不新建**（2026-09-26）：`buildTasks` 开头判 `shotQueue.ts:54 inFlightVideoShots`（`videoing` + 任务 ID 齐备）非空即 `return []` —— 批量是 N 个 worker 顺序领取任务列表，免费档 N=1，把续轮询排进列表等于让一个卡死的孤儿任务占住 worker 最长 30 分钟（`VIDEO_POLL_TIMEOUT_MS`），后面待补做镜头全轮不到；这些镜头改由 `resumePendingVideoTasks` **并发**独占续轮询（只发 GET）。返回空列表时 `createBatchRunner` 走 `onEmpty` 且不注册，故该函数的项目级 `hasActiveTask` 跳过不会误伤自己。已计费任务偿清前不开新任务、剩余镜头由用户点「补做缺失 (N)」继续，是既定取舍。成功/失败写回统一走 `useVideoActions.ts:commitVideoResult` / `commitVideoFailure`（批量创建、批量续轮询、单镜头重摇三路共用；终态失败一并清 `videoTaskId`/`videoTaskModel`，否则镜头掉进既不进待补做集合、也无人轮询的死区）
+2. **批量按在飞上限放行**（2026-09-26 立为「一律不新建」，2026-09-28 改为上限）：`buildTasks` 用 `shotQueue.ts:canStartVideoBatch({ inFlightCount, cap })`，`cap` = `plans.ts:videoInFlightCapFor` = 并发 + 1（免费 2 / 企业 3 / Token Plan 4）。在飞镜头仍**绝不排进任务列表**（`pendingVideoShots` 按 `status==="videoing"` 排除），它们由 `resumePendingVideoTasks` **并发**独占续轮询（只发 GET）；原因是批量是 N 个 worker 顺序领取，一个卡死的任务会占住 worker 最长 30 分钟（`VIDEO_POLL_TIMEOUT_MS`）。
+   - 为什么不再「有在飞就整批 return 空列表」：该口径**没有边界**。服务端可以受理任务后既不吐片也不给终态（2026-09-28 实测 `GET /agnesapi` 返回 200 + `status:"in_progress"` + `internal_progress:0` + `expires_at:null`，挂 2 小时 14 分），同项目其余 11 个镜头两小时无法开工，而「补做缺失」按钮又被 `generatingCount > 0` 禁掉——文档承诺的出路实际不存在。
+   - **显式放弃入口**：`useVideoActions.ts:giveUpVideoTask`（守卫 `shotQueue.ts:canGiveUpVideoTask`）+ 步骤 5 详情页「放弃这条任务」按钮（仅本镜 `videoing` 且有 `videoTaskId` 时出现，先弹危险确认）。只写状态：落 `failed`、清 `videoTaskId`/`videoTaskModel`、已无在飞则把项目状态复位 `idle`，**不发任何请求**。判死权交给用户，代码不猜时长。
+   - **按钮禁用一律用 `useVideoActions.ts:hasActiveVideoTask(pid)`**（模块级注册表，与代码守卫同口径），不得用持久状态 `status==="videoing"` 计数；单项重摇按钮另加本镜在飞条件，与 `canStartSingleReroll` 一致。
+   - 成功/失败写回统一走 `useVideoActions.ts:commitVideoResult` / `commitVideoFailure`（批量创建、批量续轮询、单镜头重摇三路共用；终态失败一并清 `videoTaskId`/`videoTaskModel`，否则镜头掉进既不进待补做集合、也无人轮询的死区）
 3. 筛选：`src/lib/shotQueue.ts:pendingVideoShots` = `!videoUrl && imageUrl && status !== "videoing" && (motionPrompt || actionDesc)`；排队数、待消耗秒数与顶部「补做缺失 (N)」按钮全部基于同一函数（含 `failed`）
 4. 提示词：`composeMotionPrompt(shot)`（返回 `shot.motionPrompt`，子字段不二次拼装，`lib/promptUtils.ts:21`；**分镜声明了止态 `endStateDesc` 时追加结尾句「结束时画面：…」——双帧方案 E；止态缺失或纯空白则与旧行为逐字一致**）+ `appendRegistryRules(negativeStrategy)` —— 追加的是 `promptRules.getActiveRenderRules()` 的**渲染文本**（只收带 `renderContent` 的条目），写给提示词作者的元指令不再进请求体
 5. **创建不重试**（2026-09-23 裁定 3）：一次 `generateVideo` 调用，失败即 `failed` 并提示手动重试；旧的重试环（`MAX_TASK_RETRIES = 2` + `8s * (attempt+1)` 退避）已删除，因为超时 / 5xx 时服务端可能已建任务，重发就是重复扣秒数。取消链路仍缺（见 9.3）

@@ -155,6 +155,28 @@ export function rpmFor(plan: PlanConfig, kind: ModelKind, tier?: SizeTier): numb
 }
 
 /**
+ * 视频批量并发数。
+ * 免费档视频 RPM=1，并发再高也只会撞 429；企业 2；Token Plan 3。
+ */
+export function videoConcurrencyFor(plan: PlanConfig): number {
+  if (plan.accessType === "tokenplan") return 3;
+  return rpmFor(plan, "video") <= 1 ? 1 : 2;
+}
+
+/**
+ * 允许同时挂着的在飞视频任务上限 = 并发 + 1。
+ *
+ * 为什么不是「有在飞就不开工」：服务端可能受理某个任务后既不出片也不给终态
+ * （2026-09-28 实测 GET 返回 200 + status=in_progress + internal_progress=0 +
+ * expires_at=null，挂 2 小时 14 分）。旧口径让其余镜头整批陪绑停摆，界面上
+ * 「补做缺失」又被禁用，等于没有出路。留 1 个余量既能保住那条已计费任务的
+ * 续轮询身份，又不会无上限地把饱和队列越挤越死。
+ */
+export function videoInFlightCapFor(plan: PlanConfig): number {
+  return videoConcurrencyFor(plan) + 1;
+}
+
+/**
  * 将尺寸串映射到官方尺寸档位。
  * - 档位串（"1K"/"2K"/"3K"/"4K"，大小写不敏感）直接透传；
  * - 像素尺寸串（如 "1344x768" / "1024x1024"）按官方档位长边解析：

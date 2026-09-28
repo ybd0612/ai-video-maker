@@ -6,9 +6,11 @@
 
 import { describe, expect, it } from "vitest";
 import {
+  canGiveUpVideoTask,
+  canStartSingleReroll,
+  canStartVideoBatch,
   hasResumableVideoTask,
   inFlightVideoShots,
-  canStartSingleReroll,
   isShotInFlight,
   pendingImageShots,
   pendingVideoShots,
@@ -118,6 +120,48 @@ describe("hasResumableVideoTask（在飞任务可否续轮询的唯一口径）"
     expect(hasResumableVideoTask(shot({ id: "e", status: "videoed", videoUrl: "https://cdn.test/e.mp4", ...task }))).toBe(false);
     expect(hasResumableVideoTask(shot({ id: "f", status: "failed", ...task }))).toBe(false);
     expect(hasResumableVideoTask(shot({ id: "g", status: "imaged", imageUrl: "https://cdn.test/g.png", ...task }))).toBe(false);
+  });
+});
+
+/* ── 在飞上限：一条卡住的任务不得让整批陪绑（2026-09-28 实测） ────────────────
+   旧口径是「项目只要有在飞视频任务，buildTasks 就整批返回 []」。服务端对某个任务
+   既不出片也不给终态（实测 GET 返回 200 + in_progress + internal_progress 0 +
+   expires_at null，挂 2 小时 14 分），于是其余镜头两小时无法开工，界面上
+   「补做缺失」又被 generatingCount>0 禁掉 —— 承诺的出路实际不存在。 */
+describe("canStartVideoBatch（按在飞上限放行，不再整批陪绑）", () => {
+  it("在飞数低于上限就允许开工——有在飞任务不再等于批量停摆", () => {
+    expect(canStartVideoBatch({ inFlightCount: 0, cap: 2 })).toBe(true);
+    expect(canStartVideoBatch({ inFlightCount: 1, cap: 2 })).toBe(true);
+  });
+
+  it("在飞数达到或超过上限才拒绝（防止把饱和队列越挤越死）", () => {
+    expect(canStartVideoBatch({ inFlightCount: 2, cap: 2 })).toBe(false);
+    expect(canStartVideoBatch({ inFlightCount: 5, cap: 2 })).toBe(false);
+  });
+
+  it("上限恒大于并发：并发 1 的免费档也允许 1 条旧任务挂着再开 1 条", () => {
+    expect(canStartVideoBatch({ inFlightCount: 1, cap: 1 })).toBe(false);
+  });
+});
+
+/* ── 显式放弃已计费任务的入口 ────────────────────────────────────────────────
+   判死权交回用户：服务端不给终态时（expires_at null），代码不猜时长，
+   由用户按下「放弃这条任务」才清 videoTaskId 让镜头回到待补做集合。 */
+describe("canGiveUpVideoTask（放弃已计费任务的准入判据）", () => {
+  const task = { videoTaskId: "task_abc", videoTaskModel: "agnes-video-2.5-flash" };
+
+  it("本镜确有服务端在飞任务且批量没在跑 → 允许放弃", () => {
+    expect(canGiveUpVideoTask({ batchActive: false, shot: shot({ id: "a", status: "videoing", ...task }) })).toBe(true);
+  });
+
+  it("批量正在跑 → 拒绝（worker 正持有该镜头，放弃会与写回抢所有权）", () => {
+    expect(canGiveUpVideoTask({ batchActive: true, shot: shot({ id: "b", status: "videoing", ...task }) })).toBe(false);
+  });
+
+  it("没有在飞任务就没有东西可放弃：缺 ID 或非 videoing 一律拒绝", () => {
+    expect(canGiveUpVideoTask({ batchActive: false, shot: shot({ id: "c", status: "videoing" }) })).toBe(false);
+    expect(canGiveUpVideoTask({ batchActive: false, shot: shot({ id: "d", status: "videoing", videoTaskId: "task_abc" }) })).toBe(false);
+    expect(canGiveUpVideoTask({ batchActive: false, shot: shot({ id: "e", status: "imaged", imageUrl: "https://cdn.test/e.png", ...task }) })).toBe(false);
   });
 });
 

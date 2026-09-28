@@ -4,12 +4,12 @@ import {
   selectActiveProject,
 } from "@/stores/projectStore";
 import { useSettingsStore } from "@/stores/settingsStore";
-import { resolvePlan, type PlanId } from "@/lib/plans";
+import { resolvePlan, videoConcurrencyFor, videoInFlightCapFor, type PlanId } from "@/lib/plans";
 import { generateVideo, aspectRatioToVideoAspect, pollVideoTaskById, VideoTaskCreatedError } from "@/services/videoService";
 import { planShotVideoMedia } from "@/lib/videoPlan";
 import { extractTailFrameUrl } from "@/services/renderService";
 import { releaseTailFrames, setTailFrame, snapshotTailFrames } from "@/lib/tailFrameStore";
-import { pendingVideoShots, inFlightVideoShots, hasResumableVideoTask, canStartSingleReroll, isShotInFlight, type ResumableVideoShot } from "@/lib/shotQueue";
+import { pendingVideoShots, inFlightVideoShots, hasResumableVideoTask, canStartSingleReroll, canStartVideoBatch, canGiveUpVideoTask, isShotInFlight, type ResumableVideoShot } from "@/lib/shotQueue";
 import { getTranslation } from "@/i18n";
 import { composeMotionPrompt } from "@/lib/promptUtils";
 import { createBatchRunner, hasActiveTask } from "@/lib/batchRunner";
@@ -145,11 +145,19 @@ const runVideoBatch = createBatchRunner({
     const latestProject = useProjectStore.getState().projects.find((p) => p.id === pid);
     if (!latestProject) return [];
     const shotsNeedingVideos = pendingVideoShots(latestProject.shots);
-    // 有已计费、尚未回收的在飞任务时**一律不新建**：这些镜头由 resumePendingVideoTasks
-    // 的并发通道独占续轮询（见该函数）。不能把它们排进本列表 —— 批量是 N 个 worker
-    // 顺序领取任务，免费档 N=1，一个卡死的孤儿任务最长占住 worker 30 分钟，
-    // 后面所有镜头都轮不到（2026-09-26 实测 6 个在飞任务 progress 全 0）。
-    if (inFlightVideoShots(latestProject.shots).length > 0) return [];
+    // 在飞任务数达到上限才不开工（2026-09-28 由「有在飞就整批停摆」改为按上限放行）。
+    // 仍然绝不把在飞镜头排进本列表：它们是 resumePendingVideoTasks 并发续轮询的专属对象
+    // （pendingVideoShots 已按 status==="videoing" 排除），批量 worker 顺序领取任务，
+    // 一个卡死的任务最长占住 worker 30 分钟（2026-09-26 实测 6 个在飞任务 progress 全 0）。
+    // 但「只要有一条没偿清就整批陪绑」没有边界：服务端可能受理任务后既不吐片也不给
+    // 终态（2026-09-28 实测 200 + in_progress + internal_progress 0 + expires_at null
+    // 挂 2 小时 14 分），其余镜头两小时无法开工且按钮被禁用，等于没有出路。
+    // 上限 = 并发 + 1，见 plans.ts:videoInFlightCapFor。
+    const inFlightCount = inFlightVideoShots(latestProject.shots).length;
+    if (!canStartVideoBatch({
+      inFlightCount,
+      cap: videoInFlightCapFor(resolvePlan(providerConfig.plan as PlanId | undefined)),
+    })) return [];
     const videoAspect = aspectRatioToVideoAspect(latestProject.aspectRatio);
     const rules = extractVideoRules();
 
@@ -292,6 +300,18 @@ export async function resumePendingVideoTasks(): Promise<void> {
 export interface VideoActions {
   generateVideosForStep: () => Promise<void>;
   rerollVideo: (shotId: string) => Promise<void>;
+  /** 显式放弃本镜的服务端在飞任务：清任务 ID 并落 failed，使镜头回到待补做集合 */
+  giveUpVideoTask: (shotId: string) => void;
+}
+
+/**
+ * 该项目当前是否有视频批量在跑（模块级注册表）。
+ * UI 的按钮禁用条件必须用这条真实互斥判据，而不是持久状态 `status==="videoing"` ——
+ * 后者会因服务端不给终态而永远为真，把「补做缺失」永久禁掉（2026-09-28）。
+ * 与 useAssetActions 的 hasActiveAssetTask 同形态。
+ */
+export function hasActiveVideoTask(projectId: string): boolean {
+  return hasActiveTask(activeVideoTasks, projectId);
 }
 
 export function useVideoActions(): VideoActions {
@@ -304,10 +324,7 @@ export function useVideoActions(): VideoActions {
     if (!project) return;
 
     const plan = resolvePlan(providerConfig.plan as PlanId | undefined);
-    const videoConcurrency =
-      plan.accessType === "tokenplan" ? 3 : plan.rpm.video <= 1 ? 1 : 2;
-
-    await runVideoBatch({ projectId: project.id, concurrency: videoConcurrency });
+    await runVideoBatch({ projectId: project.id, concurrency: videoConcurrencyFor(plan) });
   }, []);
 
   const rerollVideo = useCallback(async (shotId: string) => {
@@ -386,5 +403,41 @@ export function useVideoActions(): VideoActions {
     }
   }, []);
 
-  return { generateVideosForStep, rerollVideo };
+  /**
+   * 显式放弃本镜的服务端在飞任务：**只写状态，不发任何请求**。
+   *
+   * 服务端受理任务后可以既不吐片也不给终态（2026-09-28 实测 `in_progress` +
+   * `internal_progress:0` + `expires_at:null` 挂 2 小时 14 分），此时代码不该猜时长
+   * 判死——那会白扔已计费额度并让同一镜头二次扣秒数——所以把判死权交回用户。
+   * 清掉 `videoTaskId` 后镜头回到 `pendingVideoShots` 集合，可再次发起生成。
+   */
+  const giveUpVideoTask = useCallback((shotId: string) => {
+    const store = useProjectStore.getState();
+    const project = selectActiveProject(store);
+    if (!project) return;
+    const targetProjectId = project.id;
+
+    const shot = project.shots.find((item) => item.id === shotId);
+    if (!shot) return;
+    if (!canGiveUpVideoTask({ batchActive: hasActiveVideoTask(targetProjectId), shot })) return;
+
+    const abandonedTaskId = shot.videoTaskId;
+    store.updateShotByProjectId(targetProjectId, shotId, {
+      status: "failed",
+      videoProgress: 0,
+      videoTaskId: undefined,
+      videoTaskModel: undefined,
+      error: getTranslation("error.videoTaskGivenUp", { videoId: abandonedTaskId ?? "" }),
+    });
+
+    // 放弃后若已无在飞镜头，项目状态不该继续挂着 videoing（界面会显示「生成中」）
+    // 必须重新取 store：上面的 store 是写回前的快照，按它数会把刚放弃的镜头算成在飞
+    const latest = useProjectStore.getState().projects.find((item) => item.id === targetProjectId);
+    const stillInFlight = latest?.shots.filter((item) => hasResumableVideoTask(item)).length ?? 0;
+    if (stillInFlight === 0) {
+      useProjectStore.getState().setProjectStatusById(targetProjectId, "idle");
+    }
+  }, []);
+
+  return { generateVideosForStep, rerollVideo, giveUpVideoTask };
 }

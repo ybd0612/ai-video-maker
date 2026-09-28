@@ -79,6 +79,32 @@ export function canStartSingleReroll(input: {
   return !input.batchActive && !isShotInFlight(input.shot);
 }
 
+/**
+ * 视频批量能否开工：在飞任务数达到上限才停。
+ *
+ * 旧口径是「项目只要有在飞视频任务，整批任务列表返回空」，本意是「已计费任务偿清前
+ * 不开新任务」。2026-09-28 实测暴露它没有边界：服务端受理任务后可以既不吐片也不给
+ * 终态（GET 200 + `status:"in_progress"` + `internal_progress:0` + `expires_at:null`
+ * 挂了 2 小时 14 分），同项目其余 11 个镜头两小时无法开工，界面上「补做缺失」又被
+ * `generatingCount > 0` 禁掉 —— 文档承诺的出路实际不存在。
+ * 改为上限后仍守住「不无上限地把饱和队列越挤越死」，数值见 `plans.ts:videoInFlightCapFor`。
+ */
+export function canStartVideoBatch(input: { inFlightCount: number; cap: number }): boolean {
+  return input.inFlightCount < input.cap;
+}
+
+/**
+ * 「放弃这条已计费任务」能否发起：本镜确有服务端任务在飞，且批量没在跑。
+ *
+ * 为什么需要它：解锁此前只能靠服务端给终态（404 / failed / cancelled）。服务端不给时，
+ * 代码不该猜时长判死（那会白扔已计费额度，并让同一镜头二次扣秒数），判死权交回用户，
+ * 这里只做准入守卫。批量正在跑时拒绝：worker 正持有该镜头，此时清 `videoTaskId`
+ * 会与它的写回抢所有权。
+ */
+export function canGiveUpVideoTask(input: { batchActive: boolean; shot: Shot }): boolean {
+  return !input.batchActive && hasResumableVideoTask(input.shot);
+}
+
 /** 有画面提示词但提示词为空 —— 永远不会被生成，需要单独提示用户 */
 export function shotsWithoutVisualPrompt(shots: readonly Shot[]): Shot[] {
   return shots.filter((shot) => !shot.visualPrompt.trim());

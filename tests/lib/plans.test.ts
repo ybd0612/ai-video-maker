@@ -12,6 +12,8 @@ import {
   imageSizeToTier,
   resolvePlan,
   rpmFor,
+  videoConcurrencyFor,
+  videoInFlightCapFor,
   type PlanId,
 } from "@/lib/plans";
 
@@ -139,5 +141,32 @@ describe("imageSizeToTier", () => {
     expect(imageSizeToTier("")).toBe("1K");
     expect(imageSizeToTier("auto")).toBe("1K");
     expect(imageSizeToTier("1024")).toBe("1K");
+  });
+});
+
+/* ── 视频并发与在飞上限（单一事实源） ───────────────────────────────────────
+   并发口径此前散落在 useVideoActions 的三元表达式里；在飞上限是 2026-09-28 新增：
+   「一条已计费但服务端不给终态的任务」不应让整批镜头陪绑停摆，
+   但也不允许无上限地把饱和队列越挤越死，故上限取「并发 + 1」。 */
+describe("视频并发与在飞上限", () => {
+  it("并发按访问类型：免费 1 / 企业 2 / Token Plan 3", () => {
+    expect(videoConcurrencyFor(PLANS.default)).toBe(1);
+    expect(videoConcurrencyFor(PLANS.enterprise)).toBe(2);
+    expect(videoConcurrencyFor(PLANS.starter)).toBe(3);
+    expect(videoConcurrencyFor(PLANS.plus)).toBe(3);
+    expect(videoConcurrencyFor(PLANS.pro)).toBe(3);
+  });
+
+  it("在飞上限 = 并发 + 1（允许上一条未偿清的任务挂着，不再整批停摆）", () => {
+    expect(videoInFlightCapFor(PLANS.default)).toBe(2);
+    expect(videoInFlightCapFor(PLANS.enterprise)).toBe(3);
+    expect(videoInFlightCapFor(PLANS.starter)).toBe(4);
+    expect(videoInFlightCapFor(PLANS.pro)).toBe(4);
+  });
+
+  it("上限恒大于并发，保证并发为 1 的档位也能开工", () => {
+    for (const plan of Object.values(PLANS)) {
+      expect(videoInFlightCapFor(plan)).toBeGreaterThan(videoConcurrencyFor(plan));
+    }
   });
 });

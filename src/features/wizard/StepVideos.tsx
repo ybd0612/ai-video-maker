@@ -16,6 +16,7 @@ import { PromptSubFields } from "./PromptSubFields";
 import { Lightbox } from "@/components/ui/Lightbox";
 import { useWizardActions } from "./useWizardActions";
 import { pendingVideoShots } from "@/lib/shotQueue";
+import { hasActiveVideoTask } from "./useVideoActions";
 import { MEDIA_FRAME, placeholderClass, resolveAspect } from "@/lib/mediaLayout";
 import { syncSelectionWithShots } from "@/lib/railSelection";
 import { describeFirstFrameSource, firstFrameSourceKey } from "@/lib/firstFrameSource";
@@ -36,13 +37,17 @@ export function StepVideos() {
   const plan = useSettingsStore((s) => s.providerConfig.plan);
   const videoConsistency = useSettingsStore((s) => s.videoConsistency);
   const setWizardStep = useProjectStore((s) => s.setWizardStep);
-  const { generateVideosForStep, rerollVideo } = useWizardActions();
+  const { generateVideosForStep, rerollVideo, giveUpVideoTask } = useWizardActions();
 
   const shots = project?.shots ?? [];
   const videoedCount = shots.filter((s) => !!s.videoUrl).length;
   const allVideoed = shots.length > 0 && shots.every((s) => !!s.videoUrl);
   const failedCount = shots.filter((s) => s.status === "failed").length;
+  // 仅用于「N 生成中」计数；**不得**参与按钮禁用 —— 服务端不给终态时它恒为真，
+  // 会把「补做缺失」永久禁掉（2026-09-28 事故：其余镜头两小时无法开工）
   const generatingCount = shots.filter((s) => s.status === "videoing").length;
+  // 按钮禁用的唯一判据：该项目是否真有批量在跑（模块级注册表，与代码守卫同口径）
+  const batchActive = project ? hasActiveVideoTask(project.id) : false;
   // 与批量生成同一口径：待补做 = 有图 + 有动态描述 + 无视频 + 非生成中（含失败镜头）
   const pending = pendingVideoShots(shots);
   const pendingCount = pending.length;
@@ -142,7 +147,7 @@ export function StepVideos() {
             {pendingCount > 0 && (
               <button
                 onClick={() => generateVideosForStep()}
-                disabled={generatingCount > 0}
+                disabled={batchActive}
                 className={`flex items-center gap-1 rounded px-2 py-1 text-[0.6875rem] transition disabled:opacity-50 ${
                   failedCount > 0 ? "text-danger hover:bg-danger-deep/30" : "text-warn hover:bg-warn-deep/30"
                 }`}
@@ -175,7 +180,7 @@ export function StepVideos() {
                 }
                 generateVideosForStep();
               }}
-              disabled={generatingCount > 0}
+              disabled={batchActive}
               className="flex items-center gap-1 rounded px-2 py-1 text-[0.6875rem] text-success hover:bg-success-deep/30 transition disabled:opacity-50"
             >
               <RefreshCw className="h-3 w-3" />
@@ -283,12 +288,32 @@ export function StepVideos() {
           <button
             type="button"
             onClick={() => rerollVideo(current.id)}
-            disabled={generatingCount > 0}
+            disabled={batchActive || current.status === "videoing"}
             className="flex items-center gap-1 rounded-md border border-line px-3 py-1.5 text-xs text-success transition hover:bg-success-deep/30 disabled:opacity-50"
           >
             <RefreshCw className={`h-3 w-3 ${current.status === "videoing" ? "animate-spin" : ""}`} />
             {t("wizard.reroll")}
           </button>
+          {/* 服务端既不吐片也不给终态时的显式出口：判死权在用户，代码不猜时长 */}
+          {current.status === "videoing" && current.videoTaskId && (
+            <button
+              type="button"
+              onClick={async () => {
+                const ok = await confirmDialog({
+                  title: t("wizard.giveUpConfirmTitle"),
+                  message: t("wizard.giveUpConfirmMessage", { videoId: current.videoTaskId ?? "" }),
+                  confirmLabel: t("wizard.giveUpVideoTask"),
+                  variant: "danger",
+                });
+                if (ok) giveUpVideoTask(current.id);
+              }}
+              disabled={batchActive}
+              title={t("wizard.giveUpVideoTaskHint")}
+              className="flex items-center rounded-md border border-line px-3 py-1.5 text-xs text-danger transition hover:bg-danger-deep/30 disabled:opacity-50"
+            >
+              {t("wizard.giveUpVideoTask")}
+            </button>
+          )}
           {allVideoed && (
             <button
               type="button"

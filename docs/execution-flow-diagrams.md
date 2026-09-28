@@ -447,13 +447,16 @@ Promise.allSettled([链A, 链B])                                      :269
 
 ```
 [编排] generateVideosForStep()
-  并发 = 套餐 accessType=="tokenplan" ? 3 : 视频 RPM<=1 ? 1 : 2          :198
+  并发 = plans.ts:videoConcurrencyFor(套餐)   tokenplan 3 / 视频 RPM<=1 → 1 / 其余 2
   recoverStuck: status=="videoing" 且 !hasResumableVideoTask(缺 videoTaskId 或 videoTaskModel)
               -> {status:"imaged", videoProgress:0, error:清}
-              带任务 ID 的 videoing 镜头跳过复位，改由本轮批量续轮询同一任务（只发 GET）
-  前置闸门: inFlightVideoShots(在飞+任务 ID 齐备) 非空 → 直接 return 空任务列表（不注册）
-          已计费任务改由 resumePendingVideoTasks 并发续轮询（只发 GET）；
-          偿清前不开新任务，剩余镜头由用户点「补做缺失 (N)」继续
+              带任务 ID 的 videoing 镜头跳过复位，改由 resumePendingVideoTasks 续轮询同一任务（只发 GET）
+  前置闸门: canStartVideoBatch({ inFlightCount, cap })  ← cap = videoInFlightCapFor = 并发 + 1
+          在飞数达上限才 return 空任务列表（不注册）；2026-09-28 由「有在飞就整批停摆」改为上限，
+          因为服务端可既不吐片也不给终态（200 + in_progress + internal_progress 0 + expires_at null），
+          旧口径没有边界 —— 其余镜头两小时无法开工且按钮被持久状态禁掉
+          同一条在飞任务只对**本镜**保持「不重建」；跨镜堆积由上限约束
+          服务端不给终态时的显式出口：详情页「放弃这条任务」→ giveUpVideoTask（只写状态，不发请求）
   任务列表: [ ...pendingVideoShots 创建任务 ]
   筛选待生成: 无 videoUrl && 有 imageUrl && status!="videoing"
               && (motionPrompt 动态提示词 或 actionDesc 动作 非空)
