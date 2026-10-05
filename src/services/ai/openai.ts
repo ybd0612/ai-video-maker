@@ -7,6 +7,7 @@
 import { MODELS, MAX_OUTPUT_TOKENS } from "@/lib/models";
 import { resolveBaseUrl } from "@/lib/resolveBaseUrl";
 import { fetchWithRetry } from "@/lib/fetchWithRetry";
+import { summarizeApiError } from "@/lib/apiError";
 import { rateLimiter, imageSizeToTier, RATE_LIMIT_RETRY_BUDGET } from "@/services/rateLimit";
 import { generateVideo as rawGenerateVideo } from "@/services/videoService";
 import { getTranslation } from "@/i18n";
@@ -120,7 +121,10 @@ export class OpenAIService implements AIService {
     if (!resp.ok) {
       const body = await resp.text().catch(() => "");
       throw new Error(
-        getTranslation("error.chatApiError", { status: resp.status, detail: body }),
+        getTranslation("error.chatApiError", {
+          status: resp.status,
+          detail: summarizeApiError(body),
+        }),
       );
     }
 
@@ -131,7 +135,7 @@ export class OpenAIService implements AIService {
       throw new Error(
         getTranslation("error.chatNonJson", {
           contentType,
-          body: body.slice(0, 200),
+          body: summarizeApiError(body),
         }),
       );
     }
@@ -252,7 +256,10 @@ export class OpenAIService implements AIService {
         if (parseErr instanceof ImageSafetyFilterError) throw parseErr;
       }
       throw new Error(
-        getTranslation("error.imageApiError", { status: resp.status, detail: text }),
+        getTranslation("error.imageApiError", {
+          status: resp.status,
+          detail: summarizeApiError(text),
+        }),
       );
     }
 
@@ -262,7 +269,7 @@ export class OpenAIService implements AIService {
       throw new Error(
         getTranslation("error.imageApiNonJson", {
           contentType,
-          body: text.slice(0, 200),
+          body: summarizeApiError(text),
         }),
       );
     }

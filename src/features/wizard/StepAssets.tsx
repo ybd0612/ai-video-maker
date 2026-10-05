@@ -18,7 +18,7 @@ import { AssetListSection } from "./AssetListSection";
 import { VisualDirectionEditor } from "./VisualDirectionEditor";
 import { AssetEditor } from "./AssetEditor";
 import { ReviewCheckpoint } from "./ReviewCheckpoint";
-import { useWizardActions, hasActiveAssetTask } from "./useWizardActions";
+import { useWizardActions, hasActiveAssetTask, hasActiveScriptTask, stopAssetBatch, stopScriptBatch } from "./useWizardActions";
 import { generateImage, aspectRatioToImageParams } from "@/services/imageService";
 import { Lightbox } from "@/components/ui/Lightbox";
 import { confirmDialog } from "@/components/ui/ConfirmDialog";
@@ -51,6 +51,7 @@ export function StepAssets() {
   // 与「想法 → 资产」同构（不在生成前切页，避免用户进去先看一屏转圈）。
   const [enteringStoryboard, setEnteringStoryboard] = useState(false);
   const [storyboardError, setStoryboardError] = useState<string | null>(null);
+  const stopStoryboardRequestedRef = useRef(false);
 
   // 卸载守卫：切页后 onProgress / finally 里的 setState 已无意义
   const mountedRef = useRef(true);
@@ -82,6 +83,7 @@ export function StepAssets() {
   const totalAssetCount = assetGroups.reduce((sum, group) => sum + group.count, 0);
   const readyAssetCount = assetGroups.reduce((sum, group) => sum + group.ready, 0);
   const hasMissingAssets = !styleReferenceUrl || assetGroups.some((group) => group.ready < group.count);
+  const scriptBatchRunning = Boolean(project?.id && hasActiveScriptTask(project.id));
 
   // 刷新/中断后恢复：assetGenerationStarted 卡 true 且没有存活任务时重置，
   // 避免“生成全部”按钮永久禁用转圈（用户反馈过“资产第一个自动在加载”）。
@@ -109,14 +111,15 @@ export function StepAssets() {
       return;
     }
 
+    stopStoryboardRequestedRef.current = false;
     setEnteringStoryboard(true);
     setStoryboardError(null);
     let navigated = false;
     try {
       await generateStoryboard(idea, {
         onProgress: () => {
-          // 首个镜头就该绪（成功或失败）即切页：进去立刻有内容可审，其余镜头继续填充
-          if (navigated) return;
+          // 首个镜头就绪（成功或失败）即切页；但用户已主动停止时留在资产页。
+          if (navigated || stopStoryboardRequestedRef.current) return;
           navigated = true;
           setWizardStep(3);
         },
@@ -370,10 +373,21 @@ export function StepAssets() {
             <h3 className="text-sm font-semibold text-ink">{t("wizard.assetReadinessTitle")}</h3>
             <p className="mt-0.5 text-[0.6875rem] text-ink-5">{t("wizard.assetReadinessHint")}</p>
           </div>
-          <button onClick={() => void handleFillMissing()} disabled={anyGenerating || !hasMissingAssets} className="flex shrink-0 items-center gap-1.5 rounded-lg bg-accent-solid px-3 py-2 text-[0.6875rem] font-medium text-white transition hover:bg-accent-solid disabled:cursor-not-allowed disabled:opacity-50">
-            {anyGenerating ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Wand2 className="h-3.5 w-3.5" />}
-            {t("wizard.fillMissingAssets")}
-          </button>
+          <div className="flex shrink-0 items-center gap-2">
+            {project?.assetGenerationStarted === true && project.id && (
+              <button
+                onClick={() => stopAssetBatch(project.id)}
+                title={t("wizard.stopBatchHint")}
+                className="rounded-lg px-3 py-2 text-[0.6875rem] font-medium text-danger transition hover:bg-danger-deep/30"
+              >
+                {t("wizard.stopBatch")}
+              </button>
+            )}
+            <button onClick={() => void handleFillMissing()} disabled={anyGenerating || !hasMissingAssets} className="flex items-center gap-1.5 rounded-lg bg-accent-solid px-3 py-2 text-[0.6875rem] font-medium text-white transition hover:bg-accent-solid disabled:cursor-not-allowed disabled:opacity-50">
+              {anyGenerating ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Wand2 className="h-3.5 w-3.5" />}
+              {t("wizard.fillMissingAssets")}
+            </button>
+          </div>
         </div>
         <div className="mt-3 grid grid-cols-2 gap-2 md:grid-cols-4">
           {[
@@ -471,6 +485,18 @@ export function StepAssets() {
         confirmPendingLabelKey="wizard.storyboardPreparing"
         onConfirm={() => void handleConfirmAssets()}
         footer={<>
+          {scriptBatchRunning && project?.id && (
+            <button
+              onClick={() => {
+                stopStoryboardRequestedRef.current = true;
+                stopScriptBatch(project.id);
+              }}
+              title={t("wizard.stopBatchHint")}
+              className="mt-2 rounded-lg px-3 py-1.5 text-xs font-medium text-danger transition hover:bg-danger-deep/30"
+            >
+              {t("wizard.stopBatch")}
+            </button>
+          )}
           {enteringStoryboard && (
             <p className="mt-2 text-[0.625rem] text-ink-5">{t("wizard.storyboardEnterHint")}</p>
           )}

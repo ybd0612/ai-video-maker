@@ -114,9 +114,15 @@ function PromptRulesSettings({
     if (ok) setStored((stored ?? []).filter((r) => r.id !== rule.id));
   };
 
-  /* 编辑内容：覆盖后条目为单语文本（zh=en 同值）；「恢复默认」删差异即回到内置双语原文 */
+  /* 编辑内容：覆盖后条目为单语文本（zh=en 同值）；「恢复默认」删差异即回到内置双语原文。
+   * 带 renderContent 的条目（composeShot/negativeStrategy 渲染路径）同步覆盖渲染文本，
+   * 否则用户在设置里改的话永远进不了发给模型的提示词（2026-10-03 审计 P1-2）。 */
   const updateContent = (rule: PromptRule, value: string) => {
-    upsertStored({ ...rule, content: { zh: value, en: value } });
+    upsertStored({
+      ...rule,
+      content: { zh: value, en: value },
+      ...(rule.renderContent ? { renderContent: { zh: value, en: value } } : {}),
+    });
   };
   const toggleEnabled = (rule: PromptRule) => {
     upsertStored({ ...rule, enabled: !rule.enabled });

@@ -1239,12 +1239,22 @@ function renderSectionBlock(
 /**
  * 取某任务用于**渲染进最终提示词**的文本：只收带 renderContent 的生效条目。
  * 与 buildSystemPrompt 分工 —— 那个给提示词作者看，这个发给生成模型。
+ *
+ * 契约修复（2026-10-03 审计 P1-2）：
+ * - enabled=false 的条目必须剔除（与 buildSystemPrompt / getActiveRuleText 同口径，
+ *   此前设置里的开关对 composeShot/negativeStrategy 渲染路径无效）；
+ * - 用户在设置里改过 renderContent 的条目，以覆盖后的文本为准（mergeRules 透传）；
+ * - 用户自建条目没有 renderContent，回退其 content（自建文本即用户想让模型收到的内容）。
  */
 export function getActiveRenderRules(task: PromptTask, language: "zh" | "en"): string {
   return getActiveRules()
-    .filter((r) => r.task === task && r.section === "rules")
-    .flatMap((r) => (r.renderContent ? [r.renderContent[language].trim()] : []))
-    .filter((text) => text !== "")
+    .filter((r) => r.task === task && r.section === "rules" && r.enabled)
+    .flatMap((r) => {
+      const text =
+        r.renderContent?.[language] ?? (r.source === "custom" ? r.content?.[language] : undefined);
+      const trimmed = text?.trim();
+      return trimmed ? [trimmed] : [];
+    })
     .join(", ");
 }
 
@@ -1272,6 +1282,9 @@ export function buildSystemPrompt(
  * - 同 id：custom 存储版整体覆盖 builtin（content/enabled 均以存储版为准）；
  * - 仅存在于 stored 的条目（自定义）：追加到对应位置之后（保持 builtin 顺序在前）。
  * 纯函数，单独导出供测试与 UI 使用。
+ *
+ * renderContent 契约（2026-10-03 审计 P1-2）：同 id 覆盖时存储版若带 renderContent
+ * 则以存储版为准（用户在设置里改过的渲染文本要能进渲染路径），缺省才回落 builtin。
  */
 export function mergeRules(builtin: PromptRule[], stored: PromptRule[]): PromptRule[] {
   const byId = new Map<string, PromptRule>(builtin.map((r) => [r.id, r]));
@@ -1280,7 +1293,13 @@ export function mergeRules(builtin: PromptRule[], stored: PromptRule[]): PromptR
     byId.set(
       s.id,
       base
-        ? { ...base, content: s.content, enabled: s.enabled, source: s.source ?? base.source }
+        ? {
+            ...base,
+            content: s.content,
+            enabled: s.enabled,
+            source: s.source ?? base.source,
+            renderContent: s.renderContent ?? base.renderContent,
+          }
         : { ...s },
     );
   }

@@ -40,8 +40,8 @@ describe("explainShotReferences", () => {
     expect(r.rejected.every((x) => x.because === "size-budget")).toBe(true);
   });
 
-  it("特写额度 1 角色 + 3 道具：第二个角色被拒，道具全收", () => {
-    expect(MAX_REFERENCES_BY_SIZE["close-up"]).toEqual({ characters: 1, props: 3 });
+  it("特写额度 1 角色 + 1 产品 + 3 道具：第二个角色被拒，道具全收", () => {
+    expect(MAX_REFERENCES_BY_SIZE["close-up"]).toEqual({ characters: 1, products: 1, props: 3 });
     const r = explainShotReferences(shotFor({ shotSize: "close-up" }), { assets: ASSETS });
     expect(r.accepted).toEqual([
       "https://cdn.test/c1.png", "https://cdn.test/p1.png", "https://cdn.test/p2.png",

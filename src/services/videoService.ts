@@ -21,6 +21,7 @@ import { startSpan } from "@/lib/logger";
 import { getTranslation } from "@/i18n";
 import { MODELS } from "@/lib/models";
 import { fetchWithRetry } from "@/lib/fetchWithRetry";
+import { summarizeApiError } from "@/lib/apiError";
 import { clampNumber } from "@/lib/validation";
 import { MAX_VIDEO_REFERENCE_IMAGES } from "@/lib/videoPlan";
 import { rateLimiter, RATE_LIMIT_RETRY_BUDGET } from "@/services/rateLimit";
@@ -261,7 +262,8 @@ export async function generateVideo(
 
     if (!createResp.ok) {
       const text = await createResp.text().catch(() => "");
-      throw new Error(`Video create error ${createResp.status}: ${text}`);
+      // 原始响应体可能含请求回显（提示词/base64）与内部字段，收敛成摘要再上用户可见错误
+      throw new Error(`Video create error ${createResp.status}: ${summarizeApiError(text)}`);
     }
 
     const createContentType = createResp.headers.get("content-type") ?? "";
@@ -354,14 +356,17 @@ export async function pollVideoTaskById(
         if (notExistCount > VIDEO_POLL_MAX_NOT_EXIST_RETRIES) {
           throw VideoTaskCreatedError.taskVanished(
             `视频任务 ${videoId} 持续不存在（已重试 ${notExistCount} 次，HTTP ${pollResp.status}）。` +
-            `轮询 URL: ${pollUrl}。响应: ${text.slice(0, 300)}`,
+            `响应: ${summarizeApiError(text)}`,
             videoId,
           );
         }
         continue;
       }
 
-      throw new VideoTaskCreatedError(`Video poll error ${pollResp.status}: ${text.slice(0, 500)}`, videoId);
+      throw new VideoTaskCreatedError(
+        `Video poll error ${pollResp.status}: ${summarizeApiError(text)}`,
+        videoId,
+      );
     }
 
     // 成功获取响应，重置 not_exist 计数

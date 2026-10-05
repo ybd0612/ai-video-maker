@@ -8,7 +8,7 @@ import {
 import { useSettingsStore } from "@/stores/settingsStore";
 import { generateImage, aspectRatioToImageParams } from "@/services/imageService";
 import { composeVisualPrompt } from "@/lib/promptUtils";
-import { createBatchRunner, hasActiveTask } from "@/lib/batchRunner";
+import { createBatchRunner, hasActiveTask, stopActiveBatch } from "@/lib/batchRunner";
 import {
   composeMultiReferencePrompt,
   composeTextToImagePrompt,
@@ -22,6 +22,16 @@ import { pendingImageShots, canStartSingleReroll, isShotInFlight } from "@/lib/s
 import { restoreProjectStatusIfReady } from "./wizardActionUtils";
 
 const activeImageTasks = new Map<string, AbortController>();
+
+/**
+ * 停止某项目的图片批量生成（P3 修复：批量在飞时此前无任何用户可见的停止入口）。
+ * 只拦止尚未领取的任务；已在飞的生图请求正常完成写回。runner 的 finally 会复位
+ * imageGenerationStarted 并按完成度结算项目状态（全成 idle / 有缺 failed+计数），
+ * 因此 UI 显示"部分完成"属预期，用户可对缺图镜头用既有的重试/单项重摇续作。
+ */
+export function stopImageBatch(projectId: string): boolean {
+  return stopActiveBatch(activeImageTasks, projectId);
+}
 
 type ImageGenerationInput = {
   prompt: string;
@@ -178,10 +188,11 @@ const runImageBatch = createBatchRunner({
     useProjectStore.getState().setImageGenerationStartedByProjectId(pid, false);
     const updatedProject = useProjectStore.getState().projects.find((p) => p.id === pid);
     const allImaged = updatedProject?.shots.every((shot) => !!shot.imageUrl);
-    if (allImaged) {
+    const failedCount = (updatedProject?.shots ?? []).filter((shot) => shot.status === "failed").length;
+    if (allImaged || failedCount === 0) {
+      // 用户主动停止、或剩余任务因镜头正被单项重摇而跳过：保留待补镜头但不显示失败告警。
       useProjectStore.getState().setProjectStatusById(pid, "idle");
     } else {
-      const failedCount = (updatedProject?.shots ?? []).filter((shot) => shot.status === "failed").length;
       useProjectStore.getState().setProjectStatusById(
         pid,
         "failed",

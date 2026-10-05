@@ -2,6 +2,20 @@
 
 面向 AI 创作的短视频制作工具。主流程为 6 步向导（想法 → 资产 → 分镜 → 图片 → 视频 → 后期），底层按生成域编排（想法提取 → 风格母版 → 资产图 → 分镜 → 镜头图 → 镜头视频 → 本地拼接），集成 Agnes AI 的文本、图像、视频三大模型，支持中英文与黑白双主题。
 
+## Agent skills
+
+### Issue tracker
+
+Issues are tracked in this repo's GitHub Issues (`ybd0612/ai-video-maker`); read and write them via the `deck_*` tools, not raw tracker commands. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Default five canonical roles (`needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`), plus the wayfinder labels (`wayfinder:map` / `wayfinder:research` / `wayfinder:prototype` / `wayfinder:grilling` / `wayfinder:task`), all present in this repo. See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+multi-context — 子项目各一份 `CONTEXT.md`，根目录一份 `CONTEXT-MAP.md`（本次初始化不建，留到第一次真正写下词条时懒建）。 See `docs/agents/domain.md`.
+
 ## 技术栈
 
 - React 19 + TypeScript + Vite

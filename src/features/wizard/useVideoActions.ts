@@ -20,6 +20,15 @@ import { restoreProjectStatusIfReady } from "./wizardActionUtils";
 const activeVideoTasks = new Map<string, AbortController>();
 
 /**
+ * 刷新恢复轮询的本地登记表：key = `${pid}::${shotId}`。
+ * 2026-10-03 审计 P2-5：恢复轮询**故意不进** activeVideoTasks 注册表（那是批量互斥判据，
+ * 注册进去会让挂死的恢复轮询永久禁用按钮、也让「放弃」不可达——2026-09-28 设计取舍）。
+ * 但放弃/重建必须能掐掉这条只读通道：给它单独的轻量登记表，只用于 abort。
+ */
+const resumeControllers = new Map<string, AbortController>();
+const resumeKey = (pid: string, shotId: string) => `${pid}::${shotId}`;
+
+/**
  * 从注册表提取视频提示词所需的正向约束文本（negativeStrategy）。
  * motionPrompt 恒为英文，故取 en；调用方读 store，lib 保持纯函数。
  * 不新增 API negative 字段、不污染 stylePrompt。
@@ -317,7 +326,18 @@ export async function resumePendingVideoTasks(): Promise<void> {
     }
 
     const resumeResults = await Promise.allSettled(
-      waiting.map((shot) => resumeShotVideoTask(targetProjectId, shot, providerConfig)),
+      waiting.map((shot) => {
+        // P2-5：恢复轮询登记进独立轻量表（不进 activeVideoTasks：2026-09-28 设计
+        // 取舍保持「放弃」在挂死轮询下仍可达），供放弃/重摇掐掉这条只读通道。
+        const controller = new AbortController();
+        const key = resumeKey(targetProjectId, shot.id);
+        resumeControllers.set(key, controller);
+        return resumeShotVideoTask(targetProjectId, shot, providerConfig, controller.signal).finally(
+          () => {
+            if (resumeControllers.get(key) === controller) resumeControllers.delete(key);
+          },
+        );
+      }),
     );
 
     // 服务端确认「任务已不存在」且额度还在的镜头：立刻只重建这几个
@@ -388,6 +408,10 @@ export function useVideoActions(): VideoActions {
     if (!canStartSingleReroll({ batchActive: hasActiveTask(activeVideoTasks, targetProjectId), shot })) return;
 
     const expectedRevision = shot.renderRevision ?? 0;
+    // P2-5：重摇即宣告旧任务作废。刷新恢复的续轮询不在 activeVideoTasks 互斥表内
+    // （canStartSingleReroll 只挡批量），这里显式掐掉该镜头的只读轮询通道，
+    // 避免它带着旧 revision 快照与新创建路径并行写回。
+    resumeControllers.get(resumeKey(targetProjectId, shotId))?.abort();
     // 旧视频即将作废：先释放它的末帧，下一镜不会再接到过期画面
     releaseTailFrames([shotId]);
 
@@ -478,13 +502,19 @@ export function useVideoActions(): VideoActions {
     if (!canGiveUpVideoTask({ batchActive: hasActiveVideoTask(targetProjectId), shot })) return;
 
     const abandonedTaskId = shot.videoTaskId;
+    // P2-5：显式推进 renderRevision，让任何迟到的旧轮询写回（commitVideoResult/
+    // commitVideoFailure 的 IfRevision 守卫）作废；同步先落状态，再 abort 恢复轮询，
+    // 被中断的 poll 走 catch → 守卫失败 → 不会覆盖本镜的放弃结论。
+    // updates 不含 visual/motion/output 字段，applyShotUpdates 不会二次改这个值。
     store.updateShotByProjectId(targetProjectId, shotId, {
       status: "failed",
       videoProgress: 0,
       videoTaskId: undefined,
       videoTaskModel: undefined,
+      renderRevision: (shot.renderRevision ?? 0) + 1,
       error: getTranslation("error.videoTaskGivenUp", { videoId: abandonedTaskId ?? "" }),
     });
+    resumeControllers.get(resumeKey(targetProjectId, shotId))?.abort();
 
     // 放弃后若已无在飞镜头，项目状态不该继续挂着 videoing（界面会显示「生成中」）
     // 必须重新取 store：上面的 store 是写回前的快照，按它数会把刚放弃的镜头算成在飞

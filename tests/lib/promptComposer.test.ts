@@ -422,6 +422,45 @@ describe("pickShotReferences", () => {
     expect(pickShotReferences(makeShot(), project)).toEqual([]);
   });
 
+  it("P1-3：两个角色占满角色额度后，显式产品仍获得独立产品额度", () => {
+    const char2 = makeAsset({ id: "char_2", type: "character", name: "Bear", imageUrl: "http://img/char2.png" });
+    const project = { assets: [charAsset, char2, productAsset], styleReferenceUrl: undefined };
+    const shot = makeShot({ activeCharacterIds: ["char_1", "char_2"], activeProductIds: ["prod_1"] });
+    const refs = pickShotReferences(shot, project);
+    // 修复前：产品计入角色额度，第三个被静默跳过 → 只剩两张角色图
+    expect(refs).toEqual(["http://img/char.png", "http://img/char2.png", "http://img/product.png"]);
+  });
+
+  it("P1-3：远景仍收产品锚定（1 张）但拒道具特写图", () => {
+    const project = { assets: [charAsset, productAsset], styleReferenceUrl: undefined };
+    const shot = makeShot({ shotSize: "wide" as never, activeCharacterIds: ["char_1"], activeProductIds: ["prod_1"] });
+    expect(pickShotReferences(shot, project)).toEqual([
+      "http://img/char.png",
+      "http://img/product.png",
+    ]);
+  });
+
+  it("总数仍被 MAX_TOTAL_REFERENCES=4 封顶（角色2+产品1+道具2 → 4）", () => {
+    const char2 = makeAsset({ id: "char_2", type: "character", name: "Bear", imageUrl: "http://img/char2.png" });
+    const prop1 = makeAsset({ id: "prop_1", type: "prop", name: "Fence", imageUrl: "http://img/prop1.png" });
+    const prop2 = makeAsset({ id: "prop_2", type: "prop", name: "Bucket", imageUrl: "http://img/prop2.png" });
+    const project = { assets: [charAsset, char2, productAsset, prop1, prop2], styleReferenceUrl: undefined };
+    const shot = makeShot({
+      shotSize: "medium" as never,
+      activeCharacterIds: ["char_1", "char_2"],
+      activeProductIds: ["prod_1"],
+      activePropIds: ["prop_1", "prop_2"],
+    });
+    const refs = pickShotReferences(shot, project);
+    expect(refs).toHaveLength(4);
+    expect(refs).toEqual([
+      "http://img/char.png",
+      "http://img/char2.png",
+      "http://img/product.png",
+      "http://img/prop1.png",
+    ]);
+  });
+
   it("角色参考优先 imageUrl，缺图时回退 avatarUrl", () => {
     const avatarChar = makeAsset({
       id: "char_av",

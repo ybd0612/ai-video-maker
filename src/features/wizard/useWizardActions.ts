@@ -30,6 +30,7 @@ export function useWizardActions() {
   };
 }
 
-export { hasActiveAssetTask } from "./useAssetActions";
-export { hasActiveScriptTask, hasActiveIdeaTask } from "./useScriptActions";
+export { hasActiveAssetTask, stopAssetBatch } from "./useAssetActions";
+export { hasActiveScriptTask, hasActiveIdeaTask, stopScriptBatch } from "./useScriptActions";
+export { stopImageBatch } from "./useImageActions";
 export { extractNewAssets } from "@/lib/extractAssets";

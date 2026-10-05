@@ -8,6 +8,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   createBatchRunner,
   hasActiveTask,
+  stopActiveBatch,
   runWithConcurrency,
 } from "@/lib/batchRunner";
 
@@ -28,6 +29,23 @@ describe("hasActiveTask", () => {
     expect(hasActiveTask(registry, "p1")).toBe(true);
     registry.delete("p1");
     expect(hasActiveTask(registry, "p1")).toBe(false);
+  });
+});
+
+describe("stopActiveBatch", () => {
+  it("注册表未命中时返回 false", () => {
+    const registry = new Map<string, AbortController>();
+    expect(stopActiveBatch(registry, "missing")).toBe(false);
+  });
+
+  it("命中时 abort，但保留注册表供 runner finally 清理", () => {
+    const registry = new Map<string, AbortController>();
+    const controller = new AbortController();
+    registry.set("p1", controller);
+
+    expect(stopActiveBatch(registry, "p1")).toBe(true);
+    expect(controller.signal.aborted).toBe(true);
+    expect(registry.get("p1")).toBe(controller);
   });
 });
 
@@ -136,6 +154,34 @@ describe("createBatchRunner", () => {
     await runPromise;
 
     expect(executed).toEqual([]); // 第二个任务被跳过
+    expect(registry.has("p1")).toBe(false);
+  });
+
+  it("stopActiveBatch 会让未开始任务跳过并执行 finally 收尾", async () => {
+    const registry = new Map<string, AbortController>();
+    const started: string[] = [];
+    const onFinally = vi.fn();
+    const deferred = makeDeferredTask();
+
+    const runner = createBatchRunner({
+      registry,
+      buildTasks: () => [
+        async () => {
+          started.push("in-flight");
+          await deferred.done();
+        },
+        async () => { started.push("unstarted"); },
+      ],
+      onFinally,
+    });
+
+    const runPromise = runner({ projectId: "p1", concurrency: 1 });
+    expect(stopActiveBatch(registry, "p1")).toBe(true);
+    deferred.finish();
+    await runPromise;
+
+    expect(started).toEqual(["in-flight"]);
+    expect(onFinally).toHaveBeenCalledWith("p1");
     expect(registry.has("p1")).toBe(false);
   });
 

@@ -212,6 +212,16 @@ describe("planShotVideoMedia（编排层唯一入口）", () => {
     expect(media).toEqual({ imageUrl: TAIL("s0") });
   });
 
+  it("衔接末帧是浏览器 blob 地址时，改用本镜公网画面图", () => {
+    const { plan, media } = planShotVideoMedia({
+      shot: sameScene[1], shots: sameScene, assets: ASSETS,
+      styleReferenceUrl: IMG(9), consistency: "chain",
+      tailFrames: { s0: "blob:http://127.0.0.1/tail-frame" },
+    });
+    expect(plan.reason).toBe("first-frame-only");
+    expect(media).toEqual({ imageUrl: IMG(1) });
+  });
+
   it("衔接判定通过但末帧还没抽出来 → 自动降级为仅锁本镜首帧", () => {
     const { plan, media } = planShotVideoMedia({
       shot: sameScene[1], shots: sameScene, assets: ASSETS,

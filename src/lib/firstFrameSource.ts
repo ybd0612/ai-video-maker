@@ -17,7 +17,7 @@ import type { TranslationKey } from "@/i18n";
 export type FirstFrameSource =
   | { kind: "manual-tail" }
   | { kind: "handoff"; fromShotId: string }
-  | { kind: "self"; because: "consistency-off" | "tail-missing" | ContinuitySkipReason };
+  | { kind: "self"; because: "consistency-off" | "tail-missing" | "tail-local-only" | ContinuitySkipReason };
 
 export function describeFirstFrameSource(input: {
   shotId: string;
@@ -34,9 +34,11 @@ export function describeFirstFrameSource(input: {
   const decisions = planShotContinuity(shots);
   const handoff = buildHandoffMap(decisions).get(shotId);
   if (handoff) {
-    return tailFrames[handoff]
-      ? { kind: "handoff", fromShotId: handoff }
-      : { kind: "self", because: "tail-missing" };
+    const tailFrame = tailFrames[handoff];
+    if (!tailFrame) return { kind: "self", because: "tail-missing" };
+    return tailFrame.startsWith("blob:")
+      ? { kind: "self", because: "tail-local-only" }
+      : { kind: "handoff", fromShotId: handoff };
   }
   const own = decisions.find((d) => d.shotId === shotId);
   if (!own || own.linked) return { kind: "self", because: "last-shot" };
@@ -48,6 +50,7 @@ const FALLBACK: TranslationKey = "videoPlan.firstFrame.self";
 const BECAUSE_KEYS: Record<string, TranslationKey> = {
   "consistency-off": "videoPlan.firstFrame.off",
   "tail-missing": "videoPlan.firstFrame.tailMissing",
+  "tail-local-only": "videoPlan.firstFrame.tailLocalOnly",
   "last-shot": "videoPlan.firstFrame.firstShot",
   "no-first-frame": "videoPlan.firstFrame.prevNoImage",
   "scene-unknown": "videoPlan.firstFrame.sceneUnknown",

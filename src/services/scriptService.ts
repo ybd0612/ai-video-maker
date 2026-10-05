@@ -320,6 +320,10 @@ export async function generateStoryboardOutline(
 
   const parsed = parseJsonFromResponse<{
     shots?: Array<{ title?: string; summary?: string; characterNames?: string[]; sceneName?: string }>;
+    /** 契约键（骨架要求）：大纲新增资产写在这里 */
+    newCharacters?: RawCharacter[];
+    newScenes?: RawScene[];
+    /** 历史兼容键：早期模型/旧骨架曾输出 characters/scenes，解析时同样接受 */
     characters?: RawCharacter[];
     scenes?: RawScene[];
   }>(result.content);
@@ -334,9 +338,26 @@ export async function generateStoryboardOutline(
       characterNames: Array.isArray(s.characterNames) ? s.characterNames : [],
       sceneName: s.sceneName ?? undefined,
     })),
-    newCharacters: Array.isArray(parsed.characters) ? parsed.characters : [],
-    newScenes: Array.isArray(parsed.scenes) ? parsed.scenes : [],
+    newCharacters: pickOutlineAssets(parsed, "newCharacters", "characters"),
+    newScenes: pickOutlineAssets(parsed, "newScenes", "scenes"),
   };
+}
+
+/**
+ * 大纲响应的新增资产取键（storyboardOutline 契约修复，2026-10-03）：
+ * 骨架要求模型输出 newCharacters/newScenes，旧模型/旧骨架可能输出 characters/scenes。
+ * 此前只读后者导致按契约返回的大纲新资产被静默丢弃；现在两种键都接受，优先契约键。
+ * 导出供单测（纯函数，不触网）。
+ */
+export function pickOutlineAssets<T>(
+  parsed: Partial<Record<"newCharacters" | "newScenes" | "characters" | "scenes", unknown>>,
+  contractKey: "newCharacters" | "newScenes",
+  legacyKey: "characters" | "scenes",
+): T[] {
+  const contract = parsed[contractKey];
+  if (Array.isArray(contract)) return contract as T[];
+  const legacy = parsed[legacyKey];
+  return Array.isArray(legacy) ? (legacy as T[]) : [];
 }
 
 /**

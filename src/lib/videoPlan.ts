@@ -135,7 +135,9 @@ export function planShotVideoMedia(input: ShotVideoMediaInput): {
   media: VideoMediaFields;
 } {
   const handoff = buildHandoffMap(planShotContinuity(input.shots)).get(input.shot.id);
-  const autoFirstFrameUrl = handoff ? input.tailFrames?.[handoff] : undefined;
+  const tailFrameUrl = handoff ? input.tailFrames?.[handoff] : undefined;
+  // FFmpeg 提取的末帧是浏览器本地 blob URL，远端视频 API 无法读取；退回本镜公网生图地址。
+  const autoFirstFrameUrl = tailFrameUrl?.startsWith("blob:") ? undefined : tailFrameUrl;
   const identityReferences =
     input.consistency === "identity" && !autoFirstFrameUrl
       ? pickIdentityReferences(input.shot, input.assets, input.styleReferenceUrl)

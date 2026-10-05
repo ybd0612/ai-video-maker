@@ -23,7 +23,7 @@ const INPUT = (over: Partial<Parameters<typeof describeFirstFrameSource>[0]> = {
   useDualFrame: false,
   lastFrameUrl: undefined,
   consistency: "chain" as const,
-  tailFrames: { s0: "blob:tail-s0" },
+  tailFrames: { s0: "https://cdn.test/tail-s0.png" },
   ...over,
 });
 
@@ -45,6 +45,11 @@ describe("describeFirstFrameSource", () => {
   it("判定可衔接但末帧没抽到（刷新后内存丢失）→ tail-missing", () => {
     expect(describeFirstFrameSource(INPUT({ tailFrames: {} })))
       .toEqual({ kind: "self", because: "tail-missing" });
+  });
+
+  it("末帧是浏览器本地 blob 地址时解释为退回本镜公网画面图", () => {
+    expect(describeFirstFrameSource(INPUT({ tailFrames: { s0: "blob:http://127.0.0.1/tail" } })))
+      .toEqual({ kind: "self", because: "tail-local-only" });
   });
 
   it("景别跨两档 → 透出 shotContinuity 的真实原因 size-gap", () => {
@@ -78,6 +83,7 @@ describe("describeFirstFrameSource", () => {
       { kind: "handoff", fromShotId: "s0" },
       { kind: "self", because: "consistency-off" },
       { kind: "self", because: "tail-missing" },
+      { kind: "self", because: "tail-local-only" },
       { kind: "self", because: "size-gap" },
       { kind: "self", because: "scene-changed" },
       { kind: "self", because: "cast-disjoint" },

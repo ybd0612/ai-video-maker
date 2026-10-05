@@ -28,24 +28,27 @@ export function explainShotReferences(
   const budget = MAX_REFERENCES_BY_SIZE[shot.shotSize ?? "unknown"];
   const rejected: RejectedReference[] = [];
 
-  // 与 pickShotReferences 同一资格口径：角色可用 avatarUrl 兜底，且产品与角色共用角色额度
+  // 与 pickShotReferences 同一资格口径：角色可用 avatarUrl 兜底；
+  // 2026-10-03 P1-3 起产品有独立配额（budget.products），不再与角色共享额度。
   let charUsed = 0;
+  let productUsed = 0;
   let propUsed = 0;
 
   const collect = (
     ids: readonly string[] | undefined,
     assetType: Asset["type"],
-    kind: "character" | "prop",
+    kind: "character" | "product" | "prop",
   ): void => {
-    const cap = kind === "character" ? budget.characters : budget.props;
+    const cap = kind === "character" ? budget.characters : kind === "product" ? budget.products : budget.props;
     for (const id of ids ?? []) {
       const asset = project.assets.find((a) => a.id === id && a.type === assetType);
       if (!asset) continue;
       const url = asset.imageUrl ?? (assetType === "character" ? asset.avatarUrl : undefined);
       if (!url) continue;
-      const used = kind === "character" ? charUsed : propUsed;
+      const used = kind === "character" ? charUsed : kind === "product" ? productUsed : propUsed;
       if (acceptedSet.has(url)) {
         if (kind === "character") charUsed += 1;
+        else if (kind === "product") productUsed += 1;
         else propUsed += 1;
         continue;
       }
@@ -58,7 +61,7 @@ export function explainShotReferences(
   };
 
   collect(shot.activeCharacterIds, "character", "character");
-  collect(shot.activeProductIds, "product", "character");
+  collect(shot.activeProductIds, "product", "product");
   collect(shot.activePropIds, "prop", "prop");
   return { accepted, rejected };
 }

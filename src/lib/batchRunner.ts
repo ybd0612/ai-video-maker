@@ -14,6 +14,25 @@ export function hasActiveTask(
 }
 
 /**
+ * 用户侧「停止批量生成」的统一入口：对注册表中的 AbortController 调用 abort()。
+ * 语义边界（诚实文案的前提）：
+ * - 只能阻止【尚未开始】的任务；已发出的生成请求不会由此函数中止，具体请求
+ *   的完成/写回行为由任务自身负责。
+ * - 不删除注册表条目：对应流程的 finally 会统一 delete 并执行 onFinally 收尾，避免
+ *   在旧任务仍运行时允许同项目启动第二批。
+ * - 命中返回 true，未命中（任务已结束/从未启动）返回 false，调用方据此决定按钮态。
+ */
+export function stopActiveBatch(
+  registry: Map<string, AbortController>,
+  projectId: string,
+): boolean {
+  const controller = registry.get(projectId);
+  if (!controller) return false;
+  controller.abort();
+  return true;
+}
+
+/**
  * 受控并发执行：n 个 worker 共享任务队列，全部结束后返回。
  * - signal.aborted 时 worker 停止领取新任务（已开始的任务由其内部响应取消）；
  * - allSettled 语义：单任务/单 worker 异常不外抛，不 reject 整体。

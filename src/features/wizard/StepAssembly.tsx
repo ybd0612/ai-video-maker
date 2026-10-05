@@ -234,6 +234,9 @@ export function StepAssembly() {
               className="w-full"
             />
           </div>
+          <p className="max-w-lg text-center text-xs text-warn">
+            {t("assembly.sessionPreviewHint")}
+          </p>
           <div className="flex items-center gap-2">
             <button
               onClick={handleRerender}

@@ -11,7 +11,7 @@ import { useProjectStore, selectActiveProject } from "@/stores/projectStore";
 import { useT } from "@/i18n";
 import { PromptSubFields } from "./PromptSubFields";
 import { Lightbox } from "@/components/ui/Lightbox";
-import { useWizardActions } from "./useWizardActions";
+import { useWizardActions, stopImageBatch } from "./useWizardActions";
 import { pendingImageShots, shotsWithoutVisualPrompt } from "@/lib/shotQueue";
 import { MEDIA_FRAME, placeholderClass, resolveAspect } from "@/lib/mediaLayout";
 import { syncSelectionWithShots } from "@/lib/railSelection";
@@ -94,6 +94,15 @@ export function StepImages() {
                 <RefreshCw className="h-3 w-3 animate-spin" />
                 {generatingCount} {t("wizard.generating")}
               </span>
+            )}
+            {project?.imageGenerationStarted === true && (
+              <button
+                onClick={() => stopImageBatch(project.id)}
+                title={t("wizard.stopBatchHint")}
+                className="rounded px-2 py-1 text-[0.6875rem] text-danger hover:bg-danger-deep/30 transition"
+              >
+                {t("wizard.stopBatch")}
+              </button>
             )}
             {pendingCount > 0 && (
               <button

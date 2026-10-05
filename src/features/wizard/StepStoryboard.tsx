@@ -9,7 +9,7 @@ import { useEffect, useRef, useState } from "react";
 import { useProjectStore, selectActiveProject, type Asset, type Shot } from "@/stores/projectStore";
 import { useT, type TranslationKey } from "@/i18n";
 import { ShotDetail } from "./ShotDetail";
-import { useWizardActions, hasActiveScriptTask } from "./useWizardActions";
+import { useWizardActions, hasActiveScriptTask, stopScriptBatch } from "./useWizardActions";
 import { useSettingsStore } from "@/stores/settingsStore";
 import { syncSelectionWithShots } from "@/lib/railSelection";
 import { WizardMessages } from "./WizardMessages";
@@ -33,6 +33,7 @@ export function StepStoryboard() {
   const [editingShotId, setEditingShotId] = useState<string | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const stopRequestedRef = useRef(false);
 
   const shots = project?.shots ?? [];
   const assets = project?.assets ?? [];
@@ -42,7 +43,8 @@ export function StepStoryboard() {
   const scriptedCount = shots.filter((shot) => shot.scriptText.trim()).length;
   const allShotsHaveVisualPrompt = shots.length > 0 && shots.every((shot) => shot.visualPrompt.trim());
   // 「生成中」以 store 为准：从资产页切进来时任务已在飞，只靠局部 isGenerating 会漏判
-  const generating = isGenerating || shots.some((shot) => shot.status === "scripting");
+  // project.status 覆盖大纲请求阶段（此时尚未创建 scripting 占位镜头，跨步骤启动时本地 state 也为 false）。
+  const generating = isGenerating || project?.status === "scripting" || shots.some((shot) => shot.status === "scripting");
   const [railCompact, setRailCompact] = useState(false);
   // 双栏选中态（页面局部，不持久化）：选中项被删除时回落首镜，不留悬空选中
   const currentId = syncSelectionWithShots(shots.map((shot) => shot.id), editingShotId ?? undefined);
@@ -61,10 +63,13 @@ export function StepStoryboard() {
       });
       if (!ok) return;
     }
+    stopRequestedRef.current = false;
     setIsGenerating(true);
     setError(null);
     try {
       await generateStoryboard(ideaPrompt.trim());
+      // 用户停止后保留当前的部分分镜，不能把它误当成完整成功而自动跳到图片步骤。
+      if (stopRequestedRef.current) return;
       // auto 模式：分镜生成成功后自动推进到图片步骤（无需确认）
       const latest = useProjectStore.getState().projects.find((p) => p.id === project.id);
       if (latest?.automationMode === "auto") {
@@ -120,11 +125,13 @@ export function StepStoryboard() {
     const hasContent = shots.some((s) => s.scriptText.trim() || s.visualPrompt.trim());
     if (hasContent) return;
     autoStoryboardRef.current = true;
+    stopRequestedRef.current = false;
     void (async () => {
       setIsGenerating(true);
       setError(null);
       try {
         await generateStoryboard(ideaPromptTrimmed);
+        if (stopRequestedRef.current) return;
         // auto 模式：分镜生成成功后自动推进到图片步骤（与手动生成行为一致）
         const latest = useProjectStore.getState().projects.find((p) => p.id === project.id);
         if (latest?.automationMode === "auto") {
@@ -163,6 +170,18 @@ export function StepStoryboard() {
         {/* Asset summary */}
         <AssetSummaryBar assets={assets} t={t} styleReady={!!project?.styleReferenceUrl} />
 
+        {generating && project?.id && (
+          <button
+            onClick={() => {
+              stopRequestedRef.current = true;
+              stopScriptBatch(project.id);
+            }}
+            title={t("wizard.stopBatchHint")}
+            className="rounded-lg px-4 py-2 text-xs font-medium text-danger transition hover:bg-danger-deep/30"
+          >
+            {t("wizard.stopBatch")}
+          </button>
+        )}
         <button
           onClick={handleGenerateStoryboard}
           disabled={!ideaPrompt.trim() || generating}
@@ -196,14 +215,28 @@ export function StepStoryboard() {
           done={scriptedCount}
           total={shots.length}
           actions={
-            <button
-              onClick={handleGenerateStoryboard}
-              disabled={generating}
-              className="flex items-center gap-1 rounded px-2 py-1 text-[0.6875rem] text-accent transition hover:bg-accent-deep/30 disabled:opacity-50"
-            >
-              {generating ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
-              {generating ? t("wizard.generating") : t("wizard.reroll")}
-            </button>
+            <div className="flex items-center gap-1">
+              {generating && project?.id && (
+                <button
+                  onClick={() => {
+                    stopRequestedRef.current = true;
+                    stopScriptBatch(project.id);
+                  }}
+                  title={t("wizard.stopBatchHint")}
+                  className="rounded px-2 py-1 text-[0.6875rem] text-danger transition hover:bg-danger-deep/30"
+                >
+                  {t("wizard.stopBatch")}
+                </button>
+              )}
+              <button
+                onClick={handleGenerateStoryboard}
+                disabled={generating}
+                className="flex items-center gap-1 rounded px-2 py-1 text-[0.6875rem] text-accent transition hover:bg-accent-deep/30 disabled:opacity-50"
+              >
+                {generating ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
+                {generating ? t("wizard.generating") : t("wizard.reroll")}
+              </button>
+            </div>
           }
         />
 

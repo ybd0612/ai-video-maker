@@ -31,7 +31,7 @@ export const zh = {
   "settings.videoConsistency.off": "关闭衔接（只用本镜画面图作首帧）",
   "settings.videoConsistency.chain": "同场景自动衔接（推荐）",
   "settings.videoConsistency.identity": "同场景衔接 + 跨场景角色参考",
-  "settings.videoConsistencyHint": "「同场景自动衔接」把下一镜的画面图当作本镜尾帧，让相邻镜头接得上；「跨场景角色参考」在接不上时（换场景、换场后重新出场）改把角色定妆照与风格母版作为参考图送给视频模型，用来锚定身份与画风。实测两者互斥，同场景衔接优先。",
+  "settings.videoConsistencyHint": "「同场景自动衔接」把前一镜视频的末帧作为本镜首帧，让相邻镜头接得上；「跨场景角色参考」在接不上时（换场景、换场后重新出场）改把角色定妆照与风格母版作为参考图送给视频模型，用来锚定身份与画风。实测两者互斥，同场景衔接优先。",
   "settings.github.desc": "开源项目，欢迎 Star ⭐ 和 PR",
   "settings.language": "语言",
   "settings.plan": "套餐 / 访问类型",
@@ -243,6 +243,8 @@ export const zh = {
   "wizard.reroll": "重新生成",
   "wizard.rerollAll": "全部重新生成",
   "wizard.generating": "生成中...",
+  "wizard.stopBatch": "停止生成",
+  "wizard.stopBatchHint": "只拦下尚未开始的生成；正在进行的请求会正常完成并保留结果。",
   "wizard.storyboardPreparing": "正在生成分镜…",
   "wizard.storyboardEnterHint": "首个镜头就绪后自动进入分镜页",
   "wizard.shotDeleteConfirm": "删除镜头 {index}？该镜头的文案、提示词与引用会一并移除。",
@@ -259,6 +261,7 @@ export const zh = {
   "videoPlan.firstFrame.self": "首帧用本镜画面图",
   "videoPlan.firstFrame.off": "首帧用本镜画面图（视频一致性已关闭）",
   "videoPlan.firstFrame.tailMissing": "首帧用本镜画面图（前镜末帧尚未抽到，刷新后会丢失）",
+  "videoPlan.firstFrame.tailLocalOnly": "首帧用本镜公网画面图（前镜末帧是本地临时地址，视频服务无法读取）",
   "videoPlan.firstFrame.firstShot": "首帧用本镜画面图（这是第一镜）",
   "videoPlan.firstFrame.prevNoImage": "首帧用本镜画面图（前镜没有画面图）",
   "videoPlan.firstFrame.sceneUnknown": "首帧用本镜画面图（未标主场景，无法判断是否同场景）",
@@ -440,6 +443,7 @@ export const zh = {
 
   // 拼接（成片）步骤
   "assembly.failedPrefix": "拼接失败",
+  "assembly.sessionPreviewHint": "预览视频仅在当前会话中保留；离开此页面或刷新后可能消失，请及时下载保存。",
 
   // 运行日志与链路追踪（顶栏快捷开关 + 日志面板工具条）
   "log.title": "运行日志",
@@ -516,7 +520,7 @@ export const en = {
   "settings.videoConsistency.off": "No chaining (use each shot's own frame only)",
   "settings.videoConsistency.chain": "Chain same-scene shots (recommended)",
   "settings.videoConsistency.identity": "Chaining + character reference across scenes",
-  "settings.videoConsistencyHint": "\"Chain\" feeds the next shot's image as this shot's last frame so adjacent shots connect. \"Character reference\" instead sends the portrait and style master as reference images when shots cannot be chained (scene change or re-entry), anchoring identity and art style. The two are mutually exclusive on the API; chaining wins.",
+  "settings.videoConsistencyHint": "\"Chain\" feeds the previous shot's last video frame in as this shot's first frame so adjacent shots connect. \"Character reference\" instead sends the portrait and style master as reference images when shots cannot be chained (scene change or re-entry), anchoring identity and art style. The two are mutually exclusive on the API; chaining wins.",
   "settings.github.desc": "Open source project — Star ⭐ and PRs welcome",
   "settings.language": "Language",
   "settings.plan": "Plan / Access Tier",
@@ -729,6 +733,8 @@ export const en = {
   "wizard.reroll": "Re-roll",
   "wizard.rerollAll": "Re-roll All",
   "wizard.generating": "Generating...",
+  "wizard.stopBatch": "Stop",
+  "wizard.stopBatchHint": "Only upcoming work is stopped; requests already in flight finish and keep their results.",
   "wizard.storyboardPreparing": "Generating storyboard…",
   "wizard.storyboardEnterHint": "Opens the storyboard once the first shot is ready",
   "wizard.shotDeleteConfirm": "Delete shot {index}? Its script, prompts and references will be removed.",
@@ -745,6 +751,7 @@ export const en = {
   "videoPlan.firstFrame.self": "First frame is this shot's still",
   "videoPlan.firstFrame.off": "First frame is this shot's still (video consistency off)",
   "videoPlan.firstFrame.tailMissing": "First frame is this shot's still (previous tail frame not extracted; lost on refresh)",
+  "videoPlan.firstFrame.tailLocalOnly": "First frame is this shot's public still (previous tail frame is a local-only URL the video service cannot read)",
   "videoPlan.firstFrame.firstShot": "First frame is this shot's still (this is the first shot)",
   "videoPlan.firstFrame.prevNoImage": "First frame is this shot's still (previous shot has no image)",
   "videoPlan.firstFrame.sceneUnknown": "First frame is this shot's still (no main scene tagged)",
@@ -926,6 +933,7 @@ export const en = {
 
   // Assembly step
   "assembly.failedPrefix": "Assembly failed",
+  "assembly.sessionPreviewHint": "The preview is kept only for this session and may disappear when you leave or refresh. Download it now to keep a copy.",
 
   // Runtime log & tracing (top-bar toggle + log dock toolbar)
   "log.title": "Runtime log",

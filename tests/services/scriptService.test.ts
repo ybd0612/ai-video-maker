@@ -3,6 +3,8 @@
 // 视觉方向纯函数单测（不触网）：
 // - parseVisualDirection：details 结构化写法 / 旧平铺写法 / 非法 JSON
 // - applyVisualDirectionRewrite：非空重写字段覆盖，空字段保留原值
+// - pickOutlineAssets：大纲新资产契约键修复（newCharacters/newScenes 优先，
+//   旧 characters/scenes 兼容；两键皆无 → 空数组）
 // 断言来自 src/services/scriptService.ts 真实实现。
 // ────────────────────────────────────────────────────────────────────────────
 
@@ -10,6 +12,8 @@ import { describe, expect, it } from "vitest";
 import {
   applyVisualDirectionRewrite,
   parseVisualDirection,
+  pickOutlineAssets,
+  type RawCharacter,
   type RawVisualDirection,
 } from "@/services/scriptService";
 
@@ -118,5 +122,56 @@ describe("applyVisualDirectionRewrite", () => {
     expect(next.details.mediumMaterial).toBe("水彩");
     expect(next.details.composition).toBe("对称留白");
     expect(next.mediumMaterial).toBe("水彩");
+  });
+});
+
+/* ── pickOutlineAssets：大纲新资产契约键（storyboardOutline 修复） ────────── */
+
+const CHAR: RawCharacter = {
+  name: "小狐狸",
+  description: "主角",
+  appearancePrompt: "a small fox",
+};
+
+describe("pickOutlineAssets", () => {
+  it("骨架契约键 newCharacters 被读取（此前只读 characters，按格式返回的新资产被静默丢弃）", () => {
+    expect(
+      pickOutlineAssets<RawCharacter>({ newCharacters: [CHAR] }, "newCharacters", "characters"),
+    ).toEqual([CHAR]);
+  });
+
+  it("兼容旧键 characters/scenes：契约键缺失时回退旧键", () => {
+    expect(
+      pickOutlineAssets<RawCharacter>({ characters: [CHAR] }, "newCharacters", "characters"),
+    ).toEqual([CHAR]);
+  });
+
+  it("两键并存时优先契约键", () => {
+    const legacy: RawCharacter = { ...CHAR, name: "旧版" };
+    expect(
+      pickOutlineAssets<RawCharacter>(
+        { newCharacters: [CHAR], characters: [legacy] },
+        "newCharacters",
+        "characters",
+      ),
+    ).toEqual([CHAR]);
+  });
+
+  it("两键皆缺 / 非数组 → 空数组（不抛错）", () => {
+    expect(pickOutlineAssets<RawCharacter>({}, "newCharacters", "characters")).toEqual([]);
+    expect(
+      pickOutlineAssets<RawCharacter>(
+        { newCharacters: "不是数组" as unknown as RawCharacter[] },
+        "newCharacters",
+        "characters",
+      ),
+    ).toEqual([]);
+  });
+
+  it("newScenes 同样按契约键读取", () => {
+    const scene = { name: "森林", description: "d", appearancePrompt: "a forest" };
+    expect(
+      pickOutlineAssets<{ name: string }>({ newScenes: [scene] }, "newScenes", "scenes"),
+    ).toEqual([scene]);
   });
 });

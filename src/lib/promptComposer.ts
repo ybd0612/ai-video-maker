@@ -300,17 +300,23 @@ export const MAX_TOTAL_REFERENCES = 4;
  * 成因（2026-09-23 实测）：i2i 复制参考图构图的能力远高于文本否定，
  * 而道具图是单个物体的近景/微距样张 —— 四张近景参考塞满一个要求"极远"的镜头，
  * 景别必然被压成中近景，且道具细节会顶替画面主体（晾衣绳画成一串灯泡）。
+ *
+ * ⚠️ 2026-10-03 审计 P1-3 修复：产品（主体）从角色额度中拆出独立 `products` 配额。
+ * 此前产品走 kind="character"，两个角色就把额度占满，显式引用的产品锚定图被静默跳过，
+ * 产品外观连贯性依赖"恰好少一个角色"才成立。拆分配额后：角色身份锚点不被产品挤占、
+ * 产品锚定不再被角色挤占，总数仍由 MAX_TOTAL_REFERENCES=4 封顶；远景/极远景产品配额
+ * 维持 1（与拆分前"角色未满即可进"的行为一致，商业主体的场景展示是合法需求）。
  */
 export const MAX_REFERENCES_BY_SIZE: Record<
   ShotSize | "unknown",
-  { characters: number; props: number }
+  { characters: number; products: number; props: number }
 > = {
-  "extreme-wide": { characters: 2, props: 0 },
-  wide: { characters: 2, props: 0 },
-  medium: { characters: 2, props: 2 },
-  close: { characters: 2, props: 2 },
-  "close-up": { characters: 1, props: 3 },
-  unknown: { characters: 2, props: 2 },
+  "extreme-wide": { characters: 2, products: 1, props: 0 },
+  wide: { characters: 2, products: 1, props: 0 },
+  medium: { characters: 2, products: 1, props: 2 },
+  close: { characters: 2, products: 1, props: 2 },
+  "close-up": { characters: 1, products: 1, props: 3 },
+  unknown: { characters: 2, products: 1, props: 2 },
 };
 
 export function pickShotReferences(
@@ -320,13 +326,17 @@ export function pickShotReferences(
   const out: string[] = [];
   const budget = MAX_REFERENCES_BY_SIZE[shot.shotSize ?? "unknown"];
   let charUsed = 0;
+  let productUsed = 0;
   let propUsed = 0;
 
-  const push = (url: string | undefined | null, kind: "character" | "prop"): void => {
+  const push = (url: string | undefined | null, kind: "character" | "product" | "prop"): void => {
     if (!url || out.length >= MAX_TOTAL_REFERENCES) return;
     if (kind === "character") {
       if (charUsed >= budget.characters) return;
       charUsed += 1;
+    } else if (kind === "product") {
+      if (productUsed >= budget.products) return;
+      productUsed += 1;
     } else {
       if (propUsed >= budget.props) return;
       propUsed += 1;
@@ -345,7 +355,7 @@ export function pickShotReferences(
 
   // 3. 产品图：只使用镜头显式引用，避免把全局产品污染到无关镜头。
   for (const id of shot.activeProductIds ?? []) {
-    push(project.assets.find((a) => a.id === id && a.type === "product")?.imageUrl, "character");
+    push(project.assets.find((a) => a.id === id && a.type === "product")?.imageUrl, "product");
   }
 
   // 4. 道具图：只使用镜头显式引用。

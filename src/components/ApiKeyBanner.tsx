@@ -1,4 +1,3 @@
-import { useEffect, useRef } from "react";
 import { AlertTriangle, Settings } from "lucide-react";
 import { useSettingsStore } from "@/stores/settingsStore";
 import { useT } from "@/i18n";
@@ -6,16 +5,7 @@ import { useT } from "@/i18n";
 export function ApiKeyBanner() {
   const apiKey = useSettingsStore((s) => s.providerConfig.apiKey);
   const setOpen = useSettingsStore((s) => s.setSettingsDialogOpen);
-  const autoOpened = useRef(false);
   const t = useT();
-
-  // Auto-open settings dialog on first visit when no API key is configured
-  useEffect(() => {
-    if (!apiKey && !autoOpened.current) {
-      autoOpened.current = true;
-      setOpen(true);
-    }
-  }, [apiKey, setOpen]);
 
   if (apiKey) return null;
 

@@ -124,7 +124,15 @@ export interface RewritePromptFromFieldsOptions {
   fields: Record<string, string>;
 }
 
-/** 根据结构化分镜字段重写 API 使用的完整英文提示词。 */
+/**
+ * 根据结构化分镜字段重写 API 使用的完整提示词。
+ *
+ * ⚠️ 2026-10-03 审计 P2-4 修复：输出语言**跟随现有完整提示词**，不再强制英文。
+ * 分镜契约（`promptRules.ts` storyboard 中文规则 + `storyboard.subfields-language`）
+ * 把「完整中文提示词」定为 API 唯一来源；此前本路径强制输出英文，用户第一次编辑
+ * 子字段失焦就会把中文 SSOT 整段换成英文，与 stylePrompt（中文）、外观锚点复用
+ * 规则和负向策略的中文口径互相矛盾，且后续润色（保持原语种）无法再收敛回中文。
+ */
 export async function rewritePromptFromFields(
   opts: RewritePromptFromFieldsOptions,
 ): Promise<string> {
@@ -137,11 +145,12 @@ export async function rewritePromptFromFields(
     apiKey: opts.apiKey,
     baseUrl: opts.baseUrl,
     purpose: "fieldAssist",
-    paramContext: `Rewrite the ${kindLabel} prompt from structured storyboard fields. Return a complete English API prompt.`,
+    paramContext: `Rewrite the ${kindLabel} prompt from structured storyboard fields. Return a complete prompt in the same language as the existing prompt.`,
     messages: [
       {
         role: "system",
-        content: `You are an expert ${kindLabel} prompt editor. Rewrite the complete prompt in English. Preserve all valid information from the existing prompt, apply the edited structured fields, remove contradictions and do not add unrelated subjects. Return only the final prompt, with no explanation.`,
+        content:
+          `You are an expert ${kindLabel} prompt editor. Rewrite the complete prompt keeping the SAME natural language as the existing prompt (Chinese in → Chinese out; English in → English out; if the existing prompt is empty, follow the language of the structured fields). Preserve all valid information from the existing prompt, apply the edited structured fields, remove contradictions and do not add unrelated subjects. Return only the final prompt, with no explanation.`,
       },
       {
         role: "user",

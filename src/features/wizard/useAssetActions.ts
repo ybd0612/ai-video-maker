@@ -9,7 +9,7 @@ import {
 import { useSettingsStore } from "@/stores/settingsStore";
 import { generateImage, aspectRatioToImageParams } from "@/services/imageService";
 import { createAIService } from "@/services/ai/factory";
-import { createBatchRunner, hasActiveTask } from "@/lib/batchRunner";
+import { createBatchRunner, hasActiveTask, stopActiveBatch } from "@/lib/batchRunner";
 import {
   getStylePrompt,
   getStyleReferenceUrl,
@@ -26,6 +26,10 @@ import { refineWithAudit, type AuditOutcome } from "@/lib/refineContent";
 import { buildSystemPrompt as buildRulesSystemPrompt, getActiveRules } from "@/lib/promptRules";
 
 const activeAssetTasks = new Map<string, AbortController>();
+// 处理风格母版与资产图批次切换之间的极窄时隙：风格任务已清注册表、
+// 资产 runner 尚未注册时，仍应让用户点击的停止生效。
+const assetStylePreflights = new Set<string>();
+const pendingAssetBatchStops = new Set<string>();
 
 export interface AssetGenerationOptions {
   generatePortraits?: boolean;
@@ -46,6 +50,23 @@ export interface AssetActions {
 /** 查询某项目是否仍有存活的资产生成任务，供资产步骤恢复 UI 标记。 */
 export function hasActiveAssetTask(projectId: string): boolean {
   return hasActiveTask(activeAssetTasks, projectId);
+}
+
+/**
+ * 停止某项目的资产批量生成（P3 修复：批量在飞时此前无任何用户可见的停止入口）。
+ * 只拦止尚未领取的任务；已在飞的生图请求正常完成写回。
+ * 注意：先行的风格母版阶段与批量共用同一注册表，母版请求已在飞时同样无法掐断，
+ * 但其后排队的资产图任务会被跳过（runner finally 复位 assetGenerationStarted）。
+ */
+export function stopAssetBatch(projectId: string): boolean {
+  const stopped = stopActiveBatch(activeAssetTasks, projectId);
+  if (assetStylePreflights.has(projectId)) {
+    // The style-reference request itself ignores the signal; remember intent so the
+    // follow-up asset-image batch is not launched after that request settles.
+    pendingAssetBatchStops.add(projectId);
+    return true;
+  }
+  return stopped;
 }
 
 /** 派生失败兜底：project.style 非空 → style reference 模板；否则 cinematic 模板。 */
@@ -311,9 +332,28 @@ export function useAssetActions(): AssetActions {
     const generateProps = opts?.generateProps !== false;
     const generateStyle = opts?.generateStyle !== false;
 
-    // 阶段 1：风格参考图先行。风格失败不阻塞资产图，资产图会退化为文生图。
+    // 阶段 1：风格参考图先行。将整个前置阶段也暴露为可停止状态；底层已发出的
+    // 风格图请求不被掐断，但 stopAssetBatch 会在其完成后阻止后续资产图批次启动。
     if (generateStyle && !getStyleReferenceUrl(project)) {
-      await generateStyleReference(targetProjectId);
+      assetStylePreflights.add(targetProjectId);
+      useProjectStore.getState().setAssetGenerationStartedByProjectId(targetProjectId, true);
+      const stylePromise = generateStyleReference(targetProjectId);
+      const styleController = activeAssetTasks.get(targetProjectId);
+      try {
+        await stylePromise;
+      } catch (error) {
+        assetStylePreflights.delete(targetProjectId);
+        pendingAssetBatchStops.delete(targetProjectId);
+        useProjectStore.getState().setAssetGenerationStartedByProjectId(targetProjectId, false);
+        trace.finish(error);
+        throw error;
+      }
+      assetStylePreflights.delete(targetProjectId);
+      if (pendingAssetBatchStops.delete(targetProjectId) || styleController?.signal.aborted) {
+        useProjectStore.getState().setAssetGenerationStartedByProjectId(targetProjectId, false);
+        trace.finish();
+        return;
+      }
     }
 
     const runAssetBatch = createBatchRunner({

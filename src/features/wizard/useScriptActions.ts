@@ -26,7 +26,7 @@ import { extractNewAssets } from "@/lib/extractAssets";
 import { collectSubjectVocabulary } from "@/lib/promptComposer";
 import { refineWithAudit } from "@/lib/refineContent";
 import { beginTrace, logger } from "@/lib/logger";
-import { hasActiveTask } from "@/lib/batchRunner";
+import { hasActiveTask, stopActiveBatch } from "@/lib/batchRunner";
 import { pickShotFields } from "@/lib/shotFields";
 import { normalizeShotSize } from "@/lib/shotSize";
 import { resolveAssetId, resolveAssetIds } from "@/lib/shotReferences";
@@ -46,6 +46,16 @@ const activeScriptTasks = new Map<string, AbortController>();
 /** 查询某项目是否仍有存活的分镜任务（供向导 effect 判断，避免重复启动） */
 export function hasActiveScriptTask(projectId: string): boolean {
   return hasActiveTask(activeScriptTasks, projectId);
+}
+
+/**
+ * 停止某项目的分镜批量生成（P3 修复：此前无任何用户可见的停止入口）。
+ * 语义与 batchRunner.stopActiveBatch 一致：只拦止【尚未发起】的逐镜请求，
+ * 正在飞行中的那一镜会正常完成写回（对话请求虽非计费红线，但掐断只会得到半成品）。
+ * 停止后剩余占位镜头复位为 idle，已完成镜头保留，用户可在确认覆盖弹窗后手动续生成。
+ */
+export function stopScriptBatch(projectId: string): boolean {
+  return stopActiveBatch(activeScriptTasks, projectId);
 }
 
 /**
@@ -351,7 +361,8 @@ export function useScriptActions(
     // 中断恢复：上一轮遗留的 scripting 占位（流程被打断）先复位，再开始新一轮
     resetStuckShots(targetProjectId);
 
-    activeScriptTasks.set(targetProjectId, new AbortController());
+    const batchController = new AbortController();
+    activeScriptTasks.set(targetProjectId, batchController);
     store.setProjectStatusById(targetProjectId, "scripting");
 
     try {
@@ -364,6 +375,11 @@ export function useScriptActions(
         aspectRatio: project.aspectRatio,
         assets: project.assets,
       });
+      // 用户若在大纲请求期间停止，保留原有资产与镜头，不再创建占位或发起逐镜请求。
+      if (batchController.signal.aborted) {
+        useProjectStore.getState().setProjectStatusById(targetProjectId, "idle");
+        return;
+      }
 
       // 大纲阶段发现的新资产先补建入库（逐镜头请求的上下文需要它们的设定）
       const currentAssets = useProjectStore.getState().projects.find((p) => p.id === targetProjectId)?.assets ?? [];
@@ -402,6 +418,8 @@ export function useScriptActions(
       // 单个镜头失败只标记该镜头并继续，不中断整批。
       let completed = 0;
       for (let i = 0; i < outline.shots.length; i++) {
+        // 停止检查放在每镜发起前：进行中的一镜正常收尾，剩余镜头不再发请求
+        if (batchController.signal.aborted) break;
         const item = outline.shots[i];
         const shot = placeholderShots[i];
         // 每次重新读 store：上一镜刚写回的内容必须在本次请求里可见
@@ -450,6 +468,11 @@ export function useScriptActions(
         }
       }
 
+      // 被用户停止：剩余从未发起的占位镜头复位为 idle（否则永久停在"生成中"），
+      // 已完成镜头保留；项目回 idle，用户可稍后手动重新生成。
+      if (batchController.signal.aborted) {
+        resetStuckShots(targetProjectId);
+      }
       useProjectStore.getState().setProjectStatusById(targetProjectId, "idle");
     } catch (err) {
       // 清理本轮已写入的占位：留 scripting 会让卡片永久停在"生成中"，刷新也不会恢复
