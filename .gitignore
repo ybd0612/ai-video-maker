@@ -53,6 +53,7 @@ blob-report/
 coverage/
 
 # 工具数据（AGENTS.md 约定：不入库）
+.agent-teams/
 .workbuddy/
 .neuralmemory/
 .superpowers/
