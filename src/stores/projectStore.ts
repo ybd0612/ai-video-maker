@@ -20,14 +20,14 @@ import {
   VISUAL_SHOT_FIELDS,
 } from "./projectOps";
 import { migratePersistedState } from "./projectMigrations";
-import type { Asset, DialogueLine, Project, ProjectState, Shot, VisualDirection, WizardStep } from "./projectTypes";
+import type { Asset, DialogueLine, Project, ProjectState, Shot, StoryBrief, VisualDirection, WizardStep } from "./projectTypes";
 
 // 兼容 re-export：全项目统一从 "@/stores/projectStore" 导入
 export type {
   ProjectStatus, ShotStatus, AspectRatio, WizardStep, AutomationMode,
-  StyleDetails, VisualDirection, AssetType, AssetDerivation,
+  StyleDetails, VisualDirection, StoryBrief, AssetType, AssetDerivation,
   CharacterDetails, SceneDetails, ProductDetails, PropDetails, AssetDetails,
-  Asset, DialogueLine, Shot, ChatTurn, Project, ProjectState,
+  Asset, DialogueLine, Shot, Project, ProjectState,
 } from "./projectTypes";
 export { newId, applyShotUpdates, applyAssetUpdate } from "./projectOps";
 export { migratePersistedState } from "./projectMigrations";
@@ -114,6 +114,31 @@ export const useProjectStore = create<ProjectState>()(
                   ? { ...asset, imageUrl: undefined, prompt: "", derivation: { ...asset.derivation, locked: false, dirty: true } }
                   : { ...asset, imageUrl: undefined },
               ),
+              updatedAt: Date.now(),
+            };
+          }),
+        })),
+
+      updateStoryBrief: (updates) =>
+        set((s) => ({
+          projects: updateActive(s.projects, s.activeProjectId, (p) => {
+            // 无骨架（未提取 / 旧项目）时按部分字段补建，缺失项留空串由界面显示未设定
+            const base: StoryBrief = p.storyBrief ?? {
+              logline: "",
+              theme: "",
+              emotionArc: "",
+              audience: "",
+              durationPlan: "",
+              beats: "",
+              consistencyNotes: "",
+              revision: 0,
+            };
+            return {
+              ...p,
+              storyBrief: { ...base, ...updates, revision: base.revision + 1 },
+              // 主题/节奏变了 → 已生成的分镜不再可信，回到未审核（对齐 updateVisualDirection
+              // 的级联口径：清派生物 + 重置审核标记，但不删用户已有内容）
+              storyboardReviewed: false,
               updatedAt: Date.now(),
             };
           }),
@@ -633,7 +658,7 @@ export const useProjectStore = create<ProjectState>()(
     }),
     {
       name: "wxhb-project",
-      version: 19,
+      version: 20,
       // 迁移主体提取为导出纯函数 migratePersistedState（见文件上方），便于单测
       migrate: (persisted: unknown, version: number) =>
         migratePersistedState(persisted, version),

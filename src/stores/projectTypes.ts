@@ -55,6 +55,33 @@ export interface VisualDirection {
   status: "draft" | "confirmed" | "stale";
 }
 
+/**
+ * 项目级故事骨架（2026-10-07 新增）：第一步「想法」的结构化产物。
+ *
+ * 背景：此前一步���产出的只有「视觉方向（画风）」+「四类资产（长什么样）」，
+ * 用户想法里的主题、情绪曲线、时长与节奏规划没有任何容器承载 —— 下游分镜只能
+ * 拿着资产清单 + 原始散文重新猜一遍剧情。本类型补齐这个故事层 SSOT：
+ * 大纲与逐镜头细化都引用它，保证节奏与主题在全链路口径一致。
+ */
+export interface StoryBrief {
+  /** 一句话故事梗概（logline）：主角是谁、想做什么、阻力与结局 */
+  logline: string;
+  /** 核心主题与情绪基调 */
+  theme: string;
+  /** 情绪曲线：从开场到收尾的走向（如「孤寂→紧张→释然」） */
+  emotionArc: string;
+  /** 目标受众与投放平台认知（影响节奏密度与信息量） */
+  audience: string;
+  /** 目标时长与镜头规模规划（秒；镜头数仍由分镜阶段自行判断） */
+  durationPlan: string;
+  /** 关键节拍：起承转合的骨架，供大纲阶段据此排镜 */
+  beats: string;
+  /** 全片一致性硬约束（用户明确要求的跨镜头不变量，如「同一张脸同一服装」） */
+  consistencyNotes: string;
+  /** 生成版本计数；每次重新提取 +1 */
+  revision: number;
+}
+
 /* ── Asset model（角色/场景/产品统一为资产） ────────────────────────────── */
 
 /** 资产类型：style 为整体风格锚点（B 方案新增，复用现有字段零新列） */
@@ -219,11 +246,6 @@ export interface Shot {
   renderRevision?: number;
 }
 
-export interface ChatTurn {
-  role: "user" | "assistant";
-  content: string;
-}
-
 export interface Project {
   id: string;
   title: string;
@@ -234,6 +256,8 @@ export interface Project {
   style: string;
   /** 结构化视觉方向；style 与 style 资产仅作为历史兼容字段。 */
   visualDirection?: VisualDirection;
+  /** 结构化故事骨架；缺失时下游从 ideaPrompt 直接规划（旧项目与未提取项目）。 */
+  storyBrief?: StoryBrief;
   language: "zh" | "en";
   shots: Shot[];
   status: ProjectStatus;
@@ -242,8 +266,6 @@ export interface Project {
   updatedAt: number;
   /** Step 1: saved idea prompt text */
   ideaPrompt?: string;
-  /** Step 1: saved AI chat history */
-  ideaChatHistory?: ChatTurn[];
   /** Step 2: overall style reference image URL */
   styleReferenceUrl?: string;
   /** semi-auto 模式下用户是否已审核资产；缺省视为未审核 */
@@ -270,10 +292,12 @@ export interface ProjectState {
   /* Project actions */
   createProject: (title: string) => Project;
   switchProject: (id: string) => void;
-  updateProject: (updates: Partial<Pick<Project, "title" | "aspectRatio" | "style" | "visualDirection" | "language" | "ideaPrompt" | "ideaChatHistory" | "assets" | "styleReferenceUrl" | "assetsReviewed" | "storyboardReviewed" | "imagesReviewed" | "assetGenerationStarted" | "imageGenerationStarted" | "videoGenerationStarted">>) => void;
+  updateProject: (updates: Partial<Pick<Project, "title" | "aspectRatio" | "style" | "visualDirection" | "storyBrief" | "language" | "ideaPrompt" | "assets" | "styleReferenceUrl" | "assetsReviewed" | "storyboardReviewed" | "imagesReviewed" | "assetGenerationStarted" | "imageGenerationStarted" | "videoGenerationStarted">>) => void;
   /** 按 ID 更新指定项目（用于异步操作完成后写回发起项目，而非当前活跃项目，避免跨项目污染） */
   updateProjectById: (projectId: string, updater: (p: Project) => Project) => void;
   updateVisualDirection: (updates: Partial<VisualDirection>) => void;
+  /** 更新故事骨架；置 stale 会连带让分镜失效（节奏/主题变了）。 */
+  updateStoryBrief: (updates: Partial<Omit<StoryBrief, "revision">>) => void;
   deleteProject: (id: string) => void;
   duplicateProject: (id: string) => Project | null;
   setProjectStatus: (status: ProjectStatus, error?: string) => void;

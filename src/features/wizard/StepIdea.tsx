@@ -10,22 +10,7 @@ import { useT } from "@/i18n";
 import { Sparkles, Loader2, Monitor, Smartphone, Square } from "lucide-react";
 import { useWizardActions } from "./useWizardActions";
 import { AiPolishField } from "@/components/ui/AiPolishField";
-
-const IDEA_POLISH_PROMPT = `你是一位专业的短视频创意策划师。用户会给你一段视频想法，请在保持用户核心意图的前提下润色完善。
-
-要求：
-- 让主题更明确、更有画面感，点明情感基调与视觉风格
-- 补充可落地的场景与叙事方向，但不改变原意、不添加无关内容
-- 直接返回润色后的完整想法，不要任何解释说明
-- 控制在 200 字以内`;
-
-const IDEA_POLISH_PROMPT_EN = `You are a professional short-video creative planner. The user gives you a video idea — polish and refine it while preserving the user's core intent.
-
-Requirements:
-- Make the topic clearer and more visual; state the emotional tone and visual style
-- Add concrete scene and narrative direction without changing the original intent
-- Return ONLY the polished full idea, with no explanations
-- Keep it under 120 words`;
+import { buildIdeaPolishPrompt } from "@/lib/promptRules";
 
 interface StepIdeaProps {
   onGenerated?: () => void;
@@ -139,9 +124,7 @@ export function StepIdea({ onGenerated }: StepIdeaProps) {
         <AiPolishField
           value={prompt}
           onChange={setPrompt}
-          systemPrompt={
-            project?.language === "en" ? IDEA_POLISH_PROMPT_EN : IDEA_POLISH_PROMPT
-          }
+          systemPrompt={buildIdeaPolishPrompt()}
           resetKey={project?.id}
           onKeyDown={handleKeyDown}
           placeholder={t("wizard.ideaPlaceholder")}

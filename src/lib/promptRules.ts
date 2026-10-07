@@ -22,6 +22,7 @@ export type PromptTask =
   | "extractAssets"
   | "visualDirection"
   | "visualDirectionAudit"
+  | "storyBrief"
   | "storyboardOutline"
   | "storyboardShot"
   | "characterAppearance"
@@ -327,6 +328,62 @@ Examples:
 - Each asset's details must describe only its own visual appearance, not story action, character relationships or other assets; the visual direction must contain style language, not story subjects
 - Scene details describe only environment, space, time, weather, lighting, material and atmosphere; product and prop details describe only the object itself
 - Do NOT generate storyboard shots; return only the JSON above`,
+  },
+
+  /* ── 故事骨架提取（步骤 1，产出 StoryBrief；故事层的 SSOT） ── */
+  storyBrief: {
+    zh: `你是一位短视频叙事策划。用户会给你一段视频想法，请把它读成一份可执行的**故事骨架**，只返回 JSON：
+{
+  "logline": "一句话故事梗概：主角是谁、想做什么、遇到什么阻力、最后如何收束",
+  "theme": "核心主题与情绪基调（这个片子真正想讲什么、基调是温暖还是冷峻）",
+  "emotionArc": "情绪曲线：从开场到收尾的走向与转折（如「孤寂→紧张→释然」）",
+  "audience": "目标受众与投放场景认知（影响节奏密度与信息量；想法没写明时按最合理的默认推断）",
+  "durationPlan": "目标时长与节奏规划（总时长大致几秒、几个段落、每段多长）",
+  "beats": "关键节拍骨架：按顺序写出起、承、转、合各是什么，用「·」或换行分隔",
+  "consistencyNotes": "全片一致性硬约束：用户明确要求的、必须跨镜头保持不变的设定（同一张脸/同一套服装/同一个物件的颜色形状）；想法没提则写「无额外约束」"
+}
+
+要求：
+- 这是**故事层**规划：只写主题、情绪、节奏与一致性要求，**不要写画面风格、画风、镜头质感或构图**（那是视觉方向负责的），也不要写具体资产设定（那是资产提取负责的）
+- 想法里已经写明的情节、人物、场景与节拍，**必须照抄进对应字段**，禁止另编一套；只有想法确实没说清的部分才由你补全
+- 每个字段都必须非空；用户写了但你不认同的判断也照写，那是他的创意决定
+{{#rules}}
+规则：
+{{rules}}
+{{/rules}}
+{{#examples}}
+参考示例：
+{{examples}}
+{{/examples}}
+{{#safety}}
+{{safety}}
+{{/safety}}`,
+    en: `You are a short-video narrative planner. The user gives you a video idea — read it into an executable **story skeleton** and return JSON only:
+{
+  "logline": "One-sentence story summary: who the protagonist is, what they want, what resists them, how it resolves",
+  "theme": "Core theme and emotional tone (what the piece is really about, warm or cold in register)",
+  "emotionArc": "Emotional arc: how the mood shifts from opening to ending (e.g. 'lonely → tense → relieved')",
+  "audience": "Target audience and placement context (drives pacing density and information load; infer the most sensible default when the idea does not say)",
+  "durationPlan": "Target duration and pacing plan (roughly how many seconds in total, how many segments, how long each)",
+  "beats": "Key beats: write setup, development, turn and payoff in order, separated by '·' or newlines",
+  "consistencyNotes": "Hard cross-shot consistency constraints the user explicitly required and that must never change across shots (same face, same outfit, same object's colour and shape); write 'no extra constraints' when the idea asks for none"
+}
+
+Requirements:
+- This is the **story layer**: write theme, emotion, pacing and consistency only. Do NOT write visual style, art style, camera texture or composition (that is the visual direction's job), and do NOT write asset settings (that is asset extraction's job)
+- Any plot, character, scene or beat the idea already states MUST be copied into the matching field; never invent an alternative. Only fill in what the idea genuinely left unsaid
+- Every field must be non-empty; if you disagree with something the user wrote, still write it — it is their creative decision
+{{#rules}}
+Rules:
+{{rules}}
+{{/rules}}
+{{#examples}}
+Examples:
+{{examples}}
+{{/examples}}
+{{#safety}}
+{{safety}}
+{{/safety}}`,
   },
 
   /* ── 步骤 3 分镜大纲（scriptService.generateStoryboardOutline） ── */
@@ -828,6 +885,41 @@ export const BUILTIN_RULES: PromptRule[] = [
     source: "builtin",
   },
 
+  /* ── storyBrief（步骤 1 故事骨架提取） ── */
+  {
+    id: "storyBrief.no-style-leak",
+    task: "storyBrief",
+    section: "rules",
+    content: {
+      zh: "- **只规划故事，不碰画面**：本任务与「视觉方向」分工明确 —— 画风、媒介、色彩、光影、镜头质感、构图规律一律留给视觉方向，资产外观设定留给资产提取。写进本任务会让两层互相污染。\n- **beat 用可见的行动写**：节拍写「她拧开杯盖，热气升起」，不要写「她感到平静」。情绪只能作为走向被描述（emotionArc），不能单独成为一个节拍。",
+      en: "- **Plan the story only, never the picture**: this task is explicitly split from visual direction — medium, palette, lighting, camera texture and composition belong to the visual direction, and asset appearance belongs to asset extraction. Mixing them in pollutes both layers.\n- **Write beats as visible actions**: write 'she twists the cap off and steam rises', not 'she feels calm'. Emotion may only be described as a direction (emotionArc); it never becomes a beat by itself.",
+    },
+    enabled: true,
+    source: "builtin",
+  },
+  {
+    id: "storyBrief.fidelity",
+    task: "storyBrief",
+    section: "rules",
+    content: {
+      zh: "- 想法原文已写明的情节、人物、场景、镜头设想与硬性要求，**原样照抄**进对应字段（logline / beats / consistencyNotes），禁止另编一套；只有原文确实没说清的部分才补全。\n- consistencyNotes 只记录**用户明确要求跨镜头不变**的东西（同一张脸、同一套服装、某个物件的颜色与形状）；不要把画面风格、氛围或情绪写进去。\n- 原文中已给出的时长、平台、镜头数设想直接落进 durationPlan / audience；没写才推断。",
+      en: "- Any plot, character, scene, shot idea or hard requirement already stated in the idea MUST be copied verbatim into the matching field (logline / beats / consistencyNotes); never substitute an alternative. Only fill what the idea genuinely left unsaid.\n- consistencyNotes records only what the user explicitly requires to stay unchanged across shots (same face, same outfit, an object's colour and shape); do not put visual style, atmosphere or emotion in there.\n- Any duration, platform or shot-count the idea already gives goes straight into durationPlan / audience; only infer when absent.",
+    },
+    enabled: true,
+    source: "builtin",
+  },
+  {
+    id: "safety.storyBrief-scope",
+    task: "storyBrief",
+    section: "safety",
+    content: {
+      zh: "- 只做故事规划，不输出分镜画面提示词；不涉及暴力、血腥、裸露等敏感内容",
+      en: "- Plan the story only; do NOT output shot image prompts. No violence, gore, nudity or other sensitive content",
+    },
+    enabled: true,
+    source: "builtin",
+  },
+
   /* ── storyboard（步骤 3 完整分镜生成；顺序 = 原「重要规则」段顺序） ── */
   {
     id: "storyboard.outline-assets",
@@ -1136,6 +1228,31 @@ export const BUILTIN_RULES: PromptRule[] = [
 
   /* ── polish（chatService 8 个专家角色，单语原文整体作为单条目） ── */
   {
+    id: "polish.idea",
+    task: "polish",
+    section: "rules",
+    content: {
+      zh: `你是一位专业的短视频创意策划师。用户会给你一段视频想法，请在保持用户核心意图的前提下润色完善。
+
+要求：
+- 让主题更明确、更有画面感，点明情感基调与视觉风格
+- 补充可落地的场景与叙事方向，但不改变原意、不添加无关内容
+- 用户已经把情节、镜头设想、时长或一致性要求写清楚的部分**原样保留**，只补你没写清的表达，不要另编一套剧情
+- 不要限制字数：原想法有多长、信息有多密，润色后就该保留多少；删掉任何用户明确写出的情节都是错误的
+- 直接返回润色后的完整想法，不要任何解释说明`,
+      en: `You are a professional short-video creative planner. The user gives you a video idea — polish and refine it while preserving the user's core intent.
+
+Requirements:
+- Make the topic clearer and more visual; state the emotional tone and visual style
+- Add concrete scene and narrative direction without changing the original intent
+- Keep verbatim anything the user has already spelled out (plot, shot ideas, duration, consistency requirements); only improve the parts they left loose — never substitute an alternative plot
+- Do NOT impose a word limit: the polished idea should stay as long as the original needs it to be. Dropping any element the user explicitly wrote is a failure
+- Return ONLY the polished full idea, with no explanations`,
+    },
+    enabled: true,
+    source: "builtin",
+  },
+  {
     id: "polish.script-text",
     task: "polish",
     section: "rules",
@@ -1352,4 +1469,13 @@ export function resolvePolishSystemPrompt(systemPrompt: string): string {
 /** 角色外貌生成 system prompt（CharacterEditor 使用，恒英文输出） */
 export function buildCharacterAppearancePrompt(): string {
   return buildSystemPrompt("characterAppearance", "en", getActiveRules());
+}
+
+/**
+ * 想法润色 system prompt（StepIdea 使用）。
+ * 走注册表：条目 `polish.idea` 可在设置「提示词规则」里编辑/关闭，
+ * 与其它任务规格同一套机制，不在组件里内联提示词常量。
+ */
+export function buildIdeaPolishPrompt(): string {
+  return buildSystemPrompt("polish", "zh", getActiveRules());
 }

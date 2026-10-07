@@ -398,5 +398,13 @@ export function migratePersistedState(
     // no-op：见上方说明
   }
 
+  // Migrate from v19 to v20: 新增 Project.storyBrief（故事骨架）。
+  // 刻意不补默认值：故事骨架只能由第一步的 LLM 提取产出，代码凭空造一个
+  // 「梗概/主题/节奏」等于把模型从未给出的创作决策塞进下游分镜上下文。
+  // 旧项目保持 undefined —— 下游读取时按「未设定」降级为直接用 ideaPrompt 规划。
+  if (version < 20) {
+    // no-op：见上方说明
+  }
+
   return state;
 }

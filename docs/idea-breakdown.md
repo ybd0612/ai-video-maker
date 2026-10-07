@@ -11,10 +11,13 @@
 ## 一句话结论
 
 ```
-一句想法  ──拆成──>  1 个视觉方向  +  4 类资产（角色/场景/主体/道具）  +  N 个镜头（N 由模型判断，不写固定区间）
-                         │                    │                          │
-                     只管"画风"          只管"长什么样"            只管"这一镜发生什么"
-                     不含任何主体        不含动作与剧情             复用上面的外观与 ID
+一句想法  ──拆成──>  1 个故事骨架  +  1 个视觉方向  +  4 类资产（角色/场景/主体/道具）  +  N 个镜头
+                         │                    │                    │
+                     管"讲什么"          只管"画风"           只管"长什么样"
+                     主题/节奏/一致性      不含任何主体        不含动作与剧情
+                         └────────────────────┴────────────────────┘
+                              ↓ 复用外观 ID 与英文外观描述
+                            N 个镜头（故事层 = 排镜的唯一口径）
 ```
 
 三条硬规矩（都由提示词显式约束，不是代码校验）：
@@ -29,6 +32,15 @@
 
 ```
 用户想法 ideaPrompt
+│
+├─[C] 故事骨架 storyBrief             （1 份，项目级，2026-10-07 新增）
+│   ├─ 一句话梗概        logline
+│   ├─ 核心主题          theme
+│   ├─ 情绪曲线          emotionArc
+│   ├─ 目标受众          audience
+│   ├─ 时长规划          durationPlan
+│   ├─ 关键节拍          beats
+│   └─ 一致性约束        consistencyNotes  ← 全片不变量
 │
 ├─[A] 视觉方向 visualDirection            （1 份，项目级）
 │   ├─ 名称                name
@@ -132,23 +144,50 @@ details 各字段都只描述视觉语言本身，不承载故事主体。
 - 不要生成分镜，只返回上述 JSON
 ```
 
-用户消息实际长这样（`scriptService.ts:826-844`）：
+用户消息实际长这样（`scriptService.ts` 的 `extractAssetsByType`）：
 
 ```
 <用户的想法原文>
-
-Design assets according to the confirmed visual direction.
-Asset appearance prompts describe the subject only; do not redefine the global art style.
 
 THIS CALL EXTRACTS ONLY "character": the "characters" array carries the assets for
 this call, and every other array MUST be an empty array.
 ```
 
-四类各发一次请求、并行跑，靠最后这句「只提取 X 类」区分；代码还会做兜底过滤（`scriptService.ts:924-930`）——**即使模型越界输出了别的类数组，也只保留本次目标类**，其余置空。
+四类各发一次请求、并行跑，靠最后这句「只提取 X 类」区分；代码还会做兜底过滤——**即使模型越界输出了别的类数组，也只保留本次目标类**，其余置空。
 
-⚠️ 一个要注意的事实：那句 `Design assets according to the confirmed visual direction`（按已确认的视觉方向设计资产）在现行链路里**没有附带视觉方向数据**。`extractAssetsByType` 的第 3 个参数 `visualDirection` 从未被调用方传入（唯一调用点 `useScriptActions.ts:239`），而且链 A 与链 B 是并行发出的，资产提取时视觉方向还没产出。**结论：资产提取阶段看不到画风，画风是在后面生图时才注入的。**
+> **2026-10-07 修正**：原文此前还有一句 `Design assets according to the confirmed visual direction.`，而 `extractAssetsByType` 的第 3 参 `visualDirection` 从未被调用方传入（链 A 与链 B 并行发出，资产提取时视觉方向还没产出）。模型被告知了一个它拿不到的上下文。**该句已删除**，`visualDirection` 形参一并移除。**结论：资产提取阶段看不到画风，画风是在后面生图时才注入的**（风格全由 `stylePrompt` 文本承载）。
 
-另外还有 4 条按类追加的内置规则条目（可在设置里改）：`extract.assets-animals` 角色/动物类、`extract.assets-scenes` 场景类、`extract.assets-products` 产品类、`extract.assets-props` 道具类，外加 `safety.extract-scope` 内容安全边界（`promptRules.ts:695-751`）。
+另外还有 4 条按类追加的内置规则条目（可在设置里改）：`extract.assets-animals` 角色/动物类、`extract.assets-scenes` 场景类、`extract.assets-products` 产品类、`extract.assets-props` 道具类，外加 `safety.extract-scope` 内容安全边界。
+
+---
+
+## 图 3·5　[C] 故事骨架 StoryBrief（2026-10-07 新增）
+
+**它补的是什么缺口**：此前第一步的产出只有「画风」与「长什么样」两类，用户想法里的**主题、情绪曲线、时长与节奏规划、跨镜头一致性要求没有任何容器承载** —— 下游分镜只能拿着资产清单 + 原始散文重新猜一遍剧情。StoryBrief 是故事层的 SSOT。
+
+骨架 `promptRules.ts` 任务名 `storyBrief`，出参七字段：
+
+```json
+{
+  "logline": "一句话梗概：主角是谁、想做什么、遇到什么阻力、最后如何收束",
+  "theme": "核心主题与情绪基调",
+  "emotionArc": "情绪曲线（孤寂→紧张→释然）",
+  "audience": "目标受众与投放场景认知",
+  "durationPlan": "目标时长与节奏规划",
+  "beats": "关键节拍骨架（起承转合）",
+  "consistencyNotes": "全片一致性硬约束（同一张脸 / 同一套服装 / 同一物件的颜色形状）"
+}
+```
+
+内置条目：`storyBrief.no-style-leak`（只规划故事不碰画面，画风归视觉方向）、`storyBrief.fidelity`（原文写明的情节必须照抄）、`safety.storyBrief-scope`。
+
+**编排位置**：与链 A（视觉方向）、链 C（四类资产）**三条并行**发出，完成即写回 store，**失败只记警告不拖垮整体**（缺省时下游按「未设定」降级为直接从想法原文规划，行为与改造前一致）。
+
+**消费点**：注入 `generateStoryboardOutline` 与 `generateStoryboardShot` 的 user 消息（`buildStoryBriefContext`），两个环节都以它为剧情与节奏的唯一口径。
+
+**界面**：步骤 2 顶部「故事骨架」卡片（视觉方向卡片之上，因它更上游）→ 点开为 `StoryBriefEditor.tsx`，复用 `AssetDetailShell` 详情外壳；字段可改，改后 `updateStoryBrief` 重置 `storyboardReviewed`（对齐 `updateVisualDirection` 的级联口径：不删已有镜头）。
+
+**持久化**：`Project.storyBrief`，v19 → v20。刻意不补默认值 —— 故事层只能由模型产出，代码凭空造等于把创作决策塞进下游；旧项目保持 `undefined`。
 
 ---
 
@@ -157,6 +196,12 @@ this call, and every other array MUST be an empty array.
 ```
 产物                        被谁读                             以什么形式进入下一步
 =====================================================================================
+故事骨架 7 字段              步骤3 大纲 + 逐镜头                  buildStoryBriefContext
+  storyBrief.{7}                                            拼进 user 消息顶部
+                                                              「已确认的故事骨架…」
+                                                              （缺省则不注入，
+                                                                行为与改造前一致）
+
 视觉方向 6 维                风格提示词派生 deriveStylePrompt   作为输入文本（不含故事主体）
   details.{6}                                                     ↓
                                                             英文风格提示词 stylePrompt

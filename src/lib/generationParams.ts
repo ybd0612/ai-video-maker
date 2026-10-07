@@ -26,6 +26,7 @@ import {
 export type GenerationPurpose =
   | "visualDirection"
   | "visualDirectionAudit"
+  | "storyBrief"
   | "assetExtraction"
   | "storyboard"
   | "storyboardOutline"

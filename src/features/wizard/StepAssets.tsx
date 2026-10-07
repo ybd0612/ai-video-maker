@@ -12,10 +12,11 @@ import {
 } from "@/stores/projectStore";
 import { useSettingsStore } from "@/stores/settingsStore";
 import { useT } from "@/i18n";
-import { ImageIcon, Loader2, Wand2 } from "lucide-react";
+import { ImageIcon, Loader2, Wand2, ScrollText } from "lucide-react";
 import { CharacterEditor } from "@/features/characters/CharacterEditor";
 import { AssetListSection } from "./AssetListSection";
 import { VisualDirectionEditor } from "./VisualDirectionEditor";
+import { StoryBriefEditor } from "./StoryBriefEditor";
 import { AssetEditor } from "./AssetEditor";
 import { ReviewCheckpoint } from "./ReviewCheckpoint";
 import { useWizardActions, hasActiveAssetTask, hasActiveScriptTask, stopAssetBatch, stopScriptBatch } from "./useWizardActions";
@@ -42,6 +43,7 @@ export function StepAssets() {
   const [editingChar, setEditingChar] = useState<Asset | null>(null);
   const [showEditor, setShowEditor] = useState(false);
   const [showVisualDirectionEditor, setShowVisualDirectionEditor] = useState(false);
+  const [showStoryBriefEditor, setShowStoryBriefEditor] = useState(false);
   const [editingAsset, setEditingAsset] = useState<Asset | null>(null);
   const [generatingScenes, setGeneratingScenes] = useState<Set<string>>(new Set());
   const [generatingProducts, setGeneratingProducts] = useState<Set<string>>(new Set());
@@ -136,6 +138,9 @@ export function StepAssets() {
     const targetProjectId = project?.id;
     if (!targetProjectId) return;
     useProjectStore.getState().updateProjectById(targetProjectId, (p) => ({ ...p, assetsReviewed: true }));
+    // 半自动下资产图是延后到确认时才生成的（见 useScriptActions.extractCharactersFromIdea）：
+    // 用户校对完设定才出图，避免按修改前的提示词白烧一轮配额。缺图才补，已有图不动。
+    if (hasMissingAssets) void handleFillMissing();
     await enterStoryboard();
   };
 
@@ -295,6 +300,10 @@ export function StepAssets() {
 
   // ── Editor mode ───────────────────────────────────────────────────────
 
+  if (showStoryBriefEditor) {
+    return <StoryBriefEditor onClose={() => setShowStoryBriefEditor(false)} />;
+  }
+
   if (showVisualDirectionEditor) {
     return <VisualDirectionEditor onClose={() => setShowVisualDirectionEditor(false)} onGenerate={() => handleGenerateStyle()} generating={generatingStyle} />;
   }
@@ -332,6 +341,37 @@ export function StepAssets() {
           {t("wizard.noAssetsContinueHint")}
         </p>
       )}
+
+      {/* ── Story brief section: the story layer upstream of everything ── */}
+      <section
+        role="button"
+        tabIndex={0}
+        onClick={() => setShowStoryBriefEditor(true)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            setShowStoryBriefEditor(true);
+          }
+        }}
+        title={t("wizard.editStoryBrief")}
+        className="cursor-pointer rounded-2xl border border-accent/40 bg-accent-deep/10 p-4 transition hover:border-accent focus:border-accent focus:outline-none"
+      >
+        <div className="flex items-start gap-4">
+          <div className="flex h-24 w-36 shrink-0 items-center justify-center rounded-xl border border-accent/30 bg-app">
+            <ScrollText className="h-5 w-5 text-ink-5" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="text-[0.6875rem] font-medium uppercase tracking-[0.12em] text-accent">{t("wizard.storyBriefTitle")}</p>
+            <p className="mt-1 text-base font-semibold text-ink">
+              {project?.storyBrief?.logline || t("wizard.storyBriefUnset")}
+            </p>
+            {project?.storyBrief?.emotionArc && (
+              <p className="mt-1 text-xs text-ink-3">{project.storyBrief.emotionArc}</p>
+            )}
+            <p className="mt-2 text-[0.6875rem] text-ink-5">{t("wizard.storyBriefHint")}</p>
+          </div>
+        </div>
+      </section>
 
       {/* ── Visual direction section: upstream of all assets ───────────── */}
       <section

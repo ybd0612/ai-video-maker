@@ -14,6 +14,7 @@ import {
   auditCharacterFidelity,
   auditVisualDirection,
   extractAssetsByType,
+  extractStoryBriefFromIdea,
   extractVisualDirectionFromIdea,
   generateStoryboardOutline,
   generateStoryboardShot,
@@ -241,10 +242,29 @@ export function useScriptActions(
         return visualDirection;
       })();
 
-      // 链 B：资产按类型并行提取（4 路小请求）。风格由视觉方向链唯一负责；
+      // 链 B：故事骨架（主题/情绪/节奏/一致性约束）。
+      // 与链 A、链 C 并行发出，完成即写回，不切步骤（切页由链 A 负责）。
+      // 失败只记警告不拖垮整体：故事层缺失时下游按未设定降级，仍可出分镜。
+      const storyTask = (async () => {
+        try {
+          const raw = await extractStoryBriefFromIdea(baseOpts);
+          useProjectStore.getState().updateProjectById(targetProjectId, (p) => ({
+            ...p,
+            storyBrief: {
+              ...raw,
+              revision: (p.storyBrief?.revision ?? 0) + 1,
+            },
+          }));
+          return raw;
+        } catch (err) {
+          logger.warn("llm", "logmsg.storyBriefFailed", { error: String(err) });
+          return null;
+        }
+      })();
+
+      // 链 C：资产按类型并行提取（4 路小请求）。风格由视觉方向链唯一负责；
       // 单类完成即写回，单类失败不拖垮整体，全部失败才算失败。
-      const assetsTask = (async () => {
-        const types: ExtractableAssetType[] = ["character", "scene", "product", "prop"];
+      const assetsTask = (async () => {        const types: ExtractableAssetType[] = ["character", "scene", "product", "prop"];
         let added = 0;
         const failures: Array<{ type: ExtractableAssetType; error: unknown }> = [];
 
@@ -297,8 +317,12 @@ export function useScriptActions(
         return added;
       })();
 
-      // 两链并行；任一失败保留另一链已写回的内容并按失败收尾（用户重试走原确认弹窗）
-      const [directionOutcome, assetsOutcome] = await Promise.allSettled([directionTask, assetsTask]);
+      // 三链并行；任一失败保留其余链已写回的内容并按失败收尾（用户重试走原确认弹窗）
+      const [directionOutcome, , assetsOutcome] = await Promise.allSettled([
+        directionTask,
+        storyTask,
+        assetsTask,
+      ]);
       const directionError = directionOutcome.status === "rejected" ? directionOutcome.reason : null;
       const assetsError = assetsOutcome.status === "rejected" ? assetsOutcome.reason : null;
 
@@ -316,11 +340,23 @@ export function useScriptActions(
       // 两链都完成才复位：scripting 覆盖整个提取期，同时是步骤 1 「AI 提取」与「下一步」的门禁信号
       useProjectStore.getState().setProjectStatusById(targetProjectId, "idle");
 
-      // 后台生成链路仍按原顺序执行：先风格参考图，再生成角色/场景/产品图。
-      void (async () => {
-        await generateStyleReference(targetProjectId);
-        await generateAssetImages(undefined, targetProjectId);
-      })();
+      // 生图时机（2026-10-07）：
+      // - 全自动：提取完立刻在后台烧生图，保持原有零干预节奏。
+      // - 半自动：**等用户校对完资产再生成** —— 资产设定是生图提示词的唯一来源，
+      //   用户改完物种/外观后立刻出图会白烧一轮配额（免费档生图按 size tier 计费）。
+      //   用户可在步骤 2 用「补全缺失」按钮随时手动触发，不依赖自动。
+      const latest = useProjectStore.getState().projects.find((p) => p.id === targetProjectId);
+      const autoGenerate = (latest?.automationMode ?? "semi-auto") === "auto";
+      if (autoGenerate) {
+        void (async () => {
+          await generateStyleReference(targetProjectId);
+          await generateAssetImages(undefined, targetProjectId);
+        })();
+      } else {
+        logger.info("llm", "logmsg.assetImagesDeferred", {
+          reason: "semi-auto: waiting for assetsReviewed",
+        });
+      }
       trace.finish();
       return true;
     } catch (err) {
@@ -374,6 +410,7 @@ export function useScriptActions(
         language: project.language,
         aspectRatio: project.aspectRatio,
         assets: project.assets,
+        storyBrief: project.storyBrief,
       });
       // 用户若在大纲请求期间停止，保留原有资产与镜头，不再创建占位或发起逐镜请求。
       if (batchController.signal.aborted) {
@@ -413,59 +450,74 @@ export function useScriptActions(
       }));
       useProjectStore.getState().setShotsByProjectId(targetProjectId, placeholderShots);
 
-      // 阶段 2：按序逐镜头生成。相邻镜头必须看到上一镜的实际产出，
-      // 因此这里刻意不并发（storyboard.shot-craft 的「承接上一镜」在并发下无法执行）。
+      // 阶段 2：滑动窗口并发（2026-10-07 由全串行改来）。
+      // 约束来自 storyboard.handoff-previous：相邻镜头必须看到上一镜的实际产出，
+      // 全并发下同批的镜头互相看不见、承接彻底失效。
+      // 解法：**按序分批**，批内并发（本批每镜都能看到本批之前所有已完成的镜），
+      // 批间串行（前一批全部写回后才发下一批）—— 承接语义完整保留，
+      // 耗时从 N × 单镜降到 ⌈N / 窗口⌉ × 单镜。
       // 单个镜头失败只标记该镜头并继续，不中断整批。
+      const CONCURRENCY = 3;
       let completed = 0;
-      for (let i = 0; i < outline.shots.length; i++) {
-        // 停止检查放在每镜发起前：进行中的一镜正常收尾，剩余镜头不再发请求
-        if (batchController.signal.aborted) break;
-        const item = outline.shots[i];
-        const shot = placeholderShots[i];
-        // 每次重新读 store：上一镜刚写回的内容必须在本次请求里可见
-        const latestProject = useProjectStore.getState().projects.find((p) => p.id === targetProjectId);
-        const prev = i > 0 ? latestProject?.shots[i - 1] : undefined;
+      const reportProgress = () => {
+        completed += 1;
         try {
-          const raw = await generateStoryboardShot({
-            apiKey: providerConfig.apiKey,
-            baseUrl: providerConfig.baseUrl,
-            prompt,
-            language: project.language,
-            aspectRatio: project.aspectRatio,
-            assets: assetsForShots,
-            outline: outlineJson,
-            item,
-            index: i,
-            total: placeholderShots.length,
-            previousShot: prev
-              ? {
-                  scriptText: prev.scriptText,
-                  visualPrompt: prev.visualPrompt,
-                  shotSize: prev.shotSize,
-                }
-              : undefined,
-          });
-          // 名字/引用 → 资产 ID 解析（用最新 assets，含大纲补建的新资产）。
-          // 引用未命中只降级为空，不得阻断已成功生成的镜头内容写回。
-          const latestAssets = useProjectStore.getState().projects.find((p) => p.id === targetProjectId)?.assets ?? [];
-          useProjectStore.getState().updateShotByProjectId(targetProjectId, shot.id, {
-            ...buildShotUpdate(raw, latestAssets),
-            status: "scripted" as const,
-          });
-        } catch (err) {
-          useProjectStore.getState().updateShotByProjectId(targetProjectId, shot.id, {
-            status: "failed",
-            error: err instanceof Error ? err.message : String(err),
-          });
-        } finally {
-          // 进度回调异常绝不允许污染镜头结果（会连带整批分镜失败）
-          completed += 1;
-          try {
-            options?.onProgress?.(completed, placeholderShots.length);
-          } catch {
-            // 进度回调仅用于界面提示，忽略其异常
-          }
+          options?.onProgress?.(completed, placeholderShots.length);
+        } catch {
+          // 进度回调仅用于界面提示，忽略其异常
         }
+      };
+
+      for (let start = 0; start < outline.shots.length; start += CONCURRENCY) {
+        // 停止检查放在每批发起前：进行中的镜头正常收尾，剩余镜头不再发请求
+        if (batchController.signal.aborted) break;
+        const batch = outline.shots.slice(start, start + CONCURRENCY);
+        await Promise.all(
+          batch.map(async (item, offset) => {
+            const i = start + offset;
+            const shot = placeholderShots[i];
+            // 每次重新读 store：本批之前已写回的镜头内容必须在本次请求里可见
+            const latestProject = useProjectStore.getState().projects.find((p) => p.id === targetProjectId);
+            const prev = i > 0 ? latestProject?.shots[i - 1] : undefined;
+            try {
+              const raw = await generateStoryboardShot({
+                apiKey: providerConfig.apiKey,
+                baseUrl: providerConfig.baseUrl,
+                prompt,
+                language: project.language,
+                aspectRatio: project.aspectRatio,
+                assets: assetsForShots,
+                storyBrief: project.storyBrief,
+                outline: outlineJson,
+                item,
+                index: i,
+                total: placeholderShots.length,
+                previousShot: prev
+                  ? {
+                      scriptText: prev.scriptText,
+                      visualPrompt: prev.visualPrompt,
+                      shotSize: prev.shotSize,
+                    }
+                  : undefined,
+              });
+              // 名字/引用 → 资产 ID 解析（用最新 assets，含大纲补建的新资产）。
+              // 引用未命中只降级为空，不得阻断已成功生成的镜头内容写回。
+              const latestAssets = useProjectStore.getState().projects.find((p) => p.id === targetProjectId)?.assets ?? [];
+              useProjectStore.getState().updateShotByProjectId(targetProjectId, shot.id, {
+                ...buildShotUpdate(raw, latestAssets),
+                status: "scripted" as const,
+              });
+            } catch (err) {
+              useProjectStore.getState().updateShotByProjectId(targetProjectId, shot.id, {
+                status: "failed",
+                error: err instanceof Error ? err.message : String(err),
+              });
+            } finally {
+              // 进度回调异常绝不允许污染镜头结果（会连带整批分镜失败）
+              reportProgress();
+            }
+          }),
+        );
       }
 
       // 被用户停止：剩余从未发起的占位镜头复位为 idle（否则永久停在"生成中"），

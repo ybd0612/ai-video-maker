@@ -4,7 +4,7 @@
 // Unified prompt — no mode branching. AI auto-detects characters in content.
 // ────────────────────────────────────────────────────────────────────────────
 
-import type { Shot, Asset, AssetDetails } from "@/stores/projectStore";
+import type { Shot, Asset, AssetDetails, StoryBrief } from "@/stores/projectStore";
 import { createAIService } from "@/services/ai/factory";
 import {
   buildSystemPrompt as buildTaskSystemPrompt,
@@ -29,6 +29,8 @@ interface GenerateScriptOptions {
   aspectRatio: string;
   /** 项目统一资产（角色/场景/产品），用于构建一致性提示词 */
   assets?: Asset[];
+  /** 故事骨架（第一步产物）；缺省时下游从 prompt 直接规划 */
+  storyBrief?: StoryBrief;
 }
 
 export interface RawShot {
@@ -127,6 +129,39 @@ export interface GenerateScriptResult {
 
 const MAX_SCRIPT_RETRIES = 2;
 
+
+/**
+ * 故事骨架上下文段（2026-10-07）：把第一步产出的故事层规划喂给分镜阶段。
+ * 缺省（旧项目 / 未提取）返回空串，大纲照旧直接从想法原文规划 —— 行为与改造前一致。
+ */
+function buildStoryBriefContext(language: "zh" | "en", brief?: StoryBrief): string {
+  if (!brief) return "";
+  const hasContent = [brief.logline, brief.theme, brief.beats, brief.emotionArc, brief.durationPlan]
+    .some((v) => v.trim());
+  if (!hasContent) return "";
+  if (language === "en") {
+    return [
+      "\nConfirmed story brief (the story layer — follow it; it outranks re-inventing the plot):",
+      `- Logline: ${brief.logline}`,
+      `- Theme: ${brief.theme}`,
+      `- Emotion arc: ${brief.emotionArc}`,
+      `- Audience: ${brief.audience}`,
+      `- Duration plan: ${brief.durationPlan}`,
+      `- Key beats: ${brief.beats}`,
+      `- Cross-shot consistency (must hold in every shot): ${brief.consistencyNotes}`,
+    ].join("\n");
+  }
+  return [
+    "\n已确认的故事骨架（故事层 SSOT —— 必须据此排镜，不得另编一套剧情）：",
+    `- 一句话梗概：${brief.logline}`,
+    `- 核心主题：${brief.theme}`,
+    `- 情绪曲线：${brief.emotionArc}`,
+    `- 目标受众：${brief.audience}`,
+    `- 时长规划：${brief.durationPlan}`,
+    `- 关键节拍：${brief.beats}`,
+    `- 跨镜头一致性（每个镜头都必须满足）：${brief.consistencyNotes}`,
+  ].join("\n");
+}
 
 /** 资产上下文段（动态数据：已有角色/场景/产品列表，供模型复用 ID 与保持一致性） */
 function buildAssetsContext(language: "zh" | "en", assets?: Asset[]): string {
@@ -308,10 +343,15 @@ export async function generateStoryboardOutline(
     ].join("\n"),
   });
 
+  const briefContext = buildStoryBriefContext(opts.language, opts.storyBrief);
   const result = await service.chatCompletion({
     messages: [
       { role: "system", content: systemPrompt },
-      { role: "user", content: opts.prompt },
+      {
+        role: "user",
+        // 无骨架（旧项目 / 未提取）时逐字只发想法原文，行为与改造前完全一致
+        content: briefContext ? `${briefContext}\n${opts.prompt}` : opts.prompt,
+      },
     ],
     temperature: params.temperature,
     ...(params.topP === undefined ? {} : { topP: params.topP }),
@@ -445,6 +485,7 @@ export async function generateStoryboardShot(
   });
 
   const userContent = [
+    buildStoryBriefContext(opts.language, opts.storyBrief),
     `Storyboard outline (for continuity, do not repeat other shots):\n${opts.outline}`,
     `Now write ONLY shot ${opts.index + 1}/${opts.total}:`,
     `Title: ${opts.item.title}`,
@@ -928,6 +969,84 @@ export async function extractVisualDirectionFromIdea(
   if (!direction)
     throw new Error(getTranslation("error.visualDirectionParseFailed"));
   return direction;
+}
+
+/** 故事骨架提取结果：模型输出格式（revision 由编排层写入 store）。 */
+export interface RawStoryBrief {
+  logline: string;
+  theme: string;
+  emotionArc: string;
+  audience: string;
+  durationPlan: string;
+  beats: string;
+  consistencyNotes: string;
+}
+
+/**
+ * 故事骨架提取（步骤 1，第三链）：把想法读成主题/情绪/节奏/一致性四类规划。
+ *
+ * 与视觉方向、资产提取并列的第三条产出链。存在的理由：此前第一步只产出
+ * 「画风」与「长什么样」，用户想法里的主题与节奏没有任何容器承载，
+ * 下游分镜只能拿着资产清单 + 散文重新猜一遍剧情。
+ */
+export async function extractStoryBriefFromIdea(
+  opts: GenerateScriptOptions,
+): Promise<RawStoryBrief> {
+  const service = createAIService({
+    provider: "openai",
+    apiKey: opts.apiKey,
+    baseUrl: opts.baseUrl,
+  });
+  const params = await resolveGenerationParams({
+    purpose: "storyBrief",
+    apiKey: opts.apiKey,
+    baseUrl: opts.baseUrl,
+    context: [
+      "Task: read a story idea into a narrative skeleton (logline, theme, emotion arc, audience, duration plan, key beats, cross-shot consistency constraints). This is the story layer; visual style is decided elsewhere.",
+      `Language: ${opts.language}`,
+      `Aspect ratio: ${opts.aspectRatio}`,
+    ].join("\n"),
+  });
+  const result = await service.chatCompletion({
+    messages: [
+      {
+        role: "system",
+        content: buildTaskSystemPrompt("storyBrief", opts.language, getActiveRules()),
+      },
+      { role: "user", content: opts.prompt },
+    ],
+    temperature: params.temperature,
+    ...(params.topP === undefined ? {} : { topP: params.topP }),
+    enableThinking: params.enableThinking,
+  });
+
+  const brief = parseStoryBrief(result.content);
+  if (!brief) throw new Error(getTranslation("error.storyBriefParseFailed"));
+  return brief;
+}
+
+/**
+ * 故事骨架 JSON 解析：逐字段取非空字符串，缺字段以空串补齐（details 同款策略）。
+ * 解析不出任何字段即视为失败，交由编排层保留旧值而非写入半截骨架。
+ */
+export function parseStoryBrief(content: string): RawStoryBrief | null {
+  const parsed = parseJsonFromResponse<Record<string, unknown>>(content);
+  if (!parsed) return null;
+  const pick = (key: keyof RawStoryBrief): string => {
+    const value = parsed[key];
+    return typeof value === "string" ? value.trim() : "";
+  };
+  const brief: RawStoryBrief = {
+    logline: pick("logline"),
+    theme: pick("theme"),
+    emotionArc: pick("emotionArc"),
+    audience: pick("audience"),
+    durationPlan: pick("durationPlan"),
+    beats: pick("beats"),
+    consistencyNotes: pick("consistencyNotes"),
+  };
+  // 全空 = 模型没给可用内容；返回 null 让调用方保留既有值
+  return Object.values(brief).some(Boolean) ? brief : null;
 }
 
 export type ExtractableAssetType = "character" | "scene" | "product" | "prop" | "style";
