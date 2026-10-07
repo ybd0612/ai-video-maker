@@ -6,7 +6,7 @@
 // ────────────────────────────────────────────────────────────────────────────
 
 import { describe, expect, it } from "vitest";
-import type { Project, Shot } from "@/stores/projectStore";
+import type { Asset, Project, Shot } from "@/stores/projectStore";
 import { evaluateWizardAdvance } from "@/lib/wizardGating";
 
 function makeShot(overrides: Partial<Shot> = {}): Shot {
@@ -27,6 +27,17 @@ function makeShot(overrides: Partial<Shot> = {}): Shot {
     useDualFrame: false,
     ...overrides,
   };
+}
+
+function makeAsset(overrides: Partial<Asset> = {}): Asset {
+  return {
+    id: `asset_${Math.random().toString(36).slice(2)}`,
+    type: "character",
+    name: "主角",
+    description: "设定",
+    prompt: "p",
+    ...overrides,
+  } as Asset;
 }
 
 function makeProject(overrides: Partial<Project> = {}): Project {
@@ -103,6 +114,98 @@ describe("evaluateWizardAdvance · 放行与其它门禁", () => {
     );
     expect(r.canAdvance).toBe(false);
     expect(r.reasonKey).toBe("wizard.block.assetsNotReviewed");
+  });
+
+  // 资产图延后到「确认」后才生成（2026-10-07 两步流程）：没生图就放行等于把
+  // 未验证的空设定喂给分镜，用户也无从确认图的正确性。
+  describe("步骤 2：半自动的参考图门禁", () => {
+    const withImages = (extra: Partial<Project> = {}) =>
+      makeProject({
+        automationMode: "semi-auto",
+        styleReferenceUrl: "https://img.test/style.png",
+        assets: [makeAsset({ imageUrl: "https://img.test/a.png" })],
+        ...extra,
+      });
+
+    it("有待出图资产但无任何图 → assetsImagesPending", () => {
+      const r = evaluateWizardAdvance(
+        makeProject({
+          automationMode: "semi-auto",
+          styleReferenceUrl: undefined,
+          assets: [makeAsset({ imageUrl: undefined })],
+        }),
+        2,
+      );
+      expect(r.canAdvance).toBe(false);
+      expect(r.reasonKey).toBe("wizard.block.assetsImagesPending");
+    });
+
+    it("资产图齐但缺风格图 → 仍阻挡（风格是全片一致性的母版）", () => {
+      const r = evaluateWizardAdvance(
+        makeProject({
+          automationMode: "semi-auto",
+          styleReferenceUrl: undefined,
+          assets: [makeAsset({ imageUrl: "https://img.test/a.png" })],
+        }),
+        2,
+      );
+      expect(r.canAdvance).toBe(false);
+      expect(r.reasonKey).toBe("wizard.block.assetsImagesPending");
+    });
+
+    it("有风格图但资产缺图 → assetsImagesPending", () => {
+      const r = evaluateWizardAdvance(
+        makeProject({
+          automationMode: "semi-auto",
+          styleReferenceUrl: "https://img.test/style.png",
+          assets: [makeAsset({ imageUrl: undefined })],
+        }),
+        2,
+      );
+      expect(r.canAdvance).toBe(false);
+      expect(r.reasonKey).toBe("wizard.block.assetsImagesPending");
+    });
+
+    it("style 类型资产无图不算缺（风格图由 styleReferenceUrl 判定）", () => {
+      const r = evaluateWizardAdvance(withImages({ assets: [makeAsset({ type: "style", imageUrl: undefined })] }), 2);
+      expect(r.canAdvance).toBe(true);
+    });
+
+    it("图齐 → 放行", () => {
+      expect(evaluateWizardAdvance(withImages(), 2).canAdvance).toBe(true);
+    });
+
+    it("全自动不受此门禁约束", () => {
+      const r = evaluateWizardAdvance(
+        makeProject({
+          automationMode: "auto",
+          styleReferenceUrl: undefined,
+          assets: [makeAsset({ imageUrl: undefined })],
+        }),
+        2,
+      );
+      expect(r.canAdvance).toBe(true);
+    });
+
+    it("已有分镜的旧项目不回溯（shots 非空即视为图已验证）", () => {
+      const r = evaluateWizardAdvance(
+        makeProject({
+          automationMode: "semi-auto",
+          styleReferenceUrl: undefined,
+          shots: [makeShot()],
+        }),
+        2,
+      );
+      expect(r.canAdvance).toBe(true);
+    });
+
+    it("零资产（无需出图）→ 放行", () => {
+      const r = evaluateWizardAdvance(
+        makeProject({ automationMode: "semi-auto", assets: [], styleReferenceUrl: undefined }),
+        2,
+      );
+      expect(r.canAdvance).toBe(true);
+    });
   });
 
   it("步骤 4：半自动图片齐全但未确认 → imagesNotReviewed", () => {

@@ -7,6 +7,7 @@
 
 import type { TranslationKey } from "@/i18n";
 import type { Project } from "@/stores/projectStore";
+import { getStyleReferenceUrl } from "@/lib/promptComposer";
 
 export interface AdvanceEvaluation {
   canAdvance: boolean;
@@ -43,9 +44,24 @@ export function evaluateWizardAdvance(
       if (project.status === "scripting") return blocked("wizard.block.extracting");
       return OK;
 
-    case 2:
+    case 2: {
       if (semiAuto && project.assetsReviewed !== true) return blocked("wizard.block.assetsNotReviewed");
+      // 半自动下资产图延后到「确认」后才生成（2026-10-07 改为两步流程）：
+      // 无图直接放行等于把空设定喂给分镜，此时用户也无从确认图的正确性。
+      // 已进入或已生成分镜的旧项目不受此限（shots 非空即说明图已验证过）。
+      if (semiAuto && (project.shots ?? []).length === 0) {
+        const drawable = (project.assets ?? []).filter((a) => a.type !== "style");
+        // 只有真有待出图的资产时才要求参考图：零资产（纯文字分镜）或全为
+        // 手动资产时，「必须先生成图再进分镜」是凭空多加的一道门槛。
+        if (drawable.length > 0) {
+          const missingAssetImage = drawable.some((a) => !a.imageUrl && !a.avatarUrl);
+          if (missingAssetImage || !getStyleReferenceUrl(project)) {
+            return blocked("wizard.block.assetsImagesPending");
+          }
+        }
+      }
       return OK;
+    }
 
     case 3: {
       if (shots.length === 0) return blocked("wizard.block.noShots");

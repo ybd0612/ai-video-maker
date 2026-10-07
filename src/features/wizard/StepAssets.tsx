@@ -52,6 +52,8 @@ export function StepAssets() {
   // 「进入分镜」过程态：在本页等待分镜首个镜头就绪后再切到步骤 3，
   // 与「想法 → 资产」同构（不在生成前切页，避免用户进去先看一屏转圈）。
   const [enteringStoryboard, setEnteringStoryboard] = useState(false);
+  /** 「确认后先生成参考图、留在本页」的过程态（半自动延后生图的两步流程） */
+  const [generatingAssetsAfterReview, setGeneratingAssetsAfterReview] = useState(false);
   const [storyboardError, setStoryboardError] = useState<string | null>(null);
   const stopStoryboardRequestedRef = useRef(false);
 
@@ -67,7 +69,12 @@ export function StepAssets() {
   // 统一禁用所有生成按钮 —— 批量与单项可能重复提交同一资产（双倍配额消耗），
   // 且共用集中式限流器，逐个排队不如明确禁用直观。全部请求返回后恢复。
   const anyGenerating =
-    project?.assetGenerationStarted === true || generatingStyle || generatingScenes.size > 0 || generatingProducts.size > 0 || generatingProps.size > 0;
+    project?.assetGenerationStarted === true ||
+    generatingStyle ||
+    generatingAssetsAfterReview ||
+    generatingScenes.size > 0 ||
+    generatingProducts.size > 0 ||
+    generatingProps.size > 0;
 
   const assets = project?.assets ?? [];
   const characters = assets.filter((a) => a.type === "character");
@@ -133,14 +140,33 @@ export function StepAssets() {
     }
   };
 
-  /** 审核卡点确认：置审核标记后进入分镜（生成与切页统一由 enterStoryboard 处理） */
+  /**
+   * 审核卡点确认（2026-10-07 由一步改为两步，修复「图看不见」）。
+   *
+   * 原实现：置标记 → void 生图（不等待）→ 立刻进分镜。半自动延后生图的初衷
+   * （校对完再出图、避免白烧配额）被完全架空 —— 图在后台生成，用户已经切到
+   * 分镜页，永远看不到自己刚确认的东西。
+   *
+   * 现在：缺图时这一步只生图并**留在资产页**，让用户真正看到图；
+   * 图已齐时（或零资产）才直接进分镜。用户看完图再点一次即可。
+   */
   const handleConfirmAssets = async () => {
     const targetProjectId = project?.id;
     if (!targetProjectId) return;
+
+    // 缺图：置审核标记 + 生成参考图，停在资产页等用户查看
+    if (hasMissingAssets) {
+      useProjectStore.getState().updateProjectById(targetProjectId, (p) => ({ ...p, assetsReviewed: true }));
+      setGeneratingAssetsAfterReview(true);
+      try {
+        await handleFillMissing();
+      } finally {
+        if (mountedRef.current) setGeneratingAssetsAfterReview(false);
+      }
+      return;
+    }
+
     useProjectStore.getState().updateProjectById(targetProjectId, (p) => ({ ...p, assetsReviewed: true }));
-    // 半自动下资产图是延后到确认时才生成的（见 useScriptActions.extractCharactersFromIdea）：
-    // 用户校对完设定才出图，避免按修改前的提示词白烧一轮配额。缺图才补，已有图不动。
-    if (hasMissingAssets) void handleFillMissing();
     await enterStoryboard();
   };
 
@@ -518,11 +544,11 @@ export function StepAssets() {
       <ReviewCheckpoint
         mode={project?.automationMode ?? "semi-auto"}
         titleKey="review.assetsQualityCheck"
-        hintKey="review.assetsHint"
-        confirmLabelKey="review.confirmAssets"
+        hintKey={hasMissingAssets ? "review.assetsHintPendingImages" : "review.assetsHint"}
+        confirmLabelKey={hasMissingAssets ? "review.confirmAssetsAndGenerate" : "review.confirmAssets"}
         confirmDisabled={anyGenerating || enteringStoryboard}
-        confirmPending={enteringStoryboard}
-        confirmPendingLabelKey="wizard.storyboardPreparing"
+        confirmPending={generatingAssetsAfterReview || enteringStoryboard}
+        confirmPendingLabelKey={generatingAssetsAfterReview ? "wizard.generatingAssetImages" : "wizard.storyboardPreparing"}
         onConfirm={() => void handleConfirmAssets()}
         footer={<>
           {scriptBatchRunning && project?.id && (
@@ -536,6 +562,9 @@ export function StepAssets() {
             >
               {t("wizard.stopBatch")}
             </button>
+          )}
+          {generatingAssetsAfterReview && (
+            <p className="mt-2 text-[0.625rem] text-ink-5">{t("wizard.generatingAssetImagesHint")}</p>
           )}
           {enteringStoryboard && (
             <p className="mt-2 text-[0.625rem] text-ink-5">{t("wizard.storyboardEnterHint")}</p>
